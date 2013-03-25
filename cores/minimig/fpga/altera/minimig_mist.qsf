@@ -1,0 +1,486 @@
+# Copyright (C) 1991-2007 Altera Corporation
+# Your use of Altera Corporation's design tools, logic functions 
+# and other software and tools, and its AMPP partner logic 
+# functions, and any output files from any of the foregoing 
+# (including device programming or simulation files), and any 
+# associated documentation or information are expressly subject 
+# to the terms and conditions of the Altera Program License 
+# Subscription Agreement, Altera MegaCore Function License 
+# Agreement, or other applicable license agreement, including, 
+# without limitation, that your use is for the sole purpose of 
+# programming logic devices manufactured by Altera and sold by 
+# Altera or its authorized distributors.  Please refer to the 
+# applicable agreement for further details.
+
+
+# The default values for assignments are stored in the file
+#		minimig_de1_assignment_defaults.qdf
+# If this file doesn't exist, and for assignments not listed, see file
+#		assignment_defaults.qdf
+
+# Altera recommends that you do not modify this file. This
+# file is updated automatically by the Quartus II software
+# and any changes you make may be lost or overwritten.
+
+
+set_global_assignment -name FAMILY "Cyclone III"
+set_global_assignment -name DEVICE EP3C25E144C8
+set_global_assignment -name TOP_LEVEL_ENTITY minimig_mist_top
+set_global_assignment -name ORIGINAL_QUARTUS_VERSION 7.2
+set_global_assignment -name PROJECT_CREATION_TIME_DATE "22:27:29  OCTOBER 30, 2007"
+set_global_assignment -name LAST_QUARTUS_VERSION "12.0 SP1"
+set_global_assignment -name USE_GENERATED_PHYSICAL_CONSTRAINTS OFF -section_id eda_palace
+set_global_assignment -name DEVICE_FILTER_PIN_COUNT 144
+set_global_assignment -name POWER_PRESET_COOLING_SOLUTION "NO HEAT SINK WITH STILL AIR"
+set_global_assignment -name POWER_BOARD_THERMAL_MODEL "NONE (CONSERVATIVE)"
+set_global_assignment -name OPTIMIZE_HOLD_TIMING "IO PATHS AND MINIMUM TPD PATHS"
+set_global_assignment -name FITTER_EFFORT "AUTO FIT"
+set_global_assignment -name STRATIX_CONFIGURATION_DEVICE EPCS4
+set_global_assignment -name CYCLONEII_RESERVE_NCEO_AFTER_CONFIGURATION "USE AS REGULAR IO"
+set_global_assignment -name RESERVE_ASDO_AFTER_CONFIGURATION "AS INPUT TRI-STATED"
+set_global_assignment -name CYCLONEIII_CONFIGURATION_SCHEME "PASSIVE SERIAL"
+set_global_assignment -name GENERATE_RBF_FILE ON
+set_global_assignment -name FORCE_CONFIGURATION_VCCIO ON
+set_global_assignment -name STRATIX_DEVICE_IO_STANDARD "3.3-V LVTTL"
+
+set_location_assignment PIN_7 -to LED
+set_location_assignment PIN_22 -to CLOCK_50[0]
+set_location_assignment PIN_23 -to CLOCK_50[1]
+set_location_assignment PIN_128 -to CLOCK_32[0]
+set_location_assignment PIN_129 -to CLOCK_32[1]
+set_location_assignment PIN_54 -to CLOCK_27[0]
+set_location_assignment PIN_55 -to CLOCK_27[1]
+set_location_assignment PIN_144 -to VGA_R[5]
+set_location_assignment PIN_143 -to VGA_R[4]
+set_location_assignment PIN_142 -to VGA_R[3]
+set_location_assignment PIN_141 -to VGA_R[2]
+set_location_assignment PIN_137 -to VGA_R[1]
+set_location_assignment PIN_135 -to VGA_R[0]
+set_location_assignment PIN_133 -to VGA_B[5]
+set_location_assignment PIN_132 -to VGA_B[4]
+set_location_assignment PIN_125 -to VGA_B[3]
+set_location_assignment PIN_121 -to VGA_B[2]
+set_location_assignment PIN_120 -to VGA_B[1]
+set_location_assignment PIN_115 -to VGA_B[0]
+set_location_assignment PIN_114 -to VGA_G[5]
+set_location_assignment PIN_113 -to VGA_G[4]
+set_location_assignment PIN_112 -to VGA_G[3]
+set_location_assignment PIN_111 -to VGA_G[2]
+set_location_assignment PIN_110 -to VGA_G[1]
+set_location_assignment PIN_106 -to VGA_G[0]
+set_location_assignment PIN_136 -to VGA_VS
+set_location_assignment PIN_119 -to VGA_HS
+set_location_assignment PIN_65 -to AUDIO_L
+set_location_assignment PIN_80 -to AUDIO_R
+set_location_assignment PIN_46 -to UART_TX
+set_location_assignment PIN_31 -to UART_RX
+set_location_assignment PIN_105 -to SPI_DO
+set_location_assignment PIN_88 -to SPI_DI
+set_location_assignment PIN_126 -to SPI_SCK
+set_location_assignment PIN_127 -to SPI_SS2
+set_location_assignment PIN_91 -to SPI_SS3
+set_location_assignment PIN_90 -to SPI_SS4
+set_location_assignment PIN_13 -to CONF_DATA0
+
+set_location_assignment PIN_49 -to SDRAM_A[0]
+set_location_assignment PIN_44 -to SDRAM_A[1]
+set_location_assignment PIN_42 -to SDRAM_A[2]
+set_location_assignment PIN_39 -to SDRAM_A[3]
+set_location_assignment PIN_4 -to SDRAM_A[4]
+set_location_assignment PIN_6 -to SDRAM_A[5]
+set_location_assignment PIN_8 -to SDRAM_A[6]
+set_location_assignment PIN_10 -to SDRAM_A[7]
+set_location_assignment PIN_11 -to SDRAM_A[8]
+set_location_assignment PIN_28 -to SDRAM_A[9]
+set_location_assignment PIN_50 -to SDRAM_A[10]
+set_location_assignment PIN_30 -to SDRAM_A[11]
+set_location_assignment PIN_32 -to SDRAM_A[12]
+set_location_assignment PIN_83 -to SDRAM_DQ[0]
+set_location_assignment PIN_79 -to SDRAM_DQ[1]
+set_location_assignment PIN_77 -to SDRAM_DQ[2]
+set_location_assignment PIN_76 -to SDRAM_DQ[3]
+set_location_assignment PIN_72 -to SDRAM_DQ[4]
+set_location_assignment PIN_71 -to SDRAM_DQ[5]
+set_location_assignment PIN_69 -to SDRAM_DQ[6]
+set_location_assignment PIN_68 -to SDRAM_DQ[7]
+set_location_assignment PIN_86 -to SDRAM_DQ[8]
+set_location_assignment PIN_87 -to SDRAM_DQ[9]
+set_location_assignment PIN_98 -to SDRAM_DQ[10]
+set_location_assignment PIN_99 -to SDRAM_DQ[11]
+set_location_assignment PIN_100 -to SDRAM_DQ[12]
+set_location_assignment PIN_101 -to SDRAM_DQ[13]
+set_location_assignment PIN_103 -to SDRAM_DQ[14]
+set_location_assignment PIN_104 -to SDRAM_DQ[15]
+set_location_assignment PIN_58 -to SDRAM_BA[0]
+set_location_assignment PIN_51 -to SDRAM_BA[1]
+set_location_assignment PIN_85 -to SDRAM_DQMH
+set_location_assignment PIN_67 -to SDRAM_DQML
+set_location_assignment PIN_60 -to SDRAM_nRAS
+set_location_assignment PIN_64 -to SDRAM_nCAS
+set_location_assignment PIN_66 -to SDRAM_nWE
+set_location_assignment PIN_59 -to SDRAM_nCS
+set_location_assignment PIN_33 -to SDRAM_CKE
+set_location_assignment PIN_43 -to SDRAM_CLK
+
+set_global_assignment -name CYCLONEII_OPTIMIZATION_TECHNIQUE BALANCED
+set_global_assignment -name SMART_RECOMPILE ON
+set_global_assignment -name ENABLE_SIGNALTAP ON
+set_global_assignment -name USE_SIGNALTAP_FILE ../../rtl/soc/stp1.stp
+set_global_assignment -name PHYSICAL_SYNTHESIS_COMBO_LOGIC OFF
+set_global_assignment -name PHYSICAL_SYNTHESIS_REGISTER_DUPLICATION OFF
+set_global_assignment -name PHYSICAL_SYNTHESIS_EFFORT NORMAL
+set_global_assignment -name FMAX_REQUIREMENT "114 MHz"
+set_global_assignment -name OPTIMIZE_MULTI_CORNER_TIMING OFF
+set_global_assignment -name MIN_CORE_JUNCTION_TEMP 0
+set_global_assignment -name MAX_CORE_JUNCTION_TEMP 85
+set_global_assignment -name USE_CONFIGURATION_DEVICE ON
+set_global_assignment -name TPD_REQUIREMENT "2 ns"
+set_global_assignment -name TSU_REQUIREMENT "2 ns"
+set_global_assignment -name TCO_REQUIREMENT "2 ns"
+set_global_assignment -name ALLOW_POWER_UP_DONT_CARE OFF
+set_global_assignment -name SYNTH_TIMING_DRIVEN_SYNTHESIS OFF
+set_global_assignment -name AUTO_RAM_TO_LCELL_CONVERSION OFF
+set_global_assignment -name AUTO_RAM_RECOGNITION ON
+set_global_assignment -name AUTO_ROM_RECOGNITION ON
+set_global_assignment -name PHYSICAL_SYNTHESIS_REGISTER_RETIMING OFF
+set_global_assignment -name LL_ROOT_REGION ON -section_id "Root Region"
+set_global_assignment -name LL_MEMBER_STATE LOCKED -section_id "Root Region"
+set_global_assignment -name PARTITION_NETLIST_TYPE SOURCE -section_id Top
+set_global_assignment -name PARTITION_COLOR 2147039 -section_id Top
+set_global_assignment -name MISC_FILE minimig_mist.dpf
+set_global_assignment -name PARTITION_FITTER_PRESERVATION_LEVEL PLACEMENT_AND_ROUTING -section_id Top
+
+set_global_assignment -name PHYSICAL_SYNTHESIS_ASYNCHRONOUS_SIGNAL_PIPELINING OFF
+set_global_assignment -name PHYSICAL_SYNTHESIS_COMBO_LOGIC_FOR_AREA OFF
+set_global_assignment -name PHYSICAL_SYNTHESIS_MAP_LOGIC_TO_MEMORY_FOR_AREA OFF
+
+set_global_assignment -name PROJECT_OUTPUT_DIRECTORY out
+set_global_assignment -name PLACEMENT_EFFORT_MULTIPLIER 4.0
+set_global_assignment -name ROUTER_EFFORT_MULTIPLIER 4.0
+set_global_assignment -name CYCLONEII_M4K_COMPATIBILITY OFF
+
+
+#set_parameter -name ENABLE_RUNTIME_MOD YES -to "Minimig1:minimig|amiga_boot:BOOTROM1|altsyncram:Ram0_rtl_10"
+#set_parameter -name INSTANCE_NAME mig -to "Minimig1:minimig|amiga_boot:BOOTROM1|altsyncram:Ram0_rtl_10"
+
+
+
+set_global_assignment -name CRC_ERROR_OPEN_DRAIN OFF
+set_global_assignment -name RESERVE_DATA0_AFTER_CONFIGURATION "USE AS REGULAR IO"
+set_global_assignment -name RESERVE_DATA1_AFTER_CONFIGURATION "USE AS REGULAR IO"
+set_global_assignment -name RESERVE_FLASH_NCE_AFTER_CONFIGURATION "USE AS REGULAR IO"
+set_global_assignment -name RESERVE_DCLK_AFTER_CONFIGURATION "USE AS REGULAR IO"
+set_global_assignment -name OUTPUT_IO_TIMING_NEAR_END_VMEAS "HALF VCCIO" -rise
+set_global_assignment -name OUTPUT_IO_TIMING_NEAR_END_VMEAS "HALF VCCIO" -fall
+set_global_assignment -name OUTPUT_IO_TIMING_FAR_END_VMEAS "HALF SIGNAL SWING" -rise
+set_global_assignment -name OUTPUT_IO_TIMING_FAR_END_VMEAS "HALF SIGNAL SWING" -fall
+set_instance_assignment -name GLOBAL_SIGNAL "GLOBAL CLOCK" -to "amigaclk:amigaclk|altpll:altpll_component|_clk0"
+set_instance_assignment -name GLOBAL_SIGNAL "GLOBAL CLOCK" -to "amigaclk:amigaclk|altpll:altpll_component|_clk1"
+set_instance_assignment -name GLOBAL_SIGNAL "GLOBAL CLOCK" -to "amigaclk:amigaclk|altpll:altpll_component|_clk2"
+set_instance_assignment -name GLOBAL_SIGNAL "GLOBAL CLOCK" -to SPI_SCK
+set_instance_assignment -name GLOBAL_SIGNAL "GLOBAL CLOCK" -to clk7_cnt[1]
+set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to SDRAM_DQ[0]
+set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to SDRAM_DQ[1]
+set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to SDRAM_DQ[2]
+set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to SDRAM_DQ[3]
+set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to SDRAM_DQ[4]
+set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to SDRAM_DQ[5]
+set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to SDRAM_DQ[6]
+set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to SDRAM_DQ[7]
+set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to SDRAM_DQ[8]
+set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to SDRAM_DQ[9]
+set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to SDRAM_DQ[10]
+set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to SDRAM_DQ[11]
+set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to SDRAM_DQ[12]
+set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to SDRAM_DQ[13]
+set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to SDRAM_DQ[14]
+set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to SDRAM_DQ[15]
+set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to SDRAM_A[0]
+set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to SDRAM_A[1]
+set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to SDRAM_A[2]
+set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to SDRAM_A[3]
+set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to SDRAM_A[4]
+set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to SDRAM_A[5]
+set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to SDRAM_A[6]
+set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to SDRAM_A[7]
+set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to SDRAM_A[8]
+set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to SDRAM_A[9]
+set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to SDRAM_A[10]
+set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to SDRAM_A[11]
+set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to SDRAM_A[12]
+set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to SDRAM_BA[0]
+set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to SDRAM_BA[1]
+set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to SDRAM_DQMH
+set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to SDRAM_DQML
+set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to SDRAM_nRAS
+set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to SDRAM_nCAS
+set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to SDRAM_nWE
+set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to SDRAM_nCS
+
+set_instance_assignment -name FAST_OUTPUT_ENABLE_REGISTER ON -to SDRAM_DQ[0]
+set_instance_assignment -name FAST_OUTPUT_ENABLE_REGISTER ON -to SDRAM_DQ[1]
+set_instance_assignment -name FAST_OUTPUT_ENABLE_REGISTER ON -to SDRAM_DQ[2]
+set_instance_assignment -name FAST_OUTPUT_ENABLE_REGISTER ON -to SDRAM_DQ[3]
+set_instance_assignment -name FAST_OUTPUT_ENABLE_REGISTER ON -to SDRAM_DQ[4]
+set_instance_assignment -name FAST_OUTPUT_ENABLE_REGISTER ON -to SDRAM_DQ[5]
+set_instance_assignment -name FAST_OUTPUT_ENABLE_REGISTER ON -to SDRAM_DQ[6]
+set_instance_assignment -name FAST_OUTPUT_ENABLE_REGISTER ON -to SDRAM_DQ[7]
+set_instance_assignment -name FAST_OUTPUT_ENABLE_REGISTER ON -to SDRAM_DQ[8]
+set_instance_assignment -name FAST_OUTPUT_ENABLE_REGISTER ON -to SDRAM_DQ[9]
+set_instance_assignment -name FAST_OUTPUT_ENABLE_REGISTER ON -to SDRAM_DQ[10]
+set_instance_assignment -name FAST_OUTPUT_ENABLE_REGISTER ON -to SDRAM_DQ[11]
+set_instance_assignment -name FAST_OUTPUT_ENABLE_REGISTER ON -to SDRAM_DQ[12]
+set_instance_assignment -name FAST_OUTPUT_ENABLE_REGISTER ON -to SDRAM_DQ[13]
+set_instance_assignment -name FAST_OUTPUT_ENABLE_REGISTER ON -to SDRAM_DQ[14]
+set_instance_assignment -name FAST_OUTPUT_ENABLE_REGISTER ON -to SDRAM_DQ[15]
+
+set_instance_assignment -name FAST_INPUT_REGISTER ON -to SDRAM_DQ[0]
+set_instance_assignment -name FAST_INPUT_REGISTER ON -to SDRAM_DQ[1]
+set_instance_assignment -name FAST_INPUT_REGISTER ON -to SDRAM_DQ[2]
+set_instance_assignment -name FAST_INPUT_REGISTER ON -to SDRAM_DQ[3]
+set_instance_assignment -name FAST_INPUT_REGISTER ON -to SDRAM_DQ[4]
+set_instance_assignment -name FAST_INPUT_REGISTER ON -to SDRAM_DQ[5]
+set_instance_assignment -name FAST_INPUT_REGISTER ON -to SDRAM_DQ[6]
+set_instance_assignment -name FAST_INPUT_REGISTER ON -to SDRAM_DQ[7]
+set_instance_assignment -name FAST_INPUT_REGISTER ON -to SDRAM_DQ[8]
+set_instance_assignment -name FAST_INPUT_REGISTER ON -to SDRAM_DQ[9]
+set_instance_assignment -name FAST_INPUT_REGISTER ON -to SDRAM_DQ[10]
+set_instance_assignment -name FAST_INPUT_REGISTER ON -to SDRAM_DQ[11]
+set_instance_assignment -name FAST_INPUT_REGISTER ON -to SDRAM_DQ[12]
+set_instance_assignment -name FAST_INPUT_REGISTER ON -to SDRAM_DQ[13]
+set_instance_assignment -name FAST_INPUT_REGISTER ON -to SDRAM_DQ[14]
+set_instance_assignment -name FAST_INPUT_REGISTER ON -to SDRAM_DQ[15]
+
+set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to SDRAM_A[0]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to SDRAM_A[1]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to SDRAM_A[2]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to SDRAM_A[3]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to SDRAM_A[4]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to SDRAM_A[5]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to SDRAM_A[6]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to SDRAM_A[7]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to SDRAM_A[8]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to SDRAM_A[9]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to SDRAM_A[10]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to SDRAM_A[11]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to SDRAM_A[12]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to SDRAM_DQ[0]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to SDRAM_DQ[1]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to SDRAM_DQ[2]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to SDRAM_DQ[3]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to SDRAM_DQ[4]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to SDRAM_DQ[5]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to SDRAM_DQ[6]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to SDRAM_DQ[7]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to SDRAM_DQ[8]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to SDRAM_DQ[9]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to SDRAM_DQ[10]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to SDRAM_DQ[11]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to SDRAM_DQ[12]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to SDRAM_DQ[13]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to SDRAM_DQ[14]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to SDRAM_DQ[15]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to SDRAM_BA[0]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to SDRAM_BA[1]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to SDRAM_DQML
+set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to SDRAM_DQMH
+set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to SDRAM_nRAS
+set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to SDRAM_nCAS
+set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to SDRAM_nWE
+set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to SDRAM_nCS
+set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to SDRAM_CKE
+set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to SDRAM_CLK
+
+set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to VGA_R[5]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to VGA_R[4]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to VGA_R[3]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to VGA_R[2]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to VGA_R[1]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to VGA_R[0]
+
+set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to VGA_G[5]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to VGA_G[4]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to VGA_G[3]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to VGA_G[2]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to VGA_G[1]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to VGA_G[0]
+
+set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to VGA_B[5]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to VGA_B[4]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to VGA_B[3]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to VGA_B[2]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to VGA_B[1]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to VGA_B[0]
+
+set_global_assignment -name QIP_FILE ../../rtl/cycloneiii/MyPLLReconfig.qip
+set_global_assignment -name QIP_FILE ../../rtl/cycloneiii/MyPLL.qip
+set_global_assignment -name VHDL_FILE ../../rtl/cycloneiii/PLLWrapper.vhd
+set_global_assignment -name VHDL_FILE ../../rtl/mist/sdram.vhd
+set_global_assignment -name VHDL_FILE ../../rtl/tg68k/TG68KdotC_Kernel.vhd
+set_global_assignment -name VHDL_FILE ../../rtl/tg68k/TG68K_Pack.vhd
+set_global_assignment -name VHDL_FILE ../../rtl/tg68k/TG68K_ALU.vhd
+set_global_assignment -name VHDL_FILE ../../rtl/tg68k/TG68K.vhd
+set_global_assignment -name VERILOG_FILE ../../rtl/soc/minimig_mist_top.v
+set_global_assignment -name VERILOG_FILE ../../rtl/soc/user_io.v
+set_global_assignment -name VERILOG_FILE ../../rtl/de1/amigaclk.v
+set_global_assignment -name VERILOG_FILE ../../lib/altera/i_sync.v
+set_global_assignment -name VERILOG_FILE ../../lib/altera/srl16e.v
+set_global_assignment -name VERILOG_FILE ../../rtl/minimig/Userio.v
+set_global_assignment -name VERILOG_FILE ../../rtl/minimig/Sprites.v
+set_global_assignment -name VERILOG_FILE ../../rtl/minimig/Paula.v
+set_global_assignment -name VERILOG_FILE ../../rtl/minimig/Minimig1.v
+set_global_assignment -name VERILOG_FILE ../../rtl/minimig/Gayle.v
+set_global_assignment -name VERILOG_FILE ../../rtl/minimig/Gary.v
+set_global_assignment -name VERILOG_FILE ../../rtl/minimig/Floppy.v
+set_global_assignment -name VERILOG_FILE ../../rtl/minimig/Denise.v
+set_global_assignment -name VERILOG_FILE ../../rtl/minimig/Copper.v
+set_global_assignment -name VERILOG_FILE ../../rtl/minimig/Clock.v
+set_global_assignment -name VERILOG_FILE ../../rtl/minimig/CIA8520.v
+set_global_assignment -name VERILOG_FILE ../../rtl/minimig/BootRom.v
+set_global_assignment -name VERILOG_FILE ../../rtl/minimig/Blitter.v
+set_global_assignment -name VERILOG_FILE ../../rtl/minimig/Bitplanes.v
+set_global_assignment -name VERILOG_FILE ../../rtl/minimig/Beamcounter.v
+set_global_assignment -name VERILOG_FILE ../../rtl/minimig/Audio.v
+set_global_assignment -name VERILOG_FILE ../../rtl/minimig/Amber.v
+set_global_assignment -name VERILOG_FILE ../../rtl/minimig/Agnus.v
+set_global_assignment -name VERILOG_FILE ../../rtl/minimig/ActionReplay3.v
+set_global_assignment -name QIP_FILE amiga_boot.qip
+set_global_assignment -name VERILOG_FILE ../../fw/amiga_boot/bin/amiga_boot.v
+set_global_assignment -name SIGNALTAP_FILE stp1.stp
+set_global_assignment -name SDC_FILE minimig_mist.sdc
+set_global_assignment -name QIP_FILE ../../rtl/cycloneiii/PLLROM_7MHz.qip
+set_global_assignment -name QIP_FILE ../../rtl/cycloneiii/PLLROM_8MHz.qip
+set_global_assignment -name SIGNALTAP_FILE ../../rtl/soc/stp1.stp
+set_global_assignment -name SLD_NODE_CREATOR_ID 110 -section_id auto_signaltap_0
+set_global_assignment -name SLD_NODE_ENTITY_NAME sld_signaltap -section_id auto_signaltap_0
+set_global_assignment -name SLD_NODE_PARAMETER_ASSIGNMENT "SLD_NODE_INFO=805334528" -section_id auto_signaltap_0
+set_global_assignment -name SLD_NODE_PARAMETER_ASSIGNMENT "SLD_POWER_UP_TRIGGER=0" -section_id auto_signaltap_0
+set_global_assignment -name SLD_NODE_PARAMETER_ASSIGNMENT "SLD_STORAGE_QUALIFIER_INVERSION_MASK_LENGTH=0" -section_id auto_signaltap_0
+set_global_assignment -name SLD_NODE_PARAMETER_ASSIGNMENT "SLD_SEGMENT_SIZE=1024" -section_id auto_signaltap_0
+set_global_assignment -name SLD_NODE_PARAMETER_ASSIGNMENT "SLD_ATTRIBUTE_MEM_MODE=OFF" -section_id auto_signaltap_0
+set_global_assignment -name SLD_NODE_PARAMETER_ASSIGNMENT "SLD_STATE_FLOW_USE_GENERATED=0" -section_id auto_signaltap_0
+set_global_assignment -name SLD_NODE_PARAMETER_ASSIGNMENT "SLD_STATE_BITS=11" -section_id auto_signaltap_0
+set_global_assignment -name SLD_NODE_PARAMETER_ASSIGNMENT "SLD_BUFFER_FULL_STOP=1" -section_id auto_signaltap_0
+set_global_assignment -name SLD_NODE_PARAMETER_ASSIGNMENT "SLD_CURRENT_RESOURCE_WIDTH=1" -section_id auto_signaltap_0
+set_global_assignment -name SLD_NODE_PARAMETER_ASSIGNMENT "SLD_TRIGGER_LEVEL=1" -section_id auto_signaltap_0
+set_global_assignment -name SLD_NODE_PARAMETER_ASSIGNMENT "SLD_SAMPLE_DEPTH=1024" -section_id auto_signaltap_0
+set_global_assignment -name SLD_NODE_PARAMETER_ASSIGNMENT "SLD_TRIGGER_IN_ENABLED=0" -section_id auto_signaltap_0
+set_global_assignment -name SLD_NODE_PARAMETER_ASSIGNMENT "SLD_ADVANCED_TRIGGER_ENTITY=basic,1," -section_id auto_signaltap_0
+set_global_assignment -name SLD_NODE_PARAMETER_ASSIGNMENT "SLD_TRIGGER_LEVEL_PIPELINE=1" -section_id auto_signaltap_0
+set_global_assignment -name SLD_NODE_PARAMETER_ASSIGNMENT "SLD_ENABLE_ADVANCED_TRIGGER=0" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_clk -to "PLLWrapper:amigaclk|c0" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_trigger_in[0] -to "Minimig1:minimig|clk" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_trigger_in[1] -to "PLLWrapper:amigaclk|MyPLL:mypll|areset" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_trigger_in[2] -to "PLLWrapper:amigaclk|areset" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_trigger_in[3] -to "PLLWrapper:amigaclk|c1" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_trigger_in[4] -to "PLLWrapper:amigaclk|c2" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_trigger_in[5] -to "PLLWrapper:amigaclk|eightmhz" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_trigger_in[6] -to "PLLWrapper:amigaclk|locked" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_trigger_in[7] -to "TG68K:tg68k|reset" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_trigger_in[8] -to clk7_cnt[0] -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_trigger_in[9] -to clk7_cnt[1] -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_trigger_in[10] -to "sdram:sdram|reset" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_data_in[0] -to "Minimig1:minimig|clk" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_data_in[1] -to "PLLWrapper:amigaclk|MyPLL:mypll|areset" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_data_in[2] -to "PLLWrapper:amigaclk|areset" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_data_in[3] -to "PLLWrapper:amigaclk|c1" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_data_in[4] -to "PLLWrapper:amigaclk|c2" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_data_in[5] -to "PLLWrapper:amigaclk|eightmhz" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_data_in[6] -to "PLLWrapper:amigaclk|locked" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_data_in[7] -to "TG68K:tg68k|reset" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_data_in[8] -to clk7_cnt[0] -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_data_in[9] -to clk7_cnt[1] -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_data_in[10] -to "sdram:sdram|reset" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_trigger_in[11] -to "user_io:user_io|BUTTONS[0]" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_trigger_in[12] -to "user_io:user_io|BUTTONS[1]" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_trigger_in[13] -to "user_io:user_io|CORE_TYPE[0]" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_trigger_in[14] -to "user_io:user_io|CORE_TYPE[1]" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_trigger_in[15] -to "user_io:user_io|CORE_TYPE[2]" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_trigger_in[16] -to "user_io:user_io|CORE_TYPE[3]" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_trigger_in[17] -to "user_io:user_io|CORE_TYPE[4]" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_trigger_in[18] -to "user_io:user_io|CORE_TYPE[5]" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_trigger_in[19] -to "user_io:user_io|CORE_TYPE[6]" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_trigger_in[20] -to "user_io:user_io|CORE_TYPE[7]" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_trigger_in[21] -to "user_io:user_io|JOY0[0]" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_trigger_in[22] -to "user_io:user_io|JOY0[1]" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_trigger_in[23] -to "user_io:user_io|JOY0[2]" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_trigger_in[24] -to "user_io:user_io|JOY0[3]" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_trigger_in[25] -to "user_io:user_io|JOY0[4]" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_trigger_in[26] -to "user_io:user_io|JOY0[5]" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_trigger_in[27] -to "user_io:user_io|JOY1[0]" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_trigger_in[28] -to "user_io:user_io|JOY1[1]" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_trigger_in[29] -to "user_io:user_io|JOY1[2]" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_trigger_in[30] -to "user_io:user_io|JOY1[3]" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_trigger_in[31] -to "user_io:user_io|JOY1[4]" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_trigger_in[32] -to "user_io:user_io|JOY1[5]" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_trigger_in[33] -to "user_io:user_io|KBD_MOUSE_DATA[0]" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_trigger_in[34] -to "user_io:user_io|KBD_MOUSE_DATA[1]" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_trigger_in[35] -to "user_io:user_io|KBD_MOUSE_DATA[2]" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_trigger_in[36] -to "user_io:user_io|KBD_MOUSE_DATA[3]" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_trigger_in[37] -to "user_io:user_io|KBD_MOUSE_DATA[4]" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_trigger_in[38] -to "user_io:user_io|KBD_MOUSE_DATA[5]" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_trigger_in[39] -to "user_io:user_io|KBD_MOUSE_DATA[6]" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_trigger_in[40] -to "user_io:user_io|KBD_MOUSE_DATA[7]" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_trigger_in[41] -to "user_io:user_io|MOUSE_BUTTONS[0]" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_trigger_in[42] -to "user_io:user_io|MOUSE_BUTTONS[1]" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_trigger_in[43] -to "user_io:user_io|MOUSE_BUTTONS[2]" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_trigger_in[44] -to "user_io:user_io|SPI_CLK" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_trigger_in[45] -to "user_io:user_io|SPI_MISO" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_trigger_in[46] -to "user_io:user_io|SPI_MOSI" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_trigger_in[47] -to "user_io:user_io|SPI_SS_IO" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_trigger_in[48] -to "user_io:user_io|SWITCHES[0]" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_trigger_in[49] -to "user_io:user_io|SWITCHES[1]" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_trigger_in[50] -to "user_io:user_io|but_sw[0]" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_trigger_in[51] -to "user_io:user_io|but_sw[1]" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_trigger_in[52] -to "user_io:user_io|but_sw[2]" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_trigger_in[53] -to "user_io:user_io|but_sw[3]" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_data_in[11] -to "user_io:user_io|BUTTONS[0]" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_data_in[12] -to "user_io:user_io|BUTTONS[1]" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_data_in[13] -to "user_io:user_io|CORE_TYPE[0]" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_data_in[14] -to "user_io:user_io|CORE_TYPE[1]" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_data_in[15] -to "user_io:user_io|CORE_TYPE[2]" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_data_in[16] -to "user_io:user_io|CORE_TYPE[3]" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_data_in[17] -to "user_io:user_io|CORE_TYPE[4]" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_data_in[18] -to "user_io:user_io|CORE_TYPE[5]" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_data_in[19] -to "user_io:user_io|CORE_TYPE[6]" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_data_in[20] -to "user_io:user_io|CORE_TYPE[7]" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_data_in[21] -to "user_io:user_io|JOY0[0]" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_data_in[22] -to "user_io:user_io|JOY0[1]" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_data_in[23] -to "user_io:user_io|JOY0[2]" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_data_in[24] -to "user_io:user_io|JOY0[3]" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_data_in[25] -to "user_io:user_io|JOY0[4]" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_data_in[26] -to "user_io:user_io|JOY0[5]" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_data_in[27] -to "user_io:user_io|JOY1[0]" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_data_in[28] -to "user_io:user_io|JOY1[1]" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_data_in[29] -to "user_io:user_io|JOY1[2]" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_data_in[30] -to "user_io:user_io|JOY1[3]" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_data_in[31] -to "user_io:user_io|JOY1[4]" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_data_in[32] -to "user_io:user_io|JOY1[5]" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_data_in[33] -to "user_io:user_io|KBD_MOUSE_DATA[0]" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_data_in[34] -to "user_io:user_io|KBD_MOUSE_DATA[1]" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_data_in[35] -to "user_io:user_io|KBD_MOUSE_DATA[2]" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_data_in[36] -to "user_io:user_io|KBD_MOUSE_DATA[3]" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_data_in[37] -to "user_io:user_io|KBD_MOUSE_DATA[4]" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_data_in[38] -to "user_io:user_io|KBD_MOUSE_DATA[5]" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_data_in[39] -to "user_io:user_io|KBD_MOUSE_DATA[6]" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_data_in[40] -to "user_io:user_io|KBD_MOUSE_DATA[7]" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_data_in[41] -to "user_io:user_io|MOUSE_BUTTONS[0]" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_data_in[42] -to "user_io:user_io|MOUSE_BUTTONS[1]" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_data_in[43] -to "user_io:user_io|MOUSE_BUTTONS[2]" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_data_in[44] -to "user_io:user_io|SPI_CLK" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_data_in[45] -to "user_io:user_io|SPI_MISO" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_data_in[46] -to "user_io:user_io|SPI_MOSI" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_data_in[47] -to "user_io:user_io|SPI_SS_IO" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_data_in[48] -to "user_io:user_io|SWITCHES[0]" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_data_in[49] -to "user_io:user_io|SWITCHES[1]" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_data_in[50] -to "user_io:user_io|but_sw[0]" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_data_in[51] -to "user_io:user_io|but_sw[1]" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_data_in[52] -to "user_io:user_io|but_sw[2]" -section_id auto_signaltap_0
+set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_data_in[53] -to "user_io:user_io|but_sw[3]" -section_id auto_signaltap_0
+set_global_assignment -name SLD_NODE_PARAMETER_ASSIGNMENT "SLD_DATA_BITS=54" -section_id auto_signaltap_0
+set_global_assignment -name SLD_NODE_PARAMETER_ASSIGNMENT "SLD_TRIGGER_BITS=54" -section_id auto_signaltap_0
+set_global_assignment -name SLD_NODE_PARAMETER_ASSIGNMENT "SLD_INVERSION_MASK=000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000" -section_id auto_signaltap_0
+set_global_assignment -name SLD_NODE_PARAMETER_ASSIGNMENT "SLD_INVERSION_MASK_LENGTH=186" -section_id auto_signaltap_0
+set_global_assignment -name SLD_NODE_PARAMETER_ASSIGNMENT "SLD_NODE_CRC_LOWORD=7485" -section_id auto_signaltap_0
+set_global_assignment -name SLD_NODE_PARAMETER_ASSIGNMENT "SLD_NODE_CRC_HIWORD=39905" -section_id auto_signaltap_0
+set_instance_assignment -name PARTITION_HIERARCHY root_partition -to | -section_id Top
