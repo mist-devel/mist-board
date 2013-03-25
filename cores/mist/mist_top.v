@@ -1,0 +1,711 @@
+/********************************************/
+/*                                          */
+/********************************************/
+
+
+module mist_top (
+  // clock inputs
+  input wire [ 2-1:0] 	CLOCK_32, // 32 MHz
+  input wire [ 2-1:0] 	CLOCK_27, // 27 MHz
+  input wire [ 2-1:0] 	CLOCK_50, // 50 MHz
+  // LED outputs
+  output wire 		LED, // LED Yellow
+  // UART
+  output wire 		UART_TX, // UART Transmitter
+  input wire 		UART_RX, // UART Receiver
+  // VGA
+  output wire 		VGA_HS, // VGA H_SYNC
+  output wire 		VGA_VS, // VGA V_SYNC
+  output wire [ 6-1:0] 	VGA_R, // VGA Red[5:0]
+  output wire [ 6-1:0] 	VGA_G, // VGA Green[5:0]
+  output wire [ 6-1:0] 	VGA_B, // VGA Blue[5:0]
+  // SDRAM
+  inout wire [ 16-1:0] 	SDRAM_DQ, // SDRAM Data bus 16 Bits
+  output wire [ 13-1:0] SDRAM_A, // SDRAM Address bus 13 Bits
+  output wire 		SDRAM_DQML, // SDRAM Low-byte Data Mask
+  output wire 		SDRAM_DQMH, // SDRAM High-byte Data Mask
+  output wire 		SDRAM_nWE, // SDRAM Write Enable
+  output wire 		SDRAM_nCAS, // SDRAM Column Address Strobe
+  output wire 		SDRAM_nRAS, // SDRAM Row Address Strobe
+  output wire 		SDRAM_nCS, // SDRAM Chip Select
+  output wire [ 2-1:0] 	SDRAM_BA, // SDRAM Bank Address
+  output wire 		SDRAM_CLK, // SDRAM Clock
+  output wire 		SDRAM_CKE, // SDRAM Clock Enable
+  // MINIMIG specific
+  output wire 		AUDIO_L, // sigma-delta DAC output left
+  output wire 		AUDIO_R, // sigma-delta DAC output right
+  // SPI
+  inout wire 		SPI_DO,  // inout
+  input wire 		SPI_DI,
+  input wire 		SPI_SCK,
+  input wire 		SPI_SS2,    // fpga
+  input wire 		SPI_SS3,    // OSD
+  input wire 		SPI_SS4,    // "sniff" mode
+  input wire 		CONF_DATA0  // SPI_SS for user_io
+);
+
+wire [15:0] video_data;
+wire video_read;
+wire [22:0] video_address;
+wire video_de, video_hs;
+
+// on-board io
+wire [1:0] buttons;
+
+// TODO: Clean this up as all dtacks are directly generated from their sel's
+wire io_dtack;
+assign io_dtack = 
+	vreg_sel?vreg_dtack:
+	(mmu_sel?mmu_dtack:
+	((mfp_sel||mfp_iack)?mfp_dtack:
+	(acia_sel?acia_dtack:
+	(psg_sel?psg_dtack:
+	(dma_sel?dma_dtack:
+	(auto_iack?auto_iack:
+	1'b0))))));
+
+// the original tg68k did not contain working support for bus fault exceptions. While earlier
+// TOS versions cope with that, TOS versions with blitter support need this to work as this is
+// required to properly detect that a blitter is not present.
+// a bus error is now generated once no dtack is seen for 63 clock cycles. The tg68k requires 
+// a dtack to be generated with the bus error to continue operation
+wire tg68_berr = (dtack_timeout == 6'd63); //  || cpu_write_illegal;
+
+wire cpu_write = cpu_cycle && cpu2io && data_strobe && !tg68_rw;
+
+// it's illegal to write to certain memory areas
+// TODO: Still the write itself would succeed. That must not happen
+wire cpu_write_illegal = cpu_write && 
+     (tg68_adr[23:3] === 21'd0);     // the first two long words $0 and $4
+
+reg [5:0] dtack_timeout;
+always @(posedge clk_8) begin
+	if(reset) begin
+		dtack_timeout <= 6'd0;
+	end else begin
+		if(!tg68_dtack)
+			dtack_timeout <= 6'd0;
+		else if(dtack_timeout != 6'd63)
+			dtack_timeout <= dtack_timeout + 6'd1;
+	end
+end
+		
+// request interrupt ack from mfp for IPL == 6
+wire mfp_iack;
+assign mfp_iack = cpu_cycle && cpu2iack && data_strobe && (tg68_adr[3:1] == 3'b110);
+
+// the tg68k core with the wrapper of the minimig doesn't support non-autovector
+// interrupts. Also the existing support for them inside the tg68 kernel is/was broken.
+// For the atari i've fixed the non-autovector support inside the kernel and switched
+// entirely to non-autovector interrupts. This means that i now have to provide
+// the vectors for those interrupts that oin the ST are autovector ones. This needs
+// to be done for IPL2 (hbi) and IPL4 (vbi)
+wire auto_iack;
+assign auto_iack = cpu_cycle && cpu2iack && data_strobe && 
+	((tg68_adr[3:1] == 3'b100) || (tg68_adr[3:1] == 3'b010));
+wire [7:0] auto_vector;
+assign auto_vector = (tg68_adr[3:1] == 3'b100)?8'h1c:8'h1a;
+	
+// mmu cpu interface at $ff8001
+wire mmu_sel;
+wire mmu_dtack;
+wire [7:0] mmu_data_out;
+assign mmu_sel = cpu_cycle && cpu2io && data_strobe && ({tg68_adr[15:1], 1'b0} == 16'h8000);
+
+// video controller cpu interface at $ff8200
+wire vreg_sel;
+wire vreg_dtack;
+wire [15:0] vreg_data_out;
+assign vreg_sel = cpu_cycle && cpu2io && data_strobe && (tg68_adr[15:8] == 8'h82);
+
+// mfp cpu interface at $fffa00 - $fffa3f
+wire mfp_sel;
+wire mfp_dtack;
+wire [7:0] mfp_data_out;
+assign mfp_sel = cpu_cycle && cpu2io && data_strobe && (tg68_adr[15:8] == 8'hfa) && 
+	(tg68_adr[7:6] == 2'b00);
+
+// acia cpu interface at $fffc00
+wire acia_sel;
+wire acia_dtack;
+wire [7:0] acia_data_out;
+assign acia_sel = cpu_cycle && cpu2io && data_strobe && (tg68_adr[15:8] == 8'hfc);
+
+//  psg interface at $ff8800
+wire psg_sel;
+wire psg_dtack;
+wire [7:0] psg_data_out;
+assign psg_sel = cpu_cycle && cpu2io && data_strobe && (tg68_adr[15:8] == 8'h88);
+
+//  dma interface at $ff8600
+wire dma_sel;
+wire dma_dtack;
+wire [15:0] dma_data_out;
+assign dma_sel = cpu_cycle && cpu2io && data_strobe && (tg68_adr[15:8] == 8'h86);
+
+// de-multiplex the various io data output ports into one 
+wire [15:0] io_data_out;
+assign io_data_out = 
+		vreg_sel?vreg_data_out:
+		(mmu_sel?{8'h00, mmu_data_out}:
+		((mfp_sel||mfp_iack)?{8'h00, mfp_data_out}:
+		(auto_iack?{8'h00, auto_vector}:
+		(acia_sel?{acia_data_out, 8'h00}:
+		(psg_sel?{psg_data_out, 8'h00}:
+		(dma_sel?dma_data_out:
+		16'h0000))))));
+
+wire init;
+assign init = ~pll_locked;
+
+video video (
+	.reset      (init          ), // reset input
+	.clk        (clk_32        ),
+	.bus_cycle  (bus_cycle     ),
+
+	// spi for OSD
+   .sdi            (SPI_DI    ),
+   .sck            (SPI_SCK   ),
+   .ss             (SPI_SS3   ),
+
+	// cpu register interface
+	.reg_clk      (clk_8       ),
+	.reg_reset    (reset       ),
+	.reg_din      (tg68_dat_out),
+	.reg_sel      (vreg_sel    ),
+	.reg_addr     (tg68_adr[7:0]),
+	.reg_uds      (tg68_uds    ),
+	.reg_lds      (tg68_lds    ),
+	.reg_rw       (tg68_rw     ),
+	.reg_dout     (vreg_data_out),
+	.reg_dtack    (vreg_dtack  ),
+	
+   .vaddr      (video_address ),
+	.data       (video_data    ),
+	.read       (video_read    ),
+	
+	.hs			(VGA_HS			),
+	.vs			(VGA_VS			),
+	.video_r    (VGA_R        ),
+	.video_g    (VGA_G        ),
+	.video_b    (VGA_B        ),
+
+	.pal56      (~system_ctrl[9]),
+	
+	.hsO			(video_hs      ),
+	.deO			(video_de      )
+);
+
+mmu mmu (
+	// cpu register interface
+	.clk      (clk_8       ),
+	.reset    (reset       ),
+	.din      (tg68_dat_out[7:0]),
+	.sel      (mmu_sel     ),
+	.ds       (tg68_lds    ),
+	.rw       (tg68_rw     ),
+	.dout     (mmu_data_out),
+	.dtack    (mmu_dtack   )
+);
+
+wire acia_irq, dma_irq;
+
+mfp mfp (
+	// cpu register interface
+	.clk      (clk_8       ),
+	.reset    (reset       ),
+	.din      (tg68_dat_out[7:0]),
+	.sel      (mfp_sel     ),
+	.addr     (tg68_adr[7:0]),
+	.ds       (tg68_lds    ),
+	.rw       (tg68_rw     ),
+	.dout     (mfp_data_out),
+	.dtack    (mfp_dtack   ),
+	.irq	    (mfp_irq     ),
+	.iack	    (mfp_iack    ),
+
+	// serial/rs232 interface
+	.serial_data_out_available 	(serial_data_from_mfp_available),
+	.serial_strobe_out 				(serial_strobe_from_mfp),
+	.serial_data_out 	   			(serial_data_from_mfp),
+	
+	// input signals
+	.clk_ext  (clk_mfp     ),
+	.de       (video_de    ),
+	.dma_irq  (dma_irq     ),
+	.acia_irq (acia_irq    ),
+	.mono_detect (system_ctrl[8])
+); 
+
+acia acia (
+	// cpu interface
+	.clk      (clk_8       ),
+	.reset    (reset       ),
+	.din      (tg68_dat_out[15:8]),
+	.sel      (acia_sel    ),
+	.addr     (tg68_adr[7:0]),
+	.ds       (tg68_uds    ),
+	.rw       (tg68_rw     ),
+	.dout     (acia_data_out),
+	.dtack    (acia_dtack   ),
+	.irq      (acia_irq     ),
+	
+	// ikbd interface
+	.ikbd_data_out_available 	(ikbd_data_from_acia_available),
+	.ikbd_strobe_out 				(ikbd_strobe_from_acia),
+	.ikbd_data_out 	   		(ikbd_data_from_acia),
+	.ikbd_strobe_in 				(ikbd_strobe_to_acia),
+	.ikbd_data_in 	   			(ikbd_data_to_acia)
+);
+
+
+//// ym2149 sound chip ////
+reg [1:0] sclk;
+always @ (posedge clk_8)
+	sclk <= sclk + 2'd1;
+
+wire [7:0] port_a_out;
+assign floppy_side = port_a_out[0];
+assign floppy_sel = port_a_out[2:1];
+
+wire [7:0] audio_out;
+assign AUDIO_R = AUDIO_L;
+
+assign psg_dtack = psg_sel;
+
+sigma_delta_dac sigma_delta_dac (
+	.DACout 		(AUDIO_L),
+	.DACin		(audio_out),
+	.CLK 			(clk_32),
+	.RESET 		(reset)
+);
+
+YM2149 ym2149 (
+	.I_DA						( tg68_dat_out[15:8]		),
+	.O_DA						( psg_data_out				),
+	.O_DA_OE_L           (								),
+
+	// control
+	.I_A9_L              ( 1'b0						),
+	.I_A8                ( 1'b1						),
+	.I_BDIR              ( psg_sel && !tg68_rw	),
+	.I_BC2               ( 1'b1						),
+	.I_BC1              	( psg_sel && !tg68_adr[1]),
+	.I_SEL_L             ( 1'b1						),
+
+	.O_AUDIO             ( audio_out					),
+
+	// port a
+	.I_IOA           		( 8'd0 						),
+	.O_IOA              	( port_a_out				),
+	.O_IOA_OE_L      		(								),
+
+	// port b
+	.I_IOB               ( 8'd0						),
+	.O_IOB              	(								),
+	.O_IOB_OE_L         	(								),
+  
+	//
+	.ENA                	( 1'b1						), 
+	.RESET_L            	( !reset 					),
+	.CLK                	( sclk[1]  					)	// 2 MHz
+);
+  
+wire dma_dio_ack;
+wire [4:0] dma_dio_idx;
+wire [7:0 ]dma_dio_data;
+
+// floppy_sel is active low
+wire wr_prot = (floppy_sel == 2'b01)?system_ctrl[7]:system_ctrl[6];
+
+dma dma (
+	// cpu interface
+	.clk      (clk_8       ),
+	.reset    (reset       ),
+	.din      (tg68_dat_out[15:0]),
+	.sel      (dma_sel    ),
+	.addr     (tg68_adr[7:0]),
+	.uds      (tg68_uds    ),
+	.lds      (tg68_lds    ),
+	.rw       (tg68_rw     ),
+	.dout     (dma_data_out),
+	.dtack    (dma_dtack   ),
+	
+	.irq      (dma_irq     ),
+
+	// system control interface
+	.fdc_wr_prot (wr_prot),
+	
+	// data_io (arm controller imterface)
+	.dio_idx  (dma_dio_idx ),
+	.dio_data (dma_dio_data),
+	.dio_ack  (dma_dio_ack ),
+
+	// floppy interface
+	.drv_sel  (floppy_sel  ),
+	.drv_side (floppy_side )
+);
+
+wire [1:0] floppy_sel;
+wire floppy_side;
+assign LED = (floppy_sel == 2'b11);
+
+// clock generation
+wire pll_locked;
+wire clk_8;
+wire clk_32;
+wire clk_128;
+wire clk_mfp;
+    
+// use pll
+clock clock (
+  .areset       (1'b0             ), // async reset input
+  .inclk0       (CLOCK_27[0]      ), // input clock (27MHz)
+  .c0           (clk_128          ), // output clock c0 (128MHz)
+  .c1           (clk_32           ), // output clock c1 (32MHz)
+  .c2           (SDRAM_CLK        ), // output clock c2 (128MHz)
+  .c3           (clk_mfp          ), // output clock c3 (2.4576MHz)
+  .locked       (pll_locked       )  // pll locked output
+);
+
+//// 8MHz clock ////
+wire [3:0] bus_cycle;
+reg [3:0] clk_cnt;
+
+always @ (posedge clk_32, negedge pll_locked) begin
+  if (!pll_locked) 
+    clk_cnt <= #1 4'b0010;
+  else 
+    clk_cnt <=  #1 clk_cnt + 4'd1;
+end
+
+assign clk_8 = clk_cnt[1];
+assign bus_cycle = clk_cnt-4'd2;
+
+// SDRAM
+assign SDRAM_CKE         = 1'b1;
+assign SDRAM_nCS         = sdram_cs[0];
+assign SDRAM_DQML        = sdram_dqm[0];
+assign SDRAM_DQMH        = sdram_dqm[1];
+
+wire [  4-1:0] sdram_cs;
+wire [  2-1:0] sdram_dqm;
+
+// host sdram interface used for io data up/download
+wire [2:0] host_state;
+wire [22:0] host_addr;
+wire [15:0] host_dataWR;
+wire [15:0] host_dataRD;
+
+// tg68
+wire [ 16-1:0] tg68_dat_in;
+wire [ 16-1:0] tg68_dat_out;
+wire [ 32-1:0] tg68_adr;
+wire [  3-1:0] tg68_IPL;
+wire           tg68_dtack;
+wire           tg68_as;
+wire           tg68_uds;
+wire           tg68_lds;
+wire           tg68_rw;
+wire           tg68_ena7RD;
+wire           tg68_ena7WR;
+wire           tg68_enaWR;
+wire [ 16-1:0] tg68_cout;
+wire           tg68_cpuena;
+// wire [  2-1:0] cpu_config;
+// wire [  6-1:0] memcfg;
+wire [ 32-1:0] tg68_cad;
+wire [  6-1:0] tg68_cpustate;
+wire           tg68_cdma;
+wire           tg68_clds;
+wire           tg68_cuds;
+
+wire reset;
+assign reset = system_ctrl[0];
+
+// ------------- generate VBI (IPL = 4) --------------
+wire vbi_ack; 
+assign vbi_ack = cpu2iack && data_strobe && (tg68_adr[3:1] == 3'b100);
+
+reg vsD, vsD2, vsI, vbi;
+always @(negedge clk_8)
+	vsD <= VGA_VS;
+
+always @(posedge clk_8) begin
+	vsD2 <= vsD;           // delay by one
+	vsI <= vsD && !vsD2;   // create single event
+
+	if(reset || vbi_ack)
+		vbi <= 1'b0;
+	else if(vsI)
+		vbi <= 1'b1;
+end
+
+// ------------- generate HBI (IPL = 2) --------------
+wire hbi_ack; 
+assign hbi_ack = cpu2iack && data_strobe && (tg68_adr[3:1] == 3'b010);
+
+reg hsD, hsD2, hsI, hbi;
+always @(negedge clk_8)
+	hsD <= video_hs;
+
+always @(posedge clk_8) begin
+	hsD2 <= hsD;           // delay by one
+	hsI <= hsD && !hsD2;   // create single event
+
+	if(reset || hbi_ack)
+		hbi <= 1'b0;
+	else if(hsI)
+		hbi <= 1'b1;
+end
+
+wire mfp_irq;
+reg [2:0] ipl;
+always @(posedge clk_8) begin
+	if(reset) begin
+		ipl <= 3'b111;
+	end else begin
+
+		// ipl[0] is tied high on the atari
+		if(mfp_irq)   ipl <= 3'b001;  // mfp has IPL 6
+		else if(vbi)  ipl <= 3'b011;  // vbi has IPL 4
+		else if(hbi)  ipl <= 3'b101;  // hbi has IPL 2
+		else	   	  ipl <= 3'b111;
+	end
+end
+	
+//// TG68K main CPU ////
+TG68K tg68k (
+  .clk          (clk_128          ),
+  .reset        (~reset           ),
+  .clkena_in    (1'b1             ),
+  .IPL          (ipl              ),  // 3'b111
+  .dtack        (tg68_dtack       ),
+  .vpa          (1'b1             ),
+  .ein          (1'b1             ),
+  .addr         (tg68_adr         ),
+  .data_read    (cpu_data_in      ),
+  .data_write   (tg68_dat_out     ),
+  .as           (tg68_as          ),
+  .uds          (tg68_uds         ),
+  .lds          (tg68_lds         ),
+  .rw           (tg68_rw          ),
+  .berr         (tg68_berr        ),
+  .e            (                 ),
+  .vma          (                 ),
+  .wrd          (                 ),
+  .ena7RDreg    (tg68_ena7RD      ),
+  .ena7WRreg    (tg68_ena7WR      ),
+  .enaWRreg     (tg68_enaWR       ),
+  .fromram      (tg68_cout        ),
+  .ramready     (tg68_cpuena      ),
+  .cpu          (system_ctrl[5:4] ),  // 00=68000
+  .memcfg       (6'b000000        ),  // 00XXXX = no fastmem
+  .ramaddr      (tg68_cad         ),
+  .cpustate     (tg68_cpustate    ),
+  .nResetOut    (                 ),
+  .skipFetch    (                 ),
+  .cpuDMA       (tg68_cdma        ),
+  .ramlds       (tg68_clds        ),
+  .ramuds       (tg68_cuds        )
+);
+
+// 
+wire [15:0] cpu_data_in;
+assign cpu_data_in = cpu2mem?ram_data:io_data_out;
+
+// cpu/video stram multiplexing
+wire video_cycle;
+wire cpu_cycle;
+wire [22:0] ram_address;
+wire [15:0] ram_data;
+
+assign video_cycle = (bus_cycle[3:2] == 0);  // 1 is host/spi cycle
+assign cpu_cycle = (bus_cycle[3:2] == 2);
+assign ram_address = video_cycle?video_address:tg68_adr[23:1];
+assign video_data = ram_data;
+
+// TODO: put 0x000000 to 0x000007 into tos section so it's write protected
+wire MEM512K = (system_ctrl[3:1] == 3'd0);
+wire MEM1M   = (system_ctrl[3:1] == 3'd1);
+wire MEM2M   = (system_ctrl[3:1] == 3'd2);
+wire MEM4M   = (system_ctrl[3:1] == 3'd3);
+wire MEM8M   = (system_ctrl[3:1] == 3'd4);
+wire MEM14M  = (system_ctrl[3:1] == 3'd5);
+
+// ram from 0x000000 to 0x400000
+wire cpu2ram;
+assign cpu2ram = (tg68_adr[23:22] == 2'b00) ||                  // ordinary 4MB
+	((MEM14M || MEM8M) &&  (tg68_adr[23:22] == 2'b01)) ||  // MiST special 8MB 
+	(MEM14M            && ((tg68_adr[23:22] == 2'b10) |
+	                       (tg68_adr[23:21] == 3'b110))); // MiST special 14MB 
+
+// 256k tos from 0xe00000 to 0xe40000
+wire cpu2tos256k;
+assign cpu2tos256k = (tg68_adr[23:18] == 6'b111000);
+
+// 192k tos from 0xfc0000 to 0xff0000
+wire cpu2tos192k;
+assign cpu2tos192k = (tg68_adr[23:17] == 7'b1111110) || 
+							(tg68_adr[23:16] == 8'b11111110);
+
+// 128k cartridge from 0xfa0000 to 0xfc0000
+wire cpu2cart;
+assign cpu2cart = (tg68_adr[23:17] == 7'b1111101);
+
+// cpu to any type of mem (rw on ram, read on rom)
+wire cpu2mem;			
+assign cpu2mem = cpu2ram || (tg68_rw && (cpu2tos192k || cpu2tos256k || cpu2cart));
+							
+// io from 0xff0000
+wire cpu2io;
+assign cpu2io = (tg68_adr[23:16] == 8'b11111111);
+
+// irq ack happens on 0xfffffX
+wire cpu2iack;
+assign cpu2iack = (tg68_adr[23:4] == 20'hfffff);
+
+wire data_strobe;
+assign data_strobe = ~tg68_uds || ~tg68_lds;
+
+// generate dtack (for st ram only and rom), TODO: no dtack for rom write
+assign tg68_dtack = ~((cpu2mem && data_strobe && cpu_cycle) || io_dtack );
+
+wire ram_oe;
+assign ram_oe = video_cycle?~video_read:
+	(cpu_cycle?~(data_strobe && tg68_rw && cpu2mem):1'b1);
+
+wire ram_wr;
+assign ram_wr = cpu_cycle?~(data_strobe && ~tg68_rw && cpu2ram):1'b1;
+
+// data strobe
+wire ram_uds;
+assign ram_uds = video_cycle?1'b0:tg68_uds;
+
+wire ram_lds;
+assign ram_lds = video_cycle?1'b0:tg68_lds;
+
+//// sdram ////
+sdram sdram (
+  .sdata        (SDRAM_DQ         ),
+  .sdaddr       (SDRAM_A          ),
+  .dqm          (sdram_dqm        ),
+  .sd_cs        (sdram_cs         ),
+  .ba           (SDRAM_BA         ),
+  .sd_we        (SDRAM_nWE        ),
+  .sd_ras       (SDRAM_nRAS       ),
+  .sd_cas       (SDRAM_nCAS       ),
+  .sysclk       (clk_128          ),
+  .reset_in     (~init            ),
+  
+  .hostWR       (host_dataWR      ),
+  .hostAddr     ({host_addr,1'b0} ),
+  .hostState    (host_state       ),
+  .hostL        (1'b0             ),
+  .hostU        (1'b0             ),
+  .hostRD       (host_dataRD      ),
+  .hostena      (                 ),
+
+  // fast ram interface
+  .cpuWR        (tg68_dat_out     ),
+  .cpuAddr      (tg68_cad[24:1]   ),
+  .cpuU         (tg68_cuds        ),
+  .cpuL         (tg68_clds        ),
+  .cpustate     (tg68_cpustate    ),  // 6'b100101
+  .cpu_dma      (tg68_cdma        ),
+  .cpuRD        (tg68_cout        ),
+  .cpuena       (tg68_cpuena      ),
+  .enaRDreg     (                 ),
+  .enaWRreg     (tg68_enaWR       ),
+  .ena7RDreg    (tg68_ena7RD      ),
+  .ena7WRreg    (tg68_ena7WR      ),
+
+  // chip/slow ram interface
+  .chipWR       (tg68_dat_out     ),
+  .chipAddr     (ram_address      ),
+  .chipU        (ram_uds          ),
+  .chipL        (ram_lds          ),
+  .chipRW       (ram_wr           ),
+  .chip_dma     (ram_oe           ),
+  .c_7m         (clk_8            ),
+  .chipRD       (ram_data         ),
+
+  .reset_out    (                 )
+);
+
+// multiplex spi_do, drive it from user_io if that's selected, drive
+// it from minimig if it's selected and leave it open else (also
+// to be able to monitor sd card data directly)
+wire data_io_sdo;
+wire user_io_sdo;
+
+assign SPI_DO = (CONF_DATA0 == 1'b0)?user_io_sdo:
+	((SPI_SS2 == 1'b0)?data_io_sdo:1'bZ);
+
+wire [15:0] system_ctrl;
+
+// connection to transfer ikbd data from io controller to acia
+wire [7:0] ikbd_data_to_acia;
+wire ikbd_strobe_to_acia;
+
+// connection to transfer ikbd data from acia to io controller
+wire [7:0] ikbd_data_from_acia;
+wire ikbd_strobe_from_acia;
+wire ikbd_data_from_acia_available;
+
+// connection to transfer serial/rs232 data from mfp to io controller
+wire [7:0] serial_data_from_mfp;
+wire serial_strobe_from_mfp;
+wire serial_data_from_mfp_available;
+
+//// user io has an extra spi channel outside minimig core ////
+user_io user_io(
+		.SPI_CLK(SPI_SCK),
+		.SPI_SS_IO(CONF_DATA0),
+		.SPI_MISO(user_io_sdo),
+		.SPI_MOSI(SPI_DI),
+		.BUTTONS(buttons),
+		
+		// ikbd interface
+      .ikbd_strobe_out(ikbd_strobe_from_acia),
+      .ikbd_data_out(ikbd_data_from_acia),
+      .ikbd_data_out_available(ikbd_data_from_acia_available),
+      .ikbd_strobe_in(ikbd_strobe_to_acia),
+      .ikbd_data_in(ikbd_data_to_acia),
+		
+		// serial/rs232 interface
+      .serial_strobe_out(serial_strobe_from_mfp),
+      .serial_data_out(serial_data_from_mfp),
+      .serial_data_out_available(serial_data_from_mfp_available),
+		
+		.CORE_TYPE(8'ha3)    // mist core id
+);
+
+data_io data_io (
+		// system control
+		.clk_8 		(clk_8			),
+		.reset		(init	   		),
+		.bus_cycle  (bus_cycle[3:2]),
+		.ctrl_out   (system_ctrl   ),
+
+		// spi
+		.sdi   		(SPI_DI			),
+		.sck  		(SPI_SCK			),
+		.ss    		(SPI_SS2			),
+		.sdo			(data_io_sdo	),
+
+		// dma interface
+		.dma_idx    (dma_dio_idx   ),
+		.dma_data   (dma_dio_data  ),
+		.dma_ack    (dma_dio_ack   ),
+
+		// ram interface
+		.state 	 	(host_state		),
+		.addr		 	(host_addr		),
+		.data_out 	(host_dataWR	),
+		.data_in  	(host_dataRD	)
+);
+  
+			
+endmodule
+

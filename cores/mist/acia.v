@@ -1,0 +1,130 @@
+module acia (
+	// cpu register interface
+	input clk,
+	input reset,
+	input [7:0] din,
+	input sel,
+	input [7:0] addr,
+	input ds,
+	input rw,
+	output reg [7:0] dout,
+	output dtack,	
+	output irq,
+	
+	// data from io controller to acia
+   input ikbd_strobe_in,
+   input [7:0] ikbd_data_in,
+
+	// data from acia to io controller
+   output ikbd_data_out_available,
+   input ikbd_strobe_out,
+   output [7:0] ikbd_data_out
+);
+
+localparam FIFO_ADDR_BITS = 4;
+localparam FIFO_DEPTH = (1 << FIFO_ADDR_BITS);
+
+reg [7:0] fifoIn [FIFO_DEPTH-1:0];
+reg [FIFO_ADDR_BITS-1:0] writePin, readPin;
+
+// 
+reg [7:0] fifoOut [FIFO_DEPTH-1:0];
+reg [FIFO_ADDR_BITS-1:0] writePout, readPout;
+
+// timer to let bytes arrive at a reasonable speed
+reg [13:0] readTimer;
+
+reg ikbd_strobe_inD, ikbd_strobe_inD2;	
+reg data_read;	
+always @(negedge clk) begin
+	if(reset)
+		readTimer <= 14'd0;
+	else
+		if(readTimer > 0)
+			readTimer <= readTimer - 14'd1;
+
+	ikbd_strobe_inD <= ikbd_strobe_in;
+	ikbd_strobe_inD2 <= ikbd_strobe_inD;
+	
+	// read on kbd data register
+	if(sel && ~ds && rw && (addr == 8'h02))
+		data_read <= 1'b1;
+	else
+		data_read <= 1'b0;
+
+	if(reset) begin
+		// reset read and write counters
+		readPin <= 4'd0;
+		writePin <= 4'd0;
+	end else if(ikbd_strobe_inD && !ikbd_strobe_inD2) begin
+		// store data in fifo
+		fifoIn[writePin] <= ikbd_data_in;
+		writePin <= writePin + 4'd1;
+	end else if(data_read && dataInAvail) begin
+		readPin <= readPin + 4'd1;
+		
+		// Some programs (e.g. bolo) need a pause between two ikbd bytes.
+		// The ikbd runs at 7812.5 bit/s 1 start + 8 data + 1 stop bit. 
+		// One bit is 1/718.25 seconds. A pause of ~1ms is thus required
+		// 8000000/718.25 = 11138.18
+		readTimer <= 14'd11138;
+	end
+end
+
+// ------------------ cpu interface --------------------
+
+wire [7:0] rxd;
+assign rxd = fifoIn[readPin];
+
+wire dataInAvail;
+assign dataInAvail = (readPin != writePin) && (readTimer == 0);
+
+assign irq = dataInAvail;
+
+assign ikbd_data_out_available = (readPout != writePout);
+assign ikbd_data_out = fifoOut[readPout];
+
+// ---------------- send acia data to io controller ------------
+reg ikbd_strobe_outD, ikbd_strobe_outD2;
+always @(posedge clk) begin
+	ikbd_strobe_outD <= ikbd_strobe_out;
+	ikbd_strobe_outD2 <= ikbd_strobe_outD;
+
+	if(reset)
+		readPout <= 4'd0;
+	else
+		if(ikbd_strobe_outD && !ikbd_strobe_outD2)
+			readPout <= readPout + 4'd1;
+end
+	
+// dtack
+assign dtack = sel;
+
+always @(sel, ds, rw, addr, dataInAvail, rxd) begin
+   if(sel && ~ds && rw) begin
+      // keyboard acia read
+      if(addr == 8'h00)      dout = 8'h02 | (dataInAvail?8'h81:8'h00);  // status
+      else if(addr == 8'h02) dout = rxd;    // data
+      
+      // midi acia read
+      else if(addr == 8'h04) dout = 8'h02;  // status
+      else if(addr == 8'h06) dout = 8'h00;  // data
+
+      else                   dout = 8'h00;
+   end else
+     dout = 8'h00;
+end
+   
+always @(negedge clk) begin
+   if(reset) begin
+      writePout <= 0;
+   end else begin
+      // keyboard acia data register writes into buffer 
+      if(sel && ~ds && ~rw && addr == 8'h02) begin
+         fifoOut[writePout] <= din;
+			writePout <= writePout + 4'd1;
+      end
+   end
+end
+   
+endmodule
