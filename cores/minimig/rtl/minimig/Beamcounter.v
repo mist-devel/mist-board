@@ -26,7 +26,7 @@
 // 2010-04-14	- A1000 compatible VBL interrupt generation
 //
 // SB:
-// 2011-04-10 - added readable VPOSW and VHPOSW register (fix for RSI slideshow)
+// 2011-04-10	- added readable VPOSW and VHPOSW register (fix for RSI slideshow)
 
 module beamcounter
 (
@@ -50,12 +50,12 @@ module beamcounter
 	output	eol,					// end of video line
 	output	eof,					// end of video frame
 	output	reg vbl_int,			// vertical interrupt request (for Paula)
-	output	[8:1] htotal			// video line length
+	output	[8:1] htotal,			// video line length
+	output	reg lace
 );
 
 // local beam position counters
 reg		ersy;
-reg		lace;
 
 //local signals for beam counters and sync generator
 reg		long_frame;		// 1 : long frame (313 lines); 0 : normal frame (312 lines)
@@ -71,15 +71,15 @@ parameter	VHPOSW   = 9'h02C;
 parameter	BEAMCON0 = 9'h1DC;
 parameter	BPLCON0  = 9'h100;
 
-//parameter	HTOTAL  = 9'h1C0;
+parameter	HTOTAL  = 9'h1C0;
 //parameter	HSSTOP  = 9'h1C2;
 //parameter	HBSTRT  = 9'h1C4;
 //parameter	HBSTOP  = 9'h1C6;
-//parameter	VTOTAL  = 9'h1C8;
+parameter	VTOTAL  = 9'h1C8;
 //parameter	VSSTOP  = 9'h1CA;
 //parameter	VBSTRT  = 9'h1CC;
 //parameter	VBSTOP  = 9'h1CE;
-//parameter	BEAMCON = 9'h1DC;
+parameter	BEAMCON = 9'h1DC;
 //parameter	HSSTRT  = 9'h1DE;
 //parameter	VSSTRT  = 9'h1E0;
 //parameter	HCENTER = 9'h1E2;
@@ -106,9 +106,9 @@ wire	last_line;			// indicates the last line is displayed (in non-interlaced mod
 
 
 //beam position output signals
-assign	htotal = 8'd227 - 8'd1;					// line length of 227 CCKs in PAL mode (NTSC line length of 227.5 CCKs is not supported)
-assign	vtotal = pal ? 11'd312 - 11'd1 : 11'd262 - 11'd1;	// total number of lines (PAL: 312 lines, NTSC: 262)
-assign	vbstop = pal ? 9'd25 : 9'd20;			// vertical blanking end (PAL 26 lines, NTSC vblank 21 lines)
+assign	htotal = 227-1;					// line length of 227 CCKs in PAL mode (NTSC line length of 227.5 CCKs is not supported)
+assign	vtotal = pal ? 312-1 : 262-1;	// total number of lines (PAL: 312 lines, NTSC: 262)
+assign	vbstop = pal ? 25 : 20;			// vertical blanking end (PAL 26 lines, NTSC vblank 21 lines)
 
 //first visible line $1A (PAL) or $15 (NTSC)
 //sprites are fetched on line $19 (PAL) or $14 (NTSC) - vblend signal used to tell Agnus to fetch sprites during the last vertical blanking line
@@ -165,7 +165,7 @@ always @(posedge clk)
 	else if (end_of_line)
 		hpos[8:1] <= 0;
 	else if (cck && (~ersy || |hpos[8:1]))
-		hpos[8:1] <= hpos[8:1] + 1'b1;
+		hpos[8:1] <= hpos[8:1] + 1;
 		
 always @(cck)
 	hpos[0] = cck;
@@ -205,7 +205,7 @@ always @(posedge clk)
 		if (last_line)
 			vpos <= 0;
 		else
-			vpos <= vpos + 1'b1;
+			vpos <= vpos + 1;
 
 // long_frame - long frame signal used in interlaced mode
 always @(posedge clk)

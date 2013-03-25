@@ -159,7 +159,7 @@ assign VGA_B[1:0] = 2'b00;
 PLLWrapper amigaclk (
   .areset       (pll_rst          ), // async reset input
   .inclk0       (pll_in_clk       ), // input clock (27MHz)
-  .eightmhz		 (board_switches[0] ), // For testing, reconfig based on board button[0]
+  .eightmhz		 (board_switches[1] ), // For testing, reconfig based on board button[0]
   .c0           (clk_114          ), // output clock c0 (114.750000MHz)
   .c1           (clk_28           ), // output clock c1 (28.687500MHz)
   .c2           (clk_sdram        ), // output clock c2 (114.750000MHz, -146.25 deg)

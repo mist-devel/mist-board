@@ -147,7 +147,7 @@
 // 2010-06-29	- added more magic to ddf logic
 
 //SB:
-// 2011-03-08 - added DIP and FatAgnus handling of scanline 0 (fix for RoboCop2 game)
+// 2011-03-08	- added DIP and FatAgnus handling of scanline 0 (fix for RoboCop2 game)
 
 module Agnus
 (
@@ -186,7 +186,8 @@ module Agnus
 	input	a1k,						// enable A1000 OCS features
 	input	ecs,						// enabl ECS features
 	input	floppy_speed,				// allocates refresh slots for disk DMA
-	input	turbo						// alows blitter to take extra DMA slots 
+	input	turbo,					// alows blitter to take extra DMA slots 
+	output lace						// Allows Amber to use different settings for laced.
 );
 
 //register names and adresses		
@@ -450,8 +451,8 @@ bpldma_engine bpd1
 	.clk(clk),
 	.reset(reset),
 	.ecs(ecs),
-  .a1k(a1k),
-  .sof(sof),
+	.a1k(a1k),
+	.sof(sof),
 	.dmaena(bplen),
 	.vpos(vpos),
 	.hpos(hpos),
@@ -508,10 +509,9 @@ copper cp1
 always @(posedge clk)
 	if (!cck || turbo)
 		if (!bls || bltpri)
-			bls_cnt <= 2'b00;
+			bls_cnt <= 0;
 		else if (bls_cnt[1:0] != BLS_CNT_MAX)
-			bls_cnt <= bls_cnt + 2'b01;
-
+			bls_cnt <= bls_cnt + 1;
 
 //instantiate blitter
 blitter bl1
@@ -559,14 +559,15 @@ beamcounter	bc1
 	.eol(sol),
 	.eof(sof),
 	.vbl_int(vbl_int),
-	.htotal(htotal)
+	.htotal(htotal),
+	.lace(lace)
 );
 
 //horizontal strobe for Denise
 //in real Amiga Denise's hpos counter seems to be advanced by 4 CCKs in regards to Agnus' one
 //Minimig isn't cycle exact and compensation for different data delay in implemented Denise's video pipeline is required 
-assign strhor_denise = hpos==12-1 && (vpos > 8 || ecs) ? 1'b1 : 1'b0;
-assign strhor_paula = hpos==(6*2+1) ? 1'b1 : 1'b0; //hack
+assign strhor_denise = hpos==12-1 && (vpos > 8 || ecs) ? 1 : 0;
+assign strhor_paula = hpos==(6*2+1) ? 1 : 0; //hack
 
 //--------------------------------------------------------------------------------------
 
@@ -586,11 +587,11 @@ module refresh
 //dma request
 always @(hpos)
 	case (hpos)
-		9'b0000_0100_1 : dma = 1'b1;
-		9'b0000_0110_1 : dma = 1'b1;
-		9'b0000_1000_1 : dma = 1'b1;
-		9'b0000_1010_1 : dma = 1'b1;
-		default        : dma = 1'b0;
+		9'b0000_0100_1 : dma = 1;
+		9'b0000_0110_1 : dma = 1;
+		9'b0000_1000_1 : dma = 1;
+		9'b0000_1010_1 : dma = 1;
+		default        : dma = 0;
 	endcase
 
 endmodule
@@ -601,8 +602,8 @@ module bpldma_engine
 	input 	clk,		    			// bus clock
 	input	reset,						// reset
 	input	ecs,						// ddfstrt/ddfstop ECS bits enable
-  input a1k,              // DIP Agnus feature
-  input sof,              // start of frame
+	input	a1k,							// DIP Agnus feature
+	input	sof,							// start of frame
 	input	dmaena,						// enable dma input
 	input	[10:0] vpos,				// vertical position counter
 	input	[8:0] hpos,					// agnus internal horizontal position counter (advanced by 4 CCK)
@@ -616,7 +617,7 @@ module bpldma_engine
 localparam GND = 1'b0;
 localparam VCC = 1'b1;
 
-// register names and adresses
+// register names and adresses	
 localparam DIWSTRT   = 9'h08E;
 localparam DIWSTOP   = 9'h090;
 localparam DIWHIGH   = 9'h1E4;	
@@ -633,7 +634,8 @@ reg 	[8:2] ddfstop; 				// display data fetch stop
 reg		[15:1] bpl1mod;				// modulo for odd bitplanes
 reg		[15:1] bpl2mod;				// modulo for even bitplanes
 reg		[5:0] bplcon0;				// bitplane control (SHRES, HIRES and BPU bits)
-wire	[5:0] bplcon0_delayed;		// delayed bplcon0 (compatibility)
+reg 	[5:0] bplcon0_delayed;		// delayed bplcon0 (compatibility)
+reg		[5:0] bplcon0_delay [1:0];
 
 wire 	hires;						// bplcon0 - high resolution display mode
 wire	shres;						// bplcon0 - super high resolution display mode
@@ -649,7 +651,8 @@ wire	mod;						// end of data fetch, add modulo
 
 reg		hardena;					// hardware display data fetch enable ($18-$D8)
 reg 	softena;					// software display data fetch enable
-wire	ddfena;						// combined display data fetch
+reg 	ddfena;						// combined display data fetch
+reg 	ddfena_0;					// combined display data fetch
 
 reg 	[2:0] ddfseq;				// bitplane DMA fetch cycle sequencer
 reg 	ddfrun;						// set when display dma fetches data
@@ -779,19 +782,30 @@ always @(posedge clk)
 	else if (reg_address_in[8:1]==BPLCON0[8:1])
 		bplcon0 <= {data_in[6],data_in[15],data_in[4],data_in[14:12]}; //SHRES,HIRES,BPU3,BPU2,BPU1,BPU0
 
+////delay by 8 clocks (in real Amiga DMA sequencer is pipelined and features a delay of 3 CCKs)
 // delayed BPLCON0 by 3 CCKs
-   SRL16E #(
-      .INIT(16'h0000)
-   ) BPLCON0_DELAY [5:0] (
-      .Q(bplcon0_delayed),
-      .A0(GND),
-      .A1(VCC),
-      .A2(GND),
-      .A3(GND),
-      .CE(hpos[0]),
-      .CLK(clk),
-      .D(bplcon0)
-   );
+always @(posedge clk)
+	if (hpos[0])
+	begin
+		bplcon0_delay[0] <= bplcon0;
+		bplcon0_delay[1] <= bplcon0_delay[0];
+		bplcon0_delayed  <= bplcon0_delay[1];
+	end
+
+
+//// delayed BPLCON0 by 3 CCKs
+//   SRL16E #(
+//      .INIT(16'h0000)
+//   ) BPLCON0_DELAY [5:0] (
+//      .Q(bplcon0_delayed),
+//      .A0(GND),
+//      .A1(VCC),
+//      .A2(GND),
+//      .A3(GND),
+//      .CE(hpos[0]),
+//      .CLK(clk),
+//      .D(bplcon0)
+//   );
 
 assign shres = ecs & bplcon0_delayed[5];
 assign hires = bplcon0_delayed[4];
@@ -869,18 +883,25 @@ always @(posedge clk)
 //assign ddfena = hardena & softena;
 
 // delayed DDFENA by 2 CCKs
-   SRL16E #(
-      .INIT(16'h0000)
-   ) DDFENA_DELAY (
-      .Q(ddfena),
-      .A0(VCC),
-      .A1(GND),
-      .A2(GND),
-      .A3(GND),
-      .CE(hpos[0]),
-      .CLK(clk),
-      .D(hardena & softena)
-   );
+always @(posedge clk)
+	if (hpos[0])
+	begin
+		ddfena_0 <= hardena & softena;
+		ddfena <= ddfena_0;
+	end
+
+//   SRL16E #(
+//      .INIT(16'h0000)
+//   ) DDFENA_DELAY (
+//      .Q(ddfena),
+//      .A0(VCC),
+//      .A1(GND),
+//      .A2(GND),
+//      .A3(GND),
+//      .CE(hpos[0]),
+//      .CLK(clk),
+//      .D(hardena & softena)
+//   );
 
 
 // this signal enables bitplane DMA sequencer
@@ -895,7 +916,7 @@ always @(posedge clk)
 always @(posedge clk)
 	if (hpos[0]) // cycle alligment
 		if (ddfrun) // if enabled go to the next state
-			ddfseq <= ddfseq + 1'b1;
+			ddfseq <= ddfseq + 1;
 		else
 			ddfseq <= 0;
 
@@ -933,12 +954,12 @@ always @(address_out or bpl1mod or bpl2mod or plane[0] or mod)
 	if (mod)
 	begin
 		if (plane[0]) // even plane modulo
-			newpt[20:1] = address_out[20:1] + {{5{bpl2mod[15]}},bpl2mod[15:1]} + 1'b1;
+			newpt[20:1] = address_out[20:1] + {{5{bpl2mod[15]}},bpl2mod[15:1]} + 1;
 		else // odd plane modulo
-			newpt[20:1] = address_out[20:1] + {{5{bpl1mod[15]}},bpl1mod[15:1]} + 1'b1;
+			newpt[20:1] = address_out[20:1] + {{5{bpl1mod[15]}},bpl1mod[15:1]} + 1;
 	end
 	else
-		newpt[20:1] = address_out[20:1] + 1'b1;
+		newpt[20:1] = address_out[20:1] + 1;
 
 // Denise bitplane shift registers address lookup table
 always @(plane)
@@ -1069,7 +1090,7 @@ reg		[2:0] sprsel;				//memory selection
 //in our solution to save resources they are evaluated sequencially but 8 times faster (28MHz clock)
 always @(posedge clk28m)
 	if (sprsel[2]==hpos[0])		//sprsel[2] is synced with hpos[0]
-		sprsel <= sprsel + 1'b1;
+		sprsel <= sprsel + 1;
 
 //--------------------------------------------------------------------------------------
 
@@ -1081,7 +1102,7 @@ assign ptsel = (ackdma) ? sprite : reg_address_in[4:2];
 assign pcsel = (ackdma) ? sprite : reg_address_in[5:3];
 
 //sprite pointer arithmetic unit
-assign newptr = address_out[20:1] + 1'b1;
+assign newptr = address_out[20:1] + 1;
 
 //sprite pointer high word register bank (implemented using distributed ram)
 wire [20:16] sprpth_in;
@@ -1151,7 +1172,7 @@ always @(posedge clk28m)
 //--------------------------------------------------------------------------------------
 
 //check if we are allowed to allocate dma slots for sprites
-//dma slots for sprites: even cycles from 18 to 38 (inclusive)
+//dma slots for sprites: even cycles from 1A to 38 (inclusive)
 always @(posedge clk)
 	if (hpos[8:1]==8'h18 && hpos[0])
 		enable <= 1;
@@ -1259,7 +1280,7 @@ assign wr = ~dmas;
 //--------------------------------------------------------------------------------------
 
 //address_out input multiplexer and ALU
-assign address_outnew[20:1] = dma ? address_out[20:1]+1'b1 : {data_in[4:0],data_in[15:1]}; 
+assign address_outnew[20:1] = dma ? address_out[20:1]+1 : {data_in[4:0],data_in[15:1]}; 
 
 //disk pointer control
 always @(posedge clk)
@@ -1385,7 +1406,7 @@ assign address_out[20:1] = audptout[20:1];
 // audio pointers register bank (implemented using distributed ram) and ALU
 always @(posedge clk)
 	if (dmal)
-		audpt[channel] <= dmas ? audlcout[20:1] : audptout[20:1] + 1'b1;
+		audpt[channel] <= dmas ? audlcout[20:1] : audptout[20:1] + 1;
 
 // audio pointer output		
 assign audptout[20:1] = audpt[channel];
