@@ -38,7 +38,7 @@ entity TG68K is
         ein           : in std_logic:='1';
         addr          : buffer std_logic_vector(31 downto 0);
         data_read  	  : in std_logic_vector(15 downto 0);
-        data_write 	  : out std_logic_vector(15 downto 0);
+        data_write 	  : buffer std_logic_vector(15 downto 0);
         as            : out std_logic;
         uds           : out std_logic;
         lds           : out std_logic;
@@ -53,7 +53,8 @@ entity TG68K is
         fromram    	  : in std_logic_vector(15 downto 0);
         ramready      : in std_logic:='0';
         cpu           : in std_logic_vector(1 downto 0);
-        memcfg           : in std_logic_vector(5 downto 0);
+        fastramcfg           : in std_logic_vector(5 downto 0);
+		  turbochipram : in std_logic;
         ramaddr    	  : out std_logic_vector(31 downto 0);
         cpustate      : out std_logic_vector(5 downto 0);
 		nResetOut	  : out std_logic;
@@ -134,11 +135,19 @@ COMPONENT TG68KdotC_Kernel
    SIGNAL eind	      : std_logic;
    SIGNAL eindd	      : std_logic;
    SIGNAL sel_autoconfig: std_logic;
-   SIGNAL autoconfig_out: std_logic;
-   SIGNAL autoconfig_data: std_logic_vector(3 downto 0);
+   SIGNAL autoconfig_out: std_logic_vector(1 downto 0); -- We use this as a counter since we have two cards to configure
+   SIGNAL autoconfig_out_next: std_logic_vector(1 downto 0); -- We use this as a counter since we have two cards to configure
+   SIGNAL autoconfig_data: std_logic_vector(3 downto 0); -- Zorro II RAM
+   SIGNAL autoconfig_data2: std_logic_vector(3 downto 0); -- Zorro III RAM
    SIGNAL sel_fast: std_logic;
+	SIGNAL sel_chipram: std_logic;
+	SIGNAL turbochip_ena : std_logic := '0';
+	SIGNAL turbochip_d : std_logic := '0';
    SIGNAL slower       : std_logic_vector(3 downto 0);
 
+	signal ziii_base : std_logic_vector(7 downto 0);
+	signal ziiiram_ena : std_logic;
+	signal sel_ziiiram : std_logic;
 
 	type sync_states is (sync0, sync1, sync2, sync3, sync4, sync5, sync6, sync7, sync8, sync9);
 	signal sync_state		: sync_states;
@@ -153,11 +162,31 @@ BEGIN
 	addr <= cpuaddr;-- WHEN addr_akt_e='1' ELSE t_addr WHEN addr_akt_s='1' ELSE "ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ";
 --	data <= data_write WHEN data_akt_e='1' ELSE t_data WHEN data_akt_s='1' ELSE "ZZZZZZZZZZZZZZZZ";
 --	datatg68 <= fromram WHEN sel_fast='1' ELSE r_data; 
-	datatg68 <= fromram WHEN sel_fast='1' ELSE r_data WHEN sel_autoconfig='0' ELSE autoconfig_data&r_data(11 downto 0); 
+	datatg68 <= fromram WHEN sel_fast='1'
+		ELSE autoconfig_data&r_data(11 downto 0) when sel_autoconfig='1' and autoconfig_out="01" -- Zorro II autoconfig
+		ELSE autoconfig_data2&r_data(11 downto 0) when sel_autoconfig='1' and autoconfig_out="10" -- Zorro III autoconfig
+		ELSE r_data;
 --	toram <= data_write;
 	
-    sel_autoconfig <= '1' when cpuaddr(23 downto 19)="11101" AND autoconfig_out='1' ELSE '0'; --$E80000 - $EFFFFF
-	sel_fast <= '1' when state/="01" AND (cpuaddr(23 downto 21)="001" OR cpuaddr(23 downto 21)="010" OR cpuaddr(23 downto 21)="011" OR cpuaddr(23 downto 21)="100") ELSE '0'; --$200000 - $9FFFFF
+   sel_autoconfig <= '1' when cpuaddr(23 downto 19)="11101" AND autoconfig_out/="00" ELSE '0'; --$E80000 - $EFFFFF
+
+	sel_ziiiram <='1' when cpuaddr(31 downto 24)=ziii_base and ziiiram_ena='1' else '0';
+
+	sel_chipram <= '1' when state/="01" AND (cpuaddr(23 downto 21)="000") ELSE '0'; --$000000 - $1FFFFF
+
+	-- FIXME - prevent TurboChip toggling while a transaction's in progress!
+	sel_fast <= '1' when state/="01" AND
+		(
+			(turbochip_ena='1' and turbochip_d='1' AND cpuaddr(23 downto 21)="000" )
+			OR cpuaddr(23 downto 21)="001"
+			OR cpuaddr(23 downto 21)="010"
+			OR cpuaddr(23 downto 21)="011"
+			OR cpuaddr(23 downto 21)="100"
+			OR sel_ziiiram='1'
+		)
+		ELSE '0'; --$200000 - $9FFFFF
+
+--	sel_fast <= '1' when state/="01" AND (cpuaddr(23 downto 21)="001" OR cpuaddr(23 downto 21)="010" OR cpuaddr(23 downto 21)="011" OR cpuaddr(23 downto 21)="100") ELSE '0'; --$200000 - $9FFFFF
 --	sel_fast <= '1' when cpuaddr(23 downto 21)="001" OR cpuaddr(23 downto 21)="010" ELSE '0'; --$200000 - $5FFFFF
 --	sel_fast <= '1' when cpuaddr(23 downto 19)="11111" ELSE '0'; --$F800000;
 --	sel_fast <= '0'; --$200000 - $9FFFFF
@@ -171,8 +200,14 @@ BEGIN
 --	ramaddr(23 downto 0) <= cpuaddr(23 downto 0);
 --	ramaddr(24) <= sel_fast;
 --	ramaddr(31 downto 25) <= cpuaddr(31 downto 25);
-  ramaddr(23 downto 0) <= sel_fast & cpuaddr(22 downto 0); -- Map ZII FastRAM to second 8 Meg.
-  ramaddr(31 downto 24) <= cpuaddr(31 downto 24);
+	ramaddr(20 downto 0) <= cpuaddr(20 downto 0);
+	ramaddr(31 downto 25) <= "0000000";
+	ramaddr(24) <= sel_ziiiram;	-- Remap the Zorro III RAM to 0x1000000
+	ramaddr(23 downto 21) <= "100" when sel_ziiiram&cpuaddr(23 downto 21)="0001" -- 2 -> 8
+		else "101" when sel_ziiiram&cpuaddr(23 downto 21)="0010" -- 4 -> A
+		else "110" when sel_ziiiram&cpuaddr(23 downto 21)="0011" -- 6 -> C
+		else "111" when sel_ziiiram&cpuaddr(23 downto 21)="0100" -- 8 -> E
+		else cpuaddr(23 downto 21);	-- pass through others
 
 
 pf68K_Kernel_inst: TG68KdotC_Kernel 
@@ -204,18 +239,28 @@ pf68K_Kernel_inst: TG68KdotC_Kernel
 		skipFetch => skipFetch 		-- : out std_logic
         );
  
+ process(clk,turbochipram)
+begin
+	if rising_edge(clk) then
+		if state="01" then -- No mem access, so safe to switch chipram access mode
+			turbochip_d<=turbochipram;
+		end if;
+	end if;
+end process;
+
 	PROCESS (clk)
 	BEGIN
+
+		-- Zorro II RAM (Up to 8 meg at 0x200000)
 		autoconfig_data <= "1111";
-		IF memcfg(5 downto 4)/="00" THEN
+		IF fastramcfg/="000" THEN
 			CASE cpuaddr(6 downto 1) IS
-				WHEN "000000" => autoconfig_data <= "1110";		--normal card, add mem, no ROM
+				WHEN "000000" => autoconfig_data <= "1110";		--Zorro-II card, add mem, no ROM
 				WHEN "000001" => 
-					CASE memcfg(5 downto 4) IS 
+					CASE fastramcfg(1 downto 0) IS 
 						WHEN "01" => autoconfig_data <= "0110";		--2MB
 						WHEN "10" => autoconfig_data <= "0111";		--4MB
 						WHEN OTHERS => autoconfig_data <= "0000";	--8MB
---						WHEN OTHERS => autoconfig_data <= "0111";	--4MB
 					END CASE;	
 				WHEN "001000" => autoconfig_data <= "1110";		--4626=icomp
 				WHEN "001001" => autoconfig_data <= "1101";		
@@ -225,12 +270,50 @@ pf68K_Kernel_inst: TG68KdotC_Kernel
 				WHEN OTHERS => null;
 			END CASE;	
 		END IF;
+		
+		-- Zorro III RAM (Up to 16 meg, address assigned by ROM)
+		autoconfig_data2 <= "1111";
+		IF fastramcfg(2)='1' THEN -- Zorro III RAM
+			CASE cpuaddr(6 downto 1) IS
+				WHEN "000000" => autoconfig_data2 <= "1010";		--Zorro-III card, add mem, no ROM
+				WHEN "000001" => autoconfig_data2 <= "0000";		--8MB (extended to 16 in reg 08)
+				when "000100" => autoconfig_data2 <= "0000";		--Memory card, not silenceable, Extended size (16 meg), reserved.
+				WHEN "001000" => autoconfig_data2 <= "1110";		--4626=icomp
+				WHEN "001001" => autoconfig_data2 <= "1101";		
+				WHEN "001010" => autoconfig_data2 <= "1110";		
+				WHEN "001011" => autoconfig_data2 <= "1101";		
+				WHEN "010011" => autoconfig_data2 <= "1101";		--serial=2
+				WHEN OTHERS => null;
+			END CASE;	
+		END IF;
+
 		IF rising_edge(clk) THEN
 			IF reset='0' THEN
-				autoconfig_out <= '1';		--autoconfig on
+				autoconfig_out_next <= "01";		--autoconfig on
+				autoconfig_out <= "01";		--autoconfig on
+				turbochip_ena <= '0';	-- disable turbo_chipram until we know kickstart's running...
+				ziiiram_ena <='0';
+				ziii_base<=X"01";
 			ELSIF enaWRreg='1' THEN
-				IF sel_autoconfig='1' AND state="11"AND uds_in='0' AND cpuaddr(6 downto 1)="100100" THEN
-					autoconfig_out <= '0';		--autoconfig off
+				IF sel_autoconfig='1' AND state="11"AND uds_in='0' and clkena='1' then
+					case cpuaddr(6 downto 1) is
+						when "100100" => -- Register 0x48 - config
+							if autoconfig_out="01" then
+								autoconfig_out<=fastramcfg(2)&'0';
+							end if;
+							turbochip_ena <= '1';	-- enable turbo_chipram after autoconfig has been done...
+															-- FIXME - this is a hack to allow ROM overlay to work.
+						when "100010" => -- Register 0x44, assign base address to ZIII RAM.
+												-- We ought to take 16 bits here, but for now we take liberties and use a single byte.
+							if autoconfig_out="10" then
+								ziii_base<=data_write(15 downto 8);
+								ziiiram_ena <='1';
+								autoconfig_out<="00";
+							end if;
+
+						when others =>
+							null;
+					end case;
 				END IF;	
 			END IF;	
 		END IF;	

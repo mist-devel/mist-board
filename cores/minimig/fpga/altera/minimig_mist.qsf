@@ -312,6 +312,9 @@ set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to VGA_B[2]
 set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to VGA_B[1]
 set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to VGA_B[0]
 
+set_global_assignment -name VERILOG_FILE ../../rtl/cache/TwoWayCache.v
+set_global_assignment -name QIP_FILE ../../rtl/cache/CacheBlockRAM.qip
+set_global_assignment -name QIP_FILE ../../rtl/cache/Cache_DataRAM.qip
 set_global_assignment -name QIP_FILE ../../rtl/cycloneiii/MyPLLReconfig.qip
 set_global_assignment -name QIP_FILE ../../rtl/cycloneiii/MyPLL.qip
 set_global_assignment -name VHDL_FILE ../../rtl/cycloneiii/PLLWrapper.vhd
@@ -323,8 +326,6 @@ set_global_assignment -name VHDL_FILE ../../rtl/tg68k/TG68K.vhd
 set_global_assignment -name VERILOG_FILE ../../rtl/soc/minimig_mist_top.v
 set_global_assignment -name VERILOG_FILE ../../rtl/soc/user_io.v
 set_global_assignment -name VERILOG_FILE ../../rtl/de1/amigaclk.v
-set_global_assignment -name VERILOG_FILE ../../lib/altera/i_sync.v
-set_global_assignment -name VERILOG_FILE ../../lib/altera/srl16e.v
 set_global_assignment -name VERILOG_FILE ../../rtl/minimig/Userio.v
 set_global_assignment -name VERILOG_FILE ../../rtl/minimig/Sprites.v
 set_global_assignment -name VERILOG_FILE ../../rtl/minimig/Paula.v
