@@ -5,9 +5,7 @@
 
 module mist_top (
   // clock inputs
-  input wire [ 2-1:0] 	CLOCK_32, // 32 MHz
   input wire [ 2-1:0] 	CLOCK_27, // 27 MHz
-  input wire [ 2-1:0] 	CLOCK_50, // 50 MHz
   // LED outputs
   output wire 		LED, // LED Yellow
   // UART
@@ -35,7 +33,7 @@ module mist_top (
   output wire 		AUDIO_L, // sigma-delta DAC output left
   output wire 		AUDIO_R, // sigma-delta DAC output right
   // SPI
-  inout wire 		SPI_DO,  // inout
+  inout wire 		SPI_DO,
   input wire 		SPI_DI,
   input wire 		SPI_SCK,
   input wire 		SPI_SS2,    // fpga
@@ -52,23 +50,14 @@ wire video_de, video_hs;
 // on-board io
 wire [1:0] buttons;
 
-// TODO: Clean this up as all dtacks are directly generated from their sel's
-wire io_dtack;
-assign io_dtack = 
-	vreg_sel?vreg_dtack:
-	(mmu_sel?mmu_dtack:
-	((mfp_sel||mfp_iack)?mfp_dtack:
-	(acia_sel?acia_dtack:
-	(psg_sel?psg_dtack:
-	(dma_sel?dma_dtack:
-	(auto_iack?auto_iack:
-	1'b0))))));
+// generate dtack for all implemented peripherals
+wire io_dtack = vreg_sel || mmu_sel || mfp_sel || mfp_iack || 
+     acia_sel || psg_sel || dma_sel || auto_iack;
 
 // the original tg68k did not contain working support for bus fault exceptions. While earlier
 // TOS versions cope with that, TOS versions with blitter support need this to work as this is
 // required to properly detect that a blitter is not present.
-// a bus error is now generated once no dtack is seen for 63 clock cycles. The tg68k requires 
-// a dtack to be generated with the bus error to continue operation
+// a bus error is now generated once no dtack is seen for 63 clock cycles.
 wire tg68_berr = (dtack_timeout == 6'd63); //  || cpu_write_illegal;
 
 wire cpu_write = cpu_cycle && cpu2io && data_strobe && !tg68_rw;
@@ -100,63 +89,55 @@ assign mfp_iack = cpu_cycle && cpu2iack && data_strobe && (tg68_adr[3:1] == 3'b1
 // entirely to non-autovector interrupts. This means that i now have to provide
 // the vectors for those interrupts that oin the ST are autovector ones. This needs
 // to be done for IPL2 (hbi) and IPL4 (vbi)
-wire auto_iack;
-assign auto_iack = cpu_cycle && cpu2iack && data_strobe && 
-	((tg68_adr[3:1] == 3'b100) || (tg68_adr[3:1] == 3'b010));
-wire [7:0] auto_vector;
-assign auto_vector = (tg68_adr[3:1] == 3'b100)?8'h1c:8'h1a;
-	
-// mmu cpu interface at $ff8001
-wire mmu_sel;
-wire mmu_dtack;
+wire auto_iack = cpu_cycle && cpu2iack && data_strobe && 
+     ((tg68_adr[3:1] == 3'b100) || (tg68_adr[3:1] == 3'b010));
+wire [7:0] auto_vector_vbi = (auto_iack && (tg68_adr[3:1] == 3'b100))?8'h1c:8'h00;
+wire [7:0] auto_vector_hbi = (auto_iack && (tg68_adr[3:1] == 3'b010))?8'h1a:8'h00;
+   
+wire [7:0] auto_vector = auto_vector_vbi | auto_vector_hbi;
+ 
+// interfaces not implemented:
+// $fff00000 - $fff000ff  - IDE  
+// $ffff8780 - $ffff878f  - SCSI
+// $ffff8901 - $ffff893f  - STE DMA audio
+// $ffff8a00 - $ffff8a3f  - Blitter
+// $ffff9200 - $ffff923f  - STE joystick ports
+// $fffffa40 - $fffffa7f  - FPU
+// $fffffc20 - $fffffc3f  - RTC
+
+wire io_sel = cpu_cycle && cpu2io && data_strobe ;
+ 
+// mmu 8 bit interface at $ff8000 - $ff8801
+wire mmu_sel  = io_sel && ({tg68_adr[15:1], 1'd0} == 16'h8000);
 wire [7:0] mmu_data_out;
-assign mmu_sel = cpu_cycle && cpu2io && data_strobe && ({tg68_adr[15:1], 1'b0} == 16'h8000);
 
-// video controller cpu interface at $ff8200
-wire vreg_sel;
-wire vreg_dtack;
+// video controller 16 bit interface at $ff8200 - $ff827f
+wire vreg_sel = io_sel && ({tg68_adr[15:7], 7'd0} == 16'h8200);
 wire [15:0] vreg_data_out;
-assign vreg_sel = cpu_cycle && cpu2io && data_strobe && (tg68_adr[15:8] == 8'h82);
 
-// mfp cpu interface at $fffa00 - $fffa3f
-wire mfp_sel;
-wire mfp_dtack;
+// mfp 8 bit interface at $fffa00 - $fffa3f
+wire mfp_sel  = io_sel && ({tg68_adr[15:6], 6'd0} == 16'hfa00);
 wire [7:0] mfp_data_out;
-assign mfp_sel = cpu_cycle && cpu2io && data_strobe && (tg68_adr[15:8] == 8'hfa) && 
-	(tg68_adr[7:6] == 2'b00);
 
-// acia cpu interface at $fffc00
-wire acia_sel;
-wire acia_dtack;
+// acia 8 bit interface at $fffc00 - $fffc07
+wire acia_sel = io_sel && ({tg68_adr[15:3], 3'd0} == 16'hfc00);
 wire [7:0] acia_data_out;
-assign acia_sel = cpu_cycle && cpu2io && data_strobe && (tg68_adr[15:8] == 8'hfc);
 
-//  psg interface at $ff8800
-wire psg_sel;
-wire psg_dtack;
+//  psg 8 bit interface at $ff8800 - $ff8803
+wire psg_sel  = io_sel && ({tg68_adr[15:2], 2'd0} == 16'h8800);
 wire [7:0] psg_data_out;
-assign psg_sel = cpu_cycle && cpu2io && data_strobe && (tg68_adr[15:8] == 8'h88);
 
-//  dma interface at $ff8600
-wire dma_sel;
-wire dma_dtack;
+//  dma 16 bit interface at $ff8600 - $ff860f
+wire dma_sel  = io_sel && ({tg68_adr[15:4], 4'd0} == 16'h8600);
 wire [15:0] dma_data_out;
-assign dma_sel = cpu_cycle && cpu2io && data_strobe && (tg68_adr[15:8] == 8'h86);
 
 // de-multiplex the various io data output ports into one 
-wire [15:0] io_data_out;
-assign io_data_out = 
-		vreg_sel?vreg_data_out:
-		(mmu_sel?{8'h00, mmu_data_out}:
-		((mfp_sel||mfp_iack)?{8'h00, mfp_data_out}:
-		(auto_iack?{8'h00, auto_vector}:
-		(acia_sel?{acia_data_out, 8'h00}:
-		(psg_sel?{psg_data_out, 8'h00}:
-		(dma_sel?dma_data_out:
-		16'h0000))))));
+wire [7:0] io_data_out_8u = acia_data_out | psg_data_out;
+wire [7:0] io_data_out_8l = mmu_data_out | mfp_data_out | auto_vector;
+wire [15:0] io_data_out = vreg_data_out | dma_data_out |
+			{8'h00, io_data_out_8l} | {io_data_out_8u, 8'h00};
 
-wire init;
-assign init = ~pll_locked;
+wire init = ~pll_locked;
 
 video video (
 	.reset      (init          ), // reset input
@@ -173,12 +154,11 @@ video video (
 	.reg_reset    (reset       ),
 	.reg_din      (tg68_dat_out),
 	.reg_sel      (vreg_sel    ),
-	.reg_addr     (tg68_adr[7:0]),
+	.reg_addr     (tg68_adr[6:1]),
 	.reg_uds      (tg68_uds    ),
 	.reg_lds      (tg68_lds    ),
 	.reg_rw       (tg68_rw     ),
 	.reg_dout     (vreg_data_out),
-	.reg_dtack    (vreg_dtack  ),
 	
    .vaddr      (video_address ),
 	.data       (video_data    ),
@@ -204,8 +184,7 @@ mmu mmu (
 	.sel      (mmu_sel     ),
 	.ds       (tg68_lds    ),
 	.rw       (tg68_rw     ),
-	.dout     (mmu_data_out),
-	.dtack    (mmu_dtack   )
+	.dout     (mmu_data_out)
 );
 
 wire acia_irq, dma_irq;
@@ -216,11 +195,10 @@ mfp mfp (
 	.reset    (reset       ),
 	.din      (tg68_dat_out[7:0]),
 	.sel      (mfp_sel     ),
-	.addr     (tg68_adr[7:0]),
+	.addr     (tg68_adr[5:1]),
 	.ds       (tg68_lds    ),
 	.rw       (tg68_rw     ),
 	.dout     (mfp_data_out),
-	.dtack    (mfp_dtack   ),
 	.irq	    (mfp_irq     ),
 	.iack	    (mfp_iack    ),
 
@@ -243,11 +221,10 @@ acia acia (
 	.reset    (reset       ),
 	.din      (tg68_dat_out[15:8]),
 	.sel      (acia_sel    ),
-	.addr     (tg68_adr[7:0]),
+	.addr     (tg68_adr[2:1]),
 	.ds       (tg68_uds    ),
 	.rw       (tg68_rw     ),
 	.dout     (acia_data_out),
-	.dtack    (acia_dtack   ),
 	.irq      (acia_irq     ),
 	
 	// ikbd interface
@@ -270,8 +247,6 @@ assign floppy_sel = port_a_out[2:1];
 
 wire [7:0] audio_out;
 assign AUDIO_R = AUDIO_L;
-
-assign psg_dtack = psg_sel;
 
 sigma_delta_dac sigma_delta_dac (
 	.DACout 		(AUDIO_L),
@@ -324,12 +299,11 @@ dma dma (
 	.reset    (reset       ),
 	.din      (tg68_dat_out[15:0]),
 	.sel      (dma_sel    ),
-	.addr     (tg68_adr[7:0]),
+	.addr     (tg68_adr[3:1]),
 	.uds      (tg68_uds    ),
 	.lds      (tg68_lds    ),
 	.rw       (tg68_rw     ),
 	.dout     (dma_data_out),
-	.dtack    (dma_dtack   ),
 	
 	.irq      (dma_irq     ),
 

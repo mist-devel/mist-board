@@ -4,12 +4,11 @@ module dma (
 	input reset,
 	input [15:0] din,
 	input sel,
-	input [7:0] addr,
+	input [2:0] addr,
 	input uds,
 	input lds,
 	input rw,
 	output reg [15:0] dout,
-	output dtack,	
 
 	// output to mfp
 	output irq,
@@ -64,9 +63,6 @@ reg [7:0] fdc_data;
 reg [23:0] base;
 reg [7:0] scnt;
 
-// dtack
-assign dtack = sel;
-
 // virtual head is over track 0
 wire track0;
 assign track0 = (fdc_track == 8'd0);
@@ -90,7 +86,7 @@ always @(sel, rw, addr, mode, base, fdc_data, fdc_sector, fdc_status, fdc_track,
 	dout = 16'h0000;
 
 	if(sel && rw) begin
-		if((addr == 8'h04) && (mode[4] == 1'b0)) begin
+		if((addr == 3'h2) && (mode[4] == 1'b0)) begin
 			// controller access register
 			if(mode[3] == 1'b0) begin
 				// fdc
@@ -105,19 +101,19 @@ always @(sel, rw, addr, mode, base, fdc_data, fdc_sector, fdc_status, fdc_track,
 			end
 		end
 
-		if(addr == 8'h06)
+		if(addr == 3'h3)
 			dout = dma_status;
 			
 		// sector count register
-		if((addr == 8'h04) && (mode[4] == 1'b1)) 
+		if((addr == 3'h2) && (mode[4] == 1'b1)) 
 			dout = { 8'h00, scnt };
 
 		// dma base address read back
-		if(addr == 8'h09)
+		if(addr == 3'h4)
 			dout = { 8'h00, base[23:16] };				
-		if(addr == 8'h0b)
+		if(addr == 3'h5)
 			dout = { 8'h00, base[15:8] };				
-		if(addr == 8'h0d)
+		if(addr == 3'h6)
 			dout = { 8'h00, base[7:0] };
    end
 end
@@ -151,7 +147,7 @@ always @(negedge clk) begin
 						
 		// dma control and mode register
       if(sel && ~rw) begin
-			if(~lds && (addr == 8'h04) && (mode[4] == 1'b0)) begin
+			if(~lds && (addr == 3'h2) && (mode[4] == 1'b0)) begin
 				// controller access register
 				if(mode[3] == 1'b0) begin
 					// fdc register write
@@ -222,17 +218,17 @@ always @(negedge clk) begin
 			end
 			
 			// sector count register
-			if(~lds && (addr == 8'h04) && (mode[4] == 1'b1))
+			if(~lds && (addr == 3'h2) && (mode[4] == 1'b1))
 				scnt <= din[7:0];
 
-			if(addr == 8'h06)
+			if(addr == 3'h3)
 				mode <= din;
 				
-			if(~lds && (addr == 8'h09))
+			if(~lds && (addr == 3'h4))
 				base[23:16] <= din[7:0];				
-			if(~lds && (addr == 8'h0b))
+			if(~lds && (addr == 3'h5))
 				base[15:8] <= din[7:0];
-			if(~lds && (addr == 8'h0d))
+			if(~lds && (addr == 3'h6))
 				base[7:0] <= din[7:0];
       end
    end

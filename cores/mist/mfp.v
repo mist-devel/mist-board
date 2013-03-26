@@ -6,11 +6,10 @@ module mfp (
 	input 		 reset,
 	input [7:0] 	 din,
 	input 		 sel,
-	input [7:0] 	 addr,
+	input [4:0] 	 addr,
 	input 		 ds,
 	input 		 rw,
 	output reg [7:0] dout,
-	output 		 dtack,
 	output 		 irq,
 	input 		 iack,
 
@@ -67,10 +66,10 @@ mfp_timer timer_a (
 	.RST 			(reset),
    .CTRL_I		(din[4:0]),
    .CTRL_O		(timera_ctrl_o),
-   .CTRL_WE		((addr == 8'h19) && write),
+   .CTRL_WE		((addr == 5'h0c) && write),
    .DAT_I		(din),
    .DAT_O		(timera_dat_o),
-   .DAT_WE		((addr == 8'h1f) && write),
+   .DAT_WE		((addr == 5'h0f) && write),
    .T_O_PULSE	(timera_done)
 );
 
@@ -85,10 +84,10 @@ mfp_timer timer_b (
 	.RST 			(reset),
    .CTRL_I		(din[4:0]),
    .CTRL_O		(timerb_ctrl_o),
-   .CTRL_WE		((addr == 8'h1b) && write),
+   .CTRL_WE		((addr == 5'h0d) && write),
    .DAT_I		(din),
    .DAT_O		(timerb_dat_o),
-   .DAT_WE		((addr == 8'h21) && write),
+   .DAT_WE		((addr == 5'h10) && write),
    .T_I			(de),
    .T_O_PULSE	(timerb_done)
 );
@@ -103,10 +102,10 @@ mfp_timer timer_c (
 	.RST 			(reset),
    .CTRL_I		({2'b00, din[6:4]}),
    .CTRL_O		(timerc_ctrl_o),
-   .CTRL_WE		((addr == 8'h1d) && write),
+   .CTRL_WE		((addr == 5'h0e) && write),
    .DAT_I		(din),
    .DAT_O		(timerc_dat_o),
-   .DAT_WE		((addr == 8'h23) && write),
+   .DAT_WE		((addr == 5'h11) && write),
    .T_O_PULSE	(timerc_done)
 );
 
@@ -120,15 +119,12 @@ mfp_timer timer_d (
 	.RST 			(reset),
    .CTRL_I		({2'b00, din[2:0]}),
    .CTRL_O		(timerd_ctrl_o),
-   .CTRL_WE		((addr == 8'h1d) && write),
+   .CTRL_WE		((addr == 5'h0e) && write),
    .DAT_I		(din),
    .DAT_O		(timerd_dat_o),
-   .DAT_WE		((addr == 8'h25) && write),
+   .DAT_WE		((addr == 5'h12) && write),
    .T_O_PULSE	(timerd_done)
 );
-
-// dtack
-assign dtack = sel || iack;
 
 reg [7:0] aer, ddr, gpip;
 
@@ -208,31 +204,31 @@ always @(iack, sel, ds, rw, addr, gpip_cpu_out, aer, ddr, ier, ipr, isr, imr,
 
 	dout = 8'd0;
 	if(sel && ~ds && rw) begin
-		if(addr == 8'h01) dout = gpip_cpu_out;
-		if(addr == 8'h03) dout = aer;
-		if(addr == 8'h05) dout = ddr;
+		if(addr == 5'h00) dout = gpip_cpu_out;
+		if(addr == 5'h01) dout = aer;
+		if(addr == 5'h02) dout = ddr;
 	
-		if(addr == 8'h07) dout = ier[15:8];
-		if(addr == 8'h0b) dout = ipr[15:8];
-		if(addr == 8'h0f) dout = isr[15:8];
-		if(addr == 8'h13) dout = imr[15:8];
-		if(addr == 8'h09) dout = ier[7:0];
-		if(addr == 8'h0d) dout = ipr[7:0];
-		if(addr == 8'h11) dout = isr[7:0];
-		if(addr == 8'h15) dout = imr[7:0];
-		if(addr == 8'h17) dout = vr;
+		if(addr == 5'h03) dout = ier[15:8];
+		if(addr == 5'h05) dout = ipr[15:8];
+		if(addr == 5'h07) dout = isr[15:8];
+		if(addr == 5'h09) dout = imr[15:8];
+		if(addr == 5'h04) dout = ier[7:0];
+		if(addr == 5'h06) dout = ipr[7:0];
+		if(addr == 5'h08) dout = isr[7:0];
+		if(addr == 5'h0a) dout = imr[7:0];
+		if(addr == 5'h0b) dout = vr;
 	
 		// timers
-		if(addr == 8'h19) dout = { 3'b000, timera_ctrl_o};
-		if(addr == 8'h1b) dout = { 3'b000, timerb_ctrl_o};
-		if(addr == 8'h1d) dout = { timerc_ctrl_o[3:0], timerd_ctrl_o[3:0]};
-		if(addr == 8'h1f) dout = timera_dat_o;
-		if(addr == 8'h21) dout = timerb_dat_o;
-		if(addr == 8'h23) dout = timerc_dat_o;
-		if(addr == 8'h25) dout = timerd_dat_o;
+		if(addr == 5'h0c) dout = { 3'b000, timera_ctrl_o};
+		if(addr == 5'h0d) dout = { 3'b000, timerb_ctrl_o};
+		if(addr == 5'h0e) dout = { timerc_ctrl_o[3:0], timerd_ctrl_o[3:0]};
+		if(addr == 5'h0f) dout = timera_dat_o;
+		if(addr == 5'h10) dout = timerb_dat_o;
+		if(addr == 5'h11) dout = timerc_dat_o;
+		if(addr == 5'h12) dout = timerd_dat_o;
 		
 		// uart: report "tx buffer empty" if fifo is not full
-		if(addr == 8'h2d) dout = serial_data_out_fifo_full?8'h00:8'h80;
+		if(addr == 5'h16) dout = serial_data_out_fifo_full?8'h00:8'h80;
 		
 	end else if(iack) begin
 		dout = irq_vec;
@@ -292,47 +288,30 @@ always @(negedge clk) begin
 		end
 		
 		if(sel && ~ds && ~rw) begin
-			if(addr == 8'h01) 
-				gpip <= din;
-				
-			if(addr == 8'h03)
-				aer <= din;
-				
-			if(addr == 8'h05)
-				ddr <= din;
+			if(addr == 5'h00) gpip <= din;
+			if(addr == 5'h01)	aer <= din;
+			if(addr == 5'h02)	ddr <= din;
 
-			if(addr == 8'h07) begin
+			if(addr == 5'h03) begin
 				ier[15:8] <= din;
 				ipr[15:8]<= ipr[15:8] & din;  // clear pending interrupts
 			end
 				
-			if(addr == 8'h0b)	
-				ipr[15:8] <= ipr[15:8] & din;
+			if(addr == 5'h05)	ipr[15:8] <= ipr[15:8] & din;
+			if(addr == 5'h07)	isr[15:8] <= isr[15:8] & din;  // zero bits are cleared
+			if(addr == 5'h09)	imr[15:8] <= din;
 
-			if(addr == 8'h0f)	
-				isr[15:8] <= isr[15:8] & din;  // zero bits are cleared
-
-			if(addr == 8'h13)	
-				imr[15:8] <= din;
-
-			if(addr == 8'h09) begin
+			if(addr == 5'h04) begin
 				ier[7:0] <= din;
 				ipr[7:0] <= ipr[7:0] & din;  // clear pending interrupts
 			end
 
-			if(addr == 8'h0d) 
-				ipr[7:0] <= ipr[7:0] & din;
-
-			if(addr == 8'h11)	
-				isr[7:0] <= isr[7:0] & din;  // zero bits are cleared
-
-			if(addr == 8'h15)	
-				imr[7:0] <= din;
-
-			if(addr == 8'h17) 
-				vr <= din;
+			if(addr == 5'h06) ipr[7:0] <= ipr[7:0] & din;
+			if(addr == 5'h08)	isr[7:0] <= isr[7:0] & din;  // zero bits are cleared
+			if(addr == 5'h0a)	imr[7:0] <= din;
+			if(addr == 5'h0b) vr <= din;
 			
-			if(addr == 8'h2f) begin
+			if(addr == 5'h17) begin
 				fifoOut[writePout] <= din;
 				writePout <= writePout + 4'd1;
 			end

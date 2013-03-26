@@ -4,11 +4,10 @@ module acia (
 	input reset,
 	input [7:0] din,
 	input sel,
-	input [7:0] addr,
+	input [1:0] addr,
 	input ds,
 	input rw,
 	output reg [7:0] dout,
-	output dtack,	
 	output irq,
 	
 	// data from io controller to acia
@@ -47,7 +46,7 @@ always @(negedge clk) begin
 	ikbd_strobe_inD2 <= ikbd_strobe_inD;
 	
 	// read on kbd data register
-	if(sel && ~ds && rw && (addr == 8'h02))
+	if(sel && ~ds && rw && (addr == 2'd1))
 		data_read <= 1'b1;
 	else
 		data_read <= 1'b0;
@@ -65,7 +64,7 @@ always @(negedge clk) begin
 		
 		// Some programs (e.g. bolo) need a pause between two ikbd bytes.
 		// The ikbd runs at 7812.5 bit/s 1 start + 8 data + 1 stop bit. 
-		// One bit is 1/718.25 seconds. A pause of ~1ms is thus required
+		// One byte is 1/718.25 seconds. A pause of ~1ms is thus required
 		// 8000000/718.25 = 11138.18
 		readTimer <= 14'd11138;
 	end
@@ -97,22 +96,18 @@ always @(posedge clk) begin
 			readPout <= readPout + 4'd1;
 end
 	
-// dtack
-assign dtack = sel;
-
 always @(sel, ds, rw, addr, dataInAvail, rxd) begin
-   if(sel && ~ds && rw) begin
+	dout = 8'h00;
+
+	if(sel && ~ds && rw) begin
       // keyboard acia read
-      if(addr == 8'h00)      dout = 8'h02 | (dataInAvail?8'h81:8'h00);  // status
-      else if(addr == 8'h02) dout = rxd;    // data
+      if(addr == 2'd0) dout = 8'h02 | (dataInAvail?8'h81:8'h00);  // status
+      if(addr == 2'd1) dout = rxd;    // data
       
       // midi acia read
-      else if(addr == 8'h04) dout = 8'h02;  // status
-      else if(addr == 8'h06) dout = 8'h00;  // data
-
-      else                   dout = 8'h00;
-   end else
-     dout = 8'h00;
+      if(addr == 2'd2) dout = 8'h02;  // status
+      if(addr == 2'd3) dout = 8'h00;  // data
+   end
 end
    
 always @(negedge clk) begin
@@ -120,7 +115,7 @@ always @(negedge clk) begin
       writePout <= 0;
    end else begin
       // keyboard acia data register writes into buffer 
-      if(sel && ~ds && ~rw && addr == 8'h02) begin
+      if(sel && ~ds && ~rw && addr == 2'd1) begin
          fifoOut[writePout] <= din;
 			writePout <= writePout + 4'd1;
       end

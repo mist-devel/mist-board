@@ -6,12 +6,8 @@ module mmu (
 	input 		 sel,
 	input 		 ds,
 	input 		 rw,
-	output reg [7:0] dout,
-	output 		 dtack
+	output reg [7:0] dout
 );
-
-// dtack
-assign dtack = sel;
 
 reg [7:0] memconfig;
 
