@@ -44,9 +44,7 @@ clean:
 
 release:
 	make
-	cd $(FPGA_DIR)/out; cp minimig_mist.rbf core.rbf ; zip ../../../../../www/minimig_mist.zip core.rbf ; rm core.rbf
-	make clean
-	cd ..; tar --exclude=.svn --exclude=\*.bak --exclude=\*~ -z -c -v -f ../www/minimig_mist_hdl.tgz minimig
-	cp ../../www/files.html files.tmp
-	sed -e "s|Minimig core updated on [0-9/]*.|Minimig core updated on $(TODAY).|g" files.tmp > ../../www/files.html
+	cd $(FPGA_DIR)/out; cp minimig_mist.rbf core.rbf ; zip ../../../../../../www/minimig_mist.zip core.rbf ; rm core.rbf
+	cp ../../../www/files.html files.tmp
+	sed -e "s|Minimig core updated on [0-9/]*.|Minimig core updated on $(TODAY).|g" files.tmp > ../../../www/files.html
 	rm files.tmp
