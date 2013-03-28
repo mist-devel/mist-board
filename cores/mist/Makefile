@@ -45,9 +45,7 @@ clean:
 
 release:
 	make
-	cd ./out; cp mist.rbf core.rbf ; cp ../../../tos/system.fnt .; cp ../readme.txt .; zip ../../../www/mist.zip core.rbf system.fnt readme.txt ; rm core.rbf system.fnt
-	make clean
-	cd ..; tar --exclude=.svn --exclude=old --exclude=old --exclude=*.orig --exclude=\*.bak --exclude=Makefile --exclude=greybox_tmp --exclude=out --exclude=db --exclude=incremental_db --exclude=\*~ -z -c -v -f ../www/mist_hdl.tgz mist-core-atarist
-	cp ../../www/files.html files.tmp
-	sed -e "s|Mist core updated on [0-9/]*.|Mist core updated on $(TODAY).|g" files.tmp > ../../www/files.html
+	cd ./out; cp mist.rbf core.rbf ; cp ../../../../tos/system.fnt .; zip ../../../../www/mist.zip core.rbf system.fnt ; rm core.rbf system.fnt
+	cp ../../../www/files.html files.tmp
+	sed -e "s|Mist core updated on [0-9/]*.|Mist core updated on $(TODAY).|g" files.tmp > ../../../www/files.html
 	rm files.tmp

@@ -116,15 +116,15 @@ wire vreg_sel = io_sel && ({tg68_adr[15:7], 7'd0} == 16'h8200);
 wire [15:0] vreg_data_out;
 
 // mfp 8 bit interface at $fffa00 - $fffa3f
-wire mfp_sel  = io_sel && ({tg68_adr[15:6], 6'd0} == 16'hfa00);
+wire mfp_sel  = io_sel && ({tg68_adr[15:8], 8'd0} == 16'hfa00);
 wire [7:0] mfp_data_out;
 
 // acia 8 bit interface at $fffc00 - $fffc07
-wire acia_sel = io_sel && ({tg68_adr[15:3], 3'd0} == 16'hfc00);
+wire acia_sel = io_sel && ({tg68_adr[15:8], 8'd0} == 16'hfc00);
 wire [7:0] acia_data_out;
 
 //  psg 8 bit interface at $ff8800 - $ff8803
-wire psg_sel  = io_sel && ({tg68_adr[15:2], 2'd0} == 16'h8800);
+wire psg_sel  = io_sel && ({tg68_adr[15:8], 8'd0} == 16'h8800);
 wire [7:0] psg_data_out;
 
 //  dma 16 bit interface at $ff8600 - $ff860f
