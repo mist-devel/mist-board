@@ -12,11 +12,16 @@ module data_io (
 	input ss,
 	output sdo,
 	
-	// dma interface
+	// dma status interface
 	output [4:0] dma_idx,
 	input [7:0] dma_data,
 	output reg dma_ack,
 
+	// acsi data interface
+	input acsi_out_available,
+	output reg acsi_out_strobe,
+	input [9:0] acsi_out_data,
+	
 	// ram interface
 	output reg [2:0] state, // state bits required to drive the sdram host
 	output [22:0] addr,
@@ -67,7 +72,6 @@ reg [15:0] txData;
 assign sdo = txData[15];
 
 always@(negedge sck) begin
-
 	// memory read
 	if(cmd == 3) begin
 	   if(cnt == 8)
@@ -81,6 +85,19 @@ always@(negedge sck) begin
 	   if((cnt == 8) || (cnt == 16))
 			txData[15:8] <= dma_data;
 		else
+			txData[15:1] <= txData[14:0];
+	end
+	
+	// acsi daza read
+	// send alternating "data available flag + address" and "data"
+	if(cmd == 7) begin
+	   if(cnt == 8) begin
+			txData[15:8] <= { 5'd0, acsi_out_data[9:8], acsi_out_available };
+			acsi_out_strobe <= 1'b0;
+	   end else if(cnt == 16) begin
+			txData[15:8] <= acsi_out_data[7:0];
+			acsi_out_strobe <= 1'b1;
+		end else
 			txData[15:1] <= txData[14:0];
 	end
 end

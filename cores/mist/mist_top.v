@@ -58,7 +58,26 @@ wire io_dtack = vreg_sel || mmu_sel || mfp_sel || mfp_iack ||
 // TOS versions cope with that, TOS versions with blitter support need this to work as this is
 // required to properly detect that a blitter is not present.
 // a bus error is now generated once no dtack is seen for 63 clock cycles.
-wire tg68_berr = (dtack_timeout == 6'd63); //  || cpu_write_illegal;
+wire tg68_berr = (dtack_timeout == 5'd31); //  || cpu_write_illegal;
+
+// count bus errors for debugging purposes. we can thus trigger for a
+// certain bus error
+reg [3:0] berr_cnt_out;
+reg [3:0] berr_cnt;
+always @(posedge clk_8) begin
+	if(reset) begin
+		berr_cnt <= 4'd0;
+	end else begin
+		berr_cnt_out <= 4'd0;
+		if(tg68_berr) begin
+			berr_cnt_out <= berr_cnt + 4'd1;
+			berr_cnt <= berr_cnt + 4'd1;
+		end
+	end
+end
+
+// the following is just to prevent optimization			
+assign UART_TX = (berr_cnt_out == 4'd0);
 
 wire cpu_write = cpu_cycle && cpu2io && data_strobe && !tg68_rw;
 
@@ -67,18 +86,24 @@ wire cpu_write = cpu_cycle && cpu2io && data_strobe && !tg68_rw;
 wire cpu_write_illegal = cpu_write && 
      (tg68_adr[23:3] === 21'd0);     // the first two long words $0 and $4
 
-reg [5:0] dtack_timeout;
+	  
+reg [4:0] dtack_timeout;
 always @(posedge clk_8) begin
 	if(reset) begin
-		dtack_timeout <= 6'd0;
+		dtack_timeout <= 5'd0;
 	end else begin
-		if(!tg68_dtack)
-			dtack_timeout <= 6'd0;
-		else if(dtack_timeout != 6'd63)
-			dtack_timeout <= dtack_timeout + 6'd1;
+		if(!tg68_dtack || br)
+			dtack_timeout <= 5'd0;
+		else if(dtack_timeout != 5'd31)
+			dtack_timeout <= dtack_timeout + 5'd1;
 	end
 end
 		
+// no tristate busses exist inside the FPGA. so bus request doesn't do
+// much more than halting the cpu by suppressing dtack
+wire br = dma_br;   // dma is only other bus master (yet)
+wire dma_br;
+
 // request interrupt ack from mfp for IPL == 6
 wire mfp_iack;
 assign mfp_iack = cpu_cycle && cpu2iack && data_strobe && (tg68_adr[3:1] == 3'b110);
@@ -293,6 +318,11 @@ wire [7:0 ]dma_dio_data;
 // floppy_sel is active low
 wire wr_prot = (floppy_sel == 2'b01)?system_ctrl[7]:system_ctrl[6];
 
+// acsi interface
+wire data_from_acsi_available;
+wire strobe_from_acsi;
+wire [9:0] data_from_acsi;
+
 dma dma (
 	// cpu interface
 	.clk      (clk_8       ),
@@ -306,6 +336,7 @@ dma dma (
 	.dout     (dma_data_out),
 	
 	.irq      (dma_irq     ),
+	.br       (dma_br      ),
 
 	// system control interface
 	.fdc_wr_prot (wr_prot),
@@ -314,6 +345,11 @@ dma dma (
 	.dio_idx  (dma_dio_idx ),
 	.dio_data (dma_dio_data),
 	.dio_ack  (dma_dio_ack ),
+
+	// acsi interface
+	.acsi_data_out_available 	(data_from_acsi_available),
+	.acsi_strobe_out 				(strobe_from_acsi),
+	.acsi_data_out 	   		(data_from_acsi),
 
 	// floppy interface
 	.drv_sel  (floppy_sel  ),
@@ -543,7 +579,7 @@ wire data_strobe;
 assign data_strobe = ~tg68_uds || ~tg68_lds;
 
 // generate dtack (for st ram only and rom), TODO: no dtack for rom write
-assign tg68_dtack = ~((cpu2mem && data_strobe && cpu_cycle) || io_dtack );
+assign tg68_dtack = ~(((cpu2mem && data_strobe && cpu_cycle) || io_dtack ) && !br);
 
 wire ram_oe;
 assign ram_oe = video_cycle?~video_read:
@@ -668,10 +704,15 @@ data_io data_io (
 		.ss    		(SPI_SS2			),
 		.sdo			(data_io_sdo	),
 
-		// dma interface
+		// dma status interface
 		.dma_idx    (dma_dio_idx   ),
 		.dma_data   (dma_dio_data  ),
 		.dma_ack    (dma_dio_ack   ),
+
+		// acsi interface
+		.acsi_out_available  (data_from_acsi_available	),
+		.acsi_out_strobe		(strobe_from_acsi				),
+		.acsi_out_data			(data_from_acsi				),
 
 		// ram interface
 		.state 	 	(host_state		),
