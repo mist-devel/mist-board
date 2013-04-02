@@ -301,7 +301,7 @@ wire [9:0] v_offset = mono?10'd0:10'd2;
 wire de = (hcnt >= H_PRE) && (hcnt < H_ACT+H_PRE) && (vcnt >= v_offset && vcnt < V_ACT+v_offset);
 
 // a fake de signal for timer a for color modes with half the hsync frequency
-wire deC = (((hcnt >= H_PRE) && !vcnt[0]) || ((hcnt < H_ACT+H_PRE) && vcnt[0])) && 
+wire deC = (((hcnt >= H_PRE) && !vcnt[0]) || ((hcnt < H_ACT+H_PRE-10'd96) && vcnt[0])) && 
 	(vcnt >= (v_offset-10'd0) && vcnt < (V_ACT+v_offset-10'd0));
 
 // a fake hsync pulse for the scan doubled color modes

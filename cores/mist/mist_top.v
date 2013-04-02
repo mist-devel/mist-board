@@ -141,7 +141,7 @@ wire vreg_sel = io_sel && ({tg68_adr[15:7], 7'd0} == 16'h8200);
 wire [15:0] vreg_data_out;
 
 // mfp 8 bit interface at $fffa00 - $fffa3f
-wire mfp_sel  = io_sel && ({tg68_adr[15:8], 8'd0} == 16'hfa00);
+wire mfp_sel  = io_sel && ({tg68_adr[15:6], 6'd0} == 16'hfa00);
 wire [7:0] mfp_data_out;
 
 // acia 8 bit interface at $fffc00 - $fffc07
@@ -318,11 +318,6 @@ wire [7:0 ]dma_dio_data;
 // floppy_sel is active low
 wire wr_prot = (floppy_sel == 2'b01)?system_ctrl[7]:system_ctrl[6];
 
-// acsi interface
-wire data_from_acsi_available;
-wire strobe_from_acsi;
-wire [9:0] data_from_acsi;
-
 dma dma (
 	// cpu interface
 	.clk      (clk_8       ),
@@ -340,16 +335,12 @@ dma dma (
 
 	// system control interface
 	.fdc_wr_prot (wr_prot),
+	.acsi_enable (system_ctrl[17:10]),
 	
 	// data_io (arm controller imterface)
 	.dio_idx  (dma_dio_idx ),
 	.dio_data (dma_dio_data),
 	.dio_ack  (dma_dio_ack ),
-
-	// acsi interface
-	.acsi_data_out_available 	(data_from_acsi_available),
-	.acsi_strobe_out 				(strobe_from_acsi),
-	.acsi_data_out 	   		(data_from_acsi),
 
 	// floppy interface
 	.drv_sel  (floppy_sel  ),
@@ -652,7 +643,7 @@ wire user_io_sdo;
 assign SPI_DO = (CONF_DATA0 == 1'b0)?user_io_sdo:
 	((SPI_SS2 == 1'b0)?data_io_sdo:1'bZ);
 
-wire [15:0] system_ctrl;
+wire [31:0] system_ctrl;
 
 // connection to transfer ikbd data from io controller to acia
 wire [7:0] ikbd_data_to_acia;
@@ -708,11 +699,6 @@ data_io data_io (
 		.dma_idx    (dma_dio_idx   ),
 		.dma_data   (dma_dio_data  ),
 		.dma_ack    (dma_dio_ack   ),
-
-		// acsi interface
-		.acsi_out_available  (data_from_acsi_available	),
-		.acsi_out_strobe		(strobe_from_acsi				),
-		.acsi_out_data			(data_from_acsi				),
 
 		// ram interface
 		.state 	 	(host_state		),

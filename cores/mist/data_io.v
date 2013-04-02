@@ -4,7 +4,7 @@ module data_io (
 	input clk_8,
 	input reset,
 	input [1:0] bus_cycle,
-	output reg [15:0] ctrl_out,
+	output reg [31:0] ctrl_out,
  
 	// spi interface
 	input sdi,
@@ -17,11 +17,6 @@ module data_io (
 	input [7:0] dma_data,
 	output reg dma_ack,
 
-	// acsi data interface
-	input acsi_out_available,
-	output reg acsi_out_strobe,
-	input [9:0] acsi_out_data,
-	
 	// ram interface
 	output reg [2:0] state, // state bits required to drive the sdram host
 	output [22:0] addr,
@@ -85,19 +80,6 @@ always@(negedge sck) begin
 	   if((cnt == 8) || (cnt == 16))
 			txData[15:8] <= dma_data;
 		else
-			txData[15:1] <= txData[14:0];
-	end
-	
-	// acsi daza read
-	// send alternating "data available flag + address" and "data"
-	if(cmd == 7) begin
-	   if(cnt == 8) begin
-			txData[15:8] <= { 5'd0, acsi_out_data[9:8], acsi_out_available };
-			acsi_out_strobe <= 1'b0;
-	   end else if(cnt == 16) begin
-			txData[15:8] <= acsi_out_data[7:0];
-			acsi_out_strobe <= 1'b1;
-		end else
 			txData[15:1] <= txData[14:0];
 	end
 end
@@ -165,9 +147,13 @@ always@(posedge sck, posedge ss) begin
 				end				
 			end
 
-			// set control register
-			if((cmd == 4) && (cnt == 5'd23))
-				ctrl_out <= { sbuf, sdi };
+			// set control register (32 bits written in 2 * 16 bits)
+			if((cmd == 4) && (cnt == 5'd23)) begin
+			        if(bcnt < 2)
+			                ctrl_out[31:16] <= { sbuf, sdi };
+		                else
+			                ctrl_out[15:0] <= { sbuf, sdi };
+			end
 		end
 	end
 end

@@ -16,16 +16,12 @@ module dma (
 	
 	// input from system config
 	input fdc_wr_prot,
+	input [7:0] acsi_enable,
 	
 	// connection to data_io (arm controller spi interface)
 	input [4:0] dio_idx,
 	output reg [7:0] dio_data,
 	input dio_ack,
-	
-	// interface to fifo for acsi commands
-   output acsi_data_out_available,
-   input acsi_strobe_out,
-   output [9:0] acsi_data_out,  // 2 bit a0/a1 + 8 bit data
 	
 	// input from psg
 	input drv_side,
@@ -147,27 +143,6 @@ always @(sel, rw, addr, mode, base, fdc_data, fdc_sector, fdc_status, fdc_track,
    end
 end
 
-// -------------- fifo to send acsi data to io controller -------------
-assign acsi_data_out_available = (readPout != writePout);
-assign acsi_data_out = fifoOut[readPout];
-
-localparam FIFO_ADDR_BITS = 8;
-localparam FIFO_DEPTH = (1 << FIFO_ADDR_BITS);
-reg [9:0] fifoOut [FIFO_DEPTH-1:0];
-reg [FIFO_ADDR_BITS-1:0] writePout, readPout;
-
-reg acsi_strobe_outD, acsi_strobe_outD2;
-always @(posedge clk) begin
-	acsi_strobe_outD <= acsi_strobe_out;
-	acsi_strobe_outD2 <= acsi_strobe_outD;
-
-	if(reset)
-		readPout <= 0;
-	else
-		if(acsi_strobe_outD && !acsi_strobe_outD2)
-			readPout <= readPout + 8'd1;
-end
-
 // --------------- acsi handling --------------------
 reg [2:0] acsi_target;
 reg [4:0] acsi_cmd;
@@ -194,7 +169,6 @@ always @(negedge clk) begin
 		scnt <= 8'h00;
 		fdc_busy <= 2'd0;
 		motor_on <= 16'd0;
-		writePout <= 0;
 		fdc_irq <= 1'b0;
 		acsi_target <= 3'd0;
 		acsi_cmd <= 5'd0;
@@ -281,12 +255,16 @@ always @(negedge clk) begin
 						end
 
 						// ------------- TYPE II commands -------------
-						if(din[7:5] == 3'b100)         // read sector
+						if(din[7:5] == 3'b100) begin         // read sector
+							br <= 1'b1;         // request bus
 							fdc_busy <= 2'd3;
+						end
 							
 						if(din[7:5] == 3'b101)         // write sector
-							if(!fdc_wr_prot)
+							if(!fdc_wr_prot) begin
+							   br <= 1'b1;         // request bus
 								fdc_busy <= 2'd3;
+							end
 
 						// ------------- TYPE III commands ------------
 	
@@ -319,16 +297,16 @@ always @(negedge clk) begin
 						acsi_cmd <= din[4:0];
 						acsi_byte_counter <= 3'd0;
 
-						// only acsi 0 is supported
-						if(din[7:5] == 3'd0)
+						// check if this acsi device is enabled
+						if(acsi_enable[din[7:5]] == 1'b1)
 							acsi_irq <= 1'b1;
 					end else begin
 						// further bytes
 						acsi_cmd_parms[acsi_byte_counter] <= din[7:0];
 						acsi_byte_counter <= acsi_byte_counter + 3'd1;
 						
-						// only acsi 0 is supported
-						if(acsi_target == 3'd0) begin
+						// check if this acsi device is enabled
+						if(acsi_enable[acsi_target] == 1'b1) begin
 							// auto-ack first 5 bytes
 							if(acsi_byte_counter < 4)
 								acsi_irq <= 1'b1;
@@ -338,10 +316,6 @@ always @(negedge clk) begin
 							end
 						end
 					end
-	
-					// acsi: write data in output buffer
-					fifoOut[writePout] <= { mode[2:1], din[7:0] };
-					writePout <= writePout + 8'd1;
 				end
 			end
 			
