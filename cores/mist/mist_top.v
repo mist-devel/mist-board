@@ -4,7 +4,7 @@
 
 
 module mist_top (
-  // clock inputs
+  // clock inputsxque	
   input wire [ 2-1:0] 	CLOCK_27, // 27 MHz
   // LED outputs
   output wire 		LED, // LED Yellow

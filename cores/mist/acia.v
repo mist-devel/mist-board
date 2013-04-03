@@ -55,11 +55,14 @@ always @(negedge clk) begin
 		// reset read and write counters
 		readPin <= 4'd0;
 		writePin <= 4'd0;
-	end else if(ikbd_strobe_inD && !ikbd_strobe_inD2) begin
+	end else begin
+	   if(ikbd_strobe_inD && !ikbd_strobe_inD2) begin
 		// store data in fifo
 		fifoIn[writePin] <= ikbd_data_in;
 		writePin <= writePin + 4'd1;
-	end else if(data_read && dataInAvail) begin
+	   end 
+
+	   if(data_read && dataInAvail) begin
 		readPin <= readPin + 4'd1;
 		
 		// Some programs (e.g. bolo) need a pause between two ikbd bytes.
@@ -67,7 +70,8 @@ always @(negedge clk) begin
 		// One byte is 1/718.25 seconds. A pause of ~1ms is thus required
 		// 8000000/718.25 = 11138.18
 		readTimer <= 14'd11138;
-	end
+	   end
+      end
 end
 
 // ------------------ cpu interface --------------------
