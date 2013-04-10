@@ -22,6 +22,7 @@ module dma (
 	input [4:0] dio_idx,
 	output reg [7:0] dio_data,
 	input dio_ack,
+	input dio_nak,
 	
 	// input from psg
 	input drv_side,
@@ -155,8 +156,11 @@ reg acsi_irq;
 wire acsi_status_read = sel && rw && (mode[4:3] == 2'b01);
 
 reg dio_ackD, dio_ackD2;
-always @(posedge clk)
+reg dio_nakD, dio_nakD2;
+always @(posedge clk) begin
 	dio_ackD <= dio_ack;
+	dio_nakD <= dio_nak;
+end
 	
 always @(negedge clk) begin
    if(reset) begin
@@ -178,6 +182,10 @@ always @(negedge clk) begin
    end else begin
 		// acknowledge comes from io controller
 		// rising edge on ack -> clear busy flag
+		dio_nakD2 <= dio_nakD;
+		if(dio_nakD && !dio_nakD2)
+			br <= 1'b0;        // release bus
+		
 		dio_ackD2 <= dio_ackD;
 		if(dio_ackD && !dio_ackD2) begin
 			br <= 1'b0;        // release bus

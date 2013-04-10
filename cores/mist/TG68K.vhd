@@ -136,9 +136,6 @@ COMPONENT TG68KdotC_Kernel
    SIGNAL sync_state3 : std_logic;
    SIGNAL eind	      : std_logic;
    SIGNAL eindd	      : std_logic;
-   SIGNAL sel_autoconfig: std_logic;
-   SIGNAL autoconfig_out: std_logic;
-   SIGNAL autoconfig_data: std_logic_vector(3 downto 0);
    SIGNAL sel_fast: std_logic;
    SIGNAL slower       : std_logic_vector(3 downto 0);
 
@@ -156,15 +153,17 @@ BEGIN
 	addr <= cpuaddr;-- WHEN addr_akt_e='1' ELSE t_addr WHEN addr_akt_s='1' ELSE "ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ";
 --	data <= data_write WHEN data_akt_e='1' ELSE t_data WHEN data_akt_s='1' ELSE "ZZZZZZZZZZZZZZZZ";
 --	datatg68 <= fromram WHEN sel_fast='1' ELSE r_data; 
-	datatg68 <= fromram WHEN sel_fast='1' ELSE r_data WHEN sel_autoconfig='0' ELSE autoconfig_data&r_data(11 downto 0); 
+	datatg68 <= fromram WHEN sel_fast='1' ELSE r_data; --  WHEN sel_autoconfig='0' ELSE autoconfig_data&r_data(11 downto 0); 
 --	toram <= data_write;
 	
-    sel_autoconfig <= '1' when cpuaddr(23 downto 19)="11101" AND autoconfig_out='1' ELSE '0'; --$E80000 - $EFFFFF
 --TH	sel_fast <= '1' when state/="01" AND (cpuaddr(23 downto 21)="001" OR cpuaddr(23 downto 21)="010" OR cpuaddr(23 downto 21)="011" OR cpuaddr(23 downto 21)="100") ELSE '0'; --$200000 - $9FFFFF
 --	sel_fast <= '1' when cpuaddr(23 downto 21)="001" OR cpuaddr(23 downto 21)="010" ELSE '0'; --$200000 - $5FFFFF
---	sel_fast <= '1' when cpuaddr(23 downto 19)="11111" ELSE '0'; --$F800000;
-	sel_fast <= '0'; --$200000 - $9FFFFF
---	sel_fast <= '1' when cpuaddr(24)='1' AND state/="01" ELSE '0'; --$1000000 - $1FFFFFF
+--	sel_fast <= '1' when cpuaddr(23 downto 19)="11111" ELSE '0'; --$F800000;--
+
+	sel_fast <= '0'; -- off
+--	sel_fast <= '1' when cpuaddr(23 downto 22)="00" AND state/="01" ELSE '0'; --$000000 - $3fffff
+--	sel_fast <= '1' when (cpuaddr(23 downto 22)="00"  OR cpuaddr(23 downto 17)="1111110" OR cpuaddr(23 downto 16)="11111110" OR cpuaddr(23 downto 17)="1111101" OR cpuaddr(23 downto 18)="111000") AND state/="01" ELSE '0'; --$000000 - $3fffff
+	
 	ramcs <= (NOT sel_fast) or slower(0);-- OR (state(0) AND NOT state(1));
 --	cpuDMA <= NOT ramcs;
 	cpuDMA <= sel_fast;
@@ -174,9 +173,9 @@ BEGIN
 --	ramaddr(23 downto 0) <= cpuaddr(23 downto 0);
 --	ramaddr(24) <= sel_fast;
 --	ramaddr(31 downto 25) <= cpuaddr(31 downto 25);
-  ramaddr(23 downto 0) <= cpuaddr(23) & sel_fast & cpuaddr(21 downto 0);
-  ramaddr(31 downto 24) <= cpuaddr(31 downto 24);
-
+--TH  ramaddr(23 downto 0) <= cpuaddr(23) & sel_fast & cpuaddr(21 downto 0);
+--TH  ramaddr(31 downto 24) <= cpuaddr(31 downto 24);
+   ramaddr <= cpuaddr;
 
 pf68K_Kernel_inst: TG68KdotC_Kernel 
 	generic map(
@@ -208,37 +207,6 @@ pf68K_Kernel_inst: TG68KdotC_Kernel
 		skipFetch => skipFetch 		-- : out std_logic
         );
  
-	PROCESS (clk)
-	BEGIN
-		autoconfig_data <= "1111";
-		IF memcfg(5 downto 4)/="00" THEN
-			CASE cpuaddr(6 downto 1) IS
-				WHEN "000000" => autoconfig_data <= "1110";		--normal card, add mem, no ROM
-				WHEN "000001" => 
-					CASE memcfg(5 downto 4) IS 
-						WHEN "01" => autoconfig_data <= "0110";		--2MB
-						WHEN "10" => autoconfig_data <= "0111";		--4MB
---						WHEN OTHERS => autoconfig_data <= "0000";	--8MB
-						WHEN OTHERS => autoconfig_data <= "0111";	--4MB
-					END CASE;	
-				WHEN "001000" => autoconfig_data <= "1110";		--4626=icomp
-				WHEN "001001" => autoconfig_data <= "1101";		
-				WHEN "001010" => autoconfig_data <= "1110";		
-				WHEN "001011" => autoconfig_data <= "1101";		
-				WHEN "010011" => autoconfig_data <= "1110";		--serial=1
-				WHEN OTHERS => null;
-			END CASE;	
-		END IF;
-		IF rising_edge(clk) THEN
-			IF reset='0' THEN
-				autoconfig_out <= '1';		--autoconfig on
-			ELSIF enaWRreg='1' THEN
-				IF sel_autoconfig='1' AND state="11"AND uds_in='0' AND cpuaddr(6 downto 1)="100100" THEN
-					autoconfig_out <= '0';		--autoconfig off
-				END IF;	
-			END IF;	
-		END IF;	
-	END PROCESS;
 
 	PROCESS (clk)
 	BEGIN

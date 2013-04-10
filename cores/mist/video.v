@@ -301,7 +301,7 @@ wire [9:0] v_offset = mono?10'd0:10'd2;
 wire de = (hcnt >= H_PRE) && (hcnt < H_ACT+H_PRE) && (vcnt >= v_offset && vcnt < V_ACT+v_offset);
 
 // a fake de signal for timer a for color modes with half the hsync frequency
-wire deC = (((hcnt >= H_PRE) && !vcnt[0]) || ((hcnt < H_ACT+H_PRE-10'd128) && vcnt[0])) && 
+wire deC = (((hcnt >= H_PRE) && !vcnt[0]) || ((hcnt < H_ACT+H_PRE-10'd160) && vcnt[0])) && 
 	(vcnt >= (v_offset-10'd0) && vcnt < (V_ACT+v_offset-10'd0));
 
 // a fake hsync pulse for the scan doubled color modes
@@ -434,9 +434,6 @@ always@(posedge sck, posedge ss) begin
 	end
 end
 
-// output to video controller
-wire osd_oe;      					// the current pixel overwritten by the OSD
-
 // input from video controller
 // vcnt (0..399) / hcnt (0..639)
 
@@ -449,16 +446,24 @@ localparam OSD_HEIGHT = 10'd128;   // pixels are doubled vertically
 localparam OSD_POS_X  = (H_ACT-OSD_WIDTH)>>1;
 localparam OSD_POS_Y  = (V_ACT-OSD_HEIGHT)>>1;
 
-assign osd_oe    = osd_enable && (
+localparam OSD_BORDER  = 10'd2;
+
+wire osd_oe    = osd_enable && (
+	(hcnt >=  OSD_POS_X-OSD_BORDER) &&
+	(hcnt <  (OSD_POS_X + OSD_WIDTH + OSD_BORDER)) &&
+	(vcnt >=  OSD_POS_Y - OSD_BORDER) &&
+	(vcnt <  (OSD_POS_Y + OSD_HEIGHT + OSD_BORDER)));
+
+wire osd_content_area =
 	(hcnt >=  OSD_POS_X) &&
 	(hcnt <  (OSD_POS_X + OSD_WIDTH)) &&
 	(vcnt >=  OSD_POS_Y) &&
-	(vcnt <  (OSD_POS_Y + OSD_HEIGHT)));
+	(vcnt <  (OSD_POS_Y + OSD_HEIGHT));
 
 wire [7:0] osd_hcnt = hcnt - OSD_POS_X + 7'd1;  // one pixel offset for osd_byte register
 wire [6:0] osd_vcnt = vcnt - OSD_POS_Y;
 	
-wire osd_pixel = osd_byte[osd_vcnt[3:1]];
+wire osd_pixel = osd_content_area?osd_byte[osd_vcnt[3:1]]:1'b0;
 
 reg [7:0] osd_byte;
 always @(posedge clk)

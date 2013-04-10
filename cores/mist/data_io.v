@@ -16,6 +16,7 @@ module data_io (
 	output [4:0] dma_idx,
 	input [7:0] dma_data,
 	output reg dma_ack,
+	output reg dma_nak,
 
 	// ram interface
 	output reg [2:0] state, // state bits required to drive the sdram host
@@ -45,10 +46,11 @@ assign addr = addrR[22:0] - ((cmd == 2)?23'b1:23'b0);
 
 // generate state signals required to control the sdram host interface
 always @(posedge clk_8) begin
-	// start io transfers after! bus_cycle 3 and 0 (after the video cycle)
-	writeD <= write && ((bus_cycle == 3) || writeD);
+	// start io transfers clock cycles after bus_cycle 0 
+        // (after the cpu cycle)
+	writeD <= write && ((bus_cycle == 0) || writeD);
 	writeD2 <= writeD;
-	readD <= read && ((bus_cycle == 3) || readD);
+	readD <= read && ((bus_cycle == 0) || readD);
 	readD2 <= readD;
 
 	if(reset)
@@ -91,8 +93,10 @@ always@(posedge sck, posedge ss) begin
 		write <= 1'b0;
 		read <= 1'b0;
 		dma_ack <= 1'b0;
+		dma_nak <= 1'b0;
 	end else begin
 		dma_ack <= 1'b0;
+		dma_nak <= 1'b0;
 		sbuf <= { sbuf[13:0], sdi};
 
 		// 0:7 is command, 8:15 and 16:23 is payload bytes
@@ -111,6 +115,10 @@ always@(posedge sck, posedge ss) begin
 			// send ack
 			if({sbuf[6:0], sdi } == 8'd6)
 				dma_ack <= 1'b1;
+
+			// send nak
+			if({sbuf[6:0], sdi } == 8'd7)
+				dma_nak <= 1'b1;
 
 			// if we can see a read coming initiate sdram read transfer asap
 			if({sbuf[6:0], sdi } == 8'd3)

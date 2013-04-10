@@ -59,7 +59,7 @@ wire io_dtack = vreg_sel || mmu_sel || mfp_sel || mfp_iack ||
 // required to properly detect that a blitter is not present.
 // a bus error is now generated once no dtack is seen for 63 clock cycles.
 wire tg68_berr = (dtack_timeout == 5'd31); //  || cpu_write_illegal;
-
+	
 // count bus errors for debugging purposes. we can thus trigger for a
 // certain bus error
 reg [3:0] berr_cnt_out;
@@ -92,7 +92,9 @@ always @(posedge clk_8) begin
 	if(reset) begin
 		dtack_timeout <= 5'd0;
 	end else begin
-		if(!tg68_dtack || br)
+		// timeout only when cpu owns the bus and when
+		// neither dtack nor fast ram are active
+		if(!tg68_dtack || br || tg68_cpuena)
 			dtack_timeout <= 5'd0;
 		else if(dtack_timeout != 5'd31)
 			dtack_timeout <= dtack_timeout + 5'd1;
@@ -311,9 +313,9 @@ YM2149 ym2149 (
 	.CLK                	( sclk[1]  					)	// 2 MHz
 );
   
-wire dma_dio_ack;
+wire dma_dio_ack, dma_dio_nak;
 wire [4:0] dma_dio_idx;
-wire [7:0 ]dma_dio_data;
+wire [7:0] dma_dio_data;
 
 // floppy_sel is active low
 wire wr_prot = (floppy_sel == 2'b01)?system_ctrl[7]:system_ctrl[6];
@@ -341,6 +343,7 @@ dma dma (
 	.dio_idx  (dma_dio_idx ),
 	.dio_data (dma_dio_data),
 	.dio_ack  (dma_dio_ack ),
+	.dio_nak  (dma_dio_nak ),
 
 	// floppy interface
 	.drv_sel  (floppy_sel  ),
@@ -516,13 +519,13 @@ wire [15:0] cpu_data_in;
 assign cpu_data_in = cpu2mem?ram_data:io_data_out;
 
 // cpu/video stram multiplexing
-wire video_cycle;
-wire cpu_cycle;
 wire [22:0] ram_address;
 wire [15:0] ram_data;
 
-assign video_cycle = (bus_cycle[3:2] == 0);  // 1 is host/spi cycle
-assign cpu_cycle = (bus_cycle[3:2] == 2);
+wire video_cycle = (bus_cycle[3:2] == 0);
+wire cpu_cycle = (bus_cycle[3:2] == 1);
+wire io_cycle = (bus_cycle[3:2] == 2);
+
 assign ram_address = video_cycle?video_address:tg68_adr[23:1];
 assign video_data = ram_data;
 
@@ -535,57 +538,49 @@ wire MEM8M   = (system_ctrl[3:1] == 3'd4);
 wire MEM14M  = (system_ctrl[3:1] == 3'd5);
 
 // ram from 0x000000 to 0x400000
-wire cpu2ram;
-assign cpu2ram = (tg68_adr[23:22] == 2'b00) ||                  // ordinary 4MB
+wire cpu2ram = (tg68_adr[23:22] == 2'b00) ||                  // ordinary 4MB
 	((MEM14M || MEM8M) &&  (tg68_adr[23:22] == 2'b01)) ||  // MiST special 8MB 
 	(MEM14M            && ((tg68_adr[23:22] == 2'b10) |
 	                       (tg68_adr[23:21] == 3'b110))); // MiST special 14MB 
 
 // 256k tos from 0xe00000 to 0xe40000
-wire cpu2tos256k;
-assign cpu2tos256k = (tg68_adr[23:18] == 6'b111000);
+wire cpu2tos256k = (tg68_adr[23:18] == 6'b111000);
 
 // 192k tos from 0xfc0000 to 0xff0000
-wire cpu2tos192k;
-assign cpu2tos192k = (tg68_adr[23:17] == 7'b1111110) || 
-							(tg68_adr[23:16] == 8'b11111110);
+wire cpu2tos192k = (tg68_adr[23:17] == 7'b1111110) || 
+		 				 (tg68_adr[23:16] == 8'b11111110);
 
 // 128k cartridge from 0xfa0000 to 0xfc0000
-wire cpu2cart;
-assign cpu2cart = (tg68_adr[23:17] == 7'b1111101);
+wire cpu2cart = (tg68_adr[23:17] == 7'b1111101);
 
 // cpu to any type of mem (rw on ram, read on rom)
-wire cpu2mem;			
-assign cpu2mem = cpu2ram || (tg68_rw && (cpu2tos192k || cpu2tos256k || cpu2cart));
+wire cpu2mem = cpu2ram || (tg68_rw && (cpu2tos192k || cpu2tos256k || cpu2cart));
 							
 // io from 0xff0000
-wire cpu2io;
-assign cpu2io = (tg68_adr[23:16] == 8'b11111111);
+wire cpu2io = (tg68_adr[23:16] == 8'b11111111);
 
 // irq ack happens on 0xfffffX
-wire cpu2iack;
-assign cpu2iack = (tg68_adr[23:4] == 20'hfffff);
+wire cpu2iack = (tg68_adr[23:4] == 20'hfffff);
 
-wire data_strobe;
-assign data_strobe = ~tg68_uds || ~tg68_lds;
+// data strobe!
+// wire data_strobe = ~tg68_uds || ~tg68_lds;
+reg data_strobe;
+always @(posedge clk_8)
+	data_strobe <= (video_cycle) && (~tg68_uds || ~tg68_lds);
 
 // generate dtack (for st ram only and rom), TODO: no dtack for rom write
-assign tg68_dtack = ~(((cpu2mem && data_strobe && cpu_cycle) || io_dtack ) && !br);
+// assign tg68_dtack = ~(((cpu2mem && data_strobe && cpu_cycle) || io_dtack ) && !br);
+assign tg68_dtack = ~(((cpu2mem && data_strobe) || io_dtack ) && !br);
 
-wire ram_oe;
-assign ram_oe = video_cycle?~video_read:
+wire ram_oe = video_cycle?~video_read:
 	(cpu_cycle?~(data_strobe && tg68_rw && cpu2mem):1'b1);
 
-wire ram_wr;
-assign ram_wr = cpu_cycle?~(data_strobe && ~tg68_rw && cpu2ram):1'b1;
+wire ram_wr = cpu_cycle?~(data_strobe && ~tg68_rw && cpu2ram):1'b1;
 
 // data strobe
-wire ram_uds;
-assign ram_uds = video_cycle?1'b0:tg68_uds;
-
-wire ram_lds;
-assign ram_lds = video_cycle?1'b0:tg68_lds;
-
+wire ram_uds = video_cycle?1'b0:tg68_uds;
+wire ram_lds = video_cycle?1'b0:tg68_lds;
+ 
 //// sdram ////
 sdram sdram (
   .sdata        (SDRAM_DQ         ),
@@ -612,7 +607,7 @@ sdram sdram (
   .cpuAddr      (tg68_cad[24:1]   ),
   .cpuU         (tg68_cuds        ),
   .cpuL         (tg68_clds        ),
-  .cpustate     (tg68_cpustate    ),  // 6'b100101
+  .cpustate     (tg68_cpustate    ),
   .cpu_dma      (tg68_cdma        ),
   .cpuRD        (tg68_cout        ),
   .cpuena       (tg68_cpuena      ),
@@ -699,6 +694,7 @@ data_io data_io (
 		.dma_idx    (dma_dio_idx   ),
 		.dma_data   (dma_dio_data  ),
 		.dma_ack    (dma_dio_ack   ),
+		.dma_nak    (dma_dio_nak   ),
 
 		// ram interface
 		.state 	 	(host_state		),
