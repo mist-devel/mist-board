@@ -42,11 +42,11 @@ module video (
 	output reg [15:0] reg_dout,
 	
 	// screen interface
-	output 		  	hs,      // H_SYNC
-	output  		  	vs,      // V_SYNC
-	output [5:0]  	video_r, // Red[5:0]
-	output [5:0]  	video_g, // Green[5:0]
-	output [5:0]  	video_b, // Blue[5:0]
+	output reg	  	hs,      // H_SYNC
+	output reg	  	vs,      // V_SYNC
+	output reg [5:0]  	video_r, // Red[5:0]
+	output reg [5:0]  	video_g, // Green[5:0]
+	output reg [5:0]  	video_b, // Blue[5:0]
 
 	// system config
 	input 			pal56,   // use VGA compatible 56hz for PAL
@@ -162,11 +162,14 @@ wire [9:0] vcnt = mono?vcnt_mono:vcnt_color;
 wire bd = mono?1'b0:bd_color;
 // monochome is 640x480 (hs & vs neg)
 // color is 800x600 (hs & vs pos)
-assign hs = mono?~hs_mono:hs_color;
-assign vs = mono?~vs_mono:vs_color;
 wire hmax = mono?hmax_mono:hmax_color;
 wire vmax = mono?vmax_mono:vmax_color;
 
+always @(posedge clk) begin
+   hs <= mono?~hs_mono:hs_color;
+   vs <= mono?~vs_mono:vs_color;
+end
+   
 reg [15:0] tx, tx0, tx1, tx2, tx3;      // output shift registers
 
 localparam BASE_ADDR = 23'h8000;   // default video base address 0x010000
@@ -290,10 +293,15 @@ wire [2:0] stvid_g = mono?mono_rgb:color_g;
 wire [2:0] stvid_b = mono?mono_rgb:color_b;
 
 // ... add OSD overlay and feed into VGA outputs
-assign video_r = !osd_oe?{stvid_r,stvid_r}:{osd_pixel, osd_pixel, osd_pixel, stvid_r};
-assign video_g = !osd_oe?{stvid_g,stvid_g}:{osd_pixel, osd_pixel,      1'b1, stvid_g};
-assign video_b = !osd_oe?{stvid_b,stvid_b}:{osd_pixel, osd_pixel, osd_pixel, stvid_b};
+//assign video_r = !osd_oe?{stvid_r,stvid_r}:{osd_pixel, osd_pixel, osd_pixel, stvid_r};
+//assign video_g = !osd_oe?{stvid_g,stvid_g}:{osd_pixel, osd_pixel,      1'b1, stvid_g};
+//assign video_b = !osd_oe?{stvid_b,stvid_b}:{osd_pixel, osd_pixel, osd_pixel, stvid_b};
 
+always @(posedge clk) begin
+   video_r <= !osd_oe?{stvid_r,stvid_r}:{osd_pixel, osd_pixel, osd_pixel, stvid_r};
+   video_g <= !osd_oe?{stvid_g,stvid_g}:{osd_pixel, osd_pixel,      1'b1, stvid_g};
+   video_b <= !osd_oe?{stvid_b,stvid_b}:{osd_pixel, osd_pixel, osd_pixel, stvid_b};
+end
 
 // display enable signal
 // the color modes use a scan doubler and output the data with 2 lines delay

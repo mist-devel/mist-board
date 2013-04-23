@@ -19,6 +19,8 @@
 --                                                                          --
 ------------------------------------------------------------------------------
 ------------------------------------------------------------------------------
+-- add berr handling 10.03.2013
+
 -- bugfix session 07/08.Feb.2013
 -- movem ,-(an)
 -- movem (an)+,          - thanks  Gerhard Suttner
@@ -76,7 +78,7 @@ entity TG68KdotC_Kernel is
         data_in          	: in std_logic_vector(15 downto 0);
 		IPL				  	: in std_logic_vector(2 downto 0):="111";
 		IPL_autovector   	: in std_logic:='0';
-		berr   	: in std_logic:='0'; --TH 
+		berr			   	: in std_logic:='0';					-- only 68000 Stackpointer dummy
 		CPU             	: in std_logic_vector(1 downto 0):="00";  -- 00->68000  01->68010  11->68020(only some parts - yet)
         addr           		: buffer std_logic_vector(31 downto 0);
         data_write        	: out std_logic_vector(15 downto 0);
@@ -207,7 +209,7 @@ architecture logic of TG68KdotC_Kernel is
     signal set_V_Flag	  : bit;
     signal set_vectoraddr : bit;
     signal writeSR	      : bit;
-	signal trap_berr   : bit;  -- TH
+	signal trap_berr   : bit;
 	signal trap_illegal   : bit;
 	signal trap_addr_error   : bit;
 	signal trap_priv      : bit;
@@ -221,6 +223,7 @@ architecture logic of TG68KdotC_Kernel is
 	signal trapd          : bit;
     signal trap_SR        : std_logic_vector(7 downto 0);
 	signal make_trace     : std_logic;
+	signal make_berr     : std_logic;
 	
     signal set_stop	      : bit;
     signal stop	          : bit;
@@ -726,7 +729,8 @@ PROCESS (clk, setdisp, memaddr_a, briefdata, memaddr_delta, setdispbyte, datatyp
 		IF rising_edge(clk) THEN
 			IF clkena_lw='1' THEN
 				trap_vector(31 downto 8) <= (others => '0');
-                                IF trap_berr='1' THEN
+--				IF trap_addr_fault='1' THEN
+				IF trap_berr='1' THEN
 					trap_vector(7 downto 0) <= X"08";
 				END IF;	
 				IF trap_addr_error='1' THEN
@@ -844,7 +848,7 @@ PROCESS (clk, setdisp, memaddr_a, briefdata, memaddr_delta, setdispbyte, datatyp
 -----------------------------------------------------------------------------
 -- PC Calc + fetch opcode
 -----------------------------------------------------------------------------
-PROCESS (clk, IPL, setstate, state, exec_write_back, set_direct_data, next_micro_state, stop, make_trace, IPL_nr, FlagsSR, set_rot_cnt, opcode, writePCbig, set_exec, exec,
+PROCESS (clk, IPL, setstate, state, exec_write_back, set_direct_data, next_micro_state, stop, make_trace, make_berr, IPL_nr, FlagsSR, set_rot_cnt, opcode, writePCbig, set_exec, exec,
 	     PC_dataa, PC_datab, setnextpass, last_data_read, TG68_PC_brw, TG68_PC_word, Z_error, trap_trap, trap_trapv, interrupt, tmp_TG68_PC, TG68_PC)
 	BEGIN
 	
@@ -889,7 +893,8 @@ PROCESS (clk, IPL, setstate, state, exec_write_back, set_direct_data, next_micro
 		setinterrupt <= '0';
 		IF setstate="00" AND next_micro_state=idle AND setnextpass='0' AND (exec_write_back='0' OR state="11") AND set_rot_cnt="000001" AND set_exec(opcCHK)='0'THEN
 			setendOPC <= '1';
-			IF FlagsSR(2 downto 0)<IPL_nr OR IPL_nr="111"  OR make_trace='1' THEN
+--			IF FlagsSR(2 downto 0)<IPL_nr OR IPL_nr="111"  OR make_trace='1' OR make_berr='1' THEN
+			IF FlagsSR(2 downto 0)<IPL_nr OR IPL_nr="111"  OR make_trace='1' OR berr='1' THEN
 				setinterrupt <= '1';
 			ELSIF stop='0' THEN
 				setopcode <= '1';
@@ -918,6 +923,7 @@ PROCESS (clk, IPL, setstate, state, exec_write_back, set_direct_data, next_micro
 				byte <= '0';
 --				IPL_nr <= "000";
 				trap_trace <= '0';
+				trap_berr <= '0';
 				writePCbig <= '0';
 --				recall_last <= '0';
 				Suppress_Base <= '0'; 
@@ -947,10 +953,19 @@ PROCESS (clk, IPL, setstate, state, exec_write_back, set_direct_data, next_micro
 					exe_datatype <= set_datatype;
 					exe_opcode <= opcode;
 
+--					make_berr <= berr OR make_berr;
 					stop <= set_stop OR (stop AND NOT setinterrupt);
 					IF setinterrupt='1' THEN
+						trap_interrupt <= '0';
+						trap_trace <= '0';
+--						TG68_PC_word <= '0';
+						make_berr <= '0';
+						trap_berr <= '0';
 						IF make_trace='1' THEN
 							trap_trace <= '1';
+--						ELSIF make_berr='1' THEN
+						ELSIF berr='1' THEN
+							trap_berr <= '1';
 						ELSE	
 							rIPL_nr <= IPL_nr;
 							IPL_vec <= "00011"&IPL_nr;            --	TH		
@@ -967,6 +982,7 @@ PROCESS (clk, IPL, setstate, state, exec_write_back, set_direct_data, next_micro
 						trap_interrupt <= '0';
 						trap_trace <= '0';
 						TG68_PC_word <= '0';
+						trap_berr <= '0';
 					ELSIF opcode(7 downto 0)="00000000" OR opcode(7 downto 0)="11111111" OR data_is_source='1' THEN
 						TG68_PC_word <= '1';
 					END IF;	
@@ -1225,7 +1241,7 @@ PROCESS (clk, cpu, OP1out, OP2out, opcode, exe_condition, nextpass, micro_state,
 		 build_bcd, set_Z_error, trapd, movem_run, last_data_read, set, set_V_Flag, z_error, trap_trace, trap_interrupt,
 		 SVmode, preSVmode, stop, long_done, ea_only, setstate, execOPC, exec_write_back, exe_datatype,
 		 datatype, interrupt, c_out, trapmake, rot_cnt, brief, addr, 
-		 long_start, set_datatype, sndOPC, set_exec, exec, ea_build_now, reg_QA, reg_QB, berr)
+		 long_start, set_datatype, sndOPC, set_exec, exec, ea_build_now, reg_QA, reg_QB, make_berr, trap_berr)
 	BEGIN
 		TG68_PC_brw <= '0';	
 		setstate <= "00";
@@ -1253,7 +1269,6 @@ PROCESS (clk, cpu, OP1out, OP2out, opcode, exe_condition, nextpass, micro_state,
 		ea_only <= '0';
 		set_direct_data <= '0';
 		set_exec_tas <= '0';
-		trap_berr <= '0';  -- TH
 		trap_illegal <='0';
 		trap_addr_error <= '0';
 		trap_priv <='0';
@@ -1273,7 +1288,12 @@ PROCESS (clk, cpu, OP1out, OP2out, opcode, exe_condition, nextpass, micro_state,
 		next_micro_state <= idle;
 		build_logical <= '0';
 		build_bcd <= '0';
-		skipFetch <= '0';
+		--		skipFetch <= make_berr; --TH
+		if (berr='1') then
+			skipFetch <= '1';
+		else
+			skipFetch <= '0';
+		end if;
 		set_writePCbig <= '0';
 --		set_recall_last <= '0';
 		set_Suppress_Base <= '0';
@@ -1284,11 +1304,6 @@ PROCESS (clk, cpu, OP1out, OP2out, opcode, exe_condition, nextpass, micro_state,
 		END IF;	
 		set_datatype <= datatype;
 		
-		IF berr='1' then                 -- TH
-			trap_berr <= '1';  -- TH
-			trapmake <= '1';         -- TH
-		END IF;                          -- TH
-
 		set <= (OTHERS=>'0');
 		set_exec <= (OTHERS=>'0');
 		set(update_ld) <= '0';
@@ -1308,6 +1323,13 @@ PROCESS (clk, cpu, OP1out, OP2out, opcode, exe_condition, nextpass, micro_state,
 				set(writePC_add) <= '1';
 --				set_datatype <= "10";
 			END IF;
+			IF preSVmode='0' THEN
+				set(changeMode) <= '1';
+			END IF;
+			setstate <= "01";
+		END IF;	
+		IF interrupt='1' AND trap_berr='1' THEN
+			next_micro_state <= trap0;
 			IF preSVmode='0' THEN
 				set(changeMode) <= '1';
 			END IF;
@@ -2847,7 +2869,7 @@ PROCESS (clk, cpu, OP1out, OP2out, opcode, exe_condition, nextpass, micro_state,
 --						set_datatype <= "10";
 						next_micro_state <= trap1;
 					ELSE
-						IF trap_interrupt='1' OR trap_trace='1' THEN
+						IF trap_interrupt='1' OR trap_trace='1' OR trap_berr='1' THEN
 							writePC <= '1';
 						END IF;
 						datatype <= "10";
@@ -2868,8 +2890,7 @@ PROCESS (clk, cpu, OP1out, OP2out, opcode, exe_condition, nextpass, micro_state,
 					setstate <= "11";
 					datatype <= "01";
 					writeSR <= '1';
---					IF trap_berr='1' THEN   -- TH
-					IF trap_vector = X"08" THEN   -- TH
+					IF trap_berr='1' THEN
 						next_micro_state <= trap4;
 					ELSE
 						next_micro_state <= trap3;
@@ -2881,6 +2902,7 @@ PROCESS (clk, cpu, OP1out, OP2out, opcode, exe_condition, nextpass, micro_state,
 					set(directPC) <= '1';
 					setstate <= "10";
 					next_micro_state <= nopnop;
+					
 				WHEN trap4 =>		-- TRAP
 					set(presub) <= '1';
 					setstackaddr <='1';

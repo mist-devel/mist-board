@@ -64,12 +64,15 @@ wire tg68_berr = (dtack_timeout == 5'd31); //  || cpu_write_illegal;
 // certain bus error
 reg [3:0] berr_cnt_out;
 reg [3:0] berr_cnt;
+reg berrD;
 always @(posedge clk_8) begin
+	berrD <= tg68_berr;
+
 	if(reset) begin
 		berr_cnt <= 4'd0;
 	end else begin
 		berr_cnt_out <= 4'd0;
-		if(tg68_berr) begin
+		if(tg68_berr && !berrD) begin
 			berr_cnt_out <= berr_cnt + 4'd1;
 			berr_cnt <= berr_cnt + 4'd1;
 		end
@@ -94,10 +97,15 @@ always @(posedge clk_8) begin
 	end else begin
 		// timeout only when cpu owns the bus and when
 		// neither dtack nor fast ram are active
-		if(!tg68_dtack || br || tg68_cpuena)
-			dtack_timeout <= 5'd0;
-		else if(dtack_timeout != 5'd31)
-			dtack_timeout <= dtack_timeout + 5'd1;
+		if(dtack_timeout != 5'd31) begin
+			if(!tg68_dtack || br || tg68_cpuena)
+				dtack_timeout <= 5'd0;
+			else
+				dtack_timeout <= dtack_timeout + 5'd1;
+		end else
+			// leave bus error when next instruction is read
+			if(!tg68_dtack && (tg68_cpustate[1:0] == 2'd3))
+				dtack_timeout <= 1'b0;
 	end
 end
 		
