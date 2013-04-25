@@ -58,6 +58,7 @@ wire io_dtack = vreg_sel || mmu_sel || mfp_sel || mfp_iack ||
 // TOS versions cope with that, TOS versions with blitter support need this to work as this is
 // required to properly detect that a blitter is not present.
 // a bus error is now generated once no dtack is seen for 63 clock cycles.
+wire tg68_clr_berr;
 wire tg68_berr = (dtack_timeout == 5'd31); //  || cpu_write_illegal;
 	
 // count bus errors for debugging purposes. we can thus trigger for a
@@ -104,7 +105,8 @@ always @(posedge clk_8) begin
 				dtack_timeout <= dtack_timeout + 5'd1;
 		end else
 			// leave bus error when next instruction is read
-			if(!tg68_dtack && (tg68_cpustate[1:0] == 2'd3))
+//			if(!tg68_dtack && (tg68_cpustate[1:0] == 2'd3))
+			if(tg68_clr_berr)
 				dtack_timeout <= 1'b0;
 	end
 end
@@ -503,6 +505,7 @@ TG68K tg68k (
   .lds          (tg68_lds         ),
   .rw           (tg68_rw          ),
   .berr         (tg68_berr        ),
+  .clr_berr     (tg68_clr_berr    ),
   .e            (                 ),
   .vma          (                 ),
   .wrd          (                 ),
@@ -547,9 +550,14 @@ wire MEM14M  = (system_ctrl[3:1] == 3'd5);
 
 // ram from 0x000000 to 0x400000
 wire cpu2ram = (tg68_adr[23:22] == 2'b00) ||                  // ordinary 4MB
-	((MEM14M || MEM8M) &&  (tg68_adr[23:22] == 2'b01)) ||  // MiST special 8MB 
-	(MEM14M            && ((tg68_adr[23:22] == 2'b10) |
-	                       (tg68_adr[23:21] == 3'b110))); // MiST special 14MB 
+	((MEM14M || MEM8M) &&  (tg68_adr[23:22] == 2'b01)) ||  // 8MB 
+	(MEM14M            && ((tg68_adr[23:22] == 2'b10) |    // 12MB
+	                       (tg68_adr[23:21] == 3'b110)));  // 14MB 
+
+wire cpu2ram14 = (tg68_adr[23:22] == 2'b00) ||  // ordinary 4MB
+					  (tg68_adr[23:22] == 2'b01) ||  // 8MB 
+					  (tg68_adr[23:22] == 2'b10) ||  // 12MB
+	              (tg68_adr[23:21] == 3'b110);   // 14MB 
 
 // 256k tos from 0xe00000 to 0xe40000
 wire cpu2tos256k = (tg68_adr[23:18] == 6'b111000);
@@ -562,7 +570,7 @@ wire cpu2tos192k = (tg68_adr[23:17] == 7'b1111110) ||
 wire cpu2cart = (tg68_adr[23:17] == 7'b1111101);
 
 // cpu to any type of mem (rw on ram, read on rom)
-wire cpu2mem = cpu2ram || (tg68_rw && (cpu2tos192k || cpu2tos256k || cpu2cart));
+wire cpu2mem = cpu2ram14 || (tg68_rw && (cpu2tos192k || cpu2tos256k || cpu2cart));
 							
 // io from 0xff0000
 wire cpu2io = (tg68_adr[23:16] == 8'b11111111);

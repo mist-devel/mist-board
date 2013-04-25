@@ -87,7 +87,11 @@ entity TG68KdotC_Kernel is
 		busstate	  	  	: out std_logic_vector(1 downto 0);	-- 00-> fetch code 10->read data 11->write data 01->no memaccess
 		nResetOut	  		: out std_logic;
         FC              	: out std_logic_vector(2 downto 0);
+--         
+		clr_berr	  		: out std_logic;
 -- for debug		
+		db_OP1out			: out std_logic_vector(31 downto 0);
+		db_OP2out			: out std_logic_vector(31 downto 0);
 		skipFetch	  		: out std_logic;
         regin          		: buffer std_logic_vector(31 downto 0)
         );
@@ -295,6 +299,9 @@ architecture logic of TG68KdotC_Kernel is
 
 
 BEGIN  
+db_OP1out <= OP1out;
+db_OP2out <= OP2out;
+
 ALU: TG68K_ALU   
 	generic map(
 		MUL_Mode => MUL_Mode,		--0=>16Bit,  1=>32Bit,  2=>switchable with CPU(1),  3=>no MUL,
@@ -351,6 +358,7 @@ ALU: TG68K_ALU
 	nUDS <= memmaskmux(5);
 	nLDS <= memmaskmux(4);
 	clkena_lw <= '1' WHEN clkena_in='1' AND memmaskmux(3)='1' ELSE '0';
+	clr_berr <= '1' WHEN setopcode='1' AND trap_berr='1' ELSE '0';
 	
 	PROCESS (clk, nReset)
 	BEGIN
@@ -893,8 +901,7 @@ PROCESS (clk, IPL, setstate, state, exec_write_back, set_direct_data, next_micro
 		setinterrupt <= '0';
 		IF setstate="00" AND next_micro_state=idle AND setnextpass='0' AND (exec_write_back='0' OR state="11") AND set_rot_cnt="000001" AND set_exec(opcCHK)='0'THEN
 			setendOPC <= '1';
---			IF FlagsSR(2 downto 0)<IPL_nr OR IPL_nr="111"  OR make_trace='1' OR make_berr='1' THEN
-			IF FlagsSR(2 downto 0)<IPL_nr OR IPL_nr="111"  OR make_trace='1' OR berr='1' THEN
+			IF FlagsSR(2 downto 0)<IPL_nr OR IPL_nr="111"  OR make_trace='1' OR make_berr='1' THEN
 				setinterrupt <= '1';
 			ELSIF stop='0' THEN
 				setopcode <= '1';
@@ -953,7 +960,12 @@ PROCESS (clk, IPL, setstate, state, exec_write_back, set_direct_data, next_micro
 					exe_datatype <= set_datatype;
 					exe_opcode <= opcode;
 
---					make_berr <= berr OR make_berr;
+					if(trap_berr='0') then
+						make_berr <= (berr OR make_berr);
+					else
+						make_berr <= '0';
+					end if;
+						
 					stop <= set_stop OR (stop AND NOT setinterrupt);
 					IF setinterrupt='1' THEN
 						trap_interrupt <= '0';
@@ -963,8 +975,7 @@ PROCESS (clk, IPL, setstate, state, exec_write_back, set_direct_data, next_micro
 						trap_berr <= '0';
 						IF make_trace='1' THEN
 							trap_trace <= '1';
---						ELSIF make_berr='1' THEN
-						ELSIF berr='1' THEN
+						ELSIF make_berr='1' THEN
 							trap_berr <= '1';
 						ELSE	
 							rIPL_nr <= IPL_nr;
@@ -1063,16 +1074,15 @@ PROCESS (clk, IPL, setstate, state, exec_write_back, set_direct_data, next_micro
 						END IF;
 					END IF;	
 					
-					IF setopcode='1' THEN
+					IF setopcode='1' AND berr='0' THEN
 						IF state="00" THEN
 							opcode <= data_read(15 downto 0);
 						ELSE
 							opcode <= last_opc_read(15 downto 0);
 						END IF;
 						nextpass <= '0';
-					ELSIF setinterrupt='1' THEN
-						opcode(15 downto 12) <= X"7";		--moveq
-						opcode(8 downto 6) <= "001";		--word
+					ELSIF setinterrupt='1' OR setopcode='1' THEN
+						opcode <= X"4E71";		--nop
 						nextpass <= '0';
 					ELSE
 --						IF setnextpass='1' OR (regdirectsource='1' AND state="00") THEN
@@ -1288,12 +1298,7 @@ PROCESS (clk, cpu, OP1out, OP2out, opcode, exe_condition, nextpass, micro_state,
 		next_micro_state <= idle;
 		build_logical <= '0';
 		build_bcd <= '0';
-		--		skipFetch <= make_berr; --TH
-		if (berr='1') then
-			skipFetch <= '1';
-		else
-			skipFetch <= '0';
-		end if;
+		skipFetch <= make_berr;
 		set_writePCbig <= '0';
 --		set_recall_last <= '0';
 		set_Suppress_Base <= '0';
@@ -2236,14 +2241,12 @@ PROCESS (clk, cpu, OP1out, OP2out, opcode, exe_condition, nextpass, micro_state,
 				
 -- 0111 ----------------------------------------------------------------------------		
 			WHEN "0111" =>				--moveq
---				IF opcode(8)='0' THEN	-- Cloanto's Amiga Forver ROMs have mangled movq instructions with a 1 here...
-					IF trap_interrupt='0' AND trap_trace='0' THEN
-						datatype <= "10";		--Long
-						set_exec(Regwrena) <= '1';
-						set_exec(opcMOVEQ) <= '1';
-						set_exec(opcMOVE) <= '1';
-						dest_hbits <= '1';
-					END IF;	
+--				IF opcode(8)='0' THEN	-- Cloanto's Amiga Forver ROMs have mangled moveq instructions with a 1 here...
+					datatype <= "10";		--Long
+					set_exec(Regwrena) <= '1';
+					set_exec(opcMOVEQ) <= '1';
+					set_exec(opcMOVE) <= '1';
+					dest_hbits <= '1';
 --				ELSE
 --					trap_illegal <= '1';
 --					trapmake <= '1';

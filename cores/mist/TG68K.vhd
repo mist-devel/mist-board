@@ -34,6 +34,7 @@ entity TG68K is
         clkena_in     : in std_logic:='1';
         IPL           : in std_logic_vector(2 downto 0):="111";
         berr          : in std_logic:='0';
+        clr_berr      : out std_logic;
         dtack         : in std_logic;
         vpa           : in std_logic:='1';
         ein           : in std_logic:='1';
@@ -84,6 +85,7 @@ COMPONENT TG68KdotC_Kernel
 		IPL				  	: in std_logic_vector(2 downto 0):="111";
 		IPL_autovector   	: in std_logic:='0';
 		berr  	: in std_logic:='0';
+		clr_berr  	: out std_logic;
 		CPU             	: in std_logic_vector(1 downto 0):="00";  -- 00->68000  01->68010  11->68020(only same parts - yet)
         addr           		: buffer std_logic_vector(31 downto 0);
         data_write        	: out std_logic_vector(15 downto 0);
@@ -126,6 +128,7 @@ COMPONENT TG68KdotC_Kernel
    SIGNAL wr	      : std_logic;
    SIGNAL uds_in	  : std_logic;
    SIGNAL berr_in	  : std_logic;
+   SIGNAL clr_berr_in	  : std_logic;
    SIGNAL lds_in	  : std_logic;
    SIGNAL state       : std_logic_vector(1 downto 0);
    SIGNAL clkena	  : std_logic;
@@ -147,6 +150,7 @@ COMPONENT TG68KdotC_Kernel
    SIGNAL ramcs	      : std_logic;
 
 BEGIN  
+       clr_berr <= clr_berr_in;
 --	n_clk <= NOT clk;
 --	wrd <= data_akt_e OR data_akt_s;
 	wrd <= wr;
@@ -197,6 +201,7 @@ pf68K_Kernel_inst: TG68KdotC_Kernel
         addr => cpuaddr,           	-- : buffer std_logic_vector(31 downto 0);
         data_write => data_write,     -- : out std_logic_vector(15 downto 0);
 		berr => berr_in,
+		clr_berr => clr_berr_in,
 		busstate => state,	  	  	-- : buffer std_logic_vector(1 downto 0);	
         regin => open,          	-- : out std_logic_vector(31 downto 0);
 		nWr => wr,			  	-- : out std_logic;
