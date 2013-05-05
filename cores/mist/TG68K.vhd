@@ -62,7 +62,8 @@ entity TG68K is
         skipFetch     : out std_logic;
         cpuDMA         : buffer std_logic;
         ramlds        : out std_logic;
-        ramuds        : out std_logic
+        ramuds        : out std_logic;
+        turbo      : in std_logic:='0'
         );
 end TG68K;
 
@@ -164,8 +165,8 @@ BEGIN
 --	sel_fast <= '1' when cpuaddr(23 downto 21)="001" OR cpuaddr(23 downto 21)="010" ELSE '0'; --$200000 - $5FFFFF
 --	sel_fast <= '1' when cpuaddr(23 downto 19)="11111" ELSE '0'; --$F800000;--
 
-	sel_fast <= '0'; -- off
---	sel_fast <= '1' when cpuaddr(23 downto 22)="00" AND state/="01" ELSE '0'; --$000000 - $3fffff
+--	sel_fast <= '0'; -- off
+	sel_fast <= '1' when turbo='1' AND cpuaddr(23 downto 22)="00" AND state/="01" ELSE '0'; --$000000 - $3fffff
 --	sel_fast <= '1' when (cpuaddr(23 downto 22)="00"  OR cpuaddr(23 downto 17)="1111110" OR cpuaddr(23 downto 16)="11111110" OR cpuaddr(23 downto 17)="1111101" OR cpuaddr(23 downto 18)="111000") AND state/="01" ELSE '0'; --$000000 - $3fffff
 	
 	ramcs <= (NOT sel_fast) or slower(0);-- OR (state(0) AND NOT state(1));
@@ -295,9 +296,13 @@ PROCESS (clk, reset, state, as_s, as_e, rw_s, rw_e, uds_s, uds_e, lds_s, lds_e)
 			lds <= '1';
 		ELSE
 			as <= (as_s AND as_e) OR sel_fast;
-			rw <= rw_s AND rw_e;
-			uds <= uds_s AND uds_e;
-			lds <= lds_s AND lds_e;
+--			rw <= rw_s AND rw_e;
+--			uds <= uds_s AND uds_e;
+--			lds <= lds_s AND lds_e;
+--			as <= as_s OR sel_fast;
+			rw <= rw_s;
+			uds <= uds_s;
+			lds <= lds_s;
 		END IF;
 		IF reset='0' THEN
 			S_state <= "00";

@@ -59,11 +59,11 @@ wire io_dtack = vreg_sel || mmu_sel || mfp_sel || mfp_iack ||
 // required to properly detect that a blitter is not present.
 // a bus error is now generated once no dtack is seen for 63 clock cycles.
 wire tg68_clr_berr;
-wire tg68_berr = (dtack_timeout == 5'd31); //  || cpu_write_illegal;
+wire tg68_berr = (dtack_timeout == 3'd7); //  || cpu_write_illegal;
 	
 // count bus errors for debugging purposes. we can thus trigger for a
 // certain bus error
-reg [3:0] berr_cnt_out;
+reg [3:0] berr_cnt_out /* synthesis noprune */;
 reg [3:0] berr_cnt;
 reg berrD;
 always @(posedge clk_8) begin
@@ -81,9 +81,9 @@ always @(posedge clk_8) begin
 end
 
 // the following is just to prevent optimization			
-assign UART_TX = (berr_cnt_out == 4'd0);
+//assign UART_TX = (berr_cnt_out == 4'd0);
 
-wire cpu_write = cpu_cycle && cpu2io && data_strobe && !tg68_rw;
+wire cpu_write = cpu_cycle && cpu2io && address_strobe && !tg68_rw;
 
 // it's illegal to write to certain memory areas
 // TODO: Still the write itself would succeed. That must not happen
@@ -91,23 +91,25 @@ wire cpu_write_illegal = cpu_write &&
      (tg68_adr[23:3] === 21'd0);     // the first two long words $0 and $4
 
 	  
-reg [4:0] dtack_timeout;
+reg [2:0] dtack_timeout;
 always @(posedge clk_8) begin
 	if(reset) begin
-		dtack_timeout <= 5'd0;
+		dtack_timeout <= 3'd0;
 	end else begin
-		// timeout only when cpu owns the bus and when
-		// neither dtack nor fast ram are active
-		if(dtack_timeout != 5'd31) begin
-			if(!tg68_dtack || br || tg68_cpuena)
-				dtack_timeout <= 5'd0;
-			else
-				dtack_timeout <= dtack_timeout + 5'd1;
-		end else
-			// leave bus error when next instruction is read
+		if(cpu_cycle) begin
+			// timeout only when cpu owns the bus and when
+			// neither dtack nor fast ram are active
+			if(dtack_timeout != 3'd7) begin
+				if(!tg68_dtack || br || tg68_cpuena || tg68_as)
+					dtack_timeout <= 3'd0;
+				else
+					dtack_timeout <= dtack_timeout + 3'd1;
+			end else
+				// leave bus error when next instruction is read
 //			if(!tg68_dtack && (tg68_cpustate[1:0] == 2'd3))
-			if(tg68_clr_berr)
-				dtack_timeout <= 1'b0;
+				if(tg68_clr_berr)
+					dtack_timeout <= 3'd0;
+		end
 	end
 end
 		
@@ -118,7 +120,7 @@ wire dma_br;
 
 // request interrupt ack from mfp for IPL == 6
 wire mfp_iack;
-assign mfp_iack = cpu_cycle && cpu2iack && data_strobe && (tg68_adr[3:1] == 3'b110);
+assign mfp_iack = cpu_cycle && cpu2iack && address_strobe && (tg68_adr[3:1] == 3'b110);
 
 // the tg68k core with the wrapper of the minimig doesn't support non-autovector
 // interrupts. Also the existing support for them inside the tg68 kernel is/was broken.
@@ -126,7 +128,7 @@ assign mfp_iack = cpu_cycle && cpu2iack && data_strobe && (tg68_adr[3:1] == 3'b1
 // entirely to non-autovector interrupts. This means that i now have to provide
 // the vectors for those interrupts that oin the ST are autovector ones. This needs
 // to be done for IPL2 (hbi) and IPL4 (vbi)
-wire auto_iack = cpu_cycle && cpu2iack && data_strobe && 
+wire auto_iack = cpu_cycle && cpu2iack && address_strobe && 
      ((tg68_adr[3:1] == 3'b100) || (tg68_adr[3:1] == 3'b010));
 wire [7:0] auto_vector_vbi = (auto_iack && (tg68_adr[3:1] == 3'b100))?8'h1c:8'h00;
 wire [7:0] auto_vector_hbi = (auto_iack && (tg68_adr[3:1] == 3'b010))?8'h1a:8'h00;
@@ -142,7 +144,7 @@ wire [7:0] auto_vector = auto_vector_vbi | auto_vector_hbi;
 // $fffffa40 - $fffffa7f  - FPU
 // $fffffc20 - $fffffc3f  - RTC
 
-wire io_sel = cpu_cycle && cpu2io && data_strobe ;
+wire io_sel = cpu_cycle && cpu2io && address_strobe ;
  
 // mmu 8 bit interface at $ff8000 - $ff8801
 wire mmu_sel  = io_sel && ({tg68_adr[15:1], 1'd0} == 16'h8000);
@@ -263,6 +265,10 @@ acia acia (
 	.rw       (tg68_rw     ),
 	.dout     (acia_data_out),
 	.irq      (acia_irq     ),
+	
+	// MIDI interface
+	.midi_out (UART_TX      ),
+	.midi_in  (UART_RX      ),
 	
 	// ikbd interface
 	.ikbd_data_out_available 	(ikbd_data_from_acia_available),
@@ -439,7 +445,7 @@ assign reset = system_ctrl[0];
 
 // ------------- generate VBI (IPL = 4) --------------
 wire vbi_ack; 
-assign vbi_ack = cpu2iack && data_strobe && (tg68_adr[3:1] == 3'b100);
+assign vbi_ack = cpu2iack && address_strobe && (tg68_adr[3:1] == 3'b100);
 
 reg vsD, vsD2, vsI, vbi;
 always @(negedge clk_8)
@@ -457,7 +463,7 @@ end
 
 // ------------- generate HBI (IPL = 2) --------------
 wire hbi_ack; 
-assign hbi_ack = cpu2iack && data_strobe && (tg68_adr[3:1] == 3'b010);
+assign hbi_ack = cpu2iack && address_strobe && (tg68_adr[3:1] == 3'b010);
 
 reg hsD, hsD2, hsI, hbi;
 always @(negedge clk_8)
@@ -522,7 +528,8 @@ TG68K tg68k (
   .skipFetch    (                 ),
   .cpuDMA       (tg68_cdma        ),
   .ramlds       (tg68_clds        ),
-  .ramuds       (tg68_cuds        )
+  .ramuds       (tg68_cuds        ),
+  .turbo        (system_ctrl[18]  )
 );
 
 // 
@@ -579,19 +586,19 @@ wire cpu2io = (tg68_adr[23:16] == 8'b11111111);
 wire cpu2iack = (tg68_adr[23:4] == 20'hfffff);
 
 // data strobe!
-// wire data_strobe = ~tg68_uds || ~tg68_lds;
-reg data_strobe;
+// wire address_strobe = ~tg68_uds || ~tg68_lds;
+reg address_strobe;
 always @(posedge clk_8)
-	data_strobe <= (video_cycle) && (~tg68_uds || ~tg68_lds);
+	address_strobe <= (video_cycle) && ~tg68_as;
 
 // generate dtack (for st ram only and rom), TODO: no dtack for rom write
-// assign tg68_dtack = ~(((cpu2mem && data_strobe && cpu_cycle) || io_dtack ) && !br);
-assign tg68_dtack = ~(((cpu2mem && data_strobe) || io_dtack ) && !br);
+// assign tg68_dtack = ~(((cpu2mem && address_strobe && cpu_cycle) || io_dtack ) && !br);
+assign tg68_dtack = ~(((cpu2mem && address_strobe) || io_dtack ) && !br);
 
 wire ram_oe = video_cycle?~video_read:
-	(cpu_cycle?~(data_strobe && tg68_rw && cpu2mem):1'b1);
+	(cpu_cycle?~(address_strobe && tg68_rw && cpu2mem):1'b1);
 
-wire ram_wr = cpu_cycle?~(data_strobe && ~tg68_rw && cpu2ram):1'b1;
+wire ram_wr = cpu_cycle?~(address_strobe && ~tg68_rw && cpu2ram):1'b1;
 
 // data strobe
 wire ram_uds = video_cycle?1'b0:tg68_uds;
