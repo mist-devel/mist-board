@@ -150,9 +150,9 @@ assign joy_emu_en       = 1'b1; // sw_8;
 assign LED              = ~led;
 
 // unused VGA pins
-assign VGA_R[1:0] = 2'b00;
-assign VGA_G[1:0] = 2'b00;
-assign VGA_B[1:0] = 2'b00;
+assign VGA_R[1:0] = VGA_R[5:4];
+assign VGA_G[1:0] = VGA_G[5:4];
+assign VGA_B[1:0] = VGA_B[5:4];
 
     
 // use pll
