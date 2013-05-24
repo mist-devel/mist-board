@@ -45,7 +45,4 @@ clean:
 
 release:
 	make
-	cd ./out; cp mist.rbf core.rbf ; cp ../../../../tos/system.fnt .; zip ../../../../www/mist.zip core.rbf system.fnt ; rm core.rbf system.fnt
-	cp ../../../www/files.html files.tmp
-	sed -e "s|Mist core updated on [0-9/]*.|Mist core updated on $(TODAY).|g" files.tmp > ../../../www/files.html
-	rm files.tmp
+	cd ./out; cp mist.rbf ../../../bin/cores/mist/core.rbf
