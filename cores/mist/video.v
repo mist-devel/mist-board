@@ -71,11 +71,13 @@ assign hsO =   mono?hs:hsC;
 // line buffer for scan doubler for color video modes
 // the color modes have 80 words per line (320*4/16 or 640*2/16) and
 // we need space for two lines -> 160 words
-reg [15:0] sd_buffer [255:0];
+reg [15:0] sd_buffer0 [63:0];
+reg [15:0] sd_buffer1 [63:0];
+reg [15:0] sd_buffer2 [63:0];
+reg [15:0] sd_buffer3 [63:0];
 reg [6:0]  sd_wptr, sd_rptr;
 
 reg [15:0] dataR;
-
 
 // instance of video timing module for monochrome (72hz)
 wire [9:0] vcnt_mono, hcnt_mono;
@@ -169,7 +171,7 @@ always @(posedge clk) begin
    hs <= mono?~hs_mono:hs_color;
    vs <= mono?~vs_mono:vs_color;
 end
-   
+
 reg [15:0] tx, tx0, tx1, tx2, tx3;      // output shift registers
 
 localparam BASE_ADDR = 23'h8000;   // default video base address 0x010000
@@ -318,11 +320,14 @@ wire hsC = vcnt[0] && hs;
 // create a read signal that's 16 clocks ahead of oe
 assign read = (bus_cycle[3:2] == 0) && (hcnt < H_ACT) && (vcnt < V_ACT);
 
+reg line;
+
 always @(posedge clk) begin
 	if(reset) begin
 		vaddr <= _v_bas_ad;
 	end else begin
-
+		line <= vcnt[1];
+		
 		// ---- scan doubler pointer handling -----
 		if(hmax) begin
 			// reset counters at and of each line
@@ -335,13 +340,17 @@ always @(posedge clk) begin
 		// ------------ memory fetch --------------
 		if(read) begin
 			if(bus_cycle == 3) begin
-				
 				// 16bit buffer for direct mono generation
 				dataR <= data;
 				
 				// two line buffer for scan doubling
-				sd_buffer[{!vcnt[1], sd_wptr}] <= data;
-
+				case(sd_wptr[1:0])
+					2'b00: 	sd_buffer0[{!line, sd_wptr[6:2]}] <= data;
+					2'b01: 	sd_buffer1[{!line, sd_wptr[6:2]}] <= data;
+					2'b10:	sd_buffer2[{!line, sd_wptr[6:2]}] <= data;
+					2'b11:	sd_buffer3[{!line, sd_wptr[6:2]}] <= data;
+				endcase
+					
 				// increase scan doubler address
 				sd_wptr <= sd_wptr + 7'd1;
 					
@@ -369,10 +378,10 @@ always @(posedge clk) begin
 		if(low) begin
 			if((hcnt < H_ACT) && (hcnt[4:0] == 5'b01110)) begin
 				// read words for all four planes
-				tx0 <= sd_buffer[{vcnt[1], sd_rptr+7'd0}];
-				tx1 <= sd_buffer[{vcnt[1], sd_rptr+7'd1}];
-				tx2 <= sd_buffer[{vcnt[1], sd_rptr+7'd2}];
-				tx3 <= sd_buffer[{vcnt[1], sd_rptr+7'd3}];
+				tx0 <= sd_buffer0[{line, sd_rptr[6:2]}];
+				tx1 <= sd_buffer1[{line, sd_rptr[6:2]}];
+				tx2 <= sd_buffer2[{line, sd_rptr[6:2]}];
+				tx3 <= sd_buffer3[{line, sd_rptr[6:2]}];
 				sd_rptr <= sd_rptr + 7'd4;
 			end else if(hcnt[0] == 1'b0) begin
 				// shift every second pixel			
@@ -385,8 +394,13 @@ always @(posedge clk) begin
 			// med rez 640x200
 			if((hcnt < H_ACT) && (hcnt[3:0] == 4'b1111)) begin
 				// read words for all four planes
-				tx0 <= sd_buffer[{vcnt[1], sd_rptr+7'd0}];
-				tx1 <= sd_buffer[{vcnt[1], sd_rptr+7'd1}];
+				if(sd_rptr[1] == 1'b0) begin
+					tx0 <= sd_buffer0[{line, sd_rptr[6:2]}];
+					tx1 <= sd_buffer1[{line, sd_rptr[6:2]}];
+				end else begin
+					tx0 <= sd_buffer2[{line, sd_rptr[6:2]}];
+					tx1 <= sd_buffer3[{line, sd_rptr[6:2]}];
+				end
 				sd_rptr <= sd_rptr + 7'd2;
 			end else begin
 				// shift every pixel			

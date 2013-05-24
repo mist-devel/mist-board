@@ -37,7 +37,13 @@ reg [FIFO_ADDR_BITS-1:0] writePout, readPout;
 reg [13:0] readTimer;
 
 reg ikbd_strobe_inD, ikbd_strobe_inD2;	
-reg data_read;	
+reg ikbd_cpu_data_read;
+reg midi_cpu_data_read;
+
+// the two control registers
+reg [7:0] ikbd_cr;
+reg [7:0] midi_cr;
+	
 always @(negedge clk) begin
 	if(reset)
 		readTimer <= 14'd0;
@@ -50,9 +56,15 @@ always @(negedge clk) begin
 	
 	// read on ikbd data register
 	if(sel && ~ds && rw && (addr == 2'd1))
-		data_read <= 1'b1;
+		ikbd_cpu_data_read <= 1'b1;
 	else
-		data_read <= 1'b0;
+		ikbd_cpu_data_read <= 1'b0;
+
+   	// read on midi data register
+	if(sel && ~ds && rw && (addr == 2'd3))
+		midi_cpu_data_read <= 1'b1;
+	else
+		midi_cpu_data_read <= 1'b0;
 
 	if(reset) begin
 		// reset read and write counters
@@ -65,7 +77,7 @@ always @(negedge clk) begin
 			writePin <= writePin + 4'd1;
 	   end 
 
-	   if(data_read && dataInAvail) begin
+	   if(ikbd_cpu_data_read && ikbd_rx_data_available) begin
 			readPin <= readPin + 4'd1;
 		
 			// Some programs (e.g. bolo) need a pause between two ikbd bytes.
@@ -79,13 +91,14 @@ end
 
 // ------------------ cpu interface --------------------
 
-wire [7:0] rxd;
-assign rxd = fifoIn[readPin];
+wire ikbd_irq = ikbd_cr[7] && ikbd_rx_data_available;
 
-wire dataInAvail;
-assign dataInAvail = (readPin != writePin) && (readTimer == 0);
+wire [7:0] ikbd_rx_data = fifoIn[readPin];
 
-assign irq = dataInAvail;
+wire ikbd_rx_data_available;
+assign ikbd_rx_data_available = (readPin != writePin) && (readTimer == 0);
+
+assign irq = ikbd_irq || midi_irq;
 
 assign ikbd_data_out_available = (readPout != writePout);
 assign ikbd_data_out = fifoOut[readPout];
@@ -103,35 +116,84 @@ always @(posedge clk) begin
 			readPout <= readPout + 4'd1;
 end
 	
-always @(sel, ds, rw, addr, dataInAvail, rxd, midi_tx_empty) begin
+always @(sel, ds, rw, addr, ikbd_rx_data_available, ikbd_rx_data, midi_rx_data_available, midi_tx_empty) begin
 	dout = 8'h00;
 
 	if(sel && ~ds && rw) begin
       // keyboard acia read
-      if(addr == 2'd0) dout = 8'h02 | (dataInAvail?8'h81:8'h00);  // status
-      if(addr == 2'd1) dout = rxd;    // data
+      if(addr == 2'd0) dout = { ikbd_irq, 6'b000001, ikbd_rx_data_available };
+      if(addr == 2'd1) dout = ikbd_rx_data;
       
       // midi acia read
-      if(addr == 2'd2) dout = { 6'b000000, midi_tx_empty, 1'b0} ;  // status
-      if(addr == 2'd3) dout = 8'h00;  // data
+      if(addr == 2'd2) dout = { midi_irq, 5'b00000, midi_tx_empty, midi_rx_data_available};
+      if(addr == 2'd3) dout = midi_rx_data;
    end
 end
 
-// midi transmitter
-assign midi_out = midi_tx_empty ? 1'b1: midi_tx_cnt[0];
-wire midi_tx_empty = (midi_tx_cnt == 4'd0);
-reg [7:0] midi_clk;
-reg [3:0] midi_tx_cnt;
-reg [9:0] midi_tx_data;
+// ------------------------------ MIDI UART ---------------------------------
+wire midi_irq = midi_cr[7] && midi_rx_data_available;
+
+// MIDI runs at 31250bit/s which is exactly 1/256 of the 8Mhz system clock
    
 // 8MHz/256 = 31250Hz -> MIDI bit rate
+reg [7:0] midi_clk;
 always @(posedge clk)
 	midi_clk <= midi_clk + 8'd1;
 
+// --------------------------- midi receiver -----------------------------
+reg [7:0] midi_rx_cnt;    // bit + sub-bit cointer
+reg [9:0] midi_rx_shift_reg;   // shift register used during reception
+reg [7:0] midi_rx_data;  
+reg midi_rx_data_available;
+   
+always @(negedge clk) begin
+	if(reset) begin
+		midi_rx_cnt <= 8'd0;
+		midi_rx_data_available <= 1'b0;
+   end else begin
+      if(midi_cpu_data_read)
+			midi_rx_data_available <= 1'b0;   // read on midi data clears rx status
+      
+		// 1/16 system clock == 16 times midi clock
+		if(midi_clk[3:0] == 4'd0) begin
+			// receiver not running
+			if(midi_rx_cnt == 0) begin
+				if(midi_in == 0) begin
+					// expecing 10 bits starting half a bit time from now
+					midi_rx_cnt <= { 4'd10, 4'd7 };
+				end
+			end else begin
+				// receiver is running
+				midi_rx_cnt <= midi_rx_cnt - 8'd1;
+
+				if(midi_rx_cnt[3:0] == 4'd0) begin
+					// in the middle of the bit -> shift new bit into msb
+					midi_rx_shift_reg <= { midi_in, midi_rx_shift_reg[9:1] };
+				end
+
+				// last bit received
+				if(midi_rx_cnt[7:0] == 8'd1) begin
+					// copy data into rx register 
+					midi_rx_data <= midi_rx_shift_reg[8:1];  // pure data w/o start and stop bits
+					midi_rx_data_available <= 1'b1;
+					
+					// todo: check data[0] for frame error (stop bit)
+				end
+			end
+		end
+	end
+end   
+
+// --------------------------- midi transmitter -----------------------------
+assign midi_out = midi_tx_empty ? 1'b1: midi_tx_data[0];
+wire midi_tx_empty = (midi_tx_cnt == 4'd0);
+reg [3:0] midi_tx_cnt;
+reg [10:0] midi_tx_data;
+   
 always @(negedge clk) begin
 	if(midi_clk == 8'd0) begin
 		// shift down one bit, fill with 1 bits
-		midi_tx_data <= { 1'b1, midi_tx_data[9:1] };
+		midi_tx_data <= { 1'b1, midi_tx_data[10:1] };
 
 		// decreae transmit counter
 		if(midi_tx_cnt != 4'd0)
@@ -141,17 +203,33 @@ always @(negedge clk) begin
    if(reset) begin
       writePout <= 4'd0;
 		midi_tx_cnt <= 4'd0;
+		
+		ikbd_cr <= 8'h00;
+		midi_cr <= 8'h00;
    end else begin
-      // keyboard acia data register writes into buffer 
-      if(sel && ~ds && ~rw && addr == 2'd1) begin
-         fifoOut[writePout] <= din;
-			writePout <= writePout + 4'd1;
-      end
+      if(sel && ~ds && ~rw) begin
 
-      // write to midi data register
-      if(sel && ~ds && ~rw && addr == 2'd1) begin
-			midi_tx_data <= { 1'b1, din, 1'b0 };  // 8N1, lsb first
-			midi_tx_cnt <= 4'd10;   // 10 bits to go
+			// write to ikbd control register
+			if(addr == 2'd0)
+				ikbd_cr <= din;
+
+			// keyboard acia data register writes into buffer 
+			if(addr == 2'd1) begin
+				fifoOut[writePout] <= din;
+				writePout <= writePout + 4'd1;
+			end
+
+			// write to midi control register
+			if(addr == 2'd2)
+				midi_cr <= din;
+
+			// write to midi data register
+			// we load the tx register with a 1 bit (idle state) in the lsb to make sure
+			// the tx line stays ad idle level until the transmission starts
+			if(addr == 2'd3) begin
+				midi_tx_data <= { 1'b1, din, 1'b0, 1'b1 };  // 8N1, lsb first
+				midi_tx_cnt <= 4'd11;   // 10 bits to go
+			end
 		end
    end
 end
