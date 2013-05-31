@@ -91,7 +91,7 @@ end
 
 // ------------------ cpu interface --------------------
 
-wire ikbd_irq = ikbd_cr[7] && ikbd_rx_data_available;
+wire ikbd_irq = ikbd_cr[7] && ikbd_rx_data_available;  // rx irq
 
 wire [7:0] ikbd_rx_data = fifoIn[readPin];
 
@@ -131,7 +131,9 @@ always @(sel, ds, rw, addr, ikbd_rx_data_available, ikbd_rx_data, midi_rx_data_a
 end
 
 // ------------------------------ MIDI UART ---------------------------------
-wire midi_irq = midi_cr[7] && midi_rx_data_available;
+wire midi_irq = (midi_cr[7] && midi_rx_data_available) ||    // rx irq
+	((midi_cr[6:5] == 2'b01) && midi_tx_empty);               // tx irq
+//	midi_tx_irq;
 
 // MIDI runs at 31250bit/s which is exactly 1/256 of the 8Mhz system clock
    
@@ -141,34 +143,43 @@ always @(posedge clk)
 	midi_clk <= midi_clk + 8'd1;
 
 // --------------------------- midi receiver -----------------------------
-reg [7:0] midi_rx_cnt;    // bit + sub-bit cointer
+reg [7:0] midi_rx_cnt;         // bit + sub-bit cointer
 reg [9:0] midi_rx_shift_reg;   // shift register used during reception
 reg [7:0] midi_rx_data;  
+reg [3:0] midi_rx_filter;      // filter to reduce noise
 reg midi_rx_data_available;
-   
+reg midi_in_filtered;
+
 always @(negedge clk) begin
 	if(reset) begin
 		midi_rx_cnt <= 8'd0;
 		midi_rx_data_available <= 1'b0;
+		midi_rx_filter <= 4'b1111;
    end else begin
       if(midi_cpu_data_read)
 			midi_rx_data_available <= 1'b0;   // read on midi data clears rx status
       
 		// 1/16 system clock == 16 times midi clock
 		if(midi_clk[3:0] == 4'd0) begin
+			midi_rx_filter <= { midi_rx_filter[2:0], midi_in};
+		
+			// midi in mist be stable for 4 cycles to change state
+			if(midi_rx_filter == 4'b0000) midi_in_filtered <= 1'b0;
+			if(midi_rx_filter == 4'b1111) midi_in_filtered <= 1'b1;
+
 			// receiver not running
-			if(midi_rx_cnt == 0) begin
-				if(midi_in == 0) begin
+			if(midi_rx_cnt == 8'd0) begin
+				if(midi_in_filtered == 1'b0) begin
 					// expecing 10 bits starting half a bit time from now
 					midi_rx_cnt <= { 4'd10, 4'd7 };
 				end
 			end else begin
 				// receiver is running
 				midi_rx_cnt <= midi_rx_cnt - 8'd1;
-
+				
 				if(midi_rx_cnt[3:0] == 4'd0) begin
 					// in the middle of the bit -> shift new bit into msb
-					midi_rx_shift_reg <= { midi_in, midi_rx_shift_reg[9:1] };
+					midi_rx_shift_reg <= { midi_in_filtered, midi_rx_shift_reg[9:1] };
 				end
 
 				// last bit received
@@ -185,24 +196,45 @@ always @(negedge clk) begin
 end   
 
 // --------------------------- midi transmitter -----------------------------
-assign midi_out = midi_tx_empty ? 1'b1: midi_tx_data[0];
+assign midi_out = midi_tx_empty ? 1'b1: midi_tx_shift_reg[0];
 wire midi_tx_empty = (midi_tx_cnt == 4'd0);
-reg [3:0] midi_tx_cnt;
-reg [10:0] midi_tx_data;
-   
+reg [7:0] midi_tx_cnt;
+reg [7:0] midi_tx_data;
+reg midi_tx_data_valid;
+reg [10:0] midi_tx_shift_reg;
+ 
+// counter register writes for debugging
+reg [7:0] midi_reg_data_cnt /* synthesis noprune */;
+reg [7:0] midi_reg_ctrl_cnt /* synthesis noprune */;
+ 
 always @(negedge clk) begin
-	if(midi_clk == 8'd0) begin
-		// shift down one bit, fill with 1 bits
-		midi_tx_data <= { 1'b1, midi_tx_data[10:1] };
+
+	// 16 times midi clock
+	if(midi_clk[3:0] == 4'd0) begin
+		if(midi_tx_cnt[3:0] == 4'h0) begin
+			// shift down one bit, fill with 1 bits
+			midi_tx_shift_reg <= { 1'b1, midi_tx_shift_reg[10:1] };
+		end
 
 		// decreae transmit counter
-		if(midi_tx_cnt != 4'd0)
-			midi_tx_cnt <= midi_tx_cnt - 4'd1;
+		if(midi_tx_cnt != 8'd0)
+			midi_tx_cnt <= midi_tx_cnt - 8'd1;
+
+		// restart immediately if another byte is in tx buffer 
+		if((midi_tx_cnt == 8'd1) && midi_tx_data_valid) begin
+			midi_tx_shift_reg <= { 1'b1, midi_tx_data, 1'b0, 1'b1 };  // 8N1, lsb first
+			midi_tx_cnt <= { 4'd10, 4'd1 };   // 10 bits to go
+			midi_tx_data_valid <= 1'b0;
+		end
 	end
 			
    if(reset) begin
+		midi_reg_data_cnt <= 8'd0;
+		midi_reg_ctrl_cnt <= 8'd0;
+
       writePout <= 4'd0;
-		midi_tx_cnt <= 4'd0;
+		midi_tx_cnt <= 8'd0;
+		midi_tx_data_valid <= 1'b0;
 		
 		ikbd_cr <= 8'h00;
 		midi_cr <= 8'h00;
@@ -220,15 +252,24 @@ always @(negedge clk) begin
 			end
 
 			// write to midi control register
-			if(addr == 2'd2)
+			if(addr == 2'd2) begin
 				midi_cr <= din;
+				midi_reg_ctrl_cnt <= midi_reg_ctrl_cnt + 8'd1;
+			end
 
 			// write to midi data register
-			// we load the tx register with a 1 bit (idle state) in the lsb to make sure
-			// the tx line stays ad idle level until the transmission starts
 			if(addr == 2'd3) begin
-				midi_tx_data <= { 1'b1, din, 1'b0, 1'b1 };  // 8N1, lsb first
-				midi_tx_cnt <= 4'd11;   // 10 bits to go
+				if(midi_tx_cnt == 8'd0) begin
+					// transmitter idle? start immediately ...
+					midi_tx_shift_reg <= { 1'b1, din, 1'b0, 1'b1 };  // 8N1, lsb first
+					midi_tx_cnt <= { 4'd10, 4'd1 };   // 10 bits to go
+				end else begin
+					// ... otherwise store in data buffer
+					midi_tx_data <= din;
+					midi_tx_data_valid <= 1'b1;
+				end
+				
+				midi_reg_data_cnt <= midi_reg_data_cnt + 8'd1;				
 			end
 		end
    end

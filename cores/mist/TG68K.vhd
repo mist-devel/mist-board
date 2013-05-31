@@ -322,9 +322,10 @@ PROCESS (clk, reset, state, as_s, as_e, rw_s, rw_e, uds_s, uds_e, lds_s, lds_e)
 				data_akt_s <= '0';
 					CASE S_state IS
 						WHEN "00" => IF state/="01" AND sel_fast='0' THEN
-										 uds_s <= uds_in;
-										 lds_s <= lds_in;
-										S_state <= "01";
+									 rw_s <= wr;
+									 uds_s <= uds_in;
+									 lds_s <= lds_in;
+									 S_state <= "01";
 									 END IF;
 						WHEN "01" => as_s <= '0';
 									 rw_s <= wr;

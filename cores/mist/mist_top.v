@@ -105,8 +105,7 @@ always @(posedge clk_8) begin
 				else
 					dtack_timeout <= dtack_timeout + 3'd1;
 			end else
-				// leave bus error when next instruction is read
-//			if(!tg68_dtack && (tg68_cpustate[1:0] == 2'd3))
+				// release bus error when cpu core asks us to do so
 				if(tg68_clr_berr)
 					dtack_timeout <= 3'd0;
 		end
