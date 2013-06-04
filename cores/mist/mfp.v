@@ -236,12 +236,9 @@ always @(iack, sel, ds, rw, addr, gpip_cpu_out, aer, ddr, ier, ipr, isr, imr,
 end
 
 // delay de and timer to detect changes
-reg acia_irqD, acia_irqD2, dma_irqD, dma_irqD2;
 reg [7:0] irq_vec;
 
 always @(posedge clk) begin
-	acia_irqD <= acia_irq;
-	dma_irqD <= dma_irq;
 	iackD <= iack;
 
 	// the pending irq changes in the middle of an iack
@@ -252,9 +249,6 @@ end
 	
 reg iackD;
 always @(negedge clk) begin
-	dma_irqD2 <= dma_irqD;
-	acia_irqD2 <= acia_irqD;
-	
 	if(reset) begin
 		ipr <= 16'h0000; ier <= 16'h0000; 
 		imr <= 16'h0000; isr <= 16'h0000;
@@ -278,14 +272,12 @@ always @(negedge clk) begin
 		if(timerd_done && ier[ 4])	ipr[ 4] <= 1'b1;	// timer_d
 
 		// irq by acia ...
-		if(acia_irqD && !acia_irqD2) begin
-			if(ier[6])	ipr[6] <= 1'b1;			
-		end
+		if(acia_irq && ier[6])	
+			ipr[6] <= 1'b1;			
 
-	        // ... and dma
-		if(dma_irqD && !dma_irqD2) begin
-			if(ier[7])	ipr[7] <= 1'b1;			
-		end
+      // ... and dma
+		if(dma_irq && ier[7])
+			ipr[7] <= 1'b1;			
 		
 		if(sel && ~ds && ~rw) begin
 			if(addr == 5'h00) gpip <= din;
