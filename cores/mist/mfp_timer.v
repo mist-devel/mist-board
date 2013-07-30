@@ -111,7 +111,7 @@ always @(negedge CLK) begin
 					down_counter <= data;
 					T_O_PULSE <= 1'b1;
 		  
-					end else begin
+				end else begin
 		  
 					down_counter <= down_counter - 8'd1;		  
 				end

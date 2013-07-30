@@ -13,6 +13,11 @@
 // vdisp   400      200
 // vtot    501      315/262
 
+// Overscan:
+// http://codercorner.com/fullscrn.txt
+
+// Examples: automation 000 + 001: bottom border
+//           automation 097: top+ bottom border
 
 module video (
 	// system interface
@@ -181,8 +186,13 @@ reg [1:0] shmode;
 wire mono = (shmode == 2'd2);
 wire low = (shmode == 2'd0);
 
+// syncmode is delayed until next vsync to cope with "bottom border overscan"
 reg [1:0] syncmode;
-wire pal = (syncmode[1] == 1'b1);
+reg [1:0] syncmode_latch;
+wire pal = (syncmode_latch[1] == 1'b1);
+
+reg overscan;        	// overscan detected in current frame
+reg overscan_latched;
 
 // 16 colors with 3*3 bits each
 reg [2:0] palette_r[15:0];
@@ -257,7 +267,11 @@ always @(negedge reg_clk) begin
 		if(reg_sel && ~reg_rw) begin
 			if(reg_addr == 6'h00 && ~reg_lds) _v_bas_ad[22:15] <= reg_din[7:0];
 			if(reg_addr == 6'h01 && ~reg_lds) _v_bas_ad[14:7] <= reg_din[7:0];
-			if(reg_addr == 6'h05 && ~reg_uds) syncmode <= reg_din[9:8];
+
+			if(reg_addr == 6'h05 && ~reg_uds) begin
+				// writing to sync mode toggles between 50 and 60 hz modes
+				syncmode <= reg_din[9:8];
+			end
 
 			// the color palette registers
 			if(reg_addr >= 6'h20 && reg_addr < 6'h30 ) begin
@@ -295,37 +309,37 @@ wire [2:0] stvid_g = mono?mono_rgb:color_g;
 wire [2:0] stvid_b = mono?mono_rgb:color_b;
 
 // ... add OSD overlay and feed into VGA outputs
-//assign video_r = !osd_oe?{stvid_r,stvid_r}:{osd_pixel, osd_pixel, osd_pixel, stvid_r};
-//assign video_g = !osd_oe?{stvid_g,stvid_g}:{osd_pixel, osd_pixel,      1'b1, stvid_g};
-//assign video_b = !osd_oe?{stvid_b,stvid_b}:{osd_pixel, osd_pixel, osd_pixel, stvid_b};
-
 always @(posedge clk) begin
    video_r <= !osd_oe?{stvid_r,stvid_r}:{osd_pixel, osd_pixel, osd_pixel, stvid_r};
    video_g <= !osd_oe?{stvid_g,stvid_g}:{osd_pixel, osd_pixel,      1'b1, stvid_g};
    video_b <= !osd_oe?{stvid_b,stvid_b}:{osd_pixel, osd_pixel, osd_pixel, stvid_b};
 end
 
+wire [9:0] overscan_bottom = overscan_latched?10'd60:10'd0;
+
 // display enable signal
 // the color modes use a scan doubler and output the data with 2 lines delay
 wire [9:0] v_offset = mono?10'd0:10'd2; 
-wire de = (hcnt >= H_PRE) && (hcnt < H_ACT+H_PRE) && (vcnt >= v_offset && vcnt < V_ACT+v_offset);
+wire de = (hcnt >= H_PRE) && (hcnt < H_ACT+H_PRE) && (vcnt >= v_offset && vcnt < V_ACT+v_offset+overscan_bottom);
 
 // a fake de signal for timer a for color modes with half the hsync frequency
 wire deC = (((hcnt >= H_PRE) && !vcnt[0]) || ((hcnt < H_ACT+H_PRE-10'd160) && vcnt[0])) && 
-	(vcnt >= (v_offset-10'd0) && vcnt < (V_ACT+v_offset-10'd0));
+	(vcnt >= (v_offset-10'd0) && vcnt < (V_ACT+v_offset+overscan_bottom-10'd0));
 
 // a fake hsync pulse for the scan doubled color modes
 wire hsC = vcnt[0] && hs; 
-	
+
 // create a read signal that's 16 clocks ahead of oe
-assign read = (bus_cycle[3:2] == 0) && (hcnt < H_ACT) && (vcnt < V_ACT);
+assign read = (bus_cycle[3:2] == 0) && (hcnt < H_ACT) && (vcnt < V_ACT + overscan_bottom);
 
 reg line;
+reg last_syncmode;
 
 always @(posedge clk) begin
 	if(reset) begin
 		vaddr <= _v_bas_ad;
 	end else begin
+		last_syncmode <= syncmode[1];  // delay syncmode to detect changes
 		line <= vcnt[1];
 		
 		// ---- scan doubler pointer handling -----
@@ -358,10 +372,27 @@ always @(posedge clk) begin
 				vaddr <= vaddr + 23'd1;
 			end
 		end else begin
+		
+			// this is also the magic used to do "overscan".
+			// the magic actually involves more than writing zero (60hz)
+			// within line 200. But htis is sufficient for our detection
+			if(vcnt[9:1] == 8'd200) begin
+				// syncmode has changed from 1 to 0 (50 to 60 hz)
+				if((syncmode[1] == 1'b0) && (last_syncmode == 1'b1))
+					overscan <= 1'b1;
+			end
+		
 			// reached last possible pixel pos
 			if(hmax && vmax) begin
 				// reset video address counter
 				vaddr <= _v_bas_ad;
+				
+				// copy syncmode
+				syncmode_latch <= syncmode;
+				
+				// save and reset overscan
+				overscan_latched <= overscan;
+				overscan <= 1'b0;
 			end
 		end
 		

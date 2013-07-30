@@ -100,7 +100,7 @@ always @(posedge clk_8) begin
 			// timeout only when cpu owns the bus and when
 			// neither dtack nor fast ram are active
 			if(dtack_timeout != 3'd7) begin
-				if(!tg68_dtack || br || tg68_cpuena || tg68_as)
+				if(!tg68_dtack || br || tg68_cpuena || tg68_lds || tg68_uds)
 					dtack_timeout <= 3'd0;
 				else
 					dtack_timeout <= dtack_timeout + 3'd1;
@@ -540,7 +540,7 @@ wire [22:0] ram_address;
 wire [15:0] ram_data;
 
 wire video_cycle = (bus_cycle[3:2] == 0);
-wire cpu_cycle = (bus_cycle[3:2] == 1);
+wire cpu_cycle = (bus_cycle[3:2] == 1); // || (bus_cycle[3:2] == 3);
 wire io_cycle = (bus_cycle[3:2] == 2);
 
 assign ram_address = video_cycle?video_address:tg68_adr[23:1];
@@ -555,9 +555,9 @@ wire MEM8M   = (system_ctrl[3:1] == 3'd4);
 wire MEM14M  = (system_ctrl[3:1] == 3'd5);
 
 // ram from 0x000000 to 0x400000
-wire cpu2ram = (tg68_adr[23:22] == 2'b00) ||                  // ordinary 4MB
+wire cpu2ram = (tg68_adr[23:22] == 2'b00) ||              // ordinary 4MB
 	((MEM14M || MEM8M) &&  (tg68_adr[23:22] == 2'b01)) ||  // 8MB 
-	(MEM14M            && ((tg68_adr[23:22] == 2'b10) |    // 12MB
+	(MEM14M            && ((tg68_adr[23:22] == 2'b10) ||   // 12MB
 	                       (tg68_adr[23:21] == 3'b110)));  // 14MB 
 
 wire cpu2ram14 = (tg68_adr[23:22] == 2'b00) ||  // ordinary 4MB
@@ -588,7 +588,8 @@ wire cpu2iack = (tg68_adr[23:4] == 20'hfffff);
 // wire address_strobe = ~tg68_uds || ~tg68_lds;
 reg address_strobe;
 always @(posedge clk_8)
-	address_strobe <= (video_cycle) && ~tg68_as;
+//	address_strobe <= (video_cycle) && (~tg68_lds || ~tg68_uds);
+	address_strobe <= video_cycle && ~tg68_as;
 
 // generate dtack (for st ram only and rom), TODO: no dtack for rom write
 // assign tg68_dtack = ~(((cpu2mem && address_strobe && cpu_cycle) || io_dtack ) && !br);

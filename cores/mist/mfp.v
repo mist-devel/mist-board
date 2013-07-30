@@ -1,5 +1,8 @@
 //
 
+// define this for cubase acia irq hack
+// `define CUBHACK   
+
 module mfp (
 	// cpu register interface
 	input 		 clk,
@@ -235,12 +238,28 @@ always @(iack, sel, ds, rw, addr, gpip_cpu_out, aer, ddr, ier, ipr, isr, imr,
 	end
 end
 
+`ifndef CUBHACK  
 // delay de and timer to detect changes
+reg acia_irqD, acia_irqD2, dma_irqD, dma_irqD2;
+`endif
+
 reg [7:0] irq_vec;
 
 always @(posedge clk) begin
-	iackD <= iack;
+`ifndef CUBHACK  
+   dma_irqD <=  dma_irq;
+   acia_irqD <=  acia_irq;
+`endif
 
+   iackD <= iack;
+
+   // the polarity of the irq is negated over a real st.   
+//   if(aer[7]) dma_irqD <=  dma_irq;
+//   else       dma_irqD <= !dma_irq;
+
+//   if(aer[6]) acia_irqD <=  acia_irq;
+//   else       acia_irqD <= !acia_irq;
+   
 	// the pending irq changes in the middle of an iack
 	// phase, so we latch the current vector to keep is stable
 	// during the entire cpu read
@@ -249,6 +268,9 @@ end
 	
 reg iackD;
 always @(negedge clk) begin
+	dma_irqD2 <= dma_irqD; 		
+ 	acia_irqD2 <= acia_irqD; 		
+ 	
 	if(reset) begin
 		ipr <= 16'h0000; ier <= 16'h0000; 
 		imr <= 16'h0000; isr <= 16'h0000;
@@ -271,13 +293,29 @@ always @(negedge clk) begin
 		if(timerc_done && ier[ 5])	ipr[ 5] <= 1'b1;	// timer_c
 		if(timerd_done && ier[ 4])	ipr[ 4] <= 1'b1;	// timer_d
 
-		// irq by acia ...
-		if(acia_irq && ier[6])	
-			ipr[6] <= 1'b1;			
+`ifndef CUBHACK  
+		// in the real atari st the irqs are edge sensitive. however, this makes problems
+      // with the acias in cubase as a work around ... 
+      if(acia_irqD && !acia_irqD2) begin
+			if(ier[6]) ipr[6] <= 1'b1;
+		end
+           
+		// ... and dma
+		if(dma_irqD && !dma_irqD2) begin
+			if(ier[7]) ipr[7] <= 1'b1;
+		end
+`else
+		// ... they can be implemented level sensitive. However, this breaks some games
+		// like eg. "no second place" and even the rainbow logo in the tos 1.04 desktop
+		
+      // irq by acia ...
+		if(acia_irq && ier[6])
+			ipr[6] <= 1'b1;
 
       // ... and dma
 		if(dma_irq && ier[7])
-			ipr[7] <= 1'b1;			
+			ipr[7] <= 1'b1;
+`endif
 		
 		if(sel && ~ds && ~rw) begin
 			if(addr == 5'h00) gpip <= din;
