@@ -100,7 +100,7 @@ always @(posedge clk_8) begin
 			// timeout only when cpu owns the bus and when
 			// neither dtack nor fast ram are active
 			if(dtack_timeout != 3'd7) begin
-				if(!tg68_dtack || br || tg68_cpuena || tg68_lds || tg68_uds)
+				if(!tg68_dtack || br || tg68_cpuena || tg68_as)
 					dtack_timeout <= 3'd0;
 				else
 					dtack_timeout <= dtack_timeout + 3'd1;
