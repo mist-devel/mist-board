@@ -48,9 +48,9 @@ assign addr = addrR[22:0] - ((cmd == 2)?23'b1:23'b0);
 always @(posedge clk_8) begin
 	// start io transfers clock cycles after bus_cycle 0 
         // (after the cpu cycle)
-	writeD <= write && ((bus_cycle == 0) || writeD);
+	writeD <= write && ((bus_cycle == 3) || writeD);
 	writeD2 <= writeD;
-	readD <= read && ((bus_cycle == 0) || readD);
+	readD <= read && ((bus_cycle == 3) || readD);
 	readD2 <= readD;
 
 	if(reset)

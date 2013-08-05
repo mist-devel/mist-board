@@ -104,7 +104,7 @@ assign dma_status = { 14'd0, !(scnt == 0), 1'b1 };   // bit 0 = 1: DMA_OK
 reg [15:0] motor_on;
 
 always @(sel, rw, addr, mode, base, fdc_data, fdc_sector, fdc_status, fdc_track,
-	dma_status, scnt, acsi_target) begin
+	dma_status, scnt, acsi_target, acsi_busy) begin
 	dout = 16'h0000;
 
 	if(sel && rw) begin
@@ -123,7 +123,8 @@ always @(sel, rw, addr, mode, base, fdc_data, fdc_sector, fdc_status, fdc_track,
 			end
 			if(mode[3] == 1'b1) begin
 				// acsi status register  [3]==1 -> BUSY
-				dout = { 8'h00, acsi_target, 5'h00 }; // status "ok"
+//				dout = { 8'h00, acsi_target, 1'b0, acsi_busy, 3'h0 }; // status "ok"
+				dout = { 8'h00, 3'b000, 1'b0, acsi_busy, 3'h0 }; // status "ok"
 			end
 		end
 

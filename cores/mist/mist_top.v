@@ -114,12 +114,14 @@ end
 		
 // no tristate busses exist inside the FPGA. so bus request doesn't do
 // much more than halting the cpu by suppressing dtack
-wire br = dma_br;   // dma is only other bus master (yet)
+wire br = dma_br && (tg68_cpustate[1:0] == 2'b00) ;   // dma is only other bus master (yet)
 wire dma_br;
 
+// dma_br may come at any time. Make sure the real br comes not before the end 
+// of the instruction
+
 // request interrupt ack from mfp for IPL == 6
-wire mfp_iack;
-assign mfp_iack = cpu_cycle && cpu2iack && address_strobe && (tg68_adr[3:1] == 3'b110);
+wire mfp_iack = cpu_cycle && cpu2iack && address_strobe && (tg68_adr[3:1] == 3'b110);
 
 // the tg68k core with the wrapper of the minimig doesn't support non-autovector
 // interrupts. Also the existing support for them inside the tg68 kernel is/was broken.
@@ -434,7 +436,7 @@ wire           tg68_cpuena;
 // wire [  2-1:0] cpu_config;
 // wire [  6-1:0] memcfg;
 wire [ 32-1:0] tg68_cad;
-wire [  6-1:0] tg68_cpustate;
+wire [  6-1:0] tg68_cpustate /* synthesis noprune */;
 wire           tg68_cdma;
 wire           tg68_clds;
 wire           tg68_cuds;
@@ -589,10 +591,9 @@ wire cpu2iack = (tg68_adr[23:4] == 20'hfffff);
 reg address_strobe;
 always @(posedge clk_8)
 //	address_strobe <= (video_cycle) && (~tg68_lds || ~tg68_uds);
-	address_strobe <= video_cycle && ~tg68_as;
+	address_strobe <= video_cycle && ~tg68_as && !br;
 
 // generate dtack (for st ram only and rom), TODO: no dtack for rom write
-// assign tg68_dtack = ~(((cpu2mem && address_strobe && cpu_cycle) || io_dtack ) && !br);
 assign tg68_dtack = ~(((cpu2mem && address_strobe) || io_dtack ) && !br);
 
 wire ram_oe = video_cycle?~video_read:
