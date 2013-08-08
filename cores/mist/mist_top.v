@@ -114,11 +114,8 @@ end
 		
 // no tristate busses exist inside the FPGA. so bus request doesn't do
 // much more than halting the cpu by suppressing dtack
-wire br = dma_br && (tg68_cpustate[1:0] == 2'b00) ;   // dma is only other bus master (yet)
-wire dma_br;
-
-// dma_br may come at any time. Make sure the real br comes not before the end 
-// of the instruction
+wire br = data_io_br; //  && (tg68_cpustate[1:0] == 2'b00) ;   // dma is only other bus master (yet)
+wire data_io_br;
 
 // request interrupt ack from mfp for IPL == 6
 wire mfp_iack = cpu_cycle && cpu2iack && address_strobe && (tg68_adr[3:1] == 3'b110);
@@ -330,7 +327,7 @@ YM2149 ym2149 (
 	.CLK                	( sclk[1]  					)	// 2 MHz
 );
   
-wire dma_dio_ack, dma_dio_nak;
+wire dma_dio_ack;
 wire [4:0] dma_dio_idx;
 wire [7:0] dma_dio_data;
 
@@ -350,7 +347,6 @@ dma dma (
 	.dout     (dma_data_out),
 	
 	.irq      (dma_irq     ),
-	.br       (dma_br      ),
 
 	// system control interface
 	.fdc_wr_prot (wr_prot),
@@ -360,7 +356,6 @@ dma dma (
 	.dio_idx  (dma_dio_idx ),
 	.dio_data (dma_dio_data),
 	.dio_ack  (dma_dio_ack ),
-	.dio_nak  (dma_dio_nak ),
 
 	// floppy interface
 	.drv_sel  (floppy_sel  ),
@@ -714,11 +709,12 @@ data_io data_io (
 		.ss    		(SPI_SS2			),
 		.sdo			(data_io_sdo	),
 
+		.br         (data_io_br    ),
+		
 		// dma status interface
 		.dma_idx    (dma_dio_idx   ),
 		.dma_data   (dma_dio_data  ),
 		.dma_ack    (dma_dio_ack   ),
-		.dma_nak    (dma_dio_nak   ),
 
 		// ram interface
 		.state 	 	(host_state		),

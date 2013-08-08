@@ -16,8 +16,9 @@ module data_io (
 	output [4:0] dma_idx,
 	input [7:0] dma_data,
 	output reg dma_ack,
-	output reg dma_nak,
 
+	output reg br,
+	
 	// ram interface
 	output reg [2:0] state, // state bits required to drive the sdram host
 	output [22:0] addr,
@@ -39,7 +40,7 @@ reg writeD2;     // synchronized write delayed by one 8Mhz clock
 reg read;        // read request received via SPI
 reg readD;       // read synchonized to 8Mhz clock
 reg readD2;      // synchronized read delayed by one 8Mhz clock
-   
+	
 // during write the address needs to be decremented by one as the
 // address auto increment takes place at the beginning of each transfer
 assign addr = addrR[22:0] - ((cmd == 2)?23'b1:23'b0);
@@ -93,10 +94,8 @@ always@(posedge sck, posedge ss) begin
 		write <= 1'b0;
 		read <= 1'b0;
 		dma_ack <= 1'b0;
-		dma_nak <= 1'b0;
 	end else begin
 		dma_ack <= 1'b0;
-		dma_nak <= 1'b0;
 		sbuf <= { sbuf[13:0], sdi};
 
 		// 0:7 is command, 8:15 and 16:23 is payload bytes
@@ -116,9 +115,13 @@ always@(posedge sck, posedge ss) begin
 			if({sbuf[6:0], sdi } == 8'd6)
 				dma_ack <= 1'b1;
 
-			// send nak
+			// request bus
 			if({sbuf[6:0], sdi } == 8'd7)
-				dma_nak <= 1'b1;
+				br <= 1'b1;
+
+			// release bus
+			if({sbuf[6:0], sdi } == 8'd8)
+				br <= 1'b0;
 
 			// if we can see a read coming initiate sdram read transfer asap
 			if({sbuf[6:0], sdi } == 8'd3)

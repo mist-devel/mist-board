@@ -12,7 +12,6 @@ module dma (
 
 	// output to mfp
 	output irq,
-	output reg br,
 	
 	// input from system config
 	input fdc_wr_prot,
@@ -22,7 +21,6 @@ module dma (
 	input [4:0] dio_idx,
 	output reg [7:0] dio_data,
 	input dio_ack,
-	input dio_nak,
 	
 	// input from psg
 	input drv_side,
@@ -153,14 +151,12 @@ reg [7:0] acsi_cmd_parms [4:0];
 reg acsi_busy;
 reg acsi_irq;
 
-// acsi status register is read (clears interrupt)
-wire acsi_status_read = sel && rw && (mode[4:3] == 2'b01);
+// acsi status register is access (clears interrupt)
+wire acsi_status_read = sel && (addr == 3'h2) && (mode[4:3] == 2'b01);
 
 reg dio_ackD, dio_ackD2;
-reg dio_nakD, dio_nakD2;
 always @(posedge clk) begin
 	dio_ackD <= dio_ack;
-	dio_nakD <= dio_nak;
 end
 	
 always @(negedge clk) begin
@@ -179,17 +175,10 @@ always @(negedge clk) begin
 		acsi_cmd <= 5'd0;
 		acsi_irq <= 1'b0;
 		acsi_busy <= 1'b0;
-		br <= 1'b0;
    end else begin
-		// acknowledge comes from io controller
-		// rising edge on ack -> clear busy flag
-		dio_nakD2 <= dio_nakD;
-		if(dio_nakD && !dio_nakD2)
-			br <= 1'b0;        // release bus
 		
 		dio_ackD2 <= dio_ackD;
 		if(dio_ackD && !dio_ackD2) begin
-			br <= 1'b0;        // release bus
 			scnt <= 8'h00;     // all sectors transmitted
 		
 			// fdc_busy == 3 -> fdc waiting for io controller
@@ -211,7 +200,7 @@ always @(negedge clk) begin
 		if(fdc_status_read)
 			fdc_irq <= 1'b0;
 
-		// cpu is reading status register -> clear fdc irq
+		// cpu is reading status register -> clear acsi irq
 		if(acsi_status_read)
 			acsi_irq <= 1'b0;
 
@@ -265,13 +254,11 @@ always @(negedge clk) begin
 
 						// ------------- TYPE II commands -------------
 						if(din[7:5] == 3'b100) begin         // read sector
-							br <= 1'b1;         // request bus
 							fdc_busy <= 2'd3;
 						end
 							
 						if(din[7:5] == 3'b101)         // write sector
 							if(!fdc_wr_prot) begin
-							   br <= 1'b1;         // request bus
 								fdc_busy <= 2'd3;
 							end
 
@@ -320,7 +307,6 @@ always @(negedge clk) begin
 							if(acsi_byte_counter < 4)
 								acsi_irq <= 1'b1;
 							else begin
-								br <= 1'b1;         // request bus
 								acsi_busy <= 1'b1;  // request io cntroller
 							end
 						end
