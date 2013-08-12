@@ -30,7 +30,7 @@ module dma (
 // ------------- data_io (arm controller) interface ------
 
 always @(dio_idx, base, scnt, fdc_cmd, fdc_track, fdc_sector, 
-	fdc_data, drv_sel, drv_side, fdc_busy) begin
+	fdc_data, drv_sel, drv_side, fdc_busy, acsi_busy, acsi_target, acsi_cmd) begin
 	dio_data = 8'h00;
  	
 	case (dio_idx)

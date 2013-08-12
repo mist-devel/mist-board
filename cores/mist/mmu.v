@@ -11,7 +11,7 @@ module mmu (
 
 reg [7:0] memconfig;
 
-always @(sel, ds, rw) begin
+always @(sel, ds, rw, memconfig) begin
 	dout = 8'd0;
 	if(sel && ~ds && rw)
 		dout = memconfig;

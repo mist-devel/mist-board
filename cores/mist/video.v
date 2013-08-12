@@ -199,7 +199,7 @@ reg [2:0] palette_r[15:0];
 reg [2:0] palette_g[15:0];
 reg [2:0] palette_b[15:0];
 
-always @(reg_sel, reg_rw, reg_uds, reg_lds, reg_addr, _v_bas_ad, shmode, vaddr) begin
+always @(reg_sel, reg_rw, reg_uds, reg_lds, reg_addr, _v_bas_ad, shmode, vaddr, syncmode) begin
 	reg_dout = 16'h0000;
 
 	// read registers

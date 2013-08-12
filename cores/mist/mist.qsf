@@ -464,6 +464,7 @@ set_global_assignment -name VERILOG_FILE mfp_timer.v
 set_global_assignment -name VHDL_FILE vol_table_array.vhd
 set_global_assignment -name VHDL_FILE YM2149_volmix.vhd
 set_global_assignment -name VERILOG_FILE acia.v
+set_global_assignment -name VERILOG_FILE blitter.v
 set_global_assignment -name VHDL_FILE TG68K.vhd
 set_global_assignment -name VHDL_FILE TG68K_ALU.vhd
 set_global_assignment -name VHDL_FILE TG68K_Pack.vhd

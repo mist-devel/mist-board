@@ -203,7 +203,9 @@ assign gpip_cpu_out = (gpip_in & ~ddr) | (gpip & ddr);
 	
 // cpu read interface
 always @(iack, sel, ds, rw, addr, gpip_cpu_out, aer, ddr, ier, ipr, isr, imr, 
-	vr, irq_vec) begin
+	vr, irq_vec, serial_data_out_fifo_full, timera_dat_o, timerb_dat_o,
+	timerc_dat_o, timerd_dat_o, timera_ctrl_o, timerb_ctrl_o, timerc_ctrl_o, 
+	timerd_ctrl_o) begin
 
 	dout = 8'd0;
 	if(sel && ~ds && rw) begin

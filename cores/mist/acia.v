@@ -116,7 +116,8 @@ always @(posedge clk) begin
 			readPout <= readPout + 4'd1;
 end
 	
-always @(sel, ds, rw, addr, ikbd_rx_data_available, ikbd_rx_data, midi_rx_data_available, midi_tx_empty) begin
+always @(sel, ds, rw, addr, ikbd_rx_data_available, ikbd_rx_data, ikbd_irq, 
+		midi_rx_data, midi_rx_data_available, midi_tx_empty, midi_irq) begin
 	dout = 8'h00;
 
 	if(sel && ~ds && rw) begin
