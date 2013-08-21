@@ -114,7 +114,7 @@ end
 		
 // no tristate busses exist inside the FPGA. so bus request doesn't do
 // much more than halting the cpu by suppressing dtack
-wire br = data_io_br; //  && (tg68_cpustate[1:0] == 2'b00) ;   // dma is only other bus master (yet)
+wire br = data_io_br || blitter_br; //  && (tg68_cpustate[1:0] == 2'b00) ;   // dma is only other bus master (yet)
 wire data_io_br;
 
 // request interrupt ack from mfp for IPL == 6
@@ -137,7 +137,6 @@ wire [7:0] auto_vector = auto_vector_vbi | auto_vector_hbi;
 // $fff00000 - $fff000ff  - IDE  
 // $ffff8780 - $ffff878f  - SCSI
 // $ffff8901 - $ffff893f  - STE DMA audio
-// $ffff8a00 - $ffff8a3f  - Blitter
 // $ffff9200 - $ffff923f  - STE joystick ports
 // $fffffa40 - $fffffa7f  - FPU
 // $fffffc20 - $fffffc3f  - RTC
@@ -161,8 +160,7 @@ wire acia_sel = io_sel && ({tg68_adr[15:8], 8'd0} == 16'hfc00);
 wire [7:0] acia_data_out;
 
 // blitter 16 bit interface at $ff8a00 - $ff8a3f
-// wire blitter_sel = io_sel && ({tg68_adr[15:8], 8'd0} == 16'h8a00);
-wire blitter_sel = 1'b0;
+wire blitter_sel = system_ctrl[19] && io_sel && ({tg68_adr[15:8], 8'd0} == 16'h8a00);
 wire [15:0] blitter_data_out;
 
 //  psg 8 bit interface at $ff8800 - $ff8803
@@ -203,7 +201,7 @@ video video (
 	.reg_dout     (vreg_data_out),
 	
    .vaddr      (video_address ),
-	.data       (video_data    ),
+	.data       (ram_data_out  ),
 	.read       (video_read    ),
 	
 	.hs			(VGA_HS			),
@@ -281,18 +279,35 @@ acia acia (
 	.ikbd_data_in 	   			(ikbd_data_to_acia)
 );
 
+wire [23:1] blitter_master_addr;
+wire blitter_master_write;
+wire blitter_master_read;
+wire blitter_br;
+wire [15:0] blitter_master_data_out;
+
 blitter blitter (
+//	.bus_cycle 	(bus_cycle[3:2]  ),
+	.bus_cycle 	(bus_cycle_8  ),
+
 	// cpu interface
-	.clk      (clk_8            ),
-	.reset    (reset            ),
-	.din      (tg68_dat_out     ),
-	.sel      (blitter_sel      ),
-	.addr     (tg68_adr[5:1]    ),
-	.uds      (tg68_uds         ),
-	.lds      (tg68_uds         ),
-	.rw       (tg68_rw          ),
-	.dout     (blitter_data_out ),
-	.irq      (                 )
+	.clk       	(clk_8            ),
+	.reset     	(reset            ),
+	.din       	(tg68_dat_out     ),
+	.sel       	(blitter_sel      ),
+	.addr      	(tg68_adr[5:1]    ),
+	.uds       	(tg68_uds         ),
+	.lds       	(tg68_lds         ),
+	.rw        	(tg68_rw          ),
+	.dout      	(blitter_data_out ),
+
+	.bm_addr   	(blitter_master_addr),
+	.bm_write	(blitter_master_write),
+	.bm_data_out (blitter_master_data_out),
+	.bm_read    (blitter_master_read),
+   .bm_data_in (ram_data_out),
+
+	.br        (blitter_br       ),
+	.irq       (                 )
 );
    
 
@@ -406,16 +421,22 @@ clock clock (
 //// 8MHz clock ////
 wire [3:0] bus_cycle;
 reg [3:0] clk_cnt;
+reg [1:0] bus_cycle_8;
 
 always @ (posedge clk_32, negedge pll_locked) begin
-  if (!pll_locked) 
-    clk_cnt <= #1 4'b0010;
-  else 
-    clk_cnt <=  #1 clk_cnt + 4'd1;
+
+	if (!pll_locked) begin
+		clk_cnt <= #1 4'b0010;
+		bus_cycle_8 <= 2'd3;
+	end else begin 
+		clk_cnt <=  #1 clk_cnt + 4'd1;
+		if(clk_cnt[1:0] == 2'd2)
+			bus_cycle_8 <= bus_cycle_8 + 2'd1;
+	end
 end
 
 assign clk_8 = clk_cnt[1];
-assign bus_cycle = clk_cnt-4'd2;
+assign bus_cycle = clk_cnt - 4'd2;
 
 // SDRAM
 assign SDRAM_CKE         = 1'b1;
@@ -447,8 +468,6 @@ wire           tg68_ena7WR;
 wire           tg68_enaWR;
 wire [ 16-1:0] tg68_cout;
 wire           tg68_cpuena;
-// wire [  2-1:0] cpu_config;
-// wire [  6-1:0] memcfg;
 wire [ 32-1:0] tg68_cad;
 wire [  6-1:0] tg68_cpustate /* synthesis noprune */;
 wire           tg68_cdma;
@@ -536,7 +555,6 @@ TG68K tg68k (
   .fromram      (tg68_cout        ),
   .ramready     (tg68_cpuena      ),
   .cpu          (system_ctrl[5:4] ),  // 00=68000
-  .memcfg       (6'b000000        ),  // 00XXXX = no fastmem
   .ramaddr      (tg68_cad         ),
   .cpustate     (tg68_cpustate    ),
   .nResetOut    (                 ),
@@ -549,18 +567,17 @@ TG68K tg68k (
 
 // 
 wire [15:0] cpu_data_in;
-assign cpu_data_in = cpu2mem?ram_data:io_data_out;
+assign cpu_data_in = cpu2mem?ram_data_out:io_data_out;
 
 // cpu/video stram multiplexing
 wire [22:0] ram_address;
-wire [15:0] ram_data;
+wire [15:0] ram_data_out;
 
 wire video_cycle = (bus_cycle[3:2] == 0);
 wire cpu_cycle = (bus_cycle[3:2] == 1); // || (bus_cycle[3:2] == 3);
-wire io_cycle = (bus_cycle[3:2] == 2);
 
-assign ram_address = video_cycle?video_address:tg68_adr[23:1];
-assign video_data = ram_data;
+assign ram_address = video_cycle?video_address:(blitter_br?blitter_master_addr:tg68_adr[23:1]);
+assign video_data = ram_data_out;
 
 // TODO: put 0x000000 to 0x000007 into tos section so it's write protected
 wire MEM512K = (system_ctrl[3:1] == 3'd0);
@@ -611,13 +628,16 @@ always @(posedge clk_8)
 assign tg68_dtack = ~(((cpu2mem && address_strobe) || io_dtack ) && !br);
 
 wire ram_oe = video_cycle?~video_read:
-	(cpu_cycle?~(address_strobe && tg68_rw && cpu2mem):1'b1);
+	(cpu_cycle?~(blitter_br?blitter_master_read:(address_strobe && tg68_rw && cpu2mem)):1'b1);
+//	(cpu_cycle?~(address_strobe && tg68_rw && cpu2mem):1'b1);
 
-wire ram_wr = cpu_cycle?~(address_strobe && ~tg68_rw && cpu2ram):1'b1;
+wire ram_wr = cpu_cycle?~(blitter_br?blitter_master_write:(address_strobe && ~tg68_rw && cpu2ram)):1'b1;
+
+wire [15:0] ram_data_in = blitter_br?blitter_master_data_out:tg68_dat_out;
 
 // data strobe
-wire ram_uds = video_cycle?1'b0:tg68_uds;
-wire ram_lds = video_cycle?1'b0:tg68_lds;
+wire ram_uds = video_cycle?1'b0:(blitter_br?1'b0:tg68_uds);
+wire ram_lds = video_cycle?1'b0:(blitter_br?1'b0:tg68_lds);
  
 //// sdram ////
 sdram sdram (
@@ -655,14 +675,14 @@ sdram sdram (
   .ena7WRreg    (tg68_ena7WR      ),
 
   // chip/slow ram interface
-  .chipWR       (tg68_dat_out     ),
+  .chipWR       (ram_data_in      ),
   .chipAddr     (ram_address      ),
   .chipU        (ram_uds          ),
   .chipL        (ram_lds          ),
   .chipRW       (ram_wr           ),
   .chip_dma     (ram_oe           ),
   .c_7m         (clk_8            ),
-  .chipRD       (ram_data         ),
+  .chipRD       (ram_data_out         ),
 
   .reset_out    (                 )
 );

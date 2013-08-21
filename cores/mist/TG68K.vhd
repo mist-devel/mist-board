@@ -55,7 +55,6 @@ entity TG68K is
         fromram    	  : in std_logic_vector(15 downto 0);
         ramready      : in std_logic:='0';
         cpu           : in std_logic_vector(1 downto 0);
-        memcfg           : in std_logic_vector(5 downto 0);
         ramaddr    	  : out std_logic_vector(31 downto 0);
         cpustate      : out std_logic_vector(5 downto 0);
 		nResetOut	  : out std_logic;

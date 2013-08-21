@@ -1,24 +1,40 @@
 // blitter docs:
+// 
+// http://mikro.naprvyraz.sk/docs/ST_E/BLITTER.TXT
+// http://paradox.atari.org/files/BLIT_FAQ.TXT
+// https://steem-engine.googlecode.com/svn-history/r67/branches/Seagal/steem/code/blitter.cpp
+
+// TODO:
+// - Also use bus cycle 3 to make a "turbo blitter" being twice as fast   
 
 module blitter (
-		input 		  clk32, // 31.875 MHz
-		input [3:0] 	  bus_cycle,
+		input [1:0] 			bus_cycle,
 
 		// cpu register interface
-		input 		  clk,
-		input 		  reset,
+		input 		  			clk,
+		input 		  			reset,
 
-		input 		  sel,
-		input [4:0] 	  addr,
-		input [15:0] 	  din,
-		output reg [15:0] dout,
-		input 		  uds,
-		input 		  lds,
-		input 		  rw,
-		output 		  irq
+		input 		  			sel,
+		input [4:0] 			addr,
+		input [15:0] 			din,
+		output reg [15:0] 	dout,
+		input 		  			uds,
+		input 		  			lds,
+		input 		  			rw,
+		
+		// bus master interface
+		output [23:1] 			bm_addr,
+		output reg       		bm_write,
+		output reg    			bm_read,
+		output [15:0]  		bm_data_out,
+		input  [15:0]  		bm_data_in,
+
+		output reg	  			br,
+		output 		  			irq
+
 );
 
-assign irq = 1'b0;
+assign irq = busy;
 
 // CPU controlled register set
 reg [15:0] halftone_ram[15:0];
@@ -51,6 +67,7 @@ reg [3:0]  skew;
 reg        nfsr;
 reg        fxsr;
 
+
 // ------------------ cpu interface --------------------
 
 // CPU READ
@@ -79,16 +96,26 @@ always @(sel, rw, addr, src_y_inc, src_x_inc, src_addr, endmask1, endmask2, endm
 	   if(addr == 5'h1b) dout <= x_count;
 	   if(addr == 5'h1c) dout <= y_count;
 
-	   // since reading them has not side effect we can return the 8 bit registers
+	   // since reading them has no side effect we can return the 8 bit registers
 	   // without caring for uds/lds
 	   if(addr == 5'h1d) dout <= { 6'b000000, hop, 4'b0000, op };
 	   if(addr == 5'h1e) dout <= { busy, hog, smudge, 1'b0, line_number, fxsr, nfsr, 2'b00, skew };
 	end
 end
 
-// CPU WRITE
+// source read takes place in state 1 (normal source read) and 4 (fxsr)
+assign bm_addr = ((state == 1)||(state == 4))?src_addr:dst_addr;
+reg [2:0] state;
+
+reg [7:0] dummy /* synthesis noprune */;
+
 always @(negedge clk) begin
-   if(reset) begin
+
+	// ---------- böitter cpu register write interfce ............
+	if(reset) begin
+		busy <= 1'b0;
+		state <= 3'd0;
+		dummy <= 8'd0;
    end else begin
       if(sel && ~rw) begin
 			// ------ 16/32 bit registers, not byte adressable ----------
@@ -118,41 +145,132 @@ always @(negedge clk) begin
 			// ------ 8 bit registers ----------
 			// uds -> even bytes via d15:d8
 			// lds -> odd bytes via d7:d0
-			if(addr == 5'h1d && ~uds) hop <= din[9:8];
-			if(addr == 5'h1d && ~lds) op <= din[3:0];
+			if((addr == 5'h1d) && ~uds) hop <= din[9:8];
+			if((addr == 5'h1d) && ~lds) op <= din[3:0];
 
-			if(addr == 5'h1e && ~uds) begin
+			if(addr == 5'h1d)
+				dummy <= dummy + 8'd1;
+
+			if((addr == 5'h1e) && ~uds) begin
 				line_number <= din[11:8];
 				smudge <= din[13];
 				hog <= din[14];
-				busy <= din[15];
 
-			   // writing busy with 1 starts the blitter
-			   
+			   // writing busy with 1 starts the blitter, but only if y_count != 0
+			   if(din[15] && (y_count != 0)) begin
+					busy  <= 1'b1;
+					state <= 3'd0;
+				end
 			end
 			
-			if(addr == 5'h1e && ~lds) begin
+			if((addr == 5'h1e) && ~lds) begin
 				skew <= din[3:0];
 				nfsr <= din[6];
 				fxsr <= din[7];
 			end
 		end
    end
+	
+	// --------- blitter state machine -------------
+	br <= busy;  // hog mode: grab bus immediately as long as we need it
+	
+	// busy is written by the cpu and anly becomes active if y_count != 0
+	if(br && (bus_cycle == 2'd0)) begin
+		if(state == 3'd3) begin
+			if(last_word_in_row && fxsr)
+				state <= 3'd4;  // extra state 4, then 1, 2 ... 
+			else
+				state <= 3'd1;  // cycle through states 1, 2 and 3
+		end else if(state == 3'd4)
+			state <= 3'd1;
+		else if(state == 3'd0 && fxsr)
+			state <= 3'd4;
+		else
+			state <= state + 3'd1; 
+
+		if((state == 3'd1) || (state == 3'd4)) begin
+			// don't do the read of the last word in a row if nfsr is set
+			if(!((state == 3'd1) && nfsr && last_word_in_row)) begin
+	
+				if(src_x_inc[15] == 1'b0) 	src[15:0] <= bm_data_in;
+				else								src[31:16] <= bm_data_in;
+
+				// in noral read state (not due to fxsr) we shift
+				if(state == 3'd1) begin
+					if(src_x_inc[15] == 1'b0) 	src[31:16] <= src[15:0];
+					else								src[15:0] <= src[31:16];
+				end
+
+//				if(src_x_inc[15] == 1'b0) 	src <= { src[15:0],  bm_data_in};
+//				else								src <= { bm_data_in, src[31:16]};
+
+				// process src pointer
+				if(x_count != 1) 	// do signed add by sign expanding XXX_x_inc
+					src_addr <= src_addr + { {8{src_x_inc[15]}}, src_x_inc };
+				else 					// we are at the end of a line
+					src_addr <= src_addr + { {8{src_y_inc[15]}}, src_y_inc };
+			end else begin
+				// no source read, but shifting anyway
+				if(src_x_inc[15] == 1'b0) 	src[31:16] <= src[15:0];
+				else								src[15:0] <= src[31:16];
+
+				// TODO: do the dest read here if nfsr and skip state 2
+			end
+		end
+
+		if(state == 3'd2) begin
+			dest <= bm_data_in;
+		end
+
+		// don't update counters and adresses if still in setup phase
+		if(state == 3'd3) begin
+		
+			// y_count != 0 means blitter is (still) active	
+			if(y_count != 0) begin
+		
+				if(x_count != 1) begin 
+					// we are at the begin or within a line (have not reached the end yet)
+
+					// do signed add by sign expanding XXX_x_inc
+					dst_addr <= dst_addr + { {8{dst_x_inc[15]}}, dst_x_inc };
+		
+					x_count <= x_count - 8'd1;
+				
+				end else begin
+					// we are at the end of a line but not finished yet
+
+					// do signed add by sign expanding XXX_y_inc
+					dst_addr <= dst_addr + { {8{dst_y_inc[15]}}, dst_y_inc };
+					if(dst_y_inc[15]) line_number <= line_number + 4'd1;
+					else              line_number <= line_number - 4'd1;
+			
+					x_count <= x_count_latch;
+					y_count <= y_count - 8'd1;
+				end
+			end else begin
+				// y_count reached zero -> end of blitter operation
+				busy <= 1'b0;
+			end
+		end
+	end
 end
 
-// ----------------- blitter engine -------------------
-always @(posedge clk32) begin
-	if(reset) begin
-	 
-   end else begin
+// ----------------- blitter busmaster engine -------------------
+always @(posedge clk) begin
+	bm_read <= 1'b0;
+	bm_write <= 1'b0;
 
-   end
+	if(br && (y_count != 0) && (bus_cycle == 2'd0)) begin
+		// drive write
+		if(state == 3'd1)      bm_read  <= 1'b1;
+		else if(state == 3'd2) bm_read  <= 1'b1;
+		else if(state == 3'd3) bm_write <= 1'b1;
+		else if(state == 3'd4) bm_read  <= 1'b1;  // fxsr state
+	end
 end
 
-// wire io = (bus_cycle[3:2] == 0);  // blitter does io in cycle 0 which is the same one the cpu uses
+// wire io = (bus_cycle[3:2] == 1);  // blitter does io in cycle 1 which is the same one the cpu uses
 
-// TODO: Also use bus cycle 2 to make a "turbo blitter" being twice as fast
-   
 // internal registers
 reg [31:0] src;       // 32 bit source read buffer
 reg [15:0] dest;      // 16 bit destination read buffer
@@ -182,6 +300,12 @@ halftone_op halftone_op (
 			 .out (src_halftoned)
 			 );
 
+// todo: clean this
+reg [15:0] dummy_reg /* synthesis noprune */;
+always @(posedge clk) begin
+	dummy_reg <= src_skewed;
+end
+		 	 
 // apply blitter operation   
 blitter_op blitter_op (
 		       .op (op),
@@ -191,11 +315,18 @@ blitter_op blitter_op (
 		       .out (result)
 		       );
 
-wire  first_word_in_row = (x_count == x_count_latch);
-wire  last_word_in_row = (x_count == 16'h0001);
+				 
+				 
+wire  first_word_in_row = (x_count == x_count_latch) /* synthesis keep */;
+wire  last_word_in_row = (x_count == 16'h0001) /* synthesis keep */;
 
-wire [15:0] data_to_write;
-   
+reg  first_word_in_row_reg /* synthesis noprune */;
+reg  last_word_in_row_reg /* synthesis noprune */;
+always @(posedge clk) begin
+	first_word_in_row_reg <= first_word_in_row;
+	last_word_in_row_reg <= last_word_in_row;
+end
+
 // apply masks
 masking masking (
 	   .endmask1 (endmask1),
@@ -206,7 +337,7 @@ masking masking (
 	   .in0 (result),
 	   .in1 (dest),
 	   
-	   .out (data_to_write)
+	   .out (bm_data_out)
 	   );
    
       
