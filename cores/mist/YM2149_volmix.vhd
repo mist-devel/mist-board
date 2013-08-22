@@ -53,6 +53,8 @@
 -- NOTE, this component uses a volume table for accurate mixing of the three analogue channels,
 -- where the outputs are wired together - like in the Atari ST
 
+-- Modified for stereo sound by Juan Carlos González Amestoy.
+
 library ieee;
   use ieee.std_logic_1164.all;
   use ieee.std_logic_arith.all;
@@ -71,8 +73,10 @@ entity YM2149 is
   I_BC2               : in  std_logic;
   I_BC1               : in  std_logic;
   I_SEL_L             : in  std_logic;
+  stereo : in std_logic;
 
-  O_AUDIO             : out std_logic_vector(7 downto 0);
+  O_AUDIO_L : out std_logic_vector(7 downto 0);
+  O_AUDIO_R : out std_logic_vector(7 downto 0);
   -- port a
   I_IOA               : in  std_logic_vector(7 downto 0);
   O_IOA               : out std_logic_vector(7 downto 0);
@@ -130,8 +134,10 @@ architecture RTL of YM2149 is
   signal env_inc              : std_logic;
   signal env_vol              : std_logic_vector(4 downto 0);
 
-  signal vol_table_in         : std_logic_vector(11 downto 0);
-  signal vol_table_out        : std_logic_vector(9 downto 0);
+  signal vol_table_in_l         : std_logic_vector(11 downto 0);
+  signal vol_table_in_r         : std_logic_vector(11 downto 0);
+  signal vol_table_out_l        : std_logic_vector(9 downto 0);
+  signal vol_table_out_r        : std_logic_vector(9 downto 0);
 
 begin
   -- cpu i/f
@@ -516,40 +522,70 @@ begin
       chan_mixed(1) := (reg(7)(1) or tone_gen_op(2)) and (reg(7)(4) or noise_gen_op);
       chan_mixed(2) := (reg(7)(2) or tone_gen_op(3)) and (reg(7)(5) or noise_gen_op);
 
-      vol_table_in <= x"000";
+      vol_table_in_l <= x"000";
+      vol_table_in_r <= x"000";
 
       if (chan_mixed(0) = '1') then
-        if (reg(8)(4) = '0') then
-          vol_table_in(3 downto 0) <= reg(8)(3 downto 0);
+        if(stereo='1') then
+          if (reg(8)(4) = '0') then
+            vol_table_in_l(3 downto 0) <= reg(8)(3 downto 0);
+          else
+            vol_table_in_l(3 downto 0) <= env_vol(4 downto 1);
+          end if;
         else
-          vol_table_in(3 downto 0) <= env_vol(4 downto 1);
+          if (reg(8)(4) = '0') then
+            vol_table_in_l(3 downto 0) <= reg(8)(3 downto 0);
+            vol_table_in_r(3 downto 0) <= reg(8)(3 downto 0);
+          else
+            vol_table_in_l(3 downto 0) <= env_vol(4 downto 1);
+            vol_table_in_r(3 downto 0) <= env_vol(4 downto 1);
+          end if;
         end if;
       end if;
 
       if (chan_mixed(1) = '1') then
         if (reg(9)(4) = '0') then
-          vol_table_in(7 downto 4) <= reg(9)(3 downto 0);
+          vol_table_in_l(7 downto 4) <= reg(9)(3 downto 0);
+          vol_table_in_r(7 downto 4) <= reg(9)(3 downto 0);
         else
-          vol_table_in(7 downto 4) <= env_vol(4 downto 1);
+          vol_table_in_l(7 downto 4) <= env_vol(4 downto 1);
+          vol_table_in_r(7 downto 4) <= env_vol(4 downto 1);
         end if;
       end if;
 
       if (chan_mixed(2) = '1') then
-        if (reg(10)(4) = '0') then
-          vol_table_in(11 downto 8) <= reg(10)(3 downto 0);
+        if(stereo='1') then
+          if (reg(10)(4) = '0') then
+            vol_table_in_r(11 downto 8) <= reg(10)(3 downto 0);
+          else
+            vol_table_in_r(11 downto 8) <= env_vol(4 downto 1);
+          end if;
         else
-          vol_table_in(11 downto 8) <= env_vol(4 downto 1);
+          if (reg(10)(4) = '0') then
+            vol_table_in_l(11 downto 8) <= reg(10)(3 downto 0);
+            vol_table_in_r(11 downto 8) <= reg(10)(3 downto 0);
+          else
+            vol_table_in_l(11 downto 8) <= env_vol(4 downto 1);
+            vol_table_in_r(11 downto 8) <= reg(10)(3 downto 0);
+          end if;
         end if;
       end if;
     end if;
   end process;
 
-  u_vol_table            : vol_table
+  u_vol_table_l : vol_table
     port map (
       CLK         => clk,
-      ADDR        => vol_table_in,
-      DATA        => vol_table_out
+      ADDR        => vol_table_in_l,
+      DATA        => vol_table_out_l
       );
+
+  u_vol_table_r : vol_table
+    port map(
+      CLK=>clk,
+      ADDR=>vol_table_in_r,
+      DATA=>vol_table_out_r
+    );
 
   p_op_mixer             : process
     variable chan_mixed : std_logic;
@@ -558,9 +594,11 @@ begin
     wait until rising_edge(CLK);
 
     if (RESET_L = '0') then
-      O_AUDIO(7 downto 0) <= "00000000";
+      O_AUDIO_L(7 downto 0) <= "00000000";
+      O_AUDIO_R(7 downto 0) <= "00000000";
     else
-      O_AUDIO(7 downto 0) <= vol_table_out(9 downto 2);
+      O_AUDIO_L(7 downto 0) <= vol_table_out_l(9 downto 2);
+      O_AUDIO_R(7 downto 0) <= vol_table_out_r(9 downto 2);
     end if;
   end process;
 

@@ -182,8 +182,9 @@ wire init = ~pll_locked;
 video video (
 	.reset      (init          ), // reset input
 	.clk        (clk_32        ),
+  .clk27 (CLOCK_27[0]),
 	.bus_cycle  (bus_cycle     ),
-
+  .scanlines (system_ctrl[31:30]),
 	// spi for OSD
    .sdi            (SPI_DI    ),
    .sck            (SPI_SCK   ),
@@ -320,14 +321,21 @@ wire [7:0] port_a_out;
 assign floppy_side = port_a_out[0];
 assign floppy_sel = port_a_out[2:1];
 
-wire [7:0] audio_out;
-assign AUDIO_R = AUDIO_L;
+wire [7:0] audio_out_l,audio_out_r;
+//assign AUDIO_R = AUDIO_L;
 
-sigma_delta_dac sigma_delta_dac (
+sigma_delta_dac sigma_delta_dac_l (
 	.DACout 		(AUDIO_L),
-	.DACin		(audio_out),
+	.DACin		(audio_out_l),
 	.CLK 			(clk_32),
 	.RESET 		(reset)
+);
+
+sigma_delta_dac sigma_delta_dac_r (
+  .DACout     (AUDIO_R),
+  .DACin    (audio_out_r),
+  .CLK      (clk_32),
+  .RESET    (reset)
 );
 
 YM2149 ym2149 (
@@ -343,8 +351,10 @@ YM2149 ym2149 (
 	.I_BC1              	( psg_sel && !tg68_adr[1]),
 	.I_SEL_L             ( 1'b1						),
 
-	.O_AUDIO             ( audio_out					),
+	.O_AUDIO_L             (audio_out_l),
+  .O_AUDIO_R             (audio_out_r),
 
+  .stereo (system_ctrl[29]),
 	// port a
 	.I_IOA           		( 8'd0 						),
 	.O_IOA              	( port_a_out				),
