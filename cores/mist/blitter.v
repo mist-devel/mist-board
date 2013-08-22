@@ -103,10 +103,7 @@ always @(sel, rw, addr, src_y_inc, src_x_inc, src_addr, endmask1, endmask2, endm
 	end
 end
 
-// source read takes place in state 1 (normal source read) and 4 (fxsr)
-assign bm_addr = ((state == 1)||(state == 4))?src_addr:dst_addr;
-reg [2:0] state;
-
+reg [2:0] state /* synthesis noprune */;
 reg [7:0] dummy /* synthesis noprune */;
 
 always @(negedge clk) begin
@@ -160,7 +157,7 @@ always @(negedge clk) begin
 			   if(din[15] && (y_count != 0)) begin
 					busy  <= 1'b1;
 					state <= 3'd0;
-				end
+				end 
 			end
 			
 			if((addr == 5'h1e) && ~lds) begin
@@ -172,54 +169,63 @@ always @(negedge clk) begin
    end
 	
 	// --------- blitter state machine -------------
+	
+	// the state machine runs through most states for every word it processes
+	// state 0: Blitter has just been started, wait 1 bus cycle before updating counters
+	// state 1: normal source read cycle
+	// state 2: destination read cycle
+	// state 3: destination write cycle
+	// state 4: extra source read cycle (fxsr)
+	
 	br <= busy;  // hog mode: grab bus immediately as long as we need it
 	
-	// busy is written by the cpu and anly becomes active if y_count != 0
+	// busy->br is written by the cpu and anly becomes active if y_count != 0
 	if(br && (bus_cycle == 2'd0)) begin
-		if(state == 3'd3) begin
-			if(last_word_in_row && fxsr)
-				state <= 3'd4;  // extra state 4, then 1, 2 ... 
-			else
-				state <= 3'd1;  // cycle through states 1, 2 and 3
-		end else if(state == 3'd4)
+
+		// init/setup state
+		if(state == 3'd0) begin
+			if(fxsr) begin	
+				state <= 3'd4;
+//				op <= 4'd15;     // all black for testing
+			end
+			else     state <= 3'd1;
+		end
+		
+		// first extra source read (fxsr)
+		if(state == 3'd4) begin
+			if(src_x_inc[15] == 1'b0) 	src <= { src[15:0],  bm_data_in};
+			else								src <= { bm_data_in, src[31:16]};
+
+			src_addr <= src_addr + { {8{src_x_inc[15]}}, src_x_inc };
 			state <= 3'd1;
-		else if(state == 3'd0 && fxsr)
-			state <= 3'd4;
-		else
-			state <= state + 3'd1; 
-
-		if((state == 3'd1) || (state == 3'd4)) begin
+		end  
+		 
+		if(state == 3'd1) begin
 			// don't do the read of the last word in a row if nfsr is set
-			if(!((state == 3'd1) && nfsr && last_word_in_row)) begin
-	
-				if(src_x_inc[15] == 1'b0) 	src[15:0] <= bm_data_in;
-				else								src[31:16] <= bm_data_in;
+			if(nfsr && last_word_in_row) begin
+				// no final source read, but shifting anyway
+				if(src_x_inc[15] == 1'b0) 	src[31:16] <= src[15:0];
+				else								src[15:0] <= src[31:16];
+				
+				src_addr <= src_addr + { {8{src_y_inc[15]}}, src_y_inc } - { {8{src_x_inc[15]}}, src_x_inc };
 
-				// in noral read state (not due to fxsr) we shift
-				if(state == 3'd1) begin
-					if(src_x_inc[15] == 1'b0) 	src[31:16] <= src[15:0];
-					else								src[15:0] <= src[31:16];
-				end
+			end else begin
+				if(src_x_inc[15] == 1'b0) 	src <= { src[15:0],  bm_data_in};
+				else								src <= { bm_data_in, src[31:16]};
 
-//				if(src_x_inc[15] == 1'b0) 	src <= { src[15:0],  bm_data_in};
-//				else								src <= { bm_data_in, src[31:16]};
-
-				// process src pointer
 				if(x_count != 1) 	// do signed add by sign expanding XXX_x_inc
 					src_addr <= src_addr + { {8{src_x_inc[15]}}, src_x_inc };
 				else 					// we are at the end of a line
 					src_addr <= src_addr + { {8{src_y_inc[15]}}, src_y_inc };
-			end else begin
-				// no source read, but shifting anyway
-				if(src_x_inc[15] == 1'b0) 	src[31:16] <= src[15:0];
-				else								src[15:0] <= src[31:16];
-
-				// TODO: do the dest read here if nfsr and skip state 2
 			end
+			
+			state <= 3'd2;
 		end
 
 		if(state == 3'd2) begin
 			dest <= bm_data_in;
+			
+			state <= 3'd3;
 		end
 
 		// don't update counters and adresses if still in setup phase
@@ -235,7 +241,6 @@ always @(negedge clk) begin
 					dst_addr <= dst_addr + { {8{dst_x_inc[15]}}, dst_x_inc };
 		
 					x_count <= x_count - 8'd1;
-				
 				end else begin
 					// we are at the end of a line but not finished yet
 
@@ -251,9 +256,17 @@ always @(negedge clk) begin
 				// y_count reached zero -> end of blitter operation
 				busy <= 1'b0;
 			end
+
+			if(last_word_in_row && fxsr)
+				state <= 3'd4;  // extra state 4
+			else
+				state <= 3'd1;  // normal source read state
 		end
 	end
 end
+
+// source read takes place in state 1 (normal source read) and 4 (fxsr)
+assign bm_addr = ((state == 1)||(state == 4))?src_addr:dst_addr;
 
 // ----------------- blitter busmaster engine -------------------
 always @(posedge clk) begin
@@ -261,15 +274,12 @@ always @(posedge clk) begin
 	bm_write <= 1'b0;
 
 	if(br && (y_count != 0) && (bus_cycle == 2'd0)) begin
-		// drive write
 		if(state == 3'd1)      bm_read  <= 1'b1;
 		else if(state == 3'd2) bm_read  <= 1'b1;
 		else if(state == 3'd3) bm_write <= 1'b1;
 		else if(state == 3'd4) bm_read  <= 1'b1;  // fxsr state
 	end
 end
-
-// wire io = (bus_cycle[3:2] == 1);  // blitter does io in cycle 1 which is the same one the cpu uses
 
 // internal registers
 reg [31:0] src;       // 32 bit source read buffer
@@ -300,11 +310,6 @@ halftone_op halftone_op (
 			 .out (src_halftoned)
 			 );
 
-// todo: clean this
-reg [15:0] dummy_reg /* synthesis noprune */;
-always @(posedge clk) begin
-	dummy_reg <= src_skewed;
-end
 		 	 
 // apply blitter operation   
 blitter_op blitter_op (
@@ -354,7 +359,7 @@ module blitter_op (
 
 always @(op, in0, in1) begin
    case(op)
-     0:  out = 8'h00;
+     0:  out = 16'h0000;
      1:  out =  in0 &  in1;
      2:  out =  in0 & ~in1;
      3:  out =  in0;
@@ -364,12 +369,12 @@ always @(op, in0, in1) begin
      7:  out =  in0 |  in1;
      8:  out = ~in0 & ~in1;
      9:  out = ~in0 ^  in1;
-     10: out = ~in1;
+     10: out =        ~in1;
      11: out =  in0 | ~in1;
      12: out = ~in0;
      13: out = ~in0 |  in1;
      14: out = ~in0 | ~in1;
-     15: out = 8'hff;
+     15: out = 16'hffff;
    endcase; // case (op)
 end
    
