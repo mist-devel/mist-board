@@ -5,7 +5,9 @@
 // https://steem-engine.googlecode.com/svn-history/r67/branches/Seagal/steem/code/blitter.cpp
 
 // TODO:
-// - Also use bus cycle 3 to make a "turbo blitter" being twice as fast   
+// - Also use bus cycle 3 to make a "turbo blitter" being twice as fast
+// - Proper cooperation when DMA requests bus
+// - Non-HOG mode
 
 module blitter (
 		input [1:0] 			bus_cycle,
@@ -103,8 +105,7 @@ always @(sel, rw, addr, src_y_inc, src_x_inc, src_addr, endmask1, endmask2, endm
 	end
 end
 
-reg [2:0] state /* synthesis noprune */;
-reg [7:0] dummy /* synthesis noprune */;
+reg [2:0] state;
 
 always @(negedge clk) begin
 
@@ -112,7 +113,6 @@ always @(negedge clk) begin
 	if(reset) begin
 		busy <= 1'b0;
 		state <= 3'd0;
-		dummy <= 8'd0;
    end else begin
       if(sel && ~rw) begin
 			// ------ 16/32 bit registers, not byte adressable ----------
@@ -144,9 +144,6 @@ always @(negedge clk) begin
 			// lds -> odd bytes via d7:d0
 			if((addr == 5'h1d) && ~uds) hop <= din[9:8];
 			if((addr == 5'h1d) && ~lds) op <= din[3:0];
-
-			if(addr == 5'h1d)
-				dummy <= dummy + 8'd1;
 
 			if((addr == 5'h1e) && ~uds) begin
 				line_number <= din[11:8];
@@ -184,11 +181,9 @@ always @(negedge clk) begin
 
 		// init/setup state
 		if(state == 3'd0) begin
-			if(fxsr) begin	
-				state <= 3'd4;
-//				op <= 4'd15;     // all black for testing
-			end
-			else     state <= 3'd1;
+			if(skip_src_read) state <= 3'd2;  // skip source read
+			else if(fxsr)     state <= 3'd4;  // first extra source read
+			else              state <= 3'd1;  // normal source read
 		end
 		
 		// first extra source read (fxsr)
@@ -257,10 +252,9 @@ always @(negedge clk) begin
 				busy <= 1'b0;
 			end
 
-			if(last_word_in_row && fxsr)
-				state <= 3'd4;  // extra state 4
-			else
-				state <= 3'd1;  // normal source read state
+			if(skip_src_read)              		state <= 3'd2;  // skip source read
+			else if(last_word_in_row && fxsr)	state <= 3'd4;  // extra state 4
+			else											state <= 3'd1;  // normal source read state
 		end
 	end
 end
@@ -291,7 +285,11 @@ wire [15:0] src_halftoned;
 wire [15:0] result;
    
 // select current halftone line
-wire [15:0] halftone_line = halftone_ram[line_number];
+wire [15:0] halftone_line = halftone_ram[smudge?src_skewed[3:0]:line_number];
+
+wire skip_src_read = no_src_hop || no_src_op;
+wire no_src_hop;  // hop doesn't require source read
+wire no_src_op;   // op     -"-
 
 // shift/select 16 bits of source
 shift shift (
@@ -307,30 +305,23 @@ halftone_op halftone_op (
 			 .in0 (halftone_line),
 			 .in1 (src_skewed),
 			 
+			 .no_src (no_src_hop),
 			 .out (src_halftoned)
 			 );
 
 		 	 
 // apply blitter operation   
 blitter_op blitter_op (
-		       .op (op),
-		       .in0 (src_halftoned),
-		       .in1 (dest),
+	       .op (op),
+	       .in0 (src_halftoned),
+	       .in1 (dest),
 		       
-		       .out (result)
-		       );
+			 .no_src (no_src_op),
+	       .out (result)
+	       );
 
-				 
-				 
-wire  first_word_in_row = (x_count == x_count_latch) /* synthesis keep */;
-wire  last_word_in_row = (x_count == 16'h0001) /* synthesis keep */;
-
-reg  first_word_in_row_reg /* synthesis noprune */;
-reg  last_word_in_row_reg /* synthesis noprune */;
-always @(posedge clk) begin
-	first_word_in_row_reg <= first_word_in_row;
-	last_word_in_row_reg <= last_word_in_row;
-end
+wire  first_word_in_row = (x_count == x_count_latch);
+wire  last_word_in_row = (x_count == 16'h0001);
 
 // apply masks
 masking masking (
@@ -354,10 +345,14 @@ module blitter_op (
 	   input  [15:0] in0,
 	   input  [15:0] in1,
 
+	   output reg no_src,
       output reg [15:0] out
 );
 
 always @(op, in0, in1) begin
+	// return 1 for all ops that don't use in0 (src)
+	no_src = (op == 0) || (op == 5) || (op == 10) || (op == 15);
+
    case(op)
      0:  out = 16'h0000;
      1:  out =  in0 &  in1;
@@ -388,8 +383,7 @@ module shift (
 );
 
 always @(skew, in) begin
-	out = 16'h00;
-   // out = in[skew+15:skew];
+	out = 16'h0000;
 
    case(skew)
      0:  out =  in[15:0];
@@ -419,10 +413,14 @@ module halftone_op (
 	   input  [15:0] in0,
 	   input  [15:0] in1,
 
+	   output reg no_src,
       output reg [15:0] out
 );
 
 always @(op, in0, in1) begin
+	// return 1 for all ops that don't use in0 (src)
+	no_src = (op == 0) || (op == 1);
+
    case(op)
      0:  out = 8'hff;
      1:  out = in0;
