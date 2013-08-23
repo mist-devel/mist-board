@@ -8,6 +8,8 @@
 // - Also use bus cycle 3 to make a "turbo blitter" being twice as fast
 // - Proper cooperation when DMA requests bus
 // - Non-HOG mode
+// - Don't spend a whole state 1 if nfsr && last_word_in_row
+// - Test smudge mode
 
 module blitter (
 		input [1:0] 			bus_cycle,
@@ -105,13 +107,19 @@ always @(sel, rw, addr, src_y_inc, src_x_inc, src_addr, endmask1, endmask2, endm
 	end
 end
 
+// the state machine runs through most states for every word it processes
+// state 0: Blitter has just been started, wait 1 bus cycle before updating counters
+// state 1: normal source read cycle
+// state 2: destination read cycle
+// state 3: destination write cycle
+// state 4: extra source read cycle (fxsr)
 reg [2:0] state;
 
 always @(negedge clk) begin
 
 	// ---------- böitter cpu register write interfce ............
 	if(reset) begin
-		busy <= 1'b0;
+		busy <= 1'b0; 
 		state <= 3'd0;
    end else begin
       if(sel && ~rw) begin
@@ -154,6 +162,11 @@ always @(negedge clk) begin
 			   if(din[15] && (y_count != 0)) begin
 					busy  <= 1'b1;
 					state <= 3'd0;
+
+					// make sure the predicted x_count is one steap ahead of the 
+					// real x_count
+					if(x_count != 1) x_count_next <= x_count - 1'd1;
+					else             x_count_next <= x_count_latch;
 				end 
 			end
 			
@@ -166,13 +179,6 @@ always @(negedge clk) begin
    end
 	
 	// --------- blitter state machine -------------
-	
-	// the state machine runs through most states for every word it processes
-	// state 0: Blitter has just been started, wait 1 bus cycle before updating counters
-	// state 1: normal source read cycle
-	// state 2: destination read cycle
-	// state 3: destination write cycle
-	// state 4: extra source read cycle (fxsr)
 	
 	br <= busy;  // hog mode: grab bus immediately as long as we need it
 	
@@ -212,9 +218,11 @@ always @(negedge clk) begin
 					src_addr <= src_addr + { {8{src_x_inc[15]}}, src_x_inc };
 				else 					// we are at the end of a line
 					src_addr <= src_addr + { {8{src_y_inc[15]}}, src_y_inc };
-			end
-			
-			state <= 3'd2;
+			end 
+
+			// jump directly to destination write if no destination read is required
+			if(dest_required)	state <= 3'd2;
+			else              state <= 3'd3;
 		end
 
 		if(state == 3'd2) begin
@@ -228,7 +236,7 @@ always @(negedge clk) begin
 		
 			// y_count != 0 means blitter is (still) active	
 			if(y_count != 0) begin
-		
+
 				if(x_count != 1) begin 
 					// we are at the begin or within a line (have not reached the end yet)
 
@@ -247,12 +255,20 @@ always @(negedge clk) begin
 					x_count <= x_count_latch;
 					y_count <= y_count - 8'd1;
 				end
+				
+				// also advance the predicted next x_count
+				if(x_count_next != 1) x_count_next <= x_count_next - 1'd1;
+				else                  x_count_next <= x_count_latch;
+				
 			end else begin
 				// y_count reached zero -> end of blitter operation
 				busy <= 1'b0;
 			end
 
-			if(skip_src_read)              		state <= 3'd2;  // skip source read
+			if(skip_src_read) begin                             // skip source read (state 1)
+				if(next_dest_required)				state <= 3'd2;  //   but dest needs to be read
+				else              					state <= 3'd3;  //   also dest needs to be read
+			end
 			else if(last_word_in_row && fxsr)	state <= 3'd4;  // extra state 4
 			else											state <= 3'd1;  // normal source read state
 		end
@@ -276,6 +292,11 @@ always @(posedge clk) begin
 end
 
 // internal registers
+
+// predicts what the next x_count will be. Is needed to determine the first state in the nect
+// blitter cycle e.g. to know whether we can skip the source/dest read of the next cycle
+reg [15:0] x_count_next;
+
 reg [31:0] src;       // 32 bit source read buffer
 reg [15:0] dest;      // 16 bit destination read buffer
    
@@ -287,10 +308,11 @@ wire [15:0] result;
 // select current halftone line
 wire [15:0] halftone_line = halftone_ram[smudge?src_skewed[3:0]:line_number];
 
-wire skip_src_read = no_src_hop || no_src_op;
+wire skip_src_read = (no_src_hop || no_src_op) && !smudge;
 wire no_src_hop;  // hop doesn't require source read
 wire no_src_op;   // op     -"-
-
+wire no_dest_op;  // op doesn't require dest read
+ 
 // shift/select 16 bits of source
 shift shift (
 	     .skew (skew),
@@ -317,12 +339,35 @@ blitter_op blitter_op (
 	       .in1 (dest),
 		       
 			 .no_src (no_src_op),
+			 .no_dest (no_dest_op),
 	       .out (result)
 	       );
 
-wire  first_word_in_row = (x_count == x_count_latch);
-wire  last_word_in_row = (x_count == 16'h0001);
+// check if current column is first or last word in the row
+wire first_word_in_row = (x_count == x_count_latch);
+wire last_word_in_row = (x_count == 16'h0001);
 
+// check if next column is first or last word in the row
+wire next_is_first_word_in_row = (x_count_next == x_count_latch);
+wire next_is_last_word_in_row = (x_count_next == 16'h0001);
+
+// check if the current mask requires to read the destination first
+wire mask_requires_dest =
+	first_word_in_row?(endmask1 != 16'hffff):
+	(last_word_in_row?(endmask3 != 16'hffff):
+	(endmask2 != 16'hffff));
+
+// check if the next words mask requires to read the destination first
+wire next_mask_requires_dest =
+	next_is_first_word_in_row?(endmask1 != 16'hffff):
+	(next_is_last_word_in_row?(endmask3 != 16'hffff):
+	(endmask2 != 16'hffff));
+
+// the requirement to read the destination first may either come from the
+// operation or from the fact that masking takes place
+wire dest_required = mask_requires_dest || !no_dest_op;
+wire next_dest_required = next_mask_requires_dest || !no_dest_op;
+	
 // apply masks
 masking masking (
 	   .endmask1 (endmask1),
@@ -346,12 +391,14 @@ module blitter_op (
 	   input  [15:0] in1,
 
 	   output reg no_src,
+	   output reg no_dest,
       output reg [15:0] out
 );
 
 always @(op, in0, in1) begin
 	// return 1 for all ops that don't use in0 (src)
 	no_src = (op == 0) || (op == 5) || (op == 10) || (op == 15);
+	no_dest = (op == 0) || (op == 3) || (op == 12) || (op == 15);
 
    case(op)
      0:  out = 16'h0000;
@@ -418,11 +465,11 @@ module halftone_op (
 );
 
 always @(op, in0, in1) begin
-	// return 1 for all ops that don't use in0 (src)
+	// return 1 for all ops that don't use in1 (src)
 	no_src = (op == 0) || (op == 1);
 
    case(op)
-     0:  out = 8'hff;
+     0:  out = 16'hffff;
      1:  out = in0;
      2:  out = in1;
      3:  out = in0 & in1;
