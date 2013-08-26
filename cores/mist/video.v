@@ -742,8 +742,8 @@ module dram(
   input rClk,
   input wClk,
   input w,
-  input [11:0] rA,
-  input [11:0] wA,
+  input [10:0] rA,
+  input [10:0] wA,
   input [17:0] wD,
   output reg [17:0] D
 );
