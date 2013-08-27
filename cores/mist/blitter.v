@@ -8,8 +8,8 @@
 // - Also use bus cycle 3 to make a "turbo blitter" being twice as fast
 // - Proper cooperation when DMA requests bus
 // - Non-HOG mode
-// - Don't spend a whole state 1 if nfsr && last_word_in_row
-// - Test smudge mode
+// - Don't spend a whole state 0 if nfsr && last_word_in_row
+// - Fix spurious first source read when e.g. in op/jop 3/1
 
 module blitter (
 		input [1:0] 			bus_cycle,
@@ -33,7 +33,7 @@ module blitter (
 		output [15:0]  		bm_data_out,
 		input  [15:0]  		bm_data_in,
 
-		output reg	  			br,
+		output reg 				br,
 		output 		  			irq
 
 );
@@ -107,20 +107,30 @@ always @(sel, rw, addr, src_y_inc, src_x_inc, src_addr, endmask1, endmask2, endm
 	end
 end
 
+// flag to initialze state machine
+reg init;
+
+// wait 1 bus cycle after bus has been requested to avoid that counters are updated before 
+// first bus transfer has taken place
+reg wait4bus;
+
+// counter for cooperative (non-hog) bus access
+reg [5:0] bus_coop_cnt /* synthesis noprune */;
+
 // the state machine runs through most states for every word it processes
-// state 0: Blitter has just been started, wait 1 bus cycle before updating counters
-// state 1: normal source read cycle
-// state 2: destination read cycle
-// state 3: destination write cycle
-// state 4: extra source read cycle (fxsr)
-reg [2:0] state;
+// state 0: normal source read cycle
+// state 1: destination read cycle
+// state 2: destination write cycle
+// state 3: extra source read cycle (fxsr)
+reg [1:0] state;
 
 always @(negedge clk) begin
 
 	// ---------- böitter cpu register write interfce ............
 	if(reset) begin
 		busy <= 1'b0; 
-		state <= 3'd0;
+		state <= 2'd0;
+		wait4bus <= 1'b0;
    end else begin
       if(sel && ~rw) begin
 			// ------ 16/32 bit registers, not byte adressable ----------
@@ -128,8 +138,8 @@ always @(negedge clk) begin
 
 			if(addr == 5'h10) src_x_inc <= din[15:1];
 			if(addr == 5'h11) src_y_inc <= din[15:1];
-			if(addr == 5'h12) src_addr [23:16]<= din[7:0];
-			if(addr == 5'h13) src_addr [15:1]<= din[15:1];
+			if(addr == 5'h12) src_addr[23:16] <= din[7:0];
+			if(addr == 5'h13) src_addr[15:1] <= din[15:1];
 
 			if(addr == 5'h14) endmask1 <= din;
 			if(addr == 5'h15) endmask2 <= din;
@@ -137,8 +147,8 @@ always @(negedge clk) begin
 			
 			if(addr == 5'h17) dst_x_inc <= din[15:1];
 			if(addr == 5'h18) dst_y_inc <= din[15:1];
-			if(addr == 5'h19) dst_addr [23:16]<= din[7:0];
-			if(addr == 5'h1a) dst_addr [15:1]<= din[15:1];
+			if(addr == 5'h19) dst_addr[23:16] <= din[7:0];
+			if(addr == 5'h1a) dst_addr[15:1] <= din[15:1];
 
 			if(addr == 5'h1b) begin 
 			   x_count <= din;
@@ -154,14 +164,26 @@ always @(negedge clk) begin
 			if((addr == 5'h1d) && ~lds) op <= din[3:0];
 
 			if((addr == 5'h1e) && ~uds) begin
-				line_number <= din[11:8];
+
+				// HACK: The tg68 does not have atomic read-modify-write cycles
+				// and may be interrupted by the blitter in between. We thus don't
+				// accept changes to the line_number register as long as the blitter
+				// is running since TOS polls the busy flag in the same register	
+				// using bset which in turn can mess up the line_number
+				if(!busy) line_number <= din[11:8];
+				
 				smudge <= din[13];
 				hog <= din[14];
 
 			   // writing busy with 1 starts the blitter, but only if y_count != 0
 			   if(din[15] && (y_count != 0)) begin
 					busy  <= 1'b1;
-					state <= 3'd0;
+					wait4bus <= 1'b1;
+					bus_coop_cnt <= 6'd0;
+
+					// initialize only if blitter is newly being started and not
+					// if it's already running
+					if(!busy) init <= 1'b1;
 
 					// make sure the predicted x_count is one steap ahead of the 
 					// real x_count
@@ -174,109 +196,129 @@ always @(negedge clk) begin
 				skew <= din[3:0];
 				nfsr <= din[6];
 				fxsr <= din[7];
-			end
+			end 
 		end
    end
 	
-	// --------- blitter state machine -------------
-	
-	br <= busy;  // hog mode: grab bus immediately as long as we need it
-	
-	// busy->br is written by the cpu and anly becomes active if y_count != 0
-	if(br && (bus_cycle == 2'd0)) begin
+	// ----------------------------------------------------------------------------------
+	// -------------------------- blitter state machine ---------------------------------
+	// ----------------------------------------------------------------------------------
 
-		// init/setup state
-		if(state == 3'd0) begin
-			if(skip_src_read) state <= 3'd2;  // skip source read
-			else if(fxsr)     state <= 3'd4;  // first extra source read
-			else              state <= 3'd1;  // normal source read
+
+	// entire state machine advances in bus_cycle 0
+	// (the cycle before the one being used by the cpu/blitter for memory access)
+	if(bus_cycle == 2'd0) begin
+
+		// grab bus if blitter is supposed to run (busy == 1) and we're not waiting for the bus
+		br <= busy && !wait4bus;
+		
+		// clear busy flag if blitter is done
+		if(y_count == 0) busy <= 1'b0;
+
+		// the bus is freed/grabbed once this counter runs down to 0 in non-hog mode
+		if(busy && !hog && (bus_coop_cnt != 0))
+			bus_coop_cnt <= bus_coop_cnt - 6'd1;
+
+		// change between both states (bus grabbed and bus released)
+		if(bus_coop_cnt == 0) begin
+			bus_coop_cnt <= 6'd63;
+			wait4bus <= !wait4bus;
 		end
 		
-		// first extra source read (fxsr)
-		if(state == 3'd4) begin
-			if(src_x_inc[15] == 1'b0) 	src <= { src[15:0],  bm_data_in};
-			else								src <= { bm_data_in, src[31:16]};
+		// blitter has just been setup, so init the state machine in first step
+		if(init) begin 
+			init <= 1'b0;
 
-			src_addr <= src_addr + { {8{src_x_inc[15]}}, src_x_inc };
-			state <= 3'd1;
-		end  
-		 
-		if(state == 3'd1) begin
-			// don't do the read of the last word in a row if nfsr is set
-			if(nfsr && last_word_in_row) begin
-				// no final source read, but shifting anyway
-				if(src_x_inc[15] == 1'b0) 	src[31:16] <= src[15:0];
-				else								src[15:0] <= src[31:16];
-				
-				src_addr <= src_addr + { {8{src_y_inc[15]}}, src_y_inc } - { {8{src_x_inc[15]}}, src_x_inc };
-
-			end else begin
+			if(skip_src_read) begin                    // skip source read (state 0)
+				if(dest_required)			state <= 2'd1;  //   but dest needs to be read
+				else              		state <= 2'd2;  //   also dest needs to be read
+			end else if(fxsr)     		state <= 2'd3;  // first extra source read
+			else              			state <= 2'd0;  // normal source read
+		end
+			
+		// advance state machine only if bus is owned
+		if(br) begin
+			// first extra source read (fxsr)
+			if(state == 2'd3) begin
 				if(src_x_inc[15] == 1'b0) 	src <= { src[15:0],  bm_data_in};
 				else								src <= { bm_data_in, src[31:16]};
 
-				if(x_count != 1) 	// do signed add by sign expanding XXX_x_inc
-					src_addr <= src_addr + { {8{src_x_inc[15]}}, src_x_inc };
-				else 					// we are at the end of a line
-					src_addr <= src_addr + { {8{src_y_inc[15]}}, src_y_inc };
-			end 
-
-			// jump directly to destination write if no destination read is required
-			if(dest_required)	state <= 3'd2;
-			else              state <= 3'd3;
-		end
-
-		if(state == 3'd2) begin
-			dest <= bm_data_in;
+				src_addr <= src_addr + { {8{src_x_inc[15]}}, src_x_inc };
+				state <= 2'd0;
+			end  
+		 
+			if(state == 3'd0) begin
+				// don't do the read of the last word in a row if nfsr is set
+				if(nfsr && last_word_in_row) begin
+					// no final source read, but shifting anyway
+					if(src_x_inc[15] == 1'b0) 	src[31:16] <= src[15:0];
+					else								src[15:0] <= src[31:16];
 			
-			state <= 3'd3;
-		end
-
-		// don't update counters and adresses if still in setup phase
-		if(state == 3'd3) begin
-		
-			// y_count != 0 means blitter is (still) active	
-			if(y_count != 0) begin
-
-				if(x_count != 1) begin 
-					// we are at the begin or within a line (have not reached the end yet)
-
-					// do signed add by sign expanding XXX_x_inc
-					dst_addr <= dst_addr + { {8{dst_x_inc[15]}}, dst_x_inc };
-		
-					x_count <= x_count - 8'd1;
+					src_addr <= src_addr + { {8{src_y_inc[15]}}, src_y_inc } - { {8{src_x_inc[15]}}, src_x_inc };
 				end else begin
-					// we are at the end of a line but not finished yet
+					if(src_x_inc[15] == 1'b0) 	src <= { src[15:0],  bm_data_in};
+					else								src <= { bm_data_in, src[31:16]};
+					
+					if(x_count != 1) 	// do signed add by sign expanding XXX_x_inc
+						src_addr <= src_addr + { {8{src_x_inc[15]}}, src_x_inc };
+					else 					// we are at the end of a line
+						src_addr <= src_addr + { {8{src_y_inc[15]}}, src_y_inc };
+				end 
 
-					// do signed add by sign expanding XXX_y_inc
-					dst_addr <= dst_addr + { {8{dst_y_inc[15]}}, dst_y_inc };
-					if(dst_y_inc[15]) line_number <= line_number + 4'd1;
-					else              line_number <= line_number - 4'd1;
+				// jump directly to destination write if no destination read is required
+				if(dest_required)	state <= 2'd1;
+				else              state <= 2'd2;
+			end
+
+			if(state == 2'd1) begin
+				dest <= bm_data_in;
 			
-					x_count <= x_count_latch;
-					y_count <= y_count - 8'd1;
-				end
-				
-				// also advance the predicted next x_count
-				if(x_count_next != 1) x_count_next <= x_count_next - 1'd1;
-				else                  x_count_next <= x_count_latch;
-				
-			end else begin
-				// y_count reached zero -> end of blitter operation
-				busy <= 1'b0;
+				state <= 2'd2;
 			end
 
-			if(skip_src_read) begin                             // skip source read (state 1)
-				if(next_dest_required)				state <= 3'd2;  //   but dest needs to be read
-				else              					state <= 3'd3;  //   also dest needs to be read
+			if(state == 2'd2) begin
+		
+				// y_count != 0 means blitter is (still) active	
+				if(y_count != 0) begin
+
+					if(x_count != 1) begin 
+						// we are at the begin or within a line (have not reached the end yet)
+
+						// do signed add by sign expanding XXX_x_inc
+						dst_addr <= dst_addr + { {8{dst_x_inc[15]}}, dst_x_inc };
+		
+						x_count <= x_count - 8'd1;
+					end else begin
+						// we are at the end of a line but not finished yet
+
+						// do signed add by sign expanding XXX_y_inc
+						dst_addr <= dst_addr + { {8{dst_y_inc[15]}}, dst_y_inc };
+						if(dst_y_inc[15]) line_number <= line_number + 4'd1;
+						else              line_number <= line_number - 4'd1;
+			
+						x_count <= x_count_latch;
+						y_count <= y_count - 8'd1;
+					end
+				
+					// also advance the predicted next x_count
+					if(x_count_next != 1) x_count_next <= x_count_next - 1'd1;
+					else                  x_count_next <= x_count_latch;
+				
+				end 
+
+				if(skip_src_read) begin                             // skip source read (state 0)
+					if(next_dest_required)				state <= 2'd1;  //   but dest needs to be read
+					else              					state <= 2'd2;  //   also dest needs to be read
+				end
+				else if(last_word_in_row && fxsr)	state <= 2'd3;  // extra state 3
+				else											state <= 2'd0;  // normal source read state
 			end
-			else if(last_word_in_row && fxsr)	state <= 3'd4;  // extra state 4
-			else											state <= 3'd1;  // normal source read state
 		end
 	end
 end
 
-// source read takes place in state 1 (normal source read) and 4 (fxsr)
-assign bm_addr = ((state == 1)||(state == 4))?src_addr:dst_addr;
+// source read takes place in state 0 (normal source read) and 3 (fxsr)
+assign bm_addr = ((state == 2'd0)||(state == 2'd3))?src_addr:dst_addr;
 
 // ----------------- blitter busmaster engine -------------------
 always @(posedge clk) begin
@@ -284,10 +326,10 @@ always @(posedge clk) begin
 	bm_write <= 1'b0;
 
 	if(br && (y_count != 0) && (bus_cycle == 2'd0)) begin
-		if(state == 3'd1)      bm_read  <= 1'b1;
-		else if(state == 3'd2) bm_read  <= 1'b1;
-		else if(state == 3'd3) bm_write <= 1'b1;
-		else if(state == 3'd4) bm_read  <= 1'b1;  // fxsr state
+		if(state == 2'd0)      bm_read  <= 1'b1;
+		else if(state == 2'd1) bm_read  <= 1'b1;
+		else if(state == 2'd2) bm_write <= 1'b1;
+		else if(state == 2'd3) bm_read  <= 1'b1;  // fxsr state
 	end
 end
 
