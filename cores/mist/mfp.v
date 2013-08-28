@@ -25,6 +25,7 @@ module mfp (
 	input 		 de,
 	input 		 dma_irq, 
 	input 		 acia_irq,
+	input 		 blitter_irq,
 	input 		 mono_detect
 );
 
@@ -195,7 +196,7 @@ assign highest_irq_pending =
 // acia/dma irq is active low in st, but active high in this config, we thus invert
 // it to make sure tos sees what it expects to see when it looks at the registers
 wire [7:0] gpip_in;
-assign gpip_in = { mono_detect, 1'b0, !dma_irq, !acia_irq, 4'b0000 };
+assign gpip_in = { mono_detect, 1'b0, !dma_irq, !acia_irq, !blitter_irq, 3'b000 };
 
 // gpip as output to the cpu
 wire [7:0] gpip_cpu_out;
@@ -240,16 +241,20 @@ always @(iack, sel, ds, rw, addr, gpip_cpu_out, aer, ddr, ier, ipr, isr, imr,
 	end
 end
 
+// delay irqs to detect changes
+reg dma_irqD, dma_irqD2, blitter_irqD, blitter_irqD2;
+
 `ifndef CUBHACK  
-// delay de and timer to detect changes
-reg acia_irqD, acia_irqD2, dma_irqD, dma_irqD2;
+reg acia_irqD, acia_irqD2;
 `endif
 
 reg [7:0] irq_vec;
 
 always @(posedge clk) begin
-`ifndef CUBHACK  
    dma_irqD <=  dma_irq;
+   blitter_irqD <=  blitter_irq;
+
+`ifndef CUBHACK  
    acia_irqD <=  acia_irq;
 `endif
 
@@ -271,8 +276,12 @@ end
 reg iackD;
 always @(negedge clk) begin
 	dma_irqD2 <= dma_irqD; 		
- 	acia_irqD2 <= acia_irqD; 		
+ 	blitter_irqD2 <= blitter_irqD; 		
  	
+`ifndef CUBHACK  
+ 	acia_irqD2 <= acia_irqD; 		
+`endif
+
 	if(reset) begin
 		ipr <= 16'h0000; ier <= 16'h0000; 
 		imr <= 16'h0000; isr <= 16'h0000;
@@ -298,14 +307,8 @@ always @(negedge clk) begin
 `ifndef CUBHACK  
 		// in the real atari st the irqs are edge sensitive. however, this makes problems
       // with the acias in cubase as a work around ... 
-      if(acia_irqD && !acia_irqD2) begin
-			if(ier[6]) ipr[6] <= 1'b1;
-		end
-           
-		// ... and dma
-		if(dma_irqD && !dma_irqD2) begin
-			if(ier[7]) ipr[7] <= 1'b1;
-		end
+      if(acia_irqD && !acia_irqD2 && ier[6]) 
+			ipr[6] <= 1'b1;
 `else
 		// ... they can be implemented level sensitive. However, this breaks some games
 		// like eg. "no second place" and even the rainbow logo in the tos 1.04 desktop
@@ -313,12 +316,18 @@ always @(negedge clk) begin
       // irq by acia ...
 		if(acia_irq && ier[6])
 			ipr[6] <= 1'b1;
-
-      // ... and dma
-		if(dma_irq && ier[7])
-			ipr[7] <= 1'b1;
 `endif
 		
+		// ... dma ...
+		if(dma_irqD && !dma_irqD2) begin
+			if(ier[7]) ipr[7] <= 1'b1;
+		end
+
+		// ... and blitter
+		if(blitter_irqD && !blitter_irqD2) begin
+			if(ier[3]) ipr[3] <= 1'b1;
+		end
+
 		if(sel && ~ds && ~rw) begin
 			if(addr == 5'h00) gpip <= din;
 			if(addr == 5'h01)	aer <= din;

@@ -1,15 +1,31 @@
+//
+// blitter.v
+//
+// Atari ST BLiTTER implementation for the MiST board
+// http://code.google.com/p/mist-board/
+//
+// Copyright (c) 2013 Till Harbaum <till@harbaum.org>
+//
+// This source file is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published
+// by the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This source file is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
 // blitter docs:
-// 
 // http://mikro.naprvyraz.sk/docs/ST_E/BLITTER.TXT
 // http://paradox.atari.org/files/BLIT_FAQ.TXT
-// https://steem-engine.googlecode.com/svn-history/r67/branches/Seagal/steem/code/blitter.cpp
 
 // TODO:
-// - Also use bus cycle 3 to make a "turbo blitter" being twice as fast
-// - Proper cooperation when DMA requests bus
-// - Non-HOG mode
+// - Try to use bus cycle 3 as well to make a "turbo blitter" being twice as fast
 // - Don't spend a whole state 0 if nfsr && last_word_in_row
-// - Fix spurious first source read when e.g. in op/jop 3/1
 
 module blitter (
 		input [1:0] 			bus_cycle,
@@ -33,11 +49,12 @@ module blitter (
 		output [15:0]  		bm_data_out,
 		input  [15:0]  		bm_data_in,
 
-		output reg 				br,
+		input						br_in,
+		output reg 				br_out,
 		output 		  			irq
 
 );
-
+ 
 assign irq = busy;
 
 // CPU controlled register set
@@ -210,13 +227,13 @@ always @(negedge clk) begin
 	if(bus_cycle == 2'd0) begin
 
 		// grab bus if blitter is supposed to run (busy == 1) and we're not waiting for the bus
-		br <= busy && !wait4bus;
+		br_out <= busy && !wait4bus;
 		
 		// clear busy flag if blitter is done
 		if(y_count == 0) busy <= 1'b0;
 
 		// the bus is freed/grabbed once this counter runs down to 0 in non-hog mode
-		if(busy && !hog && (bus_coop_cnt != 0))
+		if(busy && !hog && !br_in && (bus_coop_cnt != 0))
 			bus_coop_cnt <= bus_coop_cnt - 6'd1;
 
 		// change between both states (bus grabbed and bus released)
@@ -237,7 +254,7 @@ always @(negedge clk) begin
 		end
 			
 		// advance state machine only if bus is owned
-		if(br) begin
+		if(br_out && !br_in) begin
 			// first extra source read (fxsr)
 			if(state == 2'd3) begin
 				if(src_x_inc[15] == 1'b0) 	src <= { src[15:0],  bm_data_in};
@@ -325,7 +342,7 @@ always @(posedge clk) begin
 	bm_read <= 1'b0;
 	bm_write <= 1'b0;
 
-	if(br && (y_count != 0) && (bus_cycle == 2'd0)) begin
+	if(br_out && !br_in && (y_count != 0) && (bus_cycle == 2'd0)) begin
 		if(state == 2'd0)      bm_read  <= 1'b1;
 		else if(state == 2'd1) bm_read  <= 1'b1;
 		else if(state == 2'd2) bm_write <= 1'b1;

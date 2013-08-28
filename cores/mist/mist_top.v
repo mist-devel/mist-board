@@ -249,10 +249,11 @@ mfp mfp (
 	.serial_data_out 	   			(serial_data_from_mfp),
 	
 	// input signals
-	.clk_ext  (clk_mfp     ),
-	.de       (video_de    ),
-	.dma_irq  (dma_irq     ),
-	.acia_irq (acia_irq    ),
+	.clk_ext     (clk_mfp     ),
+	.de          (video_de    ),
+	.dma_irq     (dma_irq     ),
+	.acia_irq    (acia_irq    ),
+	.blitter_irq (blitter_irq ),
 	.mono_detect (system_ctrl[8])
 ); 
 
@@ -284,10 +285,10 @@ wire [23:1] blitter_master_addr;
 wire blitter_master_write;
 wire blitter_master_read;
 wire blitter_br;
+wire blitter_irq;
 wire [15:0] blitter_master_data_out;
 
 blitter blitter (
-//	.bus_cycle 	(bus_cycle[3:2]  ),
 	.bus_cycle 	(bus_cycle_8  ),
 
 	// cpu interface
@@ -307,8 +308,9 @@ blitter blitter (
 	.bm_read    (blitter_master_read),
    .bm_data_in (ram_data_out),
 
-	.br        (blitter_br       ),
-	.irq       (                 )
+	.br_in     (data_io_br       ),
+	.br_out    (blitter_br       ),
+	.irq       (blitter_irq      )
 );
    
 
