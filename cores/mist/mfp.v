@@ -143,13 +143,11 @@ reg [7:0] vr;
 assign irq = ((ipr & imr) != 16'h0000) && (highest_irq_active == highest_irq_pending);
 
 // handle pending and in service irqs
-wire [15:0] irq_active_map;
-assign irq_active_map = (ipr | isr) & imr;
+wire [15:0] irq_active_map = (ipr | isr) & imr;
 
 // (i am pretty sure this can be done much more elegant ...)
 // check the number of the highest active irq
-wire [3:0] highest_irq_active;
-assign highest_irq_active=
+wire [3:0] highest_irq_active=
 	( irq_active_map[15]    == 1'b1)?4'd15:
 	((irq_active_map[15:14] == 2'b01)?4'd14:
 	((irq_active_map[15:13] == 3'b001)?4'd13:
@@ -168,12 +166,10 @@ assign highest_irq_active=
 	((irq_active_map[15:0]  == 16'b000000000000001)?4'd0:
 			4'd0)))))))))))))));
 
-wire [15:0] irq_pending_map;
-assign irq_pending_map = ipr & imr;
+wire [15:0] irq_pending_map = ipr & imr;
 
 // check the number of the highest pending irq 
-wire [3:0] highest_irq_pending;
-assign highest_irq_pending =
+wire [3:0] highest_irq_pending =
 	( irq_pending_map[15]    == 1'b1)?4'd15:
 	((irq_pending_map[15:14] == 2'b01)?4'd14:
 	((irq_pending_map[15:13] == 3'b001)?4'd13:
@@ -198,9 +194,8 @@ assign highest_irq_pending =
 wire [7:0] gpip_in;
 assign gpip_in = { mono_detect, 1'b0, !dma_irq, !acia_irq, !blitter_irq, 3'b000 };
 
-// gpip as output to the cpu
-wire [7:0] gpip_cpu_out;
-assign gpip_cpu_out = (gpip_in & ~ddr) | (gpip & ddr);
+// gpip as output to the cpu (ddr bit == 1 -> gpip pin is output)
+wire [7:0] gpip_cpu_out = (gpip_in & ~ddr) | (gpip & ddr);
 	
 // cpu read interface
 always @(iack, sel, ds, rw, addr, gpip_cpu_out, aer, ddr, ier, ipr, isr, imr, 
@@ -250,31 +245,35 @@ reg acia_irqD, acia_irqD2;
 
 reg [7:0] irq_vec;
 
+reg iackD;
 always @(posedge clk) begin
-   dma_irqD <=  dma_irq;
-   blitter_irqD <=  blitter_irq;
-
-`ifndef CUBHACK  
-   acia_irqD <=  acia_irq;
-`endif
-
    iackD <= iack;
 
-   // the polarity of the irq is negated over a real st.   
-//   if(aer[7]) dma_irqD <=  dma_irq;
-//   else       dma_irqD <= !dma_irq;
-
-//   if(aer[6]) acia_irqD <=  acia_irq;
-//   else       acia_irqD <= !acia_irq;
-   
 	// the pending irq changes in the middle of an iack
-	// phase, so we latch the current vector to keep is stable
+	// phase, so we latch the current vector to keep ist stable
 	// during the entire cpu read
 	irq_vec <= { vr[7:4], highest_irq_pending };
 end
 	
-reg iackD;
 always @(negedge clk) begin
+	// ST default for most aer bits is 0 (except I2/CTS)
+	// since the irq polarity is inverted over normal ST
+	// interrupts we'll invert the irq signal if a aer bit
+	// is 1
+
+   if(aer[3]) blitter_irqD <= !blitter_irq;
+   else       blitter_irqD <=  blitter_irq;   
+
+`ifndef CUBHACK  
+   if(aer[4]) acia_irqD <= !acia_irq;
+   else       acia_irqD <=  acia_irq;   
+`endif
+
+   // the polarity of the irq is negated over a real st.   
+   if(aer[5]) dma_irqD <= !dma_irq;
+   else       dma_irqD <=  dma_irq;
+
+
 	dma_irqD2 <= dma_irqD; 		
  	blitter_irqD2 <= blitter_irqD; 		
  	
@@ -319,14 +318,12 @@ always @(negedge clk) begin
 `endif
 		
 		// ... dma ...
-		if(dma_irqD && !dma_irqD2) begin
-			if(ier[7]) ipr[7] <= 1'b1;
-		end
+		if(dma_irqD && !dma_irqD2 && ier[7]) 
+			ipr[7] <= 1'b1;
 
 		// ... and blitter
-		if(blitter_irqD && !blitter_irqD2) begin
-			if(ier[3]) ipr[3] <= 1'b1;
-		end
+		if(blitter_irqD && !blitter_irqD2 && ier[3]) 
+			ipr[3] <= 1'b1;
 
 		if(sel && ~ds && ~rw) begin
 			if(addr == 5'h00) gpip <= din;
@@ -335,7 +332,7 @@ always @(negedge clk) begin
 
 			if(addr == 5'h03) begin
 				ier[15:8] <= din;
-				ipr[15:8]<= ipr[15:8] & din;  // clear pending interrupts
+				ipr[15:8] <= ipr[15:8] & din;  // clear pending interrupts
 			end
 				
 			if(addr == 5'h05)	ipr[15:8] <= ipr[15:8] & din;

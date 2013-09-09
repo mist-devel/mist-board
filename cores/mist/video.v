@@ -1,7 +1,7 @@
 // http://martin.hinner.info/vga/timing.html
 // http://www.epanorama.net/faq/vga2rgb/calc.html
 
-// original atari video timing
+// original atari video timing 
 //         mono     color
 // pclk    32MHz    16/8MHz
 // hfreq   35.7kHz  15.75kHz
@@ -224,39 +224,37 @@ reg [2:0] palette_r[15:0];
 reg [2:0] palette_g[15:0];
 reg [2:0] palette_b[15:0];
 
+   // -----------------------------------------------------------------------
+   // --------------------------- CPU register read -------------------------
+   // -----------------------------------------------------------------------
+   
 always @(reg_sel, reg_rw, reg_uds, reg_lds, reg_addr, _v_bas_ad, shmode, vaddr, syncmode) begin
   reg_dout = 16'h0000;
 
   // read registers
   if(reg_sel && reg_rw) begin
-    
-    if(reg_addr == 6'h00 && ~reg_lds)
-      reg_dout = { 8'h00, _v_bas_ad[22:15]};
 
-    if(reg_addr == 6'h01 && ~reg_lds)
-      reg_dout = { 8'h00, _v_bas_ad[14:7]};
-      
-      if(reg_addr == 6'h02 && ~reg_lds)
-         reg_dout = { 8'h00, vaddr[22:15]};
+     // video base register (r/w)
+    if(reg_addr == 6'h00)      reg_dout <= { 8'h00, _v_bas_ad[22:15] };
+    if(reg_addr == 6'h01)      reg_dout <= { 8'h00, _v_bas_ad[14: 7] };
 
-      if(reg_addr == 6'h03 && ~reg_lds)
-         reg_dout = { 8'h00, vaddr[14:7]};
+     // video address counter (ro on ST)
+    if(reg_addr == 6'h02)      reg_dout <= { 8'h00, vaddr[22:15]     };
+    if(reg_addr == 6'h03)      reg_dout <= { 8'h00, vaddr[14:7 ]     };
+    if(reg_addr == 6'h04)      reg_dout <= { 8'h00, vaddr[6:0], 1'b0 };
 
-      if(reg_addr == 6'h04 && ~reg_lds)
-         reg_dout = { 8'h00, vaddr[6:0], 1'b0 };
-
-    if(reg_addr == 6'h05 && ~reg_uds)
-      reg_dout = { 6'h00, syncmode, 8'h00};
+     // syncmode register
+    if(reg_addr == 6'h05)      reg_dout <= { 6'h00, syncmode, 8'h00  };
 
     // the color palette registers
     if(reg_addr >= 6'h20 && reg_addr < 6'h30 ) begin
-      reg_dout[2:0]  = palette_b[reg_addr[3:0]];
-      reg_dout[6:4]  = palette_g[reg_addr[3:0]];
-      reg_dout[10:8] = palette_r[reg_addr[3:0]];
+      reg_dout[2:0]  <= palette_b[reg_addr[3:0]];
+      reg_dout[6:4]  <= palette_g[reg_addr[3:0]];
+      reg_dout[10:8] <= palette_r[reg_addr[3:0]];
     end
 
-    if(reg_addr == 6'h30 && ~reg_uds)
-      reg_dout = { 6'h00, shmode, 8'h00};
+     // shift mode register
+    if(reg_addr == 6'h30)      reg_dout <= { 6'h00, shmode, 8'h00    };
   end
 end
 

@@ -17,7 +17,7 @@ module user_io(
 		// serial data from mfp to io controller
 		output reg       serial_strobe_out,
 		input            serial_data_out_available,
-		input [7:0]      serial_data_out,
+		input [7:0]       serial_data_out,
 
 		output [1:0] BUTTONS,
 		output [1:0] SWITCHES

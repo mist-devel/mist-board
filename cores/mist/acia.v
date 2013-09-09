@@ -26,10 +26,11 @@ module acia (
 localparam FIFO_ADDR_BITS = 4;
 localparam FIFO_DEPTH = (1 << FIFO_ADDR_BITS);
 
+// input FIFO to store ikbd bytes received from IO controller
 reg [7:0] fifoIn [FIFO_DEPTH-1:0];
 reg [FIFO_ADDR_BITS-1:0] writePin, readPin;
 
-// 
+// output FIFO to store ikbd bytes to be sent to IO controller
 reg [7:0] fifoOut [FIFO_DEPTH-1:0];
 reg [FIFO_ADDR_BITS-1:0] writePout, readPout;
 
@@ -44,10 +45,13 @@ reg midi_cpu_data_read;
 reg [7:0] ikbd_cr;
 reg [7:0] midi_cr;
 	
+reg [15:0] ikbd_rx_counter /* synthesis noprune */; 
+	
 always @(negedge clk) begin
-	if(reset)
+	if(reset) begin
 		readTimer <= 14'd0;
-	else
+		ikbd_rx_counter <= 16'd0;
+	end else
 		if(readTimer > 0)
 			readTimer <= readTimer - 14'd1;
 
@@ -55,22 +59,30 @@ always @(negedge clk) begin
 	ikbd_strobe_inD2 <= ikbd_strobe_inD;
 	
 	// read on ikbd data register
-	if(sel && ~ds && rw && (addr == 2'd1))
+	ikbd_cpu_data_read <= 1'b0;
+	if(sel && ~ds && rw && (addr == 2'd1)) begin
 		ikbd_cpu_data_read <= 1'b1;
-	else
-		ikbd_cpu_data_read <= 1'b0;
+		ikbd_rx_counter <= ikbd_rx_counter + 16'd1;
+	end
 
-   	// read on midi data register
+  	// read on midi data register
+	midi_cpu_data_read <= 1'b0;
 	if(sel && ~ds && rw && (addr == 2'd3))
 		midi_cpu_data_read <= 1'b1;
-	else
-		midi_cpu_data_read <= 1'b0;
 
 	if(reset) begin
 		// reset read and write counters
 		readPin <= 4'd0;
 		writePin <= 4'd0;
 	end else begin
+
+		// ikbd acia master reset
+		if(ikbd_cr[1:0] == 2'b11) begin
+			readPin <= 4'd0;
+			writePin <= 4'd0;
+		end
+			
+		// store bytes received from IO controller via SPI
 	   if(ikbd_strobe_inD && !ikbd_strobe_inD2) begin
 			// store data in fifo
 			fifoIn[writePin] <= ikbd_data_in;
@@ -98,6 +110,8 @@ wire [7:0] ikbd_rx_data = fifoIn[readPin];
 wire ikbd_rx_data_available;
 assign ikbd_rx_data_available = (readPin != writePin) && (readTimer == 0);
 
+// in a real ST the irqs are active low open collector outputs and are simply wired
+// tegether ("wired or")
 assign irq = ikbd_irq || midi_irq;
 
 assign ikbd_data_out_available = (readPout != writePout);
@@ -115,7 +129,7 @@ always @(posedge clk) begin
 		if(ikbd_strobe_outD && !ikbd_strobe_outD2)
 			readPout <= readPout + 4'd1;
 end
-	
+
 always @(sel, ds, rw, addr, ikbd_rx_data_available, ikbd_rx_data, ikbd_irq, 
 		midi_rx_data, midi_rx_data_available, midi_tx_empty, midi_irq) begin
 	dout = 8'h00;
@@ -134,7 +148,6 @@ end
 // ------------------------------ MIDI UART ---------------------------------
 wire midi_irq = (midi_cr[7] && midi_rx_data_available) ||    // rx irq
 	((midi_cr[6:5] == 2'b01) && midi_tx_empty);               // tx irq
-//	midi_tx_irq;
 
 // MIDI runs at 31250bit/s which is exactly 1/256 of the 8Mhz system clock
    
@@ -144,7 +157,7 @@ always @(posedge clk)
 	midi_clk <= midi_clk + 8'd1;
 
 // --------------------------- midi receiver -----------------------------
-reg [7:0] midi_rx_cnt;         // bit + sub-bit cointer
+reg [7:0] midi_rx_cnt;         // bit + sub-bit counter
 reg [9:0] midi_rx_shift_reg;   // shift register used during reception
 reg [7:0] midi_rx_data;  
 reg [3:0] midi_rx_filter;      // filter to reduce noise
@@ -160,6 +173,13 @@ always @(negedge clk) begin
       if(midi_cpu_data_read)
 			midi_rx_data_available <= 1'b0;   // read on midi data clears rx status
       
+		// midi acia master reset
+		if(midi_cr[1:0] == 2'b11) begin
+			midi_rx_cnt <= 8'd0;
+			midi_rx_data_available <= 1'b0;
+			midi_rx_filter <= 4'b1111;
+		end
+
 		// 1/16 system clock == 16 times midi clock
 		if(midi_clk[3:0] == 4'd0) begin
 			midi_rx_filter <= { midi_rx_filter[2:0], midi_in};
@@ -228,17 +248,14 @@ always @(negedge clk) begin
 			midi_tx_data_valid <= 1'b0;
 		end
 	end
-			
-   if(reset) begin
+
+	if(reset) begin
 		midi_reg_data_cnt <= 8'd0;
 		midi_reg_ctrl_cnt <= 8'd0;
 
       writePout <= 4'd0;
 		midi_tx_cnt <= 8'd0;
 		midi_tx_data_valid <= 1'b0;
-		
-		ikbd_cr <= 8'h00;
-		midi_cr <= 8'h00;
    end else begin
       if(sel && ~ds && ~rw) begin
 

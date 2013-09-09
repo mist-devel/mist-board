@@ -464,7 +464,7 @@ wire [2:0] host_state;
 wire [22:0] host_addr;
 wire [15:0] host_dataWR;
 wire [15:0] host_dataRD;
-
+ 
 // tg68
 wire [ 16-1:0] tg68_dat_in;
 wire [ 16-1:0] tg68_dat_out;
@@ -486,8 +486,7 @@ wire           tg68_cdma;
 wire           tg68_clds;
 wire           tg68_cuds;
 
-wire reset;
-assign reset = system_ctrl[0];
+wire reset = system_ctrl[0];
 
 // ------------- generate VBI (IPL = 4) --------------
 wire vbi_ack; 

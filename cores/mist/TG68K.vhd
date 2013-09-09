@@ -278,7 +278,7 @@ pf68K_Kernel_inst: TG68KdotC_Kernel
 		END IF;	
 		IF rising_edge(clk) THEN
         	IF clkena='1' THEN
-				slower <= "0111";
+				slower <= "1111";
 			ELSE 
 				slower(3 downto 0) <= '0'&slower(3 downto 1); -- enaWRreg&slower(3 downto 1);
 --				slower(0) <= NOT slower(3) AND NOT slower(2);
