@@ -23,6 +23,18 @@
 // http://martin.hinner.info/vga/timing.html
 // http://www.epanorama.net/faq/vga2rgb/calc.html
 
+// original atari video timing 
+//         mono     color
+// pclk    32MHz    16/8MHz
+// hfreq   35.7kHz  15.75kHz
+// vfreq   71.2Hz   50/60Hz
+//
+// avg. values derived from frequencies:
+// hdisp   640      640/320
+// htot    896      1015/507
+// vdisp   400      200
+// vtot    501      315/262
+
 module video_modes (
 	inout mono,   // select monochrome mode (and not color)
 	input pal,    // select pal mode (and not ntsc) if a color mode is selected
@@ -39,7 +51,8 @@ localparam H_ACT    = 10'd640;
 localparam V_ACT    = 10'd400;
 
 // TIMING CONSTRAINTS:
-// The total width (act+both blank+2*border+sync) must be a multiple of 16
+// The total width (act+both blank+2*border+sync) must be a multiple of 16, for
+// low rez a multiple of 32
 // For modes to be used with the scan doubler the total heigth (act+both blank+
 // 2*border+sync) must be a multiple of 4
 
@@ -47,14 +60,15 @@ localparam V_ACT    = 10'd400;
 // -----------------------------  pal56 timing -------------------------------
 // ---------------------------------------------------------------------------
 
+// PAL modes need ~80 pixels vertical border for border removal
 // 34.21 kHz / 55.9 Hz
 
 wire [121:0] pal56_config_str;
 
 conf pal56_conf(
 // front porch      sync width      back porch       border width    sync polarity
-	.h_fp (  10'd44), .h_s (10'd120), .h_bp ( 10'd44), .h_bd (10'd40), .h_sp (1'b1),
-	.v_fp ( 10'd64), .v_s (  10'd4), .v_bp ( 10'd64), .v_bd (10'd40), .v_sp (1'b1),
+	.h_fp ( 10'd44), .h_s (10'd120), .h_bp ( 10'd44), .h_bd (10'd40), .h_sp (1'b1),
+	.v_fp ( 10'd24), .v_s (  10'd4), .v_bp ( 10'd24), .v_bd (10'd80), .v_sp (1'b1),
 	.str  (pal56_config_str)
 );
 
@@ -67,7 +81,7 @@ wire [121:0] pal50_config_str;
 conf pal50_conf(
 // front porch      sync width      back porch       border width    sync polarity
 	.h_fp ( 10'd80), .h_s ( 10'd40), .h_bp (10'd152), .h_bd (10'd40), .h_sp (1'b1),
-	.v_fp ( 10'd77), .v_s (  10'd3), .v_bp ( 10'd76), .v_bd (10'd40), .v_sp (1'b1),
+	.v_fp ( 10'd37), .v_s (  10'd3), .v_bp ( 10'd36), .v_bd (10'd80), .v_sp (1'b1),
 	.str  (pal50_config_str)
 );
 
@@ -75,14 +89,14 @@ conf pal50_conf(
 // ------------------------------  ntsc timing -------------------------------
 // ---------------------------------------------------------------------------
 
-// 32.01 kHz / 60.16 Hz
+// 31.01 kHz / 59.63 Hz
 
 wire [121:0] ntsc_config_str;
 
 conf ntsc_conf(
 // front porch      sync width      back porch       border width    sync polarity
-	.h_fp ( 10'd76), .h_s (10'd120), .h_bp ( 10'd76), .h_bd (10'd40), .h_sp (1'b1),
-	.v_fp ( 10'd24), .v_s (  10'd3), .v_bp ( 10'd25), .v_bd (10'd40), .v_sp (1'b1),
+	.h_fp ( 10'd88), .h_s (10'd120), .h_bp ( 10'd96), .h_bd (10'd40), .h_sp (1'b0),
+	.v_fp ( 10'd18), .v_s (  10'd3), .v_bp ( 10'd19), .v_bd (10'd40), .v_sp (1'b0),
 	.str  (ntsc_config_str)
 );
 

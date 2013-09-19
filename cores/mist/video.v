@@ -5,6 +5,7 @@
 // http://code.google.com/p/mist-board/
 // 
 // Copyright (c) 2013 Till Harbaum <till@harbaum.org> 
+// Modified by Juan Carlos González Amestoy.
 // 
 // This source file is free software: you can redistribute it and/or modify 
 // it under the terms of the GNU General Public License as published 
@@ -19,18 +20,6 @@
 // You should have received a copy of the GNU General Public License 
 // along with this program.  If not, see <http://www.gnu.org/licenses/>. 
 
-// original atari video timing 
-//         mono     color
-// pclk    32MHz    16/8MHz
-// hfreq   35.7kHz  15.75kHz
-// vfreq   71.2Hz   50/60Hz
-//
-// avg. values derived from frequencies:
-// hdisp   640      640/320
-// htot    896      1015/507
-// vdisp   400      200
-// vtot    501      315/262
-
 // TODO:
 // - async timing
 
@@ -38,8 +27,8 @@
 // Overscan:
 // http://codercorner.com/fullscrn.txt
 
-// Examples: automation 000 + 001: bottom border
-//           automation 097: top+ bottom border
+// Examples: automation 000, 001, 097: bottom border
+//           automation 168: top + bottom border
 
 module video (
   // system interface
