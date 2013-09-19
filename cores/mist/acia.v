@@ -205,11 +205,13 @@ always @(negedge clk) begin
 
 				// last bit received
 				if(midi_rx_cnt[7:0] == 8'd1) begin
-					// copy data into rx register 
-					midi_rx_data <= midi_rx_shift_reg[8:1];  // pure data w/o start and stop bits
-					midi_rx_data_available <= 1'b1;
-					
-					// todo: check data[0] for frame error (stop bit)
+					// check data[0] for frame error (stop bit)
+					// TODO: report frame error via status register
+					if(midi_rx_shift_reg[9] == 1'b1) begin
+						// copy data into rx register 
+						midi_rx_data <= midi_rx_shift_reg[8:1];  // pure data w/o start and stop bits
+						midi_rx_data_available <= 1'b1;
+					end
 				end
 			end
 		end

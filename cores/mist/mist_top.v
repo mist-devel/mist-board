@@ -180,11 +180,11 @@ wire [15:0] io_data_out = vreg_data_out | dma_data_out | blitter_data_out |
 wire init = ~pll_locked;
 
 video video (
-	.reset      (init          ), // reset input
-	.clk        (clk_32        ),
-  .clk27 (CLOCK_27[0]),
-	.bus_cycle  (bus_cycle     ),
-  .scanlines (system_ctrl[31:30]),
+	.reset       (init          ), // reset input
+	.clk         (clk_32        ),
+   .clk27       (CLOCK_27[0]),
+	.bus_cycle   (bus_cycle     ),
+	
 	// spi for OSD
    .sdi            (SPI_DI    ),
    .sck            (SPI_SCK   ),
@@ -212,6 +212,7 @@ video video (
 	.video_b    (VGA_B        ),
 
 	.pal56      (~system_ctrl[9]),
+   .scanlines  (system_ctrl[21:20]),
 	
 	.hsO			(video_hs      ),
 	.deO			(video_de      )
@@ -435,6 +436,7 @@ wire [3:0] bus_cycle;
 reg [3:0] clk_cnt;
 reg [1:0] bus_cycle_8;
 
+
 always @ (posedge clk_32, negedge pll_locked) begin
 
 	if (!pll_locked) begin
@@ -442,15 +444,25 @@ always @ (posedge clk_32, negedge pll_locked) begin
 		bus_cycle_8 <= 2'd3;
 	end else begin 
 		clk_cnt <=  #1 clk_cnt + 4'd1;
-		if(clk_cnt[1:0] == 2'd2)
+		if(clk_cnt[1:0] == 2'd2) begin
 			bus_cycle_8 <= bus_cycle_8 + 2'd1;
+		end
 	end
 end
 
 assign clk_8 = clk_cnt[1];
 assign bus_cycle = clk_cnt - 4'd2;
 
-// SDRAM
+// bus cycle counter for debugging
+reg [31:0] cycle_counter /* synthesis noprune */;
+always @ (posedge clk_8) begin
+	if(reset)
+		cycle_counter <= 32'd0;
+	else
+		cycle_counter <= cycle_counter + 32'd1;
+end
+
+			// SDRAM
 assign SDRAM_CKE         = 1'b1;
 assign SDRAM_nCS         = sdram_cs[0];
 assign SDRAM_DQML        = sdram_dqm[0];

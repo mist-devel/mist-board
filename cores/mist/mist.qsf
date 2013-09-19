@@ -320,6 +320,8 @@ set_global_assignment -name VERILOG_FILE clock.v
 set_global_assignment -name VERILOG_FILE mist_top.v
 set_global_assignment -name VERILOG_FILE user_io.v
 set_global_assignment -name VERILOG_FILE video.v
+set_global_assignment -name VERILOG_FILE video_modes.v
+set_global_assignment -name VERILOG_FILE osd.v
 set_global_assignment -name VERILOG_FILE data_io.v
 set_global_assignment -name VERILOG_FILE mfp.v
 set_global_assignment -name VERILOG_FILE dma.v

@@ -253,9 +253,25 @@ always @(posedge clk) begin
 	// phase, so we latch the current vector to keep ist stable
 	// during the entire cpu read
 	irq_vec <= { vr[7:4], highest_irq_pending };
-end
-	
-always @(negedge clk) begin
+
+	// ST default for most aer bits is 0 (except I2/CTS)
+	// since the irq polarity is inverted over normal ST
+	// interrupts we'll invert the irq signal if a aer bit
+	// is 1
+
+   if(aer[3]) blitter_irqD <= !blitter_irq;
+   else       blitter_irqD <=  blitter_irq;   
+
+`ifndef CUBHACK  
+   if(aer[4]) acia_irqD <= !acia_irq;
+   else       acia_irqD <=  acia_irq;   
+`endif
+
+   // the polarity of the irq is negated over a real st.   
+   if(aer[5]) dma_irqD <= !dma_irq;
+   else       dma_irqD <=  dma_irq;
+
+
 	// ST default for most aer bits is 0 (except I2/CTS)
 	// since the irq polarity is inverted over normal ST
 	// interrupts we'll invert the irq signal if a aer bit
@@ -280,6 +296,10 @@ always @(negedge clk) begin
 `ifndef CUBHACK  
  	acia_irqD2 <= acia_irqD; 		
 `endif
+	
+end
+	
+always @(negedge clk) begin
 
 	if(reset) begin
 		ipr <= 16'h0000; ier <= 16'h0000; 
