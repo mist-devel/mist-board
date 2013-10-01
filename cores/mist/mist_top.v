@@ -45,7 +45,8 @@ module mist_top (
 wire [15:0] video_data;
 wire video_read;
 wire [22:0] video_address;
-wire video_de, video_hs;
+wire st_de, st_hs, st_vs;
+wire [15:0] video_adj;
 
 // on-board io
 wire [1:0] buttons;
@@ -180,7 +181,6 @@ wire [15:0] io_data_out = vreg_data_out | dma_data_out | blitter_data_out |
 wire init = ~pll_locked;
 
 video video (
-	.reset       (init          ), // reset input
 	.clk         (clk_32        ),
    .clk27       (CLOCK_27[0]),
 	.bus_cycle   (bus_cycle     ),
@@ -207,15 +207,19 @@ video video (
 	
 	.hs			(VGA_HS			),
 	.vs			(VGA_VS			),
-	.video_r    (VGA_R        ),
-	.video_g    (VGA_G        ),
-	.video_b    (VGA_B        ),
+	.video_r    (VGA_R        	),
+	.video_g    (VGA_G        	),
+	.video_b    (VGA_B        	),
 
+	.adjust     (video_adj    	),
 	.pal56      (~system_ctrl[9]),
    .scanlines  (system_ctrl[21:20]),
 	
-	.hsO			(video_hs      ),
-	.deO			(video_de      )
+	// signals not affected by scan doubler required for
+	// irq generation
+	.st_hs		(st_hs      	),
+	.st_vs		(st_vs      	),
+	.st_de		(st_de      	)
 );
 
 mmu mmu (
@@ -251,7 +255,7 @@ mfp mfp (
 	
 	// input signals
 	.clk_ext     (clk_mfp     ),
-	.de          (video_de    ),
+	.de          (st_de       ),
 	.dma_irq     (dma_irq     ),
 	.acia_irq    (acia_irq    ),
 	.blitter_irq (blitter_irq ),
@@ -354,10 +358,11 @@ YM2149 ym2149 (
 	.I_BC1              	( psg_sel && !tg68_adr[1]),
 	.I_SEL_L             ( 1'b1						),
 
-	.O_AUDIO_L             (audio_out_l),
-  .O_AUDIO_R             (audio_out_r),
+	.O_AUDIO_L           (audio_out_l				),
+	.O_AUDIO_R           (audio_out_r				),
 
-  .stereo (system_ctrl[29]),
+	.stereo 					(system_ctrl[22]			),
+	
 	// port a
 	.I_IOA           		( 8'd0 						),
 	.O_IOA              	( port_a_out				),
@@ -506,7 +511,7 @@ assign vbi_ack = cpu2iack && address_strobe && (tg68_adr[3:1] == 3'b100);
 
 reg vsD, vsD2, vsI, vbi;
 always @(negedge clk_8)
-	vsD <= VGA_VS;
+	vsD <= st_vs;
 
 always @(posedge clk_8) begin
 	vsD2 <= vsD;           // delay by one
@@ -524,7 +529,7 @@ assign hbi_ack = cpu2iack && address_strobe && (tg68_adr[3:1] == 3'b010);
 
 reg hsD, hsD2, hsI, hbi;
 always @(negedge clk_8)
-	hsD <= video_hs;
+	hsD <= st_hs;
 
 always @(posedge clk_8) begin
 	hsD2 <= hsD;           // delay by one
@@ -771,12 +776,13 @@ data_io data_io (
 		.ss    		(SPI_SS2			),
 		.sdo			(data_io_sdo	),
 
-		.br         (data_io_br    ),
+		.video_adj	(video_adj		),
 		
 		// dma status interface
 		.dma_idx    (dma_dio_idx   ),
 		.dma_data   (dma_dio_data  ),
 		.dma_ack    (dma_dio_ack   ),
+		.br         (data_io_br    ),
 
 		// ram interface
 		.state 	 	(host_state		),

@@ -1,5 +1,5 @@
 //
-// video.v - new version
+// video.v
 // 
 // Atari ST shifter implementation for the MiST board
 // http://code.google.com/p/mist-board/
@@ -20,33 +20,19 @@
 // You should have received a copy of the GNU General Public License 
 // along with this program.  If not, see <http://www.gnu.org/licenses/>. 
 
-// original atari video timing 
-//         mono     color
-// pclk    32MHz    16/8MHz
-// hfreq   35.7kHz  15.75kHz
-// vfreq   71.2Hz   50/60Hz
-//
-// avg. values derived from frequencies:
-// hdisp   640      640/320
-// htot    896      1015/507
-// vdisp   400      200
-// vtot    501      315/262
-
 // TODO:
 // - async timing
-
 
 // Overscan:
 // http://codercorner.com/fullscrn.txt
 
-// Examples: automation 000 + 001: bottom border
-//           automation 097: top+ bottom border
+// Examples: automation 000 + 001 + 097: bottom border
+//           automation 196: top + bottom border
 
 module video (
   // system interface
   input clk,                      // 31.875 MHz
   input clk27,                    // 27.000 Mhz
-  input reset,                    // reset
   input [3:0] bus_cycle,          // bus-cycle for sync
 
   // SPI interface for OSD
@@ -78,25 +64,34 @@ module video (
   output reg [5:0]    video_b, // Blue[5:0]
 
   // system config
-  input       pal56,           // use VGA compatible 56hz for PAL
-  input [1:0] scanlines,       // scanlines (00-none 01-25% 10-50% 11-100%)
+  input       			pal56,           // use VGA compatible 56hz for PAL
+  input [1:0] 			scanlines,       // scanlines (00-none 01-25% 10-50% 11-100%)
+  input [15:0] 		adjust,          // hor/ver video adjust
   
-  // for internal use
-  output          deO,
-  output          hsO
+  // signals not affected by scan doubler for internal use like irqs
+  output      st_de,
+  output      st_vs,
+  output      st_hs
 );
+
+localparam LINE_WIDTH  = 10'd640;
+localparam LINE_BORDER = 10'd80;   // width of left and right screen border
 
 // ---------------------------------------------------------------------------
 // ------------------------------ internal signals ---------------------------
 // ---------------------------------------------------------------------------
 
-// deO is the internal display enable signal as used by the mfp. This is used
+// st_de is the internal display enable signal as used by the mfp. This is used
 // by software to generate a line interrupt and to e.g. do 512 color effects.
-// deO is active low
-assign deO = ~me; // ~(scan_doubler_enable?sd_de:de);
+// st_de is active low. Using memory enable (me) for this makes sure the cpu has
+// plenty of time before data for the next line is starting to be fetched
+assign st_de = ~me;
 
-// similar for hsync
-assign hsO = (st_h_state == 2'd0);
+// hsync irq is generated at the rising edge of st_hs
+assign st_hs = (st_h_state == 2'd0);
+
+// vsync irq is generated at the rising edge of st_vs
+assign st_vs = (v_state == 2'd0);
 
 // ---------------------------------------------------------------------------
 // -------------------------------- video mode -------------------------------
@@ -154,11 +149,6 @@ wire low  = (shmode == 2'd0);
 // derive number of planes from shiftmode
 wire [2:0] planes = mono?3'd1:(mid?3'd2:3'd4);
 
-// scandoubler is used for the mid and low rez mode
-wire scan_doubler_enable = mid || low;
-
-// line buffer for two lines of 640 pixels rgb data
-reg [8:0] sd_buffer [1279:0];
 
 reg [1:0] syncmode;
 reg [1:0] syncmode_latch;
@@ -302,10 +292,10 @@ wire [2:0] mono_rgb = de?{mono_bit, mono_bit, mono_bit}:3'b100;
 
 // ------------------------- colour video signal -----------------------------
 
-reg [8:0] color, border_color;
-wire [2:0] color_r = de?color[8:6]:border_color[8:6];
-wire [2:0] color_g = de?color[5:3]:border_color[5:3];
-wire [2:0] color_b = de?color[2:0]:border_color[2:0];
+reg [8:0] color;
+wire [2:0] color_r = color[8:6];
+wire [2:0] color_g = color[5:3];
+wire [2:0] color_b = color[2:0];
 
 // --------------- de-multiplex color and mono into one vga signal -----------
 wire [2:0] stvid_r = mono?mono_rgb:color_r;
@@ -316,19 +306,21 @@ wire [2:0] stvid_b = mono?mono_rgb:color_b;
 reg [15:0] shift_0, shift_1, shift_2, shift_3;
 
 // this line is to be displayed darker in scanline mode
-wire scanline = scan_doubler_enable && vcnt[0];
+wire scanline = scan_doubler_enable && sd_vcnt[0];
 
 // reading the scan doubler ram results in one extra delay and thus
 // reading it has to look one vga_hcnt cycle into the future
-wire [9:0] vga_hcnt_next = (vga_hcnt == t5_h_end)?10'd0:(vga_hcnt+10'd1);
+wire [9:0] border_width = t5_h_end - t4_h_border_left;
+wire [9:0] vga_hcnt_next = 
+	(vga_hcnt == t5_h_end)?(t5_h_end - t4_h_border_left):
+	((vga_hcnt >= t4_h_border_left)?(vga_hcnt-t4_h_border_left):(vga_hcnt+LINE_BORDER+10'd1));
 
 always @(posedge clk) begin
-   hs <= h_sync_pol ^ ((vga_h_state == 2'd0)?1'b0:1'b1);
-   vs <= v_sync_pol ^ ((v_state == 2'd0)?1'b0:1'b1);
+   hs <= h_sync_pol ^ ~vga_h_sync;
+   vs <= v_sync_pol ^ ~vga_v_sync;
 
 	// color data is permanently read from the scan doubler buffers
 	color <= sd_buffer[{vga_hcnt_next, !sd_toggle}];
-	border_color <= sd_border_color[!sd_toggle];
 
 	// drive video output and apply scanline effect if enabled
 	if(!scanline || scanlines == 2'b00) begin //if no scanlines or not a scanline
@@ -402,26 +394,41 @@ end
 // ------------------------------- scan doubler ------------------------------
 // ---------------------------------------------------------------------------
 		
+// scandoubler is used for the mid and low rez mode
+wire scan_doubler_enable = mid || low;
+
 // scan doubler signale indicating first or second buffer used
-wire sd_toggle = vcnt[1];
+wire sd_toggle = sd_vcnt[1];
 
 // four scan doubler shift registers for up to 4 planes
 reg [15:0] sd_shift_0, sd_shift_1, sd_shift_2, sd_shift_3;
 
-// register to save the border color for delayed output through scan doubler
-reg [8:0] sd_border_color[2];
+// msb of the shift registers is the index used to access the palette registers.
+// Return border color index (0) if outside display area
+wire [3:0] sd_index = (!me_v)?4'd0:
+	{ sd_shift_3[15], sd_shift_2[15], sd_shift_1[15], sd_shift_0[15]};
 
-// msb of the shift registers is the index used to access the palette registers
-wire [3:0] sd_index = { sd_shift_3[15], sd_shift_2[15], 
-								sd_shift_1[15], sd_shift_0[15]};
+								
+// line buffer for two lines of 720 pixels (640 + 2 * 40 border) 3 * 3 bit rgb data
+reg [8:0] sd_buffer [(2*(LINE_WIDTH+2*LINE_BORDER))-1:0];
+
+// the scan doubler needs to know which border (left or right) is currently being displayed
+reg sd_border_side;
+
+// line counter used to create scan doubler states
+reg [1:0] sd_vcnt;
 
 always @(posedge clk) begin
-
-	// save border color to cope with only line delay imposed by scan doubler
-	if(st_hcnt == t4_h_border_left)
-		sd_border_color[sd_toggle] <= {palette_r[0], palette_g[0], palette_b[0]};
 		
-	// permanently move data from data_latch into scan doublers shift registers
+	// vertical state changes at end of hsync (begin of left blank)
+	if(vga_hcnt == v_event) begin
+		// reset state counter two vga lines before screen start since scan doubler
+		// starts prefetching data two vga lines before
+		if(vcnt == (t11_v_end-10'd2))	sd_vcnt <= 2'd0;
+		else                   			sd_vcnt <= sd_vcnt + 2'd1;
+	end
+		
+			// permanently move data from data_latch into scan doublers shift registers
 	if((bus_cycle == 4'd15) && (plane == 2'd0)) begin
 		// clear shift registers since some of them may be unused and need to forced to 0
 		sd_shift_1 <= 16'h0000;
@@ -447,10 +454,31 @@ always @(posedge clk) begin
 		end
 	end
 
-	// move data from input buffer into line buffer
-	if((st_h_state == 2'd3) && (vga_hcnt[0] == 1'b0)) begin
-		sd_buffer[{st_hcnt[9:0], sd_toggle}] <= 
-			{palette_r[sd_index], palette_g[sd_index], palette_b[sd_index]};
+	// to store border colors we need to know which border we currently draw
+	if(st_hcnt == t4_h_border_left)  sd_border_side <= 1'b0;
+	if(st_hcnt == t0_h_border_right) sd_border_side <= 1'b1;
+
+	// scan doubler makes the st side operate at half the vga pixel clock
+	if(vga_hcnt[0] == 1'b0) begin
+	
+		// move data from shift register into line buffer. capture border colors as
+		// well to have the scan doubler delay in the border colors as well just in
+		// case a program changes border colors dynamically (e.g. different colors
+		// for left and right or top and bottom borders)
+		if(st_h_state == 2'd3) begin
+			sd_buffer[{LINE_BORDER + st_hcnt[9:0], sd_toggle}] <= 
+					{palette_r[sd_index], palette_g[sd_index], palette_b[sd_index]};
+		end else if(st_h_state == 2'd2) begin
+			// move bites from left/right border into appropriate places in the line buffer
+			if(!sd_border_side)
+				// left border
+				sd_buffer[{st_hcnt[9:0] - t4_h_border_left-10'd1, sd_toggle}] <=
+							{palette_r[0], palette_g[0], palette_b[0]};
+			else
+				// right border
+				sd_buffer[{st_hcnt[9:0] + LINE_BORDER, sd_toggle}] <=
+							{palette_r[0], palette_g[0], palette_b[0]};
+		end
 	end
 end		
 		
@@ -488,7 +516,8 @@ always @(posedge clk) begin
 	end
 		
 	// memory enable signal 16/32/64 bits (16*planes) ahead of display enable (de)
-	if(me_v) begin
+	// include bus cycle to stay in sync in scna doubler mode
+	if(me_v && bus_cycle[0]) begin
 		if(st_hcnt == me_h_start)  me <= 1'b1;
 		if(st_hcnt == me_h_end)    me <= 1'b0;
 	end
@@ -497,10 +526,8 @@ always @(posedge clk) begin
 	if(st_hcnt == me_h_start)
 		plane <= 2'd0;
 	
-	// starting new image at left/top start of (vga) border, this doesn't matter
-	// and is easier than coping with the differnt resultions of the st video
-	// modes
-	if((vga_hcnt == t4_h_border_left) && (vcnt == t10_v_border_top)) begin
+	// The video address counter is reloaded slightly before vsync
+	if((vga_hcnt == t4_h_border_left) && (vcnt == t8_v_sync - 10'd3)) begin
 		vaddr <= _v_bas_ad;
 
 		// copy syncmode
@@ -549,64 +576,72 @@ reg [1:0] v_state;  		// 0=sync, 1=blank, 2=border, 3=display
 wire blank  = (v_state == 2'd1) || (vga_h_state == 2'd1) || (v_state == 2'd0) || (vga_h_state == 2'd0);
 wire de     = (v_state == 2'd3) && (vga_h_state == 2'd3);
 
-wire border = 
-     ((v_state == 2'd2) && ((vga_h_state == 2'd3) || (vga_h_state == 2'd2)) ||  	// top/bottom border
-      (vga_h_state == 2'd2) && ((v_state == 2'd3) || (v_state == 2'd2)));   		// left/right border
+// time in horizontal timing where vertical states change (at the begin of the sync phase)
+wire [9:0] v_event = t2_h_sync;
 
-// time in horizontal timing where vertical states change (at the begin of the left blank phase)
-wire [9:0] v_event = t3_h_blank_left;
+// extend adjust values to 10 bits
+wire [9:0] adjust_v = { adjust[7], adjust[7], adjust[7:0] };
+wire [9:0] adjust_h = { adjust[15], adjust[15], adjust[15:8] };
+reg vga_v_sync, vga_h_sync;
 
 always @(posedge clk) begin
-	if(reset) begin
-		// It is important to reset the vga_hcnt counter here and this way (using reset which is the 
-		// plls init signal). This is necessary to keep the video states in sync with the cpus memory
-		// timing.
-		vga_hcnt <= 10'd0;
-		vcnt <= 10'd0;
-	end else begin
-		// ------------- horizontal VGA timing generation -------------
-		if(vga_hcnt == t5_h_end)  vga_hcnt <= 10'd0;
-		else                      vga_hcnt <= vga_hcnt + 10'd1;
+	// ------------- horizontal VGA timing generation -------------
+
+	// sync horizontal counter with bus cycle counter so cpu and video stay synchronous
+	// even if horizotal counter is affected by resolution changes
+	// the scan doubler is a special case as the atari line timing then expands over two vga
+	// lines and may/must be asynchronous to the vga timing at the end of the first line
+	if(vga_hcnt == t5_h_end) begin
+		if((bus_cycle == 4'd15) || (scan_doubler_enable && sd_vcnt[0]))
+			vga_hcnt <= 10'd0;
+	end else
+		vga_hcnt <= vga_hcnt + 10'd1;
+
+	// generate user adjustable vga sync signal
+	if( vga_hcnt == t2_h_sync - adjust_h ) 		vga_h_sync <= 1'b1;
+	if( vga_hcnt == t3_h_blank_left - adjust_h ) vga_h_sync <= 1'b0;
+
+	// generate horizontal video signal states
+	if( vga_hcnt == t2_h_sync )                                        		vga_h_state <= 2'd0;
+	if((vga_hcnt == t0_h_border_right) || (vga_hcnt == t4_h_border_left))  	vga_h_state <= 2'd2;
+	if((vga_hcnt == t1_h_blank_right) || (vga_hcnt == t3_h_blank_left))    	vga_h_state <= 2'd1;
+	if( vga_hcnt == t5_h_end)                                          		vga_h_state <= 2'd3;
+	  
+	// ------------- horizontal ST timing generation -------------
+	// Run st timing at full speed if no scan doubler is being used. Otherwise run
+	// it at half speed
+	if((!scan_doubler_enable) || vga_hcnt[0]) begin
+		if(st_hcnt == t5_h_end) begin
+			// changing video modes toggles scan_doubler_enable and will bring
+			// the two hcnt counters out of sync. So we'll resync st_hcnt with vgs_hcnt here
+			if((vga_hcnt == t5_h_end) && (!scan_doubler_enable || !sd_vcnt[0]))
+				st_hcnt <= 10'd0; 
+		end else 
+			st_hcnt <= st_hcnt + 10'd1;
 
 		// generate horizontal video signal states
-		if( vga_hcnt == t2_h_sync )                                        		vga_h_state <= 2'd0;
-		if((vga_hcnt == t0_h_border_right) || (vga_hcnt == t4_h_border_left))  	vga_h_state <= 2'd2;
-		if((vga_hcnt == t1_h_blank_right) || (vga_hcnt == t3_h_blank_left))    	vga_h_state <= 2'd1;
-		if( vga_hcnt == t5_h_end)                                          		vga_h_state <= 2'd3;
-	  
-		// ------------- horizontal ST timing generation -------------
-		// Run st timing at full speed if no scan doubler is being used. Otherwise run
-		// it at half speed
-		if((!scan_doubler_enable) || vga_hcnt[0]) begin
-			if(st_hcnt == t5_h_end) begin
-				// changing video modes toggles scan_doubler_enable and will bring
-				// the two hcnt counters out of sync. So we'll resync st_hcnt with vgs_hcnt here
-				if((vga_hcnt == t5_h_end) && (!scan_doubler_enable || !vcnt[0]))
-					st_hcnt <= 10'd0; 
-			end else 
-				st_hcnt <= st_hcnt + 10'd1;
+		if( st_hcnt == t2_h_sync )                                        	st_h_state <= 2'd0;
+		if((st_hcnt == t0_h_border_right) || (st_hcnt == t4_h_border_left))  st_h_state <= 2'd2;
+		if((st_hcnt == t1_h_blank_right) || (st_hcnt == t3_h_blank_left))    st_h_state <= 2'd1;
+		if( st_hcnt == t5_h_end)                                          	st_h_state <= 2'd3;
+	end
 
-			// generate horizontal video signal states
-			if( st_hcnt == t2_h_sync )                                        	st_h_state <= 2'd0;
-			if((st_hcnt == t0_h_border_right) || (st_hcnt == t4_h_border_left))  st_h_state <= 2'd2;
-			if((st_hcnt == t1_h_blank_right) || (st_hcnt == t3_h_blank_left))    st_h_state <= 2'd1;
-			if( st_hcnt == t5_h_end)                                          	st_h_state <= 2'd3;
-		end
+	// vertical state changes at end of hsync (begin of left blank)
+	if(vga_hcnt == v_event) begin
 
-		// vertical state changes at end of hsync (begin of left blank)
-		if(vga_hcnt == v_event) begin
+		// ------------- vertical timing generation -------------
+		// increase vcnt
+		if(vcnt == t11_v_end)  vcnt <= 10'd0;
+		else                   vcnt <= vcnt + 10'd1;
 
-			// ------------- vertical timing generation -------------
-			// increase vcnt
-			if(vcnt == t11_v_end)  vcnt <= 10'd0;
-			else                   vcnt <= vcnt + 10'd1;
+		if( vcnt == t8_v_sync - adjust_v ) 			vga_v_sync <= 1'b1;
+		if( vcnt == t9_v_blank_top - adjust_v ) 	vga_v_sync <= 1'b0;
 
-			// generate vertical video signal states
-			if( vcnt == t8_v_sync )                                        v_state <= 2'd0;
-			if((vcnt == t6_v_border_bot) || (vcnt == t10_v_border_top))    v_state <= 2'd2;
-			if((vcnt == t7_v_blank_bot) || (vcnt == t9_v_blank_top))       v_state <= 2'd1;
-			if( vcnt == t11_v_end)                                         v_state <= 2'd3;
-		end
+		// generate vertical video signal states
+		if( vcnt == t8_v_sync )                                        v_state <= 2'd0;
+		if((vcnt == t6_v_border_bot) || (vcnt == t10_v_border_top))    v_state <= 2'd2;
+		if((vcnt == t7_v_blank_bot) || (vcnt == t9_v_blank_top))       v_state <= 2'd1;
+		if( vcnt == t11_v_end)                                         v_state <= 2'd3;
 	end
 end
 

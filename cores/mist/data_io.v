@@ -1,4 +1,5 @@
 // SPI data client (rom, floppy, harddisk io)
+
 module data_io (
 	// clocks
 	input clk_8,
@@ -16,8 +17,10 @@ module data_io (
 	output [4:0] dma_idx,
 	input [7:0] dma_data,
 	output reg dma_ack,
-
 	output reg br,
+
+	// horizontal and vertical screen adjustments
+	output reg [15:0] video_adj,
 	
 	// ram interface
 	output reg [2:0] state, // state bits required to drive the sdram host
@@ -160,11 +163,15 @@ always@(posedge sck, posedge ss) begin
 
 			// set control register (32 bits written in 2 * 16 bits)
 			if((cmd == 4) && (cnt == 5'd23)) begin
-			        if(bcnt < 2)
-			                ctrl_out[31:16] <= { sbuf, sdi };
-		                else
-			                ctrl_out[15:0] <= { sbuf, sdi };
+				if(bcnt < 2)
+					ctrl_out[31:16] <= { sbuf, sdi };
+		      else
+					ctrl_out[15:0] <= { sbuf, sdi };
 			end
+			
+			// set video offsets
+			if((cmd == 9) && (cnt == 5'd23))
+				video_adj <= { sbuf, sdi };
 		end
 	end
 end
