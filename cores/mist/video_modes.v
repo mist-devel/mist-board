@@ -52,12 +52,10 @@ localparam V_ACT    = 10'd400;
 // ---------------------------------------------------------------------------
 
 // 56Hz replacement for Atari 50Hz low and medium resolution video mode scan doubled:
-// total: 1024x626, active incl border: 800x560, displayed: 640x400
-// horizontal scan rate: 17.27 kHz, vertical scan rate: 56.34 hz
-
+// total: 928x612, active incl border: 720x560, displayed: 640x400
+// horizontal scan rate: 17.27 kHz ST, 34.48 kHz VGA, vertical scan rate: 56.34 hz
 
 wire [121:0] pal56_config_str;
-
 conf pal56_conf(
 // front porch      sync width      back porch       border width    sync polarity
 	.h_fp ( 10'd44), .h_s (10'd120), .h_bp ( 10'd44), .h_bd (10'd40), .h_sp (1'b1),
@@ -71,7 +69,7 @@ conf pal56_conf(
 
 // Atari 50Hz low and medium resolution video mode scan doubled:
 // total: 1024x626, active incl border: 800x560, displayed: 640x400
-// horizontal scan rate: 15.625 kHz, vertical scan rate: 49.92 hz
+// horizontal scan rate: 15.625 kHz ST, 31.25 kHz VGA, vertical scan rate: 49.92 hz
 
 wire [121:0] pal50_config_str;
 conf pal50_conf(
@@ -87,7 +85,7 @@ conf pal50_conf(
 
 // Atari 60Hz low and medium resolution video mode scan doubled:
 // total: 1016x526, active incl border: 800x480, displayed: 640x400
-// horizontal scan rate: 15.748 kHz, vertical scan rate: 59.88 hz
+// horizontal scan rate: 15.748 kHz ST, 31.5 kHz VGA, vertical scan rate: 59.88 hz
 
 wire [121:0] ntsc_config_str;
 conf ntsc_conf(
@@ -103,10 +101,9 @@ conf ntsc_conf(
 
 // Atari 71Hz high resolution video mode:
 // total: 896x501, displayed: 640x400
-// horizontal scan rate: 35.714 kHz, vertical scan rate: 71.286 hz
+// horizontal scan rate: 35.714 kHz ST/VGA, vertical scan rate: 71.286 hz
 
 wire [121:0] mono_config_str;
-
 conf mono_conf(
 // front porch      sync width      back porch       border width    sync polarity
 	.h_fp (10'd108), .h_s ( 10'd40), .h_bp (10'd108), .h_bd ( 10'd0), .h_sp (1'b0),

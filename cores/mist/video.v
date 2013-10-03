@@ -312,7 +312,7 @@ wire scanline = scan_doubler_enable && sd_vcnt[0];
 // reading it has to look one vga_hcnt cycle into the future
 wire [9:0] border_width = t5_h_end - t4_h_border_left;
 wire [9:0] vga_hcnt_next = 
-	(vga_hcnt == t5_h_end)?(t5_h_end - t4_h_border_left):
+	(vga_hcnt == t5_h_end)?LINE_BORDER:
 	((vga_hcnt >= t4_h_border_left)?(vga_hcnt-t4_h_border_left):(vga_hcnt+LINE_BORDER+10'd1));
 
 always @(posedge clk) begin
