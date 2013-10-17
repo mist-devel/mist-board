@@ -13,6 +13,8 @@ module mfp_timer(
 		 inout 	     XCLK_I, 
        input 	     T_I, // ext. trigger in
 
+		 output       IRQ_DIS,  // pulse mode disables input port irq
+		 
        output reg   T_O,                          
        output reg   T_O_PULSE
 );
@@ -20,6 +22,8 @@ module mfp_timer(
 reg [7:0] data, down_counter, cur_counter;
 reg [3:0] control;
 	
+assign IRQ_DIS = pulse_mode;
+
 wire[7:0] prescaler;         // prescaler value
 reg [7:0] prescaler_counter; // prescaler counter
 

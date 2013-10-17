@@ -327,6 +327,8 @@ set_global_assignment -name VERILOG_FILE mfp.v
 set_global_assignment -name VERILOG_FILE dma.v
 set_global_assignment -name VERILOG_FILE sigma_delta_dac.v
 set_global_assignment -name VERILOG_FILE mmu.v
+set_global_assignment -name VERILOG_FILE ste_dma_snd.v
+set_global_assignment -name VERILOG_FILE ste_joystick.v
 
 set_global_assignment -name ENABLE_BENEFICIAL_SKEW_OPTIMIZATION ON
 set_global_assignment -name SLD_NODE_CREATOR_ID 110 -section_id auto_signaltap_0

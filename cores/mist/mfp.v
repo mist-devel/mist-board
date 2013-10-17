@@ -1,15 +1,17 @@
 //
 
-// define this for cubase acia irq hack
-// `define CUBHACK   
+// TODO: 
+// - map remaining inputs to irqs
+// - implement pulse mode
+// - suppress input irqs when timer_a/b are in event or pulse mode
 
 module mfp (
 	// cpu register interface
 	input 		 clk,
 	input 		 reset,
-	input [7:0] 	 din,
+	input [7:0]  din,
 	input 		 sel,
-	input [4:0] 	 addr,
+	input [4:0]  addr,
 	input 		 ds,
 	input 		 rw,
 	output reg [7:0] dout,
@@ -21,12 +23,10 @@ module mfp (
 	input  		 serial_strobe_out,
 	output [7:0] serial_data_out,
 
+	// inputs
 	input 		 clk_ext,   // external 2.457MHz
-	input 		 de,
-	input 		 dma_irq, 
-	input 		 acia_irq,
-	input 		 blitter_irq,
-	input 		 mono_detect
+	input [1:0]	 t_i,  // timer input
+ 	input [7:0]  i     // input port
 );
 
 localparam FIFO_ADDR_BITS = 4;
@@ -63,6 +63,7 @@ wire write = sel && ~ds && ~rw;
 wire timera_done;
 wire [7:0] timera_dat_o;
 wire [4:0] timera_ctrl_o;
+wire i4_irq_disable;
 
 mfp_timer timer_a (
 	.CLK 			(clk),
@@ -74,13 +75,15 @@ mfp_timer timer_a (
    .DAT_I		(din),
    .DAT_O		(timera_dat_o),
    .DAT_WE		((addr == 5'h0f) && write),
+	.IRQ_DIS    (i4_irq_disable),
+   .T_I			(t_i[0] ^ aer[4]),
    .T_O_PULSE	(timera_done)
 );
-
 
 wire timerb_done;
 wire [7:0] timerb_dat_o;
 wire [4:0] timerb_ctrl_o;
+wire i3_irq_disable;
 
 mfp_timer timer_b (
 	.CLK 			(clk),
@@ -92,7 +95,8 @@ mfp_timer timer_b (
    .DAT_I		(din),
    .DAT_O		(timerb_dat_o),
    .DAT_WE		((addr == 5'h10) && write),
-   .T_I			(de),
+	.IRQ_DIS    (i3_irq_disable),
+   .T_I			(t_i[1] ^ aer[3]),
    .T_O_PULSE	(timerb_done)
 );
 
@@ -188,14 +192,8 @@ wire [3:0] highest_irq_pending =
 	((irq_pending_map[15:0]  == 16'b000000000000001)?4'd0:
 			4'd0)))))))))))))));
 	
-// wire inputs to external gpip in
-// acia/dma irq is active low in st, but active high in this config, we thus invert
-// it to make sure tos sees what it expects to see when it looks at the registers
-wire [7:0] gpip_in;
-assign gpip_in = { mono_detect, 1'b0, !dma_irq, !acia_irq, !blitter_irq, 3'b000 };
-
 // gpip as output to the cpu (ddr bit == 1 -> gpip pin is output)
-wire [7:0] gpip_cpu_out = (gpip_in & ~ddr) | (gpip & ddr);
+wire [7:0] gpip_cpu_out = (i & ~ddr) | (gpip & ddr);
 	
 // cpu read interface
 always @(iack, sel, ds, rw, addr, gpip_cpu_out, aer, ddr, ier, ipr, isr, imr, 
@@ -236,14 +234,14 @@ always @(iack, sel, ds, rw, addr, gpip_cpu_out, aer, ddr, ier, ipr, isr, imr,
 	end
 end
 
-// delay irqs to detect changes
-reg dma_irqD, dma_irqD2, blitter_irqD, blitter_irqD2;
-
-`ifndef CUBHACK  
-reg acia_irqD, acia_irqD2;
-`endif
+// delay inputs to detect changes
+reg [7:0] iD, iD2;
 
 reg [7:0] irq_vec;
+
+// mask of input irqs which are overwritten by timer a/b inputs
+wire [7:0] ti_irq_mask = { 3'b000, i4_irq_disable, i3_irq_disable, 3'b000};
+wire [7:0] ti_irq      = { 3'b000, t_i[0], t_i[1], 3'b000};
 
 reg iackD;
 always @(posedge clk) begin
@@ -254,31 +252,9 @@ always @(posedge clk) begin
 	// during the entire cpu read
 	irq_vec <= { vr[7:4], highest_irq_pending };
 
-	// ST default for most aer bits is 0 (except I2/CTS)
-	// since the irq polarity is inverted over normal ST
-	// interrupts we'll invert the irq signal if a aer bit
-	// is 1
-
-   if(aer[3]) blitter_irqD <= !blitter_irq;
-   else       blitter_irqD <=  blitter_irq;   
-
-`ifndef CUBHACK  
-   if(aer[4]) acia_irqD <= !acia_irq;
-   else       acia_irqD <=  acia_irq;   
-`endif
-
-   // the polarity of the irq is negated over a real st.   
-   if(aer[5]) dma_irqD <= !dma_irq;
-   else       dma_irqD <=  dma_irq;
-
-
-	dma_irqD2 <= dma_irqD; 		
- 	blitter_irqD2 <= blitter_irqD; 		
- 	
-`ifndef CUBHACK  
- 	acia_irqD2 <= acia_irqD; 		
-`endif
-	
+	// delay inputs for irq generation, apply aer (irq edge)
+	iD <= aer ^ ((i & ~ti_irq_mask) | (ti_irq & ti_irq_mask));
+	iD2 <= iD;
 end
 	
 always @(negedge clk) begin
@@ -300,32 +276,16 @@ always @(negedge clk) begin
 		end
 
 		// map timer interrupts
-		if(timera_done && ier[13])	ipr[13] <= 1'b1;  // timer_a
-		if(timerb_done && ier[ 8])	ipr[ 8] <= 1'b1;	// timer_b
-		if(timerc_done && ier[ 5])	ipr[ 5] <= 1'b1;	// timer_c
-		if(timerd_done && ier[ 4])	ipr[ 4] <= 1'b1;	// timer_d
+		if(timera_done && ier[13])	     ipr[13] <= 1'b1;   // timer_a
+		if(timerb_done && ier[ 8])	     ipr[ 8] <= 1'b1;	// timer_b
+		if(timerc_done && ier[ 5])	     ipr[ 5] <= 1'b1;	// timer_c
+		if(timerd_done && ier[ 4])	     ipr[ 4] <= 1'b1;	// timer_d
 
-`ifndef CUBHACK  
-		// in the real atari st the irqs are edge sensitive. however, this makes problems
-      // with the acias in cubase as a work around ... 
-      if(acia_irqD && !acia_irqD2 && ier[6]) 
-			ipr[6] <= 1'b1;
-`else
-		// ... they can be implemented level sensitive. However, this breaks some games
-		// like eg. "no second place" and even the rainbow logo in the tos 1.04 desktop
-		
-      // irq by acia ...
-		if(acia_irq && ier[6])
-			ipr[6] <= 1'b1;
-`endif
-		
-		// ... dma ...
-		if(dma_irqD && !dma_irqD2 && ier[7]) 
-			ipr[7] <= 1'b1;
-
-		// ... and blitter
-		if(blitter_irqD && !blitter_irqD2 && ier[3]) 
-			ipr[3] <= 1'b1;
+		// input port irqs are edge sensitive
+		if(!iD[3] && iD2[3] && ier[ 3]) ipr[ 3] <= 1'b1;   // blitter
+      if(!iD[4] && iD2[4] && ier[ 6]) ipr[ 6] <= 1'b1;   // acia
+		if(!iD[5] && iD2[5] && ier[ 7]) ipr[ 7] <= 1'b1;   // dma
+		if(!iD[7] && iD2[7] && ier[15]) ipr[15] <= 1'b1;   // mono detect
 
 		if(sel && ~ds && ~rw) begin
 			if(addr == 5'h00) gpip <= din;

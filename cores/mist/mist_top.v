@@ -42,7 +42,8 @@ module mist_top (
   input wire 		CONF_DATA0  // SPI_SS for user_io
 );
 
-wire [15:0] video_data;
+wire ste = system_ctrl[23];
+
 wire video_read;
 wire [22:0] video_address;
 wire st_de, st_hs, st_vs;
@@ -53,7 +54,7 @@ wire [1:0] buttons;
 
 // generate dtack for all implemented peripherals
 wire io_dtack = vreg_sel || mmu_sel || mfp_sel || mfp_iack || 
-     acia_sel || psg_sel || dma_sel || auto_iack || blitter_sel;
+     acia_sel || psg_sel || dma_sel || auto_iack || blitter_sel || ste_joy_sel || ste_dma_snd_sel;
 
 // the original tg68k did not contain working support for bus fault exceptions. While earlier
 // TOS versions cope with that, TOS versions with blitter support need this to work as this is
@@ -137,8 +138,6 @@ wire [7:0] auto_vector = auto_vector_vbi | auto_vector_hbi;
 // interfaces not implemented:
 // $fff00000 - $fff000ff  - IDE  
 // $ffff8780 - $ffff878f  - SCSI
-// $ffff8901 - $ffff893f  - STE DMA audio
-// $ffff9200 - $ffff923f  - STE joystick ports
 // $fffffa40 - $fffffa7f  - FPU
 // $fffffc20 - $fffffc3f  - RTC
 
@@ -152,6 +151,14 @@ wire [7:0] mmu_data_out;
 wire vreg_sel = io_sel && ({tg68_adr[15:7], 7'd0} == 16'h8200);
 wire [15:0] vreg_data_out;
 
+// ste joystick 16 bit interface at $ff9200 - $ff923f
+wire ste_joy_sel = ste && io_sel && ({tg68_adr[15:6], 6'd0} == 16'h9200);
+wire [15:0] ste_joy_data_out;
+
+// ste dma snd 8 bit interface at $ff8900 - $ff893f
+wire ste_dma_snd_sel = ste && io_sel && ({tg68_adr[15:6], 6'd0} == 16'h8900);
+wire [15:0] ste_dma_snd_data_out;
+
 // mfp 8 bit interface at $fffa00 - $fffa3f
 wire mfp_sel  = io_sel && ({tg68_adr[15:6], 6'd0} == 16'hfa00);
 wire [7:0] mfp_data_out;
@@ -160,8 +167,8 @@ wire [7:0] mfp_data_out;
 wire acia_sel = io_sel && ({tg68_adr[15:8], 8'd0} == 16'hfc00);
 wire [7:0] acia_data_out;
 
-// blitter 16 bit interface at $ff8a00 - $ff8a3f
-wire blitter_sel = system_ctrl[19] && io_sel && ({tg68_adr[15:8], 8'd0} == 16'h8a00);
+// blitter 16 bit interface at $ff8a00 - $ff8a3f, STE always has a blitter
+wire blitter_sel = (system_ctrl[19] || ste) && io_sel && ({tg68_adr[15:8], 8'd0} == 16'h8a00);
 wire [15:0] blitter_data_out;
 
 //  psg 8 bit interface at $ff8800 - $ff8803
@@ -175,20 +182,21 @@ wire [15:0] dma_data_out;
 // de-multiplex the various io data output ports into one 
 wire [7:0] io_data_out_8u = acia_data_out | psg_data_out;
 wire [7:0] io_data_out_8l = mmu_data_out | mfp_data_out | auto_vector;
-wire [15:0] io_data_out = vreg_data_out | dma_data_out | blitter_data_out |
-			{8'h00, io_data_out_8l} | {io_data_out_8u, 8'h00};
+wire [15:0] io_data_out = vreg_data_out | dma_data_out | blitter_data_out | 
+				ste_joy_data_out | ste_dma_snd_data_out |
+				{8'h00, io_data_out_8l} | {io_data_out_8u, 8'h00};
 
 wire init = ~pll_locked;
 
 video video (
-	.clk         (clk_32        ),
-   .clk27       (CLOCK_27[0]),
-	.bus_cycle   (bus_cycle     ),
+	.clk         	(clk_32        ),
+   .clk27       	(CLOCK_27[0]),
+	.bus_cycle   	(bus_cycle     ),
 	
 	// spi for OSD
-   .sdi            (SPI_DI    ),
-   .sck            (SPI_SCK   ),
-   .ss             (SPI_SS3   ),
+   .sdi           (SPI_DI    	),
+   .sck           (SPI_SCK   	),
+   .ss            (SPI_SS3   	),
 
 	// cpu register interface
 	.reg_clk      (clk_8       ),
@@ -211,9 +219,11 @@ video video (
 	.video_g    (VGA_G        	),
 	.video_b    (VGA_B        	),
 
+	// configuration signals
 	.adjust     (video_adj    	),
 	.pal56      (~system_ctrl[9]),
    .scanlines  (system_ctrl[21:20]),
+	.ste			(ste				),
 	
 	// signals not affected by scan doubler required for
 	// irq generation
@@ -235,6 +245,15 @@ mmu mmu (
 
 wire acia_irq, dma_irq;
 
+// the STE delays the xsirq by 1/250000 second before feeding it into timer_a
+wire ste_dma_snd_xsirq, ste_dma_snd_xsirq_delayed;
+
+// mfp io7 is mono_detect which in ste is xor'd with the dma sound irq
+wire mfp_io7 = system_ctrl[8] ^ (ste?ste_dma_snd_xsirq:1'b0);
+
+wire [7:0] mfp_gpio_in = {mfp_io7, 1'b0, !dma_irq, !acia_irq, !blitter_irq, 3'b000 };
+wire [1:0] mfp_timer_in = {st_de, ste?ste_dma_snd_xsirq_delayed:1'b0};
+
 mfp mfp (
 	// cpu register interface
 	.clk      (clk_8       ),
@@ -254,12 +273,9 @@ mfp mfp (
 	.serial_data_out 	   			(serial_data_from_mfp),
 	
 	// input signals
-	.clk_ext     (clk_mfp     ),
-	.de          (st_de       ),
-	.dma_irq     (dma_irq     ),
-	.acia_irq    (acia_irq    ),
-	.blitter_irq (blitter_irq ),
-	.mono_detect (system_ctrl[8])
+	.clk_ext   (clk_mfp       ),  // 2.457MHz clock
+	.t_i       (mfp_timer_in  ),  // timer a/b inputs
+	.i         (mfp_gpio_in   )   // gpio-in
 ); 
 
 acia acia (
@@ -318,6 +334,73 @@ blitter blitter (
 	.irq       (blitter_irq      )
 );
    
+ste_joystick ste_joystick (
+	.clk      (clk_8       ),
+	.reset    (reset       ),
+	.din      (tg68_dat_out),
+	.sel      (ste_joy_sel ),
+	.addr     (tg68_adr[5:1]),
+	.uds      (tg68_uds    ),
+	.lds      (tg68_lds    ),
+	.rw       (tg68_rw     ),
+	.dout     (ste_joy_data_out),
+);
+
+wire [22:0] ste_dma_snd_addr;
+wire ste_dma_snd_read;
+wire [7:0] ste_audio_out_l, ste_audio_out_r;
+
+ste_dma_snd ste_dma_snd (
+	// cpu interface
+	.clk      	(clk_8       ),
+	.reset    	(reset       ),
+	.din      	(tg68_dat_out),
+	.sel      	(ste_dma_snd_sel ),
+	.addr     	(tg68_adr[5:1]),
+	.uds      	(tg68_uds    ),
+	.lds      	(tg68_lds    ),
+	.rw       	(tg68_rw     ),
+	.dout     	(ste_dma_snd_data_out),
+
+	// memory interface
+	.clk32	  	(clk_32      ),
+	.bus_cycle 	(bus_cycle   ),
+	.hsync		(st_hs       ),
+	.saddr      (ste_dma_snd_addr ),
+	.read       (ste_dma_snd_read ),
+	.data       (ram_data_out  ),
+
+	.audio_l    (ste_audio_out_l   ),
+	.audio_r    (ste_audio_out_r	),
+
+	.xsint     	(ste_dma_snd_xsirq ),
+	.xsint_d   	(ste_dma_snd_xsirq_delayed )   // 4 usec delayed
+);
+
+// audio output processing
+
+// simple mixer for ste and ym audio. result is 9 bits
+// this will later be handled by the lmc1992
+wire [8:0] audio_mix_l = { 1'b0, ym_audio_out_l} + { 1'b0, ste_audio_out_l };
+wire [8:0] audio_mix_r = { 1'b0, ym_audio_out_r} + { 1'b0, ste_audio_out_r };
+
+// limit audio to 8 bit range
+wire [7:0] audio_out_l = audio_mix_l[8]?8'd255:audio_mix_l[7:0];
+wire [7:0] audio_out_r = audio_mix_r[8]?8'd255:audio_mix_r[7:0];
+
+sigma_delta_dac sigma_delta_dac_l (
+	.DACout 		(AUDIO_L),
+	.DACin		(audio_out_l),
+	.CLK 			(clk_32),
+	.RESET 		(reset)
+);
+
+sigma_delta_dac sigma_delta_dac_r (
+	.DACout     (AUDIO_R),
+	.DACin    	(audio_out_r),
+	.CLK      	(clk_32),
+	.RESET    	(reset)
+);
 
 //// ym2149 sound chip ////
 reg [1:0] sclk;
@@ -328,22 +411,7 @@ wire [7:0] port_a_out;
 assign floppy_side = port_a_out[0];
 assign floppy_sel = port_a_out[2:1];
 
-wire [7:0] audio_out_l,audio_out_r;
-//assign AUDIO_R = AUDIO_L;
-
-sigma_delta_dac sigma_delta_dac_l (
-	.DACout 		(AUDIO_L),
-	.DACin		(audio_out_l),
-	.CLK 			(clk_32),
-	.RESET 		(reset)
-);
-
-sigma_delta_dac sigma_delta_dac_r (
-  .DACout     (AUDIO_R),
-  .DACin    (audio_out_r),
-  .CLK      (clk_32),
-  .RESET    (reset)
-);
+wire [7:0] ym_audio_out_l, ym_audio_out_r;
 
 YM2149 ym2149 (
 	.I_DA						( tg68_dat_out[15:8]		),
@@ -358,8 +426,8 @@ YM2149 ym2149 (
 	.I_BC1              	( psg_sel && !tg68_adr[1]),
 	.I_SEL_L             ( 1'b1						),
 
-	.O_AUDIO_L           (audio_out_l				),
-	.O_AUDIO_R           (audio_out_r				),
+	.O_AUDIO_L           (ym_audio_out_l			),
+	.O_AUDIO_R           (ym_audio_out_r			),
 
 	.stereo 					(system_ctrl[22]			),
 	
@@ -604,8 +672,8 @@ wire [15:0] ram_data_out;
 wire video_cycle = (bus_cycle[3:2] == 0);
 wire cpu_cycle = (bus_cycle[3:2] == 1); // || (bus_cycle[3:2] == 3);
 
-assign ram_address = video_cycle?video_address:(blitter_br?blitter_master_addr:tg68_adr[23:1]);
-assign video_data = ram_data_out;
+assign ram_address = video_cycle?((st_hs&&ste)?ste_dma_snd_addr:video_address):
+						(blitter_br?blitter_master_addr:tg68_adr[23:1]);
 
 // TODO: put 0x000000 to 0x000007 into tos section so it's write protected
 wire MEM512K = (system_ctrl[3:1] == 3'd0);
@@ -655,8 +723,13 @@ always @(posedge clk_8)
 // generate dtack (for st ram only and rom), TODO: no dtack for rom write
 assign tg68_dtack = ~(((cpu2mem && address_strobe) || io_dtack ) && !br);
 
-wire ram_oe = video_cycle?~video_read:
-	(cpu_cycle?~(blitter_br?blitter_master_read:(address_strobe && tg68_rw && cpu2mem)):1'b1);
+// memory access during the video cycle is shared between video and ste_dma_snd
+wire video_cycle_oe = (st_hs && ste)?ste_dma_snd_read:video_read;
+// memory access during the cpu cycle is shared between blitter and cpu
+wire cpu_cycle_oe = (blitter_br?blitter_master_read:(address_strobe && tg68_rw && cpu2mem));
+
+wire ram_oe = ~(video_cycle?video_cycle_oe:(cpu_cycle?cpu_cycle_oe:1'b0));
+//	(cpu_cycle?~(blitter_br?blitter_master_read:(address_strobe && tg68_rw && cpu2mem)):1'b1);
 //	(cpu_cycle?~(address_strobe && tg68_rw && cpu2mem):1'b1);
 
 wire ram_wr = cpu_cycle?~(blitter_br?blitter_master_write:(address_strobe && ~tg68_rw && cpu2ram)):1'b1;

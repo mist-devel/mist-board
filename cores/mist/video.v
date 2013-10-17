@@ -1,7 +1,7 @@
 //
 // video.v
 // 
-// Atari ST shifter implementation for the MiST board
+// Atari ST(E) shifter implementation for the MiST board
 // http://code.google.com/p/mist-board/
 // 
 // Copyright (c) 2013 Till Harbaum <till@harbaum.org> 
@@ -25,9 +25,18 @@
 
 // Overscan:
 // http://codercorner.com/fullscrn.txt
-
 // Examples: automation 000 + 001 + 097: bottom border
 //           automation 196: top + bottom border
+
+// Todo STE:
+// http://alive.atari.org/alive12/ste_hwsc.php
+// http://atari-ste.anvil-soft.com/html/devdocu2.htm
+// + 3*4 bit palette (4096 colors)
+// + lowest video base address byte
+// + video counter writeable
+// + pixel offset
+// + line offset
+// - undocumented 16 pixel "line offset overscan"
 
 module video (
   // system interface
@@ -67,6 +76,7 @@ module video (
   input       			pal56,           // use VGA compatible 56hz for PAL
   input [1:0] 			scanlines,       // scanlines (00-none 01-25% 10-50% 11-100%)
   input [15:0] 		adjust,          // hor/ver video adjust
+  input 					ste,             // enable STE featurss
   
   // signals not affected by scan doubler for internal use like irqs
   output      st_de,
@@ -76,6 +86,11 @@ module video (
 
 localparam LINE_WIDTH  = 10'd640;
 localparam LINE_BORDER = 10'd80;   // width of left and right screen border
+
+localparam STATE_SYNC   = 2'd0;
+localparam STATE_BLANK  = 2'd1;
+localparam STATE_BORDER = 2'd2;
+localparam STATE_DISP   = 2'd3;
 
 // ---------------------------------------------------------------------------
 // ------------------------------ internal signals ---------------------------
@@ -88,10 +103,10 @@ localparam LINE_BORDER = 10'd80;   // width of left and right screen border
 assign st_de = ~me;
 
 // hsync irq is generated at the rising edge of st_hs
-assign st_hs = (st_h_state == 2'd0);
+assign st_hs = (st_h_state == STATE_SYNC);
 
 // vsync irq is generated at the rising edge of st_vs
-assign st_vs = (v_state == 2'd0);
+assign st_vs = (v_state == STATE_SYNC);
 
 // ---------------------------------------------------------------------------
 // -------------------------------- video mode -------------------------------
@@ -149,7 +164,6 @@ wire low  = (shmode == 2'd0);
 // derive number of planes from shiftmode
 wire [2:0] planes = mono?3'd1:(mid?3'd2:3'd4);
 
-
 reg [1:0] syncmode;
 reg [1:0] syncmode_latch;
 wire pal = (syncmode_latch[1] == 1'b1);
@@ -160,101 +174,153 @@ reg [15:0] data_latch[4];
 localparam BASE_ADDR = 23'h8000;   // default video base address 0x010000
 reg [22:0] _v_bas_ad;              // video base address register
 
-// 16 colors with 3*3 bits each
-reg [2:0] palette_r[15:0];
-reg [2:0] palette_g[15:0];
-reg [2:0] palette_b[15:0];
+// 16 colors with 3*4 bits each (4 bits for STE, ST only uses 3 bits)
+reg [3:0] palette_r[15:0];
+reg [3:0] palette_g[15:0];
+reg [3:0] palette_b[15:0];
+
+// STE-only registers
+reg [7:0] line_offset;            	// number of words to skip at the end of each line
+reg [3:0] pixel_offset;             // number of pixels to skip at begin of line
 
 // ---------------------------------------------------------------------------
 // ----------------------------- CPU register read ---------------------------
 // ---------------------------------------------------------------------------
-   
-always @(reg_sel, reg_rw, reg_uds, reg_lds, reg_addr, _v_bas_ad, shmode, vaddr, syncmode) begin
-  reg_dout = 16'h0000;
 
-  // read registers
-  if(reg_sel && reg_rw) begin
+always @(reg_sel, reg_rw, reg_uds, reg_lds, reg_addr, _v_bas_ad, shmode, vaddr, 
+			syncmode, line_offset, pixel_offset, ste) begin
+	reg_dout = 16'h0000;
 
-     // video base register (r/w)
-    if(reg_addr == 6'h00)      reg_dout <= { 8'h00, _v_bas_ad[22:15] };
-    if(reg_addr == 6'h01)      reg_dout <= { 8'h00, _v_bas_ad[14: 7] };
+	// read registers
+	if(reg_sel && reg_rw) begin
 
-     // video address counter (ro on ST)
-    if(reg_addr == 6'h02)      reg_dout <= { 8'h00, vaddr[22:15]     };
-    if(reg_addr == 6'h03)      reg_dout <= { 8'h00, vaddr[14:7 ]     };
-    if(reg_addr == 6'h04)      reg_dout <= { 8'h00, vaddr[6:0], 1'b0 };
+		// video base register (r/w)
+		if(reg_addr == 6'h00)      	reg_dout <= {   8'h00, _v_bas_ad[22:15] };
+		if(reg_addr == 6'h01)      	reg_dout <= {   8'h00, _v_bas_ad[14: 7] };
+		if(ste && reg_addr == 6'h06)  reg_dout <= {   8'h00, _v_bas_ad[ 6: 0], 1'b0 };
 
-     // syncmode register
-    if(reg_addr == 6'h05)      reg_dout <= { 6'h00, syncmode, 8'h00  };
+		// video address counter (ro on ST)
+		if(reg_addr == 6'h02)      	reg_dout <= {   8'h00, vaddr[22:15]     };
+		if(reg_addr == 6'h03)      	reg_dout <= {   8'h00, vaddr[14:7 ]     };
+		if(reg_addr == 6'h04)      	reg_dout <= {   8'h00, vaddr[6:0], 1'b0 };
 
-    // the color palette registers
-    if(reg_addr >= 6'h20 && reg_addr < 6'h30 ) begin
-      reg_dout[2:0]  <= palette_b[reg_addr[3:0]];
-      reg_dout[6:4]  <= palette_g[reg_addr[3:0]];
-      reg_dout[10:8] <= palette_r[reg_addr[3:0]];
-    end
+		// syncmode register
+		if(reg_addr == 6'h05)      	reg_dout <= {   6'h00, syncmode, 8'h00  };
 
-     // shift mode register
-    if(reg_addr == 6'h30)      reg_dout <= { 6'h00, shmode, 8'h00    };
-  end
+		if(ste) begin
+			if(reg_addr == 6'h07)    	reg_dout <= {   8'h00, line_offset      };
+			if(reg_addr == 6'h32)    	reg_dout <= { 12'h000, pixel_offset     };
+		end
+
+		// the color palette registers
+		if(reg_addr >= 6'h20 && reg_addr < 6'h30 ) begin
+			reg_dout[3:0]  <= palette_b[reg_addr[3:0]];
+			reg_dout[7:4]  <= palette_g[reg_addr[3:0]];
+			reg_dout[11:8] <= palette_r[reg_addr[3:0]];
+
+			// return only the 3 msb in non-ste mode
+			if(!ste) begin
+				reg_dout[3] <= 1'b0;
+				reg_dout[7] <= 1'b0;
+				reg_dout[11] <= 1'b0;
+			end
+		end
+
+		// shift mode register
+		if(reg_addr == 6'h30)      reg_dout <= { 6'h00, shmode, 8'h00    };
+	end
 end
 
 // ---------------------------------------------------------------------------
 // ----------------------------- CPU register write --------------------------
 // ---------------------------------------------------------------------------
+
+// STE video address write signal is evaluated inside memory engine
+wire ste_vaddr_write = ste && reg_sel && !reg_rw && !reg_lds;
+ 
 always @(negedge reg_clk) begin
-  if(reg_reset) begin
-    _v_bas_ad <= BASE_ADDR;
-    shmode <= DEFAULT_MODE;   // default video mode 2 => mono
-    syncmode <= 2'b00;        // 60hz
-    
-    if(DEFAULT_MODE == 0) begin
-      // TOS default palette, can be disabled after tests
-      palette_r[ 0] <= 3'b111; palette_g[ 0] <= 3'b111; palette_b[ 0] <= 3'b111;
-      palette_r[ 1] <= 3'b111; palette_g[ 1] <= 3'b000; palette_b[ 1] <= 3'b000;
-      palette_r[ 2] <= 3'b000; palette_g[ 2] <= 3'b111; palette_b[ 2] <= 3'b000;
-      palette_r[ 3] <= 3'b111; palette_g[ 3] <= 3'b111; palette_b[ 3] <= 3'b000;
-      palette_r[ 4] <= 3'b000; palette_g[ 4] <= 3'b000; palette_b[ 4] <= 3'b111;
-      palette_r[ 5] <= 3'b111; palette_g[ 5] <= 3'b000; palette_b[ 5] <= 3'b111;
-      palette_r[ 6] <= 3'b000; palette_g[ 6] <= 3'b111; palette_b[ 6] <= 3'b111;
-      palette_r[ 7] <= 3'b101; palette_g[ 7] <= 3'b101; palette_b[ 7] <= 3'b101;
-      palette_r[ 8] <= 3'b011; palette_g[ 8] <= 3'b011; palette_b[ 8] <= 3'b011;
-      palette_r[ 9] <= 3'b111; palette_g[ 9] <= 3'b011; palette_b[ 9] <= 3'b011;
-      palette_r[10] <= 3'b011; palette_g[10] <= 3'b111; palette_b[10] <= 3'b011;
-      palette_r[11] <= 3'b111; palette_g[11] <= 3'b111; palette_b[11] <= 3'b011;
-      palette_r[12] <= 3'b011; palette_g[12] <= 3'b011; palette_b[12] <= 3'b111;
-      palette_r[13] <= 3'b111; palette_g[13] <= 3'b011; palette_b[13] <= 3'b111;
-      palette_r[14] <= 3'b011; palette_g[14] <= 3'b111; palette_b[14] <= 3'b111;
-      palette_r[15] <= 3'b000; palette_g[15] <= 3'b000; palette_b[15] <= 3'b000;
-    end else  
-      palette_b[ 0] <= 3'b111;
+	if(reg_reset) begin
+		_v_bas_ad <= BASE_ADDR;
+		shmode <= DEFAULT_MODE;   // default video mode 2 => mono
+		syncmode <= 2'b00;        // 60hz
+   
+		// disable STE hard scroll features
+		line_offset <= 8'h00;
+		pixel_offset <= 4'h0;
+//		pixel_offset <= 4'h1;  // XXX
+
+		if(DEFAULT_MODE == 0) begin
+			// TOS default palette, can be disabled after tests
+			palette_r[ 0] <= 4'b111; palette_g[ 0] <= 4'b111; palette_b[ 0] <= 4'b111;
+			palette_r[ 1] <= 4'b111; palette_g[ 1] <= 4'b000; palette_b[ 1] <= 4'b000;
+			palette_r[ 2] <= 4'b000; palette_g[ 2] <= 4'b111; palette_b[ 2] <= 4'b000;
+			palette_r[ 3] <= 4'b111; palette_g[ 3] <= 4'b111; palette_b[ 3] <= 4'b000;
+			palette_r[ 4] <= 4'b000; palette_g[ 4] <= 4'b000; palette_b[ 4] <= 4'b111;
+			palette_r[ 5] <= 4'b111; palette_g[ 5] <= 4'b000; palette_b[ 5] <= 4'b111;
+			palette_r[ 6] <= 4'b000; palette_g[ 6] <= 4'b111; palette_b[ 6] <= 4'b111;
+			palette_r[ 7] <= 4'b101; palette_g[ 7] <= 4'b101; palette_b[ 7] <= 4'b101;
+			palette_r[ 8] <= 4'b011; palette_g[ 8] <= 4'b011; palette_b[ 8] <= 4'b011;
+			palette_r[ 9] <= 4'b111; palette_g[ 9] <= 4'b011; palette_b[ 9] <= 4'b011;
+			palette_r[10] <= 4'b011; palette_g[10] <= 4'b111; palette_b[10] <= 4'b011;
+			palette_r[11] <= 4'b111; palette_g[11] <= 4'b111; palette_b[11] <= 4'b011;
+			palette_r[12] <= 4'b011; palette_g[12] <= 4'b011; palette_b[12] <= 4'b111;
+			palette_r[13] <= 4'b111; palette_g[13] <= 4'b011; palette_b[13] <= 4'b111;
+			palette_r[14] <= 4'b011; palette_g[14] <= 4'b111; palette_b[14] <= 4'b111;
+			palette_r[15] <= 4'b000; palette_g[15] <= 4'b000; palette_b[15] <= 4'b000;
+		end else  
+			palette_b[ 0] <= 4'b111;
         
-  end else begin
-    // write registers
-    if(reg_sel && ~reg_rw) begin
-      if(reg_addr == 6'h00 && ~reg_lds) _v_bas_ad[22:15] <= reg_din[7:0];
-      if(reg_addr == 6'h01 && ~reg_lds) _v_bas_ad[14:7] <= reg_din[7:0];
+	end else begin
+		// write registers
+		if(reg_sel && !reg_rw) begin
+			if(!reg_lds) begin
+			
+				// video base address hi/mid (ST and STE)
+				if(reg_addr == 6'h00) _v_bas_ad[22:15] <= reg_din[7:0];
+				if(reg_addr == 6'h01) _v_bas_ad[14:7] <= reg_din[7:0];
 
-      if(reg_addr == 6'h05 && ~reg_uds) begin
-        // writing to sync mode toggles between 50 and 60 hz modes
-        syncmode <= reg_din[9:8];
-      end
+				// In the STE setting hi or mid clears the low byte for ST compatibility
+				// in ST mode this doesn't harm
+				if(reg_addr[5:1] == 5'h00) _v_bas_ad[6:0] <= 7'h00;
 
-      // the color palette registers
-      if(reg_addr >= 6'h20 && reg_addr < 6'h30 ) begin
-        if(~reg_uds) begin 
-          palette_r[reg_addr[3:0]] <= reg_din[10:8];
-        end
+				// the low byte can only be written in STE mode
+				if(ste && reg_addr == 6'h06)  _v_bas_ad[6:0] <= reg_din[7:1];
+			end
+				
+			// writing to sync mode toggles between 50 and 60 hz modes
+			if(reg_addr == 6'h05 && !reg_uds) syncmode <= reg_din[9:8];
+
+			// writing special STE registers
+			if(ste && !reg_lds) begin
+				if(reg_addr == 6'h07) line_offset <= reg_din[7:0];
+				if(reg_addr == 6'h32) pixel_offset <= reg_din[3:0];
+				
+				// Writing the video address counter happens directly inside the 
+				// memory engine further below!!!
+			end
+				
+			// the color palette registers, always write bit 3 with zero if not in 
+			// ste mode as this is the lsb of ste
+			if(reg_addr >= 6'h20 && reg_addr < 6'h30 ) begin
+				if(!reg_uds) begin 
+					if(!ste)	palette_r[reg_addr[3:0]] <= { 1'b0 , reg_din[10:8] };
+					else		palette_r[reg_addr[3:0]] <= reg_din[11:8];
+				end
           
-        if(~reg_lds) begin
-          palette_g[reg_addr[3:0]] <= reg_din[6:4];
-          palette_b[reg_addr[3:0]] <= reg_din[2:0];
-        end
-      end
+				if(!reg_lds) begin
+					if(!ste) begin
+						palette_g[reg_addr[3:0]] <= { 1'b0, reg_din[6:4] };
+						palette_b[reg_addr[3:0]] <= { 1'b0, reg_din[2:0] };
+					end else begin
+						palette_g[reg_addr[3:0]] <= reg_din[7:4];
+						palette_b[reg_addr[3:0]] <= reg_din[3:0];
+					end
+				end
+			end
         
-      if(reg_addr == 6'h30 && ~reg_uds) shmode <= reg_din[9:8];
-    end
-  end
+			if(reg_addr == 6'h30 && !reg_uds) shmode <= reg_din[9:8];
+		end
+	end
 end
 
 // ---------------------------------------------------------------------------
@@ -274,9 +340,9 @@ osd osd (
 	.clk        (clk        ),
 	.hcnt       (vga_hcnt   ),
 	.vcnt       (vcnt       ),
-	.in_r       ({stvid_r, stvid_r}),
-	.in_g       ({stvid_g, stvid_g}),
-	.in_b       ({stvid_b, stvid_b}),
+	.in_r       ({stvid_r, 2'b00}),
+	.in_g       ({stvid_g, 2'b00}),
+	.in_b       ({stvid_b, 2'b00}),
 
 	// receive signal with OSD overlayed
 	.out_r      (st_and_osd_r),
@@ -286,21 +352,23 @@ osd osd (
 	
 // ----------------------- monochrome video signal ---------------------------
 // mono uses the lsb of blue palette entry 0 to invert video
-wire [2:0] blue0 = palette_b[0];
+wire [3:0] blue0 = palette_b[0];
 wire mono_bit = blue0[0]^shift_0[15];
-wire [2:0] mono_rgb = de?{mono_bit, mono_bit, mono_bit}:3'b100;
+wire [3:0] mono_rgb = de?{mono_bit, mono_bit, mono_bit, mono_bit}:4'b1000;
 
 // ------------------------- colour video signal -----------------------------
 
-reg [8:0] color;
-wire [2:0] color_r = color[8:6];
-wire [2:0] color_g = color[5:3];
-wire [2:0] color_b = color[2:0];
+// For ST compatibility reasons the STE has the color bit order 0321. This is 
+// handled here
+reg [11:0] color;
+wire [3:0] color_r = { color[10:8], color[11] };
+wire [3:0] color_g = { color[ 6:4], color[ 7] };
+wire [3:0] color_b = { color[ 2:0], color[ 3] };
 
 // --------------- de-multiplex color and mono into one vga signal -----------
-wire [2:0] stvid_r = mono?mono_rgb:color_r;
-wire [2:0] stvid_g = mono?mono_rgb:color_g;
-wire [2:0] stvid_b = mono?mono_rgb:color_b;
+wire [3:0] stvid_r = mono?mono_rgb:color_r;
+wire [3:0] stvid_g = mono?mono_rgb:color_g;
+wire [3:0] stvid_b = mono?mono_rgb:color_b;
 
 // shift registers for up to 4 planes
 reg [15:0] shift_0, shift_1, shift_2, shift_3;
@@ -391,6 +459,55 @@ always @(posedge clk) begin
 end
 
 // ---------------------------------------------------------------------------
+// --------------------------- STE hard scroll shifter -----------------------
+// ---------------------------------------------------------------------------
+
+// When STE hard scrolling is being used (pixel_offset != 0) then memory reading starts
+// 16 pixels earlier and data is being moved through an additional shift register 
+
+// extra 32 bit registers required for STE hard scrolling
+reg [31:0] ste_shift_0, ste_shift_1, ste_shift_2, ste_shift_3;
+
+// shifted data
+wire [15:0] ste_shifted_0, ste_shifted_1, ste_shifted_2, ste_shifted_3;
+
+// connect STE scroll shifters for each plane
+ste_shifter ste_shifter_0 (
+	.skew (pixel_offset),
+   .in 	(ste_shift_0),
+   .out 	(ste_shifted_0)
+);
+				
+ste_shifter ste_shifter_1 (
+	.skew (pixel_offset),
+   .in 	(ste_shift_1),
+   .out 	(ste_shifted_1)
+);
+
+ste_shifter ste_shifter_2 (
+	.skew (pixel_offset),
+   .in 	(ste_shift_2),
+   .out 	(ste_shifted_2)
+);
+
+ste_shifter ste_shifter_3 (
+	.skew (pixel_offset),
+   .in 	(ste_shift_3),
+   .out 	(ste_shifted_3)
+);
+
+// move data into STE hard scroll shift registers 
+always @(posedge clk) begin
+	if((bus_cycle == 4'd14) && (plane == 2'd0)) begin
+		// shift up 16 pixels and load new data into lower bits of shift registers
+		ste_shift_0 <= { ste_shift_0[15:0], data_latch[0] };
+		ste_shift_1 <= { ste_shift_1[15:0], (planes > 3'd1)?data_latch[1]:16'h0000 };
+		ste_shift_2 <= { ste_shift_2[15:0], (planes > 3'd2)?data_latch[2]:16'h0000 };
+		ste_shift_3 <= { ste_shift_3[15:0], (planes > 3'd2)?data_latch[3]:16'h0000 };
+	end
+end
+
+// ---------------------------------------------------------------------------
 // ------------------------------- scan doubler ------------------------------
 // ---------------------------------------------------------------------------
 		
@@ -407,10 +524,9 @@ reg [15:0] sd_shift_0, sd_shift_1, sd_shift_2, sd_shift_3;
 // Return border color index (0) if outside display area
 wire [3:0] sd_index = (!me_v)?4'd0:
 	{ sd_shift_3[15], sd_shift_2[15], sd_shift_1[15], sd_shift_0[15]};
-
 								
-// line buffer for two lines of 720 pixels (640 + 2 * 40 border) 3 * 3 bit rgb data
-reg [8:0] sd_buffer [(2*(LINE_WIDTH+2*LINE_BORDER))-1:0];
+// line buffer for two lines of 720 pixels (640 + 2 * 40 border) 3 * 4 (STE!) bit rgb data
+reg [11:0] sd_buffer [(2*(LINE_WIDTH+2*LINE_BORDER))-1:0];
 
 // the scan doubler needs to know which border (left or right) is currently being displayed
 reg sd_border_side;
@@ -428,22 +544,27 @@ always @(posedge clk) begin
 		else                   			sd_vcnt <= sd_vcnt + 2'd1;
 	end
 		
-			// permanently move data from data_latch into scan doublers shift registers
+	// permanently move data from data_latch into scan doublers shift registers
 	if((bus_cycle == 4'd15) && (plane == 2'd0)) begin
-		// clear shift registers since some of them may be unused and need to forced to 0
-		sd_shift_1 <= 16'h0000;
-		sd_shift_2 <= 16'h0000;
-		sd_shift_3 <= 16'h0000;
 
-		// load data into shift registers as required by color depth
-		sd_shift_0 <= data_latch[0];
-		if(planes > 3'd1)
-			sd_shift_1 <= data_latch[1];
-		if(planes > 3'd2) begin
-			sd_shift_2 <= data_latch[2];
-			sd_shift_3 <= data_latch[3];
+		// normally data is directly moved from the input latches into the 
+		// shift registers. Only on an ste with pixel scrolling enabled
+		// the data is moved through additional shift registers
+		if(!ste || (pixel_offset == 0)) begin
+			// load data into shift registers as required by color depth
+			sd_shift_0 <= data_latch[0];
+			sd_shift_1 <= (planes > 3'd1)?data_latch[1]:16'h0000;
+			sd_shift_2 <= (planes > 3'd2)?data_latch[2]:16'h0000;
+			sd_shift_3 <= (planes > 3'd2)?data_latch[3]:16'h0000;
+		end else begin
+			sd_shift_0 <= ste_shifted_0;
+			sd_shift_1 <= ste_shifted_1;
+			sd_shift_2 <= ste_shifted_2;
+			sd_shift_3 <= ste_shifted_3;
 		end
+		
 	end else begin
+		// do the actual shifting
 		if((planes == 3'd1) ||
 			((planes == 3'd2) && (vga_hcnt[0] == 1'b1)) ||
 			((planes == 3'd4) && (vga_hcnt[1:0] == 2'b11))) begin
@@ -465,10 +586,10 @@ always @(posedge clk) begin
 		// well to have the scan doubler delay in the border colors as well just in
 		// case a program changes border colors dynamically (e.g. different colors
 		// for left and right or top and bottom borders)
-		if(st_h_state == 2'd3) begin
+		if(st_h_state == STATE_DISP) begin
 			sd_buffer[{LINE_BORDER + st_hcnt[9:0], sd_toggle}] <= 
 					{palette_r[sd_index], palette_g[sd_index], palette_b[sd_index]};
-		end else if(st_h_state == 2'd2) begin
+		end else if(st_h_state == STATE_BORDER) begin
 			// move bites from left/right border into appropriate places in the line buffer
 			if(!sd_border_side)
 				// left border
@@ -496,16 +617,21 @@ reg [1:0] plane;
 // 16, 32 or 64 pixel ahead of display enable
 reg me, me_v;
 
-// required pixel offset allowing for prefetch of 1, 2 or 4 planes (16, 32 or 64 pixels)
+// required pixel offset allowing for prefetch of 16 pixels in 1, 2 or 4 planes (16, 32 or 64 cycles)
 wire [9:0] memory_prefetch = scan_doubler_enable?{ 4'd0, planes, 3'd0 }:{ 3'd0, planes, 4'd0 };
-wire [9:0] me_h_start      = t5_h_end - memory_prefetch;
+// ste is starting another 16 pixels earlier if horizontal hard scroll is being used
+wire [9:0] ste_prefetch    = (ste && (pixel_offset != 0))?memory_prefetch:10'd0;
+wire [9:0] me_h_start      = t5_h_end - memory_prefetch - ste_prefetch;
 wire [9:0] me_h_end        = t0_h_border_right - memory_prefetch;
 // line offset required for scan doubler
 wire [9:0] me_v_offset     = scan_doubler_enable?10'd2:10'd0;
 wire [9:0] me_v_start      = t11_v_end - me_v_offset;
 wire [9:0] me_v_end        = t6_v_border_bot - me_v_offset;
 
-
+// with scan doubler being active, there are two main clock cycles per st hor counter
+// st_h_active makes sure these events only trigger once
+wire st_h_active = (!scan_doubler_enable || bus_cycle[0]);
+ 
 always @(posedge clk) begin
 
 	// line in which memory access is enabled
@@ -517,7 +643,7 @@ always @(posedge clk) begin
 		
 	// memory enable signal 16/32/64 bits (16*planes) ahead of display enable (de)
 	// include bus cycle to stay in sync in scna doubler mode
-	if(me_v && bus_cycle[0]) begin
+	if(me_v && st_h_active) begin
 		if(st_hcnt == me_h_start)  me <= 1'b1;
 		if(st_hcnt == me_h_end)    me <= 1'b0;
 	end
@@ -552,6 +678,22 @@ always @(posedge clk) begin
 			end
 		end
 	end
+
+	// STE has additional ways to influence video address
+	if(ste) begin
+		// add line offset at the end of each video line
+		if(me_v && st_h_active && (st_hcnt == t2_h_sync))
+			vaddr <= vaddr + line_offset;
+//			vaddr <= vaddr - 23'd4; // XXX
+
+		// STE vaddr write handling
+		// bus_cycle 6 is in the middle of a cpu cycle
+		if((bus_cycle == 6) && ste_vaddr_write) begin
+			if(reg_addr == 6'h02) vaddr[22:15] <= reg_din[7:0];
+			if(reg_addr == 6'h03) vaddr[14: 7] <= reg_din[7:0];
+			if(reg_addr == 6'h04) vaddr[ 6: 0] <= reg_din[7:1];
+		end 
+	end
 end
 
 // ---------------------------------------------------------------------------
@@ -573,8 +715,9 @@ reg [9:0] vcnt;     		// vertical line counter
 reg [1:0] v_state;  		// 0=sync, 1=blank, 2=border, 3=display
 
 // blank level is also used during sync
-wire blank  = (v_state == 2'd1) || (vga_h_state == 2'd1) || (v_state == 2'd0) || (vga_h_state == 2'd0);
-wire de     = (v_state == 2'd3) && (vga_h_state == 2'd3);
+wire blank  = 	(v_state == STATE_BLANK) || (vga_h_state == STATE_BLANK) || 
+					(v_state == STATE_SYNC) || (vga_h_state == STATE_SYNC);
+wire de     = (v_state == STATE_DISP) && (vga_h_state == STATE_DISP);
 
 // time in horizontal timing where vertical states change (at the begin of the sync phase)
 wire [9:0] v_event = t2_h_sync;
@@ -602,10 +745,10 @@ always @(posedge clk) begin
 	if( vga_hcnt == t3_h_blank_left - adjust_h ) vga_h_sync <= 1'b0;
 
 	// generate horizontal video signal states
-	if( vga_hcnt == t2_h_sync )                                        		vga_h_state <= 2'd0;
-	if((vga_hcnt == t0_h_border_right) || (vga_hcnt == t4_h_border_left))  	vga_h_state <= 2'd2;
-	if((vga_hcnt == t1_h_blank_right) || (vga_hcnt == t3_h_blank_left))    	vga_h_state <= 2'd1;
-	if( vga_hcnt == t5_h_end)                                          		vga_h_state <= 2'd3;
+	if( vga_hcnt == t2_h_sync )                                        		vga_h_state <= STATE_SYNC;
+	if((vga_hcnt == t0_h_border_right) || (vga_hcnt == t4_h_border_left))  	vga_h_state <= STATE_BORDER;
+	if((vga_hcnt == t1_h_blank_right) || (vga_hcnt == t3_h_blank_left))    	vga_h_state <= STATE_BLANK;
+	if( vga_hcnt == t5_h_end)                                          		vga_h_state <= STATE_DISP;
 	  
 	// ------------- horizontal ST timing generation -------------
 	// Run st timing at full speed if no scan doubler is being used. Otherwise run
@@ -620,10 +763,10 @@ always @(posedge clk) begin
 			st_hcnt <= st_hcnt + 10'd1;
 
 		// generate horizontal video signal states
-		if( st_hcnt == t2_h_sync )                                        	st_h_state <= 2'd0;
-		if((st_hcnt == t0_h_border_right) || (st_hcnt == t4_h_border_left))  st_h_state <= 2'd2;
-		if((st_hcnt == t1_h_blank_right) || (st_hcnt == t3_h_blank_left))    st_h_state <= 2'd1;
-		if( st_hcnt == t5_h_end)                                          	st_h_state <= 2'd3;
+		if( st_hcnt == t2_h_sync )                                        	st_h_state <= STATE_SYNC;
+		if((st_hcnt == t0_h_border_right) || (st_hcnt == t4_h_border_left))  st_h_state <= STATE_BORDER;
+		if((st_hcnt == t1_h_blank_right) || (st_hcnt == t3_h_blank_left))    st_h_state <= STATE_BLANK;
+		if( st_hcnt == t5_h_end)                                          	st_h_state <= STATE_DISP;
 	end
 
 	// vertical state changes at end of hsync (begin of left blank)
@@ -638,11 +781,46 @@ always @(posedge clk) begin
 		if( vcnt == t9_v_blank_top - adjust_v ) 	vga_v_sync <= 1'b0;
 
 		// generate vertical video signal states
-		if( vcnt == t8_v_sync )                                        v_state <= 2'd0;
-		if((vcnt == t6_v_border_bot) || (vcnt == t10_v_border_top))    v_state <= 2'd2;
-		if((vcnt == t7_v_blank_bot) || (vcnt == t9_v_blank_top))       v_state <= 2'd1;
-		if( vcnt == t11_v_end)                                         v_state <= 2'd3;
+		if( vcnt == t8_v_sync )                                        v_state <= STATE_SYNC;
+		if((vcnt == t6_v_border_bot) || (vcnt == t10_v_border_top))    v_state <= STATE_BORDER;
+		if((vcnt == t7_v_blank_bot) || (vcnt == t9_v_blank_top))       v_state <= STATE_BLANK;
+		if( vcnt == t11_v_end)                                         v_state <= STATE_DISP;
 	end
+end
+
+endmodule
+
+// ---------------------------------------------------------------------------
+// --------------------------- STE hard scroll shifter -----------------------
+// ---------------------------------------------------------------------------
+
+module ste_shifter (
+	input  [3:0] skew,
+   input  [31:0] in,
+   output reg [15:0] out
+);
+
+always @(skew, in) begin
+	out = 16'h0000;
+
+   case(skew)
+     15: out =  in[16:1];
+     14: out =  in[17:2];
+     13: out =  in[18:3];
+     12: out =  in[19:4];
+     11: out =  in[20:5];
+     10: out =  in[21:6];
+     9:  out =  in[22:7];
+     8:  out =  in[23:8];
+     7:  out =  in[24:9];
+     6:  out =  in[25:10];
+     5:  out =  in[26:11];
+     4:  out =  in[27:12];
+     3:  out =  in[28:13];
+     2:  out =  in[29:14];
+     1:  out =  in[30:15];
+     0:  out =  in[31:16];
+   endcase; // case (skew)
 end
 
 endmodule
