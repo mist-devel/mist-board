@@ -164,8 +164,8 @@ BEGIN
 --	sel_fast <= '1' when cpuaddr(23 downto 21)="001" OR cpuaddr(23 downto 21)="010" ELSE '0'; --$200000 - $5FFFFF
 --	sel_fast <= '1' when cpuaddr(23 downto 19)="11111" ELSE '0'; --$F800000;--
 
---	sel_fast <= '0'; -- off
-	sel_fast <= '1' when turbo='1' AND cpuaddr(23 downto 22)="00" AND state/="01" ELSE '0'; --$000000 - $3fffff
+	sel_fast <= '0'; -- off
+--	sel_fast <= '1' when turbo='1' AND cpuaddr(23 downto 22)="00" AND state/="01" ELSE '0'; --$000000 - $3fffff
 --	sel_fast <= '1' when (cpuaddr(23 downto 22)="00"  OR cpuaddr(23 downto 17)="1111110" OR cpuaddr(23 downto 16)="11111110" OR cpuaddr(23 downto 17)="1111101" OR cpuaddr(23 downto 18)="111000") AND state/="01" ELSE '0'; --$000000 - $3fffff
 	
 	ramcs <= (NOT sel_fast) or slower(0);-- OR (state(0) AND NOT state(1));

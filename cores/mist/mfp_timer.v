@@ -13,7 +13,7 @@ module mfp_timer(
 		 inout 	     XCLK_I, 
        input 	     T_I, // ext. trigger in
 
-		 output       IRQ_DIS,  // pulse mode disables input port irq
+		 output       PULSE_MODE,  // pulse mode disables input port irq
 		 
        output reg   T_O,                          
        output reg   T_O_PULSE
@@ -22,7 +22,7 @@ module mfp_timer(
 reg [7:0] data, down_counter, cur_counter;
 reg [3:0] control;
 	
-assign IRQ_DIS = pulse_mode;
+assign PULSE_MODE = pulse_mode;
 
 wire[7:0] prescaler;         // prescaler value
 reg [7:0] prescaler_counter; // prescaler counter
@@ -103,6 +103,11 @@ always @(negedge CLK) begin
 			// handle delay mode
 			if (delay_mode === 1'b1)
 				if ((~xclk_r2 & xclk_r) === 1'b1)
+					count <= 1'b1;
+
+			// handle pulse mode
+			if (pulse_mode === 1'b1)
+				if (((~xclk_r2 & xclk_r) === 1'b1) && T_I)
 					count <= 1'b1;
 	    
 			if (count) begin

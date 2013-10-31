@@ -24,10 +24,11 @@ module data_io (
 	
 	// ram interface
 	output reg [2:0] state, // state bits required to drive the sdram host
+	output reg read,
+	output reg write,
 	output [22:0] addr,
 	output reg [15:0] data_out, // write data register
-	input [15:0] data_in,
-	input ack
+	input [15:0] data_in
 );
   
 assign dma_idx = bcnt;
@@ -37,35 +38,51 @@ reg [4:0] bcnt;  // payload byte counter
 reg [14:0] sbuf; // receive buffer (buffer used to assemble spi bytes/words)
 reg [7:0] cmd;   // command byte (first byte of spi transmission)
 reg [30:0] addrR;// address register (word address for memory transfers)
-reg write;       // write request received via SPI
+reg writeCmd;      // write request received via SPI
 reg writeD;      // write synchonized to 8Mhz clock
 reg writeD2;     // synchronized write delayed by one 8Mhz clock
-reg read;        // read request received via SPI
+reg readCmd;     // read request received via SPI
 reg readD;       // read synchonized to 8Mhz clock
 reg readD2;      // synchronized read delayed by one 8Mhz clock
+reg [15:0] ram_data; // latch for incoming ram data 
+reg brI;         // signals to bring br into local clock domain
 	
 // during write the address needs to be decremented by one as the
 // address auto increment takes place at the beginning of each transfer
-assign addr = addrR[22:0] - ((cmd == 2)?23'b1:23'b0);
+assign addr = (cmd==2)?(addrR[22:0]-23'd1):addrR[22:0];
 
 // generate state signals required to control the sdram host interface
 always @(posedge clk_8) begin
 	// start io transfers clock cycles after bus_cycle 0 
-        // (after the cpu cycle)
-	writeD <= write && ((bus_cycle == 3) || writeD);
+   // (after the cpu cycle)
+	writeD <= writeCmd && ((bus_cycle == 3) || writeD);
 	writeD2 <= writeD;
-	readD <= read && ((bus_cycle == 3) || readD);
+	readD <= readCmd && ((bus_cycle == 3) || readD);
 	readD2 <= readD;
 
-	if(reset)
+	br <= brI;
+	
+	// at the end of a read cycle latch the incoming ram data for later spi transmission
+	if(read)	ram_data <= data_in;
+	
+	if(reset) begin
 		state <= 3'b101;
-	else begin
-		if(writeD && ~writeD2)	
-			state <= 3'b011;       // write data
-		else if(readD && ~readD2)
-			state <= 3'b010;		  // read data
-		else
-			state <= 3'b001;       // decode (idle)
+		read <= 1'b0;
+		write <= 1'b0;	
+	end else begin
+		if(writeD && ~writeD2) begin
+//			state <= 3'b011;       // write data
+			write <= 1'b1;
+			read <= 1'b0;
+		end else if(readD && ~readD2) begin
+//			state <= 3'b010;		  // read data
+			write <= 1'b0;
+			read <= 1'b1;
+		end else begin
+//			state <= 3'b001;       // decode (idle)
+			write <= 1'b0;
+			read <= 1'b0;
+		end
 	end
 end
 
@@ -76,7 +93,7 @@ always@(negedge sck) begin
 	// memory read
 	if(cmd == 3) begin
 	   if(cnt == 8)
-			txData <= data_in;
+			txData <= ram_data;
 		else
 			txData[15:1] <= txData[14:0];
 	end
@@ -90,12 +107,13 @@ always@(negedge sck) begin
 	end
 end
 
+
 always@(posedge sck, posedge ss) begin
 	if(ss == 1'b1) begin
       cnt <= 5'd0;
       bcnt <= 4'd0;
-		write <= 1'b0;
-		read <= 1'b0;
+		writeCmd <= 1'b0;
+		readCmd <= 1'b0;
 		dma_ack <= 1'b0;
 	end else begin
 		dma_ack <= 1'b0;
@@ -120,15 +138,15 @@ always@(posedge sck, posedge ss) begin
 
 			// request bus
 			if({sbuf[6:0], sdi } == 8'd7)
-				br <= 1'b1;
+				brI <= 1'b1;
 
 			// release bus
 			if({sbuf[6:0], sdi } == 8'd8)
-				br <= 1'b0;
+				brI <= 1'b0;
 
 			// if we can see a read coming initiate sdram read transfer asap
 			if({sbuf[6:0], sdi } == 8'd3)
-				read <= 1;
+				readCmd <= 1;
 		end
 		
 		// handle "payload"
@@ -141,23 +159,23 @@ always@(posedge sck, posedge ss) begin
 			// write ram
 			if(cmd == 2) begin
 				if(cnt == 5'd16)
-					write <= 1'b0;
+					writeCmd <= 1'b0;
 				
 				if(cnt == 5'd23) begin
 					data_out <= { sbuf, sdi };
 					addrR <= addrR + 31'b1;				
-					write <= 1'b1;
+					writeCmd <= 1'b1;
 				end
 			end
 
 			// read ram
 			if(cmd == 3) begin
 				if(cnt == 16) 
-					read <= 0;
+					readCmd <= 0;
 				
 				if(cnt == 23) begin
 					addrR <= addrR + 31'b1;
-					read <= 1;
+					readCmd <= 1;
 				end				
 			end
 

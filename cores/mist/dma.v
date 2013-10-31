@@ -258,22 +258,20 @@ always @(negedge clk) begin
 						end
 							
 						if(din[7:5] == 3'b101)         // write sector
-							if(!fdc_wr_prot) begin
+							if(!fdc_wr_prot)
 								fdc_busy <= 2'd3;
-							end
 
 						// ------------- TYPE III commands ------------
 	
-						// these aren't supported yet
-//						if(din[7:4] == 4'b1100)         // read address
-//							fdc_busy <= 2'd3;
+						if(din[7:4] == 4'b1100)         // read address
+							fdc_busy <= 2'd3;
 
-//						if(din[7:4] == 4'b1110)         // read track
-//							fdc_busy <= 2'd3;
+						if(din[7:4] == 4'b1110)         // read track
+							fdc_busy <= 2'd3;
 
-//						if(din[7:4] == 4'b1111)         // write track
-//							if(!fdc_wr_prot)
-//							  fdc_busy <= 2'd3;
+						if(din[7:4] == 4'b1111)         // write track
+							if(!fdc_wr_prot)
+							  fdc_busy <= 2'd3;
 
 						// ------------- TYPE IV commands -------------
 						if(din[7:4] == 4'b1101)         // force intrerupt

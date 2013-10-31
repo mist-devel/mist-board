@@ -247,7 +247,6 @@ always @(negedge reg_clk) begin
 		// disable STE hard scroll features
 		line_offset <= 8'h00;
 		pixel_offset <= 4'h0;
-//		pixel_offset <= 4'h1;  // XXX
 
 		if(DEFAULT_MODE == 0) begin
 			// TOS default palette, can be disabled after tests

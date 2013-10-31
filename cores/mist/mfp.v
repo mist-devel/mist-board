@@ -1,10 +1,5 @@
 //
 
-// TODO: 
-// - map remaining inputs to irqs
-// - implement pulse mode
-// - suppress input irqs when timer_a/b are in event or pulse mode
-
 module mfp (
 	// cpu register interface
 	input 		 clk,
@@ -60,10 +55,12 @@ reg [13:0] readTimer;
 
 wire write = sel && ~ds && ~rw;
 
+// timer a/b is in pulse mode
+wire [1:0] pulse_mode;
+   
 wire timera_done;
 wire [7:0] timera_dat_o;
 wire [4:0] timera_ctrl_o;
-wire i4_irq_disable;
 
 mfp_timer timer_a (
 	.CLK 			(clk),
@@ -75,7 +72,7 @@ mfp_timer timer_a (
    .DAT_I		(din),
    .DAT_O		(timera_dat_o),
    .DAT_WE		((addr == 5'h0f) && write),
-	.IRQ_DIS    (i4_irq_disable),
+	.PULSE_MODE    (pulse_mode[1]),
    .T_I			(t_i[0] ^ aer[4]),
    .T_O_PULSE	(timera_done)
 );
@@ -83,7 +80,6 @@ mfp_timer timer_a (
 wire timerb_done;
 wire [7:0] timerb_dat_o;
 wire [4:0] timerb_ctrl_o;
-wire i3_irq_disable;
 
 mfp_timer timer_b (
 	.CLK 			(clk),
@@ -95,7 +91,7 @@ mfp_timer timer_b (
    .DAT_I		(din),
    .DAT_O		(timerb_dat_o),
    .DAT_WE		((addr == 5'h10) && write),
-	.IRQ_DIS    (i3_irq_disable),
+	.PULSE_MODE    (pulse_mode[0]),
    .T_I			(t_i[1] ^ aer[3]),
    .T_O_PULSE	(timerb_done)
 );
@@ -140,34 +136,27 @@ reg [7:0] aer, ddr, gpip;
 reg [15:0] ipr, ier, imr, isr;   // interrupt registers
 reg [7:0] vr;
 
-
-// any pending and not masked interrupt causes the irq line to go high
-// if highest_irq_pending != higest_irq_active then there's a high prio
-// irq in service and no irq is generated until this one is finished
-assign irq = ((ipr & imr) != 16'h0000) && (highest_irq_active == highest_irq_pending);
-
-// handle pending and in service irqs
-wire [15:0] irq_active_map = (ipr | isr) & imr;
-
-// (i am pretty sure this can be done much more elegant ...)
-// check the number of the highest active irq
-wire [3:0] highest_irq_active=
-	( irq_active_map[15]    == 1'b1)?4'd15:
-	((irq_active_map[15:14] == 2'b01)?4'd14:
-	((irq_active_map[15:13] == 3'b001)?4'd13:
-	((irq_active_map[15:12] == 4'b0001)?4'd12:
-	((irq_active_map[15:11] == 5'b00001)?4'd11:
-	((irq_active_map[15:10] == 6'b000001)?4'd10:
-	((irq_active_map[15:9]  == 7'b0000001)?4'd9:
-	((irq_active_map[15:8]  == 8'b00000001)?4'd8:
-	((irq_active_map[15:7]  == 9'b000000001)?4'd7:
-	((irq_active_map[15:6]  == 10'b000000001)?4'd6:
-	((irq_active_map[15:5]  == 11'b0000000001)?4'd5:
-	((irq_active_map[15:4]  == 12'b00000000001)?4'd4:
-	((irq_active_map[15:3]  == 13'b000000000001)?4'd3:
-	((irq_active_map[15:2]  == 14'b0000000000001)?4'd2:
-	((irq_active_map[15:1]  == 15'b00000000000001)?4'd1:
-	((irq_active_map[15:0]  == 16'b000000000000001)?4'd0:
+// generate irq signal if an irq is pending and no other irq of same or higher prio is in service
+assign irq = ((ipr & imr) != 16'h0000) && ((isr == 16'h0000) || (highest_irq_pending > irq_in_service));
+   
+// check number of current interrupt in service
+wire [3:0] irq_in_service =
+	( isr[15]    == 1'b1)?4'd15:
+	((isr[15:14] == 2'b01)?4'd14:
+	((isr[15:13] == 3'b001)?4'd13:
+	((isr[15:12] == 4'b0001)?4'd12:
+	((isr[15:11] == 5'b00001)?4'd11:
+	((isr[15:10] == 6'b000001)?4'd10:
+	((isr[15:9]  == 7'b0000001)?4'd9:
+	((isr[15:8]  == 8'b00000001)?4'd8:
+	((isr[15:7]  == 9'b000000001)?4'd7:
+	((isr[15:6]  == 10'b000000001)?4'd6:
+	((isr[15:5]  == 11'b0000000001)?4'd5:
+	((isr[15:4]  == 12'b00000000001)?4'd4:
+	((isr[15:3]  == 13'b000000000001)?4'd3:
+	((isr[15:2]  == 14'b0000000000001)?4'd2:
+	((isr[15:1]  == 15'b00000000000001)?4'd1:
+	((isr[15:0]  == 16'b000000000000001)?4'd0:
 			4'd0)))))))))))))));
 
 wire [15:0] irq_pending_map = ipr & imr;
@@ -240,7 +229,7 @@ reg [7:0] iD, iD2;
 reg [7:0] irq_vec;
 
 // mask of input irqs which are overwritten by timer a/b inputs
-wire [7:0] ti_irq_mask = { 3'b000, i4_irq_disable, i3_irq_disable, 3'b000};
+wire [7:0] ti_irq_mask = { 3'b000, pulse_mode, 3'b000};
 wire [7:0] ti_irq      = { 3'b000, t_i[0], t_i[1], 3'b000};
 
 reg iackD;

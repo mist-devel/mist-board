@@ -82,16 +82,7 @@ always @(posedge clk_8) begin
 	end
 end
 
-// the following is just to prevent optimization			
-//assign UART_TX = (berr_cnt_out == 4'd0);
-
 wire cpu_write = cpu_cycle && cpu2io && address_strobe && !tg68_rw;
-
-// it's illegal to write to certain memory areas
-// TODO: Still the write itself would succeed. That must not happen
-wire cpu_write_illegal = cpu_write && 
-     (tg68_adr[23:3] === 21'd0);     // the first two long words $0 and $4
-
 	  
 reg [2:0] dtack_timeout;
 always @(posedge clk_8) begin
@@ -102,7 +93,7 @@ always @(posedge clk_8) begin
 			// timeout only when cpu owns the bus and when
 			// neither dtack nor fast ram are active
 			if(dtack_timeout != 3'd7) begin
-				if(!tg68_dtack || br || tg68_cpuena || tg68_as)
+				if(!tg68_dtack || br || tg68_as)
 					dtack_timeout <= 3'd0;
 				else
 					dtack_timeout <= dtack_timeout + 3'd1;
@@ -116,7 +107,7 @@ end
 		
 // no tristate busses exist inside the FPGA. so bus request doesn't do
 // much more than halting the cpu by suppressing dtack
-wire br = data_io_br || blitter_br; //  && (tg68_cpustate[1:0] == 2'b00) ;   // dma is only other bus master (yet)
+wire br = data_io_br || blitter_br; // dma/blitter are only other bus masters
 wire data_io_br;
 
 // request interrupt ack from mfp for IPL == 6
@@ -251,8 +242,10 @@ wire ste_dma_snd_xsirq, ste_dma_snd_xsirq_delayed;
 // mfp io7 is mono_detect which in ste is xor'd with the dma sound irq
 wire mfp_io7 = system_ctrl[8] ^ (ste?ste_dma_snd_xsirq:1'b0);
 
-wire [7:0] mfp_gpio_in = {mfp_io7, 1'b0, !dma_irq, !acia_irq, !blitter_irq, 3'b000 };
-wire [1:0] mfp_timer_in = {st_de, ste?ste_dma_snd_xsirq_delayed:1'b0};
+// input 0 is busy from printer port which has a pullup
+// inputs 1,2 and 6 are inputs from serial which have pullups before an inverter
+wire [7:0] mfp_gpio_in = {mfp_io7, 1'b0, !dma_irq, !acia_irq, !blitter_irq, 3'b001 };
+wire [1:0] mfp_timer_in = {st_de, ste?ste_dma_snd_xsirq_delayed:1'b1};
 
 mfp mfp (
 	// cpu register interface
@@ -535,20 +528,6 @@ always @ (posedge clk_8) begin
 		cycle_counter <= cycle_counter + 32'd1;
 end
 
-			// SDRAM
-assign SDRAM_CKE         = 1'b1;
-assign SDRAM_nCS         = sdram_cs[0];
-assign SDRAM_DQML        = sdram_dqm[0];
-assign SDRAM_DQMH        = sdram_dqm[1];
-
-wire [  4-1:0] sdram_cs;
-wire [  2-1:0] sdram_dqm;
-
-// host sdram interface used for io data up/download
-wire [2:0] host_state;
-wire [22:0] host_addr;
-wire [15:0] host_dataWR;
-wire [15:0] host_dataRD;
  
 // tg68
 wire [ 16-1:0] tg68_dat_in;
@@ -560,16 +539,6 @@ wire           tg68_as;
 wire           tg68_uds;
 wire           tg68_lds;
 wire           tg68_rw;
-wire           tg68_ena7RD;
-wire           tg68_ena7WR;
-wire           tg68_enaWR;
-wire [ 16-1:0] tg68_cout;
-wire           tg68_cpuena;
-wire [ 32-1:0] tg68_cad;
-wire [  6-1:0] tg68_cpustate /* synthesis noprune */;
-wire           tg68_cdma;
-wire           tg68_clds;
-wire           tg68_cuds;
 
 wire reset = system_ctrl[0];
 
@@ -625,11 +594,26 @@ always @(posedge clk_8) begin
 end
 	
 //// TG68K main CPU ////
+
+// tg68 enaXXX signals to make tg68 core happy
+reg [3:0] enacnt /* synthesis noprune*/;
+wire tg68_ena7RD = (enacnt == 4'd7);
+wire tg68_ena7WR = (enacnt == 4'd15);
+wire tg68_enaWR = (enacnt[1:0] == 2'd3);
+always @(posedge clk_128) begin
+	// 128Mhz counter synchronous to 8 Mhz clock
+	// force counter to pass 0 exactly after the rising edge of clk_8
+	if(((enacnt == 15) && ( clk_8 == 0)) ||
+		((enacnt ==  0) && ( clk_8 == 1)) ||
+		((enacnt != 15) && (enacnt != 0)))
+			enacnt <= enacnt + 4'd1;
+end
+
 TG68K tg68k (
   .clk          (clk_128          ),
   .reset        (~reset           ),
   .clkena_in    (1'b1             ),
-  .IPL          (ipl              ),  // 3'b111
+  .IPL          (ipl              ),
   .dtack        (tg68_dtack       ),
   .vpa          (1'b1             ),
   .ein          (1'b1             ),
@@ -642,40 +626,20 @@ TG68K tg68k (
   .rw           (tg68_rw          ),
   .berr         (tg68_berr        ),
   .clr_berr     (tg68_clr_berr    ),
-  .e            (                 ),
-  .vma          (                 ),
-  .wrd          (                 ),
-  .ena7RDreg    (tg68_ena7RD      ),
-  .ena7WRreg    (tg68_ena7WR      ),
-  .enaWRreg     (tg68_enaWR       ),
-  .fromram      (tg68_cout        ),
-  .ramready     (tg68_cpuena      ),
+
+  // odd synchronization signals
+  .ena7RDreg (tg68_ena7RD ),
+  .ena7WRreg (tg68_ena7WR ),
+  .enaWRreg (tg68_enaWR ),
+
   .cpu          (system_ctrl[5:4] ),  // 00=68000
-  .ramaddr      (tg68_cad         ),
-  .cpustate     (tg68_cpustate    ),
-  .nResetOut    (                 ),
-  .skipFetch    (                 ),
-  .cpuDMA       (tg68_cdma        ),
-  .ramlds       (tg68_clds        ),
-  .ramuds       (tg68_cuds        ),
   .turbo        (system_ctrl[18]  )
 );
 
-// 
-wire [15:0] cpu_data_in;
-assign cpu_data_in = cpu2mem?ram_data_out:io_data_out;
+/* ------------------------------------------------------------------------------ */
+/* ----------------------------- memory area mapping ---------------------------- */
+/* ------------------------------------------------------------------------------ */
 
-// cpu/video stram multiplexing
-wire [22:0] ram_address;
-wire [15:0] ram_data_out;
-
-wire video_cycle = (bus_cycle[3:2] == 0);
-wire cpu_cycle = (bus_cycle[3:2] == 1); // || (bus_cycle[3:2] == 3);
-
-assign ram_address = video_cycle?((st_hs&&ste)?ste_dma_snd_addr:video_address):
-						(blitter_br?blitter_master_addr:tg68_adr[23:1]);
-
-// TODO: put 0x000000 to 0x000007 into tos section so it's write protected
 wire MEM512K = (system_ctrl[3:1] == 3'd0);
 wire MEM1M   = (system_ctrl[3:1] == 3'd1);
 wire MEM2M   = (system_ctrl[3:1] == 3'd2);
@@ -683,23 +647,30 @@ wire MEM4M   = (system_ctrl[3:1] == 3'd3);
 wire MEM8M   = (system_ctrl[3:1] == 3'd4);
 wire MEM14M  = (system_ctrl[3:1] == 3'd5);
 
+// rom is also at 0x000000 to 0x000007
+wire cpu2lowrom = (tg68_adr[23:3] == 21'd0);
+ 
 // ram from 0x000000 to 0x400000
-wire cpu2ram = (tg68_adr[23:22] == 2'b00) ||              // ordinary 4MB
+wire cpu2ram = (!cpu2lowrom) && (
+								  (tg68_adr[23:22] == 2'b00) ||   // ordinary 4MB
 	((MEM14M || MEM8M) &&  (tg68_adr[23:22] == 2'b01)) ||  // 8MB 
 	(MEM14M            && ((tg68_adr[23:22] == 2'b10) ||   // 12MB
-	                       (tg68_adr[23:21] == 3'b110)));  // 14MB 
+	                       (tg68_adr[23:21] == 3'b110)))); // 14MB 
 
-wire cpu2ram14 = (tg68_adr[23:22] == 2'b00) ||  // ordinary 4MB
+wire cpu2ram14 = (!cpu2lowrom) && (
+                 (tg68_adr[23:22] == 2'b00) ||  // ordinary 4MB
 					  (tg68_adr[23:22] == 2'b01) ||  // 8MB 
 					  (tg68_adr[23:22] == 2'b10) ||  // 12MB
-	              (tg68_adr[23:21] == 3'b110);   // 14MB 
+	              (tg68_adr[23:21] == 3'b110));  // 14MB 
 
 // 256k tos from 0xe00000 to 0xe40000
-wire cpu2tos256k = (tg68_adr[23:18] == 6'b111000);
+wire cpu2tos256k = (tg68_adr[23:18] == 6'b111000) || 
+							cpu2lowrom;
 
 // 192k tos from 0xfc0000 to 0xff0000
-wire cpu2tos192k = (tg68_adr[23:17] == 7'b1111110) || 
-		 				 (tg68_adr[23:16] == 8'b11111110);
+wire cpu2tos192k = (tg68_adr[23:17] == 7'b1111110)  || 
+		 				 (tg68_adr[23:16] == 8'b11111110) || 
+							cpu2lowrom;
 
 // 128k cartridge from 0xfa0000 to 0xfc0000
 wire cpu2cart = (tg68_adr[23:17] == 7'b1111101);
@@ -717,75 +688,71 @@ wire cpu2iack = (tg68_adr[23:4] == 20'hfffff);
 // wire address_strobe = ~tg68_uds || ~tg68_lds;
 reg address_strobe;
 always @(posedge clk_8)
-//	address_strobe <= (video_cycle) && (~tg68_lds || ~tg68_uds);
 	address_strobe <= video_cycle && ~tg68_as && !br;
 
 // generate dtack (for st ram only and rom), TODO: no dtack for rom write
 assign tg68_dtack = ~(((cpu2mem && address_strobe) || io_dtack ) && !br);
 
+/* ------------------------------------------------------------------------------ */
+/* ------------------------------- bus multiplexer ------------------------------ */
+/* ------------------------------------------------------------------------------ */
+
+
+// Two of the four cycles are being used. One for video (+STE audio) and one for
+// cpu, DMA and Blitter
+wire video_cycle = (bus_cycle[3:2] == 0);
+wire cpu_cycle = (bus_cycle[3:2] == 1);
+
+// ----------------- RAM address --------------
+wire [22:0] video_cycle_addr = (st_hs&&ste)?ste_dma_snd_addr:video_address;
+wire [22:0] cpu_cycle_addr = data_io_br?data_io_addr:(blitter_br?blitter_master_addr:tg68_adr[23:1]);
+wire [22:0] ram_address = video_cycle?video_cycle_addr:cpu_cycle_addr;
+
+// ----------------- RAM read -----------------
 // memory access during the video cycle is shared between video and ste_dma_snd
 wire video_cycle_oe = (st_hs && ste)?ste_dma_snd_read:video_read;
 // memory access during the cpu cycle is shared between blitter and cpu
-wire cpu_cycle_oe = (blitter_br?blitter_master_read:(address_strobe && tg68_rw && cpu2mem));
+wire cpu_cycle_oe = data_io_br?data_io_read:(blitter_br?blitter_master_read:(address_strobe && tg68_rw && cpu2mem));
+wire ram_oe = video_cycle?video_cycle_oe:(cpu_cycle?cpu_cycle_oe:1'b0);
 
-wire ram_oe = ~(video_cycle?video_cycle_oe:(cpu_cycle?cpu_cycle_oe:1'b0));
-//	(cpu_cycle?~(blitter_br?blitter_master_read:(address_strobe && tg68_rw && cpu2mem)):1'b1);
-//	(cpu_cycle?~(address_strobe && tg68_rw && cpu2mem):1'b1);
+// ----------------- RAM write -----------------
+wire video_cycle_wr = 1'b0;
+wire cpu_cycle_wr = data_io_br?data_io_write:(blitter_br?blitter_master_write:(address_strobe && ~tg68_rw && cpu2ram));
+wire ram_wr = video_cycle?video_cycle_wr:(cpu_cycle?cpu_cycle_wr:1'b0);
 
-wire ram_wr = cpu_cycle?~(blitter_br?blitter_master_write:(address_strobe && ~tg68_rw && cpu2ram)):1'b1;
-
-wire [15:0] ram_data_in = blitter_br?blitter_master_data_out:tg68_dat_out;
+wire [15:0] ram_data_out;
+wire [15:0] cpu_data_in = cpu2mem?ram_data_out:io_data_out;
+wire [15:0] ram_data_in = data_io_br?data_io_dout:(blitter_br?blitter_master_data_out:tg68_dat_out);
 
 // data strobe
-wire ram_uds = video_cycle?1'b0:(blitter_br?1'b0:tg68_uds);
-wire ram_lds = video_cycle?1'b0:(blitter_br?1'b0:tg68_lds);
+wire ram_uds = video_cycle?1'b1:((blitter_br||data_io_br)?1'b1:~tg68_uds);
+wire ram_lds = video_cycle?1'b1:((blitter_br||data_io_br)?1'b1:~tg68_lds);
  
-//// sdram ////
+assign SDRAM_CKE         = 1'b1;
+
 sdram sdram (
-  .sdata        (SDRAM_DQ         ),
-  .sdaddr       (SDRAM_A          ),
-  .dqm          (sdram_dqm        ),
-  .sd_cs        (sdram_cs         ),
-  .ba           (SDRAM_BA         ),
-  .sd_we        (SDRAM_nWE        ),
-  .sd_ras       (SDRAM_nRAS       ),
-  .sd_cas       (SDRAM_nCAS       ),
-  .sysclk       (clk_128          ),
-  .reset_in     (~init            ),
-  
-  .hostWR       (host_dataWR      ),
-  .hostAddr     ({host_addr,1'b0} ),
-  .hostState    (host_state       ),
-  .hostL        (1'b0             ),
-  .hostU        (1'b0             ),
-  .hostRD       (host_dataRD      ),
-  .hostena      (                 ),
+	// interface to the MT48LC16M16 chip
+	.sd_data     	( SDRAM_DQ                 ),
+	.sd_addr     	( SDRAM_A                  ),
+	.sd_dqm      	( {SDRAM_DQMH, SDRAM_DQML} ),
+	.sd_cs       	( SDRAM_nCS                ),
+	.sd_ba       	( SDRAM_BA                 ),
+	.sd_we       	( SDRAM_nWE                ),
+	.sd_ras      	( SDRAM_nRAS               ),
+	.sd_cas      	( SDRAM_nCAS               ),
 
-  // fast ram interface
-  .cpuWR        (tg68_dat_out     ),
-  .cpuAddr      (tg68_cad[24:1]   ),
-  .cpuU         (tg68_cuds        ),
-  .cpuL         (tg68_clds        ),
-  .cpustate     (tg68_cpustate    ),
-  .cpu_dma      (tg68_cdma        ),
-  .cpuRD        (tg68_cout        ),
-  .cpuena       (tg68_cpuena      ),
-  .enaRDreg     (                 ),
-  .enaWRreg     (tg68_enaWR       ),
-  .ena7RDreg    (tg68_ena7RD      ),
-  .ena7WRreg    (tg68_ena7WR      ),
+	// system interface
+	.clk_128      	( clk_128          			),
+	.clk_8        	( clk_8            			),
+	.init         	( init             			),
 
-  // chip/slow ram interface
-  .chipWR       (ram_data_in      ),
-  .chipAddr     (ram_address      ),
-  .chipU        (ram_uds          ),
-  .chipL        (ram_lds          ),
-  .chipRW       (ram_wr           ),
-  .chip_dma     (ram_oe           ),
-  .c_7m         (clk_8            ),
-  .chipRD       (ram_data_out         ),
-
-  .reset_out    (                 )
+	// cpu/chipset interface
+	.din       		( ram_data_in      			),
+	.addr     		( { 1'b0, ram_address } 	),
+	.ds        		( { ram_uds, ram_lds } 		),
+	.we       		( ram_wr           			),
+	.oe         	( ram_oe           			),
+	.dout       	( ram_data_out     			),
 );
 
 // multiplex spi_do, drive it from user_io if that's selected, drive
@@ -836,10 +803,14 @@ user_io user_io(
 		.CORE_TYPE(8'ha3)    // mist core id
 );
 
+wire [22:0] data_io_addr;
+wire [15:0] data_io_dout;
+wire data_io_write, data_io_read;
+
 data_io data_io (
 		// system control
 		.clk_8 		(clk_8			),
-		.reset		(init	   		),
+		.reset		(init          ),
 		.bus_cycle  (bus_cycle[3:2]),
 		.ctrl_out   (system_ctrl   ),
 
@@ -858,10 +829,11 @@ data_io data_io (
 		.br         (data_io_br    ),
 
 		// ram interface
-		.state 	 	(host_state		),
-		.addr		 	(host_addr		),
-		.data_out 	(host_dataWR	),
-		.data_in  	(host_dataRD	)
+		.read 	 	(data_io_read	),
+		.write 	 	(data_io_write	),
+		.addr		 	(data_io_addr	),
+		.data_out 	(data_io_dout 	),
+		.data_in  	(ram_data_out	)
 );
   
 			

@@ -315,7 +315,7 @@ set_global_assignment -name VHDL_FILE TG68K_ALU.vhd
 set_global_assignment -name VHDL_FILE TG68K_Pack.vhd
 set_global_assignment -name VHDL_FILE TG68KdotC_Kernel.vhd
 set_global_assignment -name SDC_FILE mist.sdc
-set_global_assignment -name VHDL_FILE sdram.vhd
+set_global_assignment -name VERILOG_FILE sdram.v
 set_global_assignment -name VERILOG_FILE clock.v
 set_global_assignment -name VERILOG_FILE mist_top.v
 set_global_assignment -name VERILOG_FILE user_io.v
