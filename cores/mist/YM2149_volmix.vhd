@@ -88,7 +88,8 @@ entity YM2149 is
   --
   ENA                 : in  std_logic; -- clock enable for higher speed operation
   RESET_L             : in  std_logic;
-  CLK                 : in  std_logic  -- note 6 Mhz
+  CLK                 : in  std_logic; -- note 6 Mhz
+  CLK8                : in  std_logic
   );
 end;
 
@@ -238,8 +239,13 @@ begin
     -- looks like registers are latches in real chip, but the address is caught at the end of the address state.
     if (RESET_L = '0') then
       addr <= (others => '0');
-    elsif falling_edge(busctrl_addr) then -- yuk
-      addr <= I_DA;
+--TH    elsif falling_edge(busctrl_addr) then -- yuk
+--TH      addr <= I_DA;
+--TH    end if;
+    elsif falling_edge(CLK8) then -- yuk
+		if (busctrl_addr = '1' ) then
+			addr <= I_DA;
+		end if;
     end if;
   end process;
 
@@ -247,7 +253,9 @@ begin
   begin
     if (RESET_L = '0') then
       reg <= (others => (others => '0'));
-    elsif falling_edge(busctrl_we) then
+--TH    elsif falling_edge(busctrl_we) then
+    elsif falling_edge(CLK8) then
+      if (busctrl_we = '1') then
         case addr(3 downto 0) is
           when x"0" => reg(0)  <= I_DA;
           when x"1" => reg(1)  <= I_DA;
@@ -267,7 +275,8 @@ begin
           when x"F" => reg(15) <= I_DA;
           when others => null;
         end case;
-    end if;
+		end if;
+   end if;
 
     env_reset <= '0';
     if (busctrl_we = '1') and (addr(3 downto 0) = x"D") then
@@ -277,6 +286,8 @@ begin
 
   p_rdata                : process(busctrl_re, addr, reg)
   begin
+    -- putting zeros on the outputs whenever the chip is not selected is necessary for the mist
+	 -- as all the chips outputs are simply or'ed tegether
     O_DA <= (others => '0'); -- 'X'
     if (busctrl_re = '1') then -- not necessary, but useful for putting 'X's in the simulator
       case addr(3 downto 0) is

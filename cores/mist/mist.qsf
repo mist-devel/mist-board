@@ -310,7 +310,6 @@ set_global_assignment -name VHDL_FILE vol_table_array.vhd
 set_global_assignment -name VHDL_FILE YM2149_volmix.vhd
 set_global_assignment -name VERILOG_FILE acia.v
 set_global_assignment -name VERILOG_FILE blitter.v
-set_global_assignment -name VHDL_FILE TG68K.vhd
 set_global_assignment -name VHDL_FILE TG68K_ALU.vhd
 set_global_assignment -name VHDL_FILE TG68K_Pack.vhd
 set_global_assignment -name VHDL_FILE TG68KdotC_Kernel.vhd
@@ -329,6 +328,7 @@ set_global_assignment -name VERILOG_FILE sigma_delta_dac.v
 set_global_assignment -name VERILOG_FILE mmu.v
 set_global_assignment -name VERILOG_FILE ste_dma_snd.v
 set_global_assignment -name VERILOG_FILE ste_joystick.v
+set_global_assignment -name VERILOG_FILE mste_ctrl.v
 
 set_global_assignment -name ENABLE_BENEFICIAL_SKEW_OPTIMIZATION ON
 set_global_assignment -name SLD_NODE_CREATOR_ID 110 -section_id auto_signaltap_0

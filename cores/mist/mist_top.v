@@ -2,7 +2,7 @@
 /*                                          */
 /********************************************/
 
-
+ 
 module mist_top (
   // clock inputsxque	
   input wire [ 2-1:0] 	CLOCK_27, // 27 MHz
@@ -43,6 +43,7 @@ module mist_top (
 );
 
 wire ste = system_ctrl[23];
+wire mste = system_ctrl[24];
 
 wire video_read;
 wire [22:0] video_address;
@@ -54,14 +55,15 @@ wire [1:0] buttons;
 
 // generate dtack for all implemented peripherals
 wire io_dtack = vreg_sel || mmu_sel || mfp_sel || mfp_iack || 
-     acia_sel || psg_sel || dma_sel || auto_iack || blitter_sel || ste_joy_sel || ste_dma_snd_sel;
+     acia_sel || psg_sel || dma_sel || auto_iack || blitter_sel || 
+	  ste_joy_sel || ste_dma_snd_sel || mste_ctrl_sel || vme_sel; 
 
 // the original tg68k did not contain working support for bus fault exceptions. While earlier
 // TOS versions cope with that, TOS versions with blitter support need this to work as this is
 // required to properly detect that a blitter is not present.
 // a bus error is now generated once no dtack is seen for 63 clock cycles.
 wire tg68_clr_berr;
-wire tg68_berr = (dtack_timeout == 3'd7); //  || cpu_write_illegal;
+wire tg68_berr = (dtack_timeout == 3'd7);
 	
 // count bus errors for debugging purposes. we can thus trigger for a
 // certain bus error
@@ -82,34 +84,36 @@ always @(posedge clk_8) begin
 	end
 end
 
-wire cpu_write = cpu_cycle && cpu2io && address_strobe && !tg68_rw;
-	  
 reg [2:0] dtack_timeout;
 always @(posedge clk_8) begin
-	if(reset) begin
+	if(reset || tg68_clr_berr) begin
 		dtack_timeout <= 3'd0;
 	end else begin
 		if(cpu_cycle) begin
 			// timeout only when cpu owns the bus and when
-			// neither dtack nor fast ram are active
+			// neither dtack nor another bus master are active
 			if(dtack_timeout != 3'd7) begin
 				if(!tg68_dtack || br || tg68_as)
 					dtack_timeout <= 3'd0;
 				else
 					dtack_timeout <= dtack_timeout + 3'd1;
-			end else
-				// release bus error when cpu core asks us to do so
-				if(tg68_clr_berr)
-					dtack_timeout <= 3'd0;
+			end 
 		end
 	end
 end
 		
 // no tristate busses exist inside the FPGA. so bus request doesn't do
 // much more than halting the cpu by suppressing dtack
+`define BRWIRE
+`ifdef BRWIRE
 wire br = data_io_br || blitter_br; // dma/blitter are only other bus masters
-wire data_io_br;
-
+`else
+reg br;
+always @(negedge clk_8)
+	if(video_cycle)
+		br <= data_io_br || blitter_br;
+`endif
+	
 // request interrupt ack from mfp for IPL == 6
 wire mfp_iack = cpu_cycle && cpu2iack && address_strobe && (tg68_adr[3:1] == 3'b110);
 
@@ -131,12 +135,21 @@ wire [7:0] auto_vector = auto_vector_vbi | auto_vector_hbi;
 // $ffff8780 - $ffff878f  - SCSI
 // $fffffa40 - $fffffa7f  - FPU
 // $fffffc20 - $fffffc3f  - RTC
+// $ffff8e00 - $ffff8e0f  - VME  (only fake implementation)
 
 wire io_sel = cpu_cycle && cpu2io && address_strobe ;
  
-// mmu 8 bit interface at $ff8000 - $ff8801
+// mmu 8 bit interface at $ff8000 - $ff8001
 wire mmu_sel  = io_sel && ({tg68_adr[15:1], 1'd0} == 16'h8000);
 wire [7:0] mmu_data_out;
+
+// mega ste cache controller 8 bit interface at $ff8e20 - $ff8e21
+wire mste_ctrl_sel = mste & io_sel && ({tg68_adr[15:1], 1'd0} == 16'h8e20);
+wire [7:0] mste_ctrl_data_out;
+
+// vme controller 8 bit interface at $ffff8e00 - $ffff8e0f
+// (requierd to enable Mega STE cpu speed/cache control)
+wire vme_sel = mste & io_sel && ({tg68_adr[15:4], 4'd0} == 16'h8e00);
 
 // video controller 16 bit interface at $ff8200 - $ff827f
 wire vreg_sel = io_sel && ({tg68_adr[15:7], 7'd0} == 16'h8200);
@@ -172,7 +185,7 @@ wire [15:0] dma_data_out;
 
 // de-multiplex the various io data output ports into one 
 wire [7:0] io_data_out_8u = acia_data_out | psg_data_out;
-wire [7:0] io_data_out_8l = mmu_data_out | mfp_data_out | auto_vector;
+wire [7:0] io_data_out_8l = mmu_data_out | mfp_data_out | auto_vector | mste_ctrl_data_out;
 wire [15:0] io_data_out = vreg_data_out | dma_data_out | blitter_data_out | 
 				ste_joy_data_out | ste_dma_snd_data_out |
 				{8'h00, io_data_out_8l} | {io_data_out_8u, 8'h00};
@@ -232,6 +245,22 @@ mmu mmu (
 	.ds       (tg68_lds    ),
 	.rw       (tg68_rw     ),
 	.dout     (mmu_data_out)
+);
+
+// mega ste cache/cpu clock controller
+wire enable_16mhz;
+mste_ctrl mste_ctrl (
+	// cpu register interface
+	.clk      (clk_8       ),
+	.reset    (reset       ),
+	.din      (tg68_dat_out[7:0]),
+	.sel      (mste_ctrl_sel ),
+	.ds       (tg68_lds    ),
+	.rw       (tg68_rw     ),
+	.dout     (mste_ctrl_data_out),
+	
+	.enable_cache (),
+	.enable_16mhz (enable_16mhz)
 );
 
 wire acia_irq, dma_irq;
@@ -437,7 +466,8 @@ YM2149 ym2149 (
 	//
 	.ENA                	( 1'b1						), 
 	.RESET_L            	( !reset 					),
-	.CLK                	( sclk[1]  					)	// 2 MHz
+	.CLK                	( sclk[1]  					),	// 2 MHz
+	.CLK8              	( clk_8  					)	// 8 MHz CPU bus clock
 );
   
 wire dma_dio_ack;
@@ -592,48 +622,113 @@ always @(posedge clk_8) begin
 		else	   	  ipl <= 3'b111;
 	end
 end
-	
-//// TG68K main CPU ////
 
-// tg68 enaXXX signals to make tg68 core happy
-reg [3:0] enacnt /* synthesis noprune*/;
-wire tg68_ena7RD = (enacnt == 4'd7);
-wire tg68_ena7WR = (enacnt == 4'd15);
-wire tg68_enaWR = (enacnt[1:0] == 2'd3);
+/* -------------------------------------------------------------------------- */
+/* ------------------------------  TG68 CPU interface  ---------------------- */
+/* -------------------------------------------------------------------------- */
+	
+reg [3:0] clkcnt;
+reg trigger /* synthesis noprune*/;
+
+// signal indicating that the cpu is making use of the current 8mhz cycle
+// this means that the cpu owns the bus and either a normal bus cycle
+// ends or a bus error has happened.
+wire cpu_uses_8mhz_cycle = cpu_cycle && !br && (!tg68_dtack || tg68_berr || (tg68_busstate == 2'b01));
+ 
+wire cpu_req_bus = !(tg68_busstate == 2'b01);
+
+// the 128 Mhz cpu clock is gated by clkena. Since the CPU cannot run at full 128MHz
+// speed a certain amount of idle cycles have to be inserted between two subsequent
+// cpu clocks. This idle time is implemented using the cpu_throttle counter. The burst 
+// counter indicates how many non memory using cpu steps may be performed faster than
+// the 8/16 Mhz raster. Value 1 is closest to the speed of a real 68k
+reg [3:0] cpu_throttle;
+reg [3:0] burst;
+ 
+reg clkena;
+reg [15:0] cpu_data_in_R;
+
 always @(posedge clk_128) begin
-	// 128Mhz counter synchronous to 8 Mhz clock
-	// force counter to pass 0 exactly after the rising edge of clk_8
-	if(((enacnt == 15) && ( clk_8 == 0)) ||
-		((enacnt ==  0) && ( clk_8 == 1)) ||
-		((enacnt != 15) && (enacnt != 0)))
-			enacnt <= enacnt + 4'd1;
+	// count 0..15 within a 8MHz cycle 
+	if(((clkcnt == 15) && ( clk_8 == 0)) ||
+		((clkcnt ==  0) && ( clk_8 == 1)) ||
+		((clkcnt != 15) && (clkcnt != 0)))
+			clkcnt <= clkcnt + 4'd1;
+
+	// default: cpu does not run
+	clkena <= 1'b0;
+	trigger <= 1'b0;
+
+	// only run cpu if throttle counter has run down
+	if(cpu_throttle == 4'd0) begin
+
+		// cpu does internal processing -> let it do this immediately
+		
+		// don't let this happen in the cpu cycle as this may result in a 
+		// read/write state which suddenly happens right in the middle of
+		// the ongoing cpu cycle
+		if(tg68_busstate == 2'b01 && !cpu_cycle && (burst != 0)) begin	
+			clkena <= 1'b1;
+			cpu_throttle <= 4'd7;
+			burst <= burst - 4'd1;
+		end
+		
+		else
+		// cpu does io -> force it to wait for end of its bus cycle
+		begin
+			// three cases:
+			// cpu addresses ram (incl. rom) -> terminate transfer early
+			// cpu addresses io -> terminate transfer after current cycle
+			// ...
+
+			// DEBUG: read data earlier
+			if((clkcnt == 14) && cpu_cycle && tg68_rw && !tg68_as && !br)
+				cpu_data_in_R <= cpu_data_in;
+			
+			if(clkcnt == 15) begin	
+				if(cpu_cycle && tg68_rw && !tg68_as && !br) begin
+					// DEBUG: and notify if it has changed (which it shouldn't)
+					if(cpu_data_in_R != cpu_data_in) trigger <= 1'b1;
+					
+					cpu_data_in_R <= cpu_data_in;
+				end
+
+				if(cpu_uses_8mhz_cycle) begin
+					clkena <= 1'b1;
+					cpu_throttle <= 4'd7;
+					burst <= 4'd1;  // allow for one subsequent cpu internal step
+				end
+			end
+		end		
+	end else
+		cpu_throttle <= cpu_throttle - 4'd1;
 end
 
-TG68K tg68k (
-  .clk          (clk_128          ),
-  .reset        (~reset           ),
-  .clkena_in    (1'b1             ),
-  .IPL          (ipl              ),
-  .dtack        (tg68_dtack       ),
-  .vpa          (1'b1             ),
-  .ein          (1'b1             ),
-  .addr         (tg68_adr         ),
-  .data_read    (cpu_data_in      ),
-  .data_write   (tg68_dat_out     ),
-  .as           (tg68_as          ),
-  .uds          (tg68_uds         ),
-  .lds          (tg68_lds         ),
-  .rw           (tg68_rw          ),
-  .berr         (tg68_berr        ),
-  .clr_berr     (tg68_clr_berr    ),
+wire [1:0] tg68_busstate;
 
-  // odd synchronization signals
-  .ena7RDreg (tg68_ena7RD ),
-  .ena7WRreg (tg68_ena7WR ),
-  .enaWRreg (tg68_enaWR ),
+wire address_strobe = cpu_cycle && !tg68_as && !br;
+// assign tg68_as = ~(!tg68_uds || !tg68_lds);
+assign tg68_as = ~(tg68_busstate != 2'b01);
 
-  .cpu          (system_ctrl[5:4] ),  // 00=68000
-  .turbo        (system_ctrl[18]  )
+TG68KdotC_Kernel tg68k (
+//TG68KdotC_Kernel #(2,2,2,2,2,2) tg68k (
+	.clk          	(clk_128 		),
+	.nReset       	(~reset			),
+	.clkena_in		(clkena			), 
+	.data_in       (cpu_data_in_R	),
+	.IPL				(ipl           ),
+	.IPL_autovector (1'b0         ),
+	.berr         	(tg68_berr     ),
+	.clr_berr     	(tg68_clr_berr ),
+	.CPU           (system_ctrl[5:4] ),  // 00=68000
+   .addr         	(tg68_adr      ),
+	.data_write   	(tg68_dat_out  ),
+	.nUDS          (tg68_uds      ),
+	.nLDS          (tg68_lds      ),
+	.nWr           (tg68_rw       ),
+	.busstate	 	(tg68_busstate ), // 00-> fetch code 10->read data 11->write data 01->no memaccess
+	.nResetOut	   (              ),
+	.FC            (              )
 );
 
 /* ------------------------------------------------------------------------------ */
@@ -672,36 +767,33 @@ wire cpu2tos192k = (tg68_adr[23:17] == 7'b1111110)  ||
 		 				 (tg68_adr[23:16] == 8'b11111110) || 
 							cpu2lowrom;
 
-// 128k cartridge from 0xfa0000 to 0xfc0000
-wire cpu2cart = (tg68_adr[23:17] == 7'b1111101);
+// 128k cartridge from 0xfa0000 to 0xfbffff
+wire cpu2cart = ({tg68_adr[23:17], 1'b0} == 8'hfa);
 
 // cpu to any type of mem (rw on ram, read on rom)
 wire cpu2mem = cpu2ram14 || (tg68_rw && (cpu2tos192k || cpu2tos256k || cpu2cart));
 							
 // io from 0xff0000
-wire cpu2io = (tg68_adr[23:16] == 8'b11111111);
+wire cpu2io = (tg68_adr[23:16] == 8'hff);
 
 // irq ack happens on 0xfffffX
 wire cpu2iack = (tg68_adr[23:4] == 20'hfffff);
 
-// data strobe!
-// wire address_strobe = ~tg68_uds || ~tg68_lds;
-reg address_strobe;
-always @(posedge clk_8)
-	address_strobe <= video_cycle && ~tg68_as && !br;
 
-// generate dtack (for st ram only and rom), TODO: no dtack for rom write
+// generate dtack (for st ram only and rom, no dtack for rom write)
 assign tg68_dtack = ~(((cpu2mem && address_strobe) || io_dtack ) && !br);
 
 /* ------------------------------------------------------------------------------ */
 /* ------------------------------- bus multiplexer ------------------------------ */
 /* ------------------------------------------------------------------------------ */
 
+// singnal indicating if cpu should use a second cpu slot for 16Mhz like operation
+wire second_cpu_slot = mste && enable_16mhz;
 
 // Two of the four cycles are being used. One for video (+STE audio) and one for
-// cpu, DMA and Blitter
+// cpu, DMA and Blitter. A third is optionally being used for faster CPU
 wire video_cycle = (bus_cycle[3:2] == 0);
-wire cpu_cycle = (bus_cycle[3:2] == 1);
+wire cpu_cycle = (bus_cycle[3:2] == 1) || (second_cpu_slot && (bus_cycle[3:2] == 3));
 
 // ----------------- RAM address --------------
 wire [22:0] video_cycle_addr = (st_hs&&ste)?ste_dma_snd_addr:video_address;
@@ -806,6 +898,7 @@ user_io user_io(
 wire [22:0] data_io_addr;
 wire [15:0] data_io_dout;
 wire data_io_write, data_io_read;
+wire data_io_br;
 
 data_io data_io (
 		// system control

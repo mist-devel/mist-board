@@ -23,7 +23,6 @@ module data_io (
 	output reg [15:0] video_adj,
 	
 	// ram interface
-	output reg [2:0] state, // state bits required to drive the sdram host
 	output reg read,
 	output reg write,
 	output [22:0] addr,
@@ -66,20 +65,16 @@ always @(posedge clk_8) begin
 	if(read)	ram_data <= data_in;
 	
 	if(reset) begin
-		state <= 3'b101;
 		read <= 1'b0;
 		write <= 1'b0;	
 	end else begin
 		if(writeD && ~writeD2) begin
-//			state <= 3'b011;       // write data
 			write <= 1'b1;
 			read <= 1'b0;
 		end else if(readD && ~readD2) begin
-//			state <= 3'b010;		  // read data
 			write <= 1'b0;
 			read <= 1'b1;
 		end else begin
-//			state <= 3'b001;       // decode (idle)
 			write <= 1'b0;
 			read <= 1'b0;
 		end
