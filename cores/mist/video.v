@@ -683,7 +683,6 @@ always @(posedge clk) begin
 		// add line offset at the end of each video line
 		if(me_v && st_h_active && (st_hcnt == t2_h_sync))
 			vaddr <= vaddr + line_offset;
-//			vaddr <= vaddr - 23'd4; // XXX
 
 		// STE vaddr write handling
 		// bus_cycle 6 is in the middle of a cpu cycle

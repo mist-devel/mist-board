@@ -710,8 +710,7 @@ wire address_strobe = cpu_cycle && !tg68_as && !br;
 // assign tg68_as = ~(!tg68_uds || !tg68_lds);
 assign tg68_as = ~(tg68_busstate != 2'b01);
 
-TG68KdotC_Kernel tg68k (
-//TG68KdotC_Kernel #(2,2,2,2,2,2) tg68k (
+TG68KdotC_Kernel #(2,2,2,2,2,2) tg68k (
 	.clk          	(clk_128 		),
 	.nReset       	(~reset			),
 	.clkena_in		(clkena			), 
