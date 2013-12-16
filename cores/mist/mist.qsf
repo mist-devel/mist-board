@@ -27,7 +27,7 @@ set_global_assignment -name DEVICE EP3C25E144C8
 set_global_assignment -name TOP_LEVEL_ENTITY mist_top
 set_global_assignment -name ORIGINAL_QUARTUS_VERSION 7.2
 set_global_assignment -name PROJECT_CREATION_TIME_DATE "22:27:29  OCTOBER 30, 2007"
-set_global_assignment -name LAST_QUARTUS_VERSION "13.0 SP1"
+set_global_assignment -name LAST_QUARTUS_VERSION 13.1
 set_global_assignment -name USE_GENERATED_PHYSICAL_CONSTRAINTS OFF -section_id eda_palace
 set_global_assignment -name DEVICE_FILTER_PIN_COUNT 144
 set_global_assignment -name POWER_PRESET_COOLING_SOLUTION "NO HEAT SINK WITH STILL AIR"
@@ -305,30 +305,6 @@ set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to VGA_B[0]
 
 set_instance_assignment -name GLOBAL_SIGNAL "GLOBAL CLOCK" -to clk_32
 
-set_global_assignment -name VERILOG_FILE mfp_timer.v
-set_global_assignment -name VHDL_FILE vol_table_array.vhd
-set_global_assignment -name VHDL_FILE YM2149_volmix.vhd
-set_global_assignment -name VERILOG_FILE acia.v
-set_global_assignment -name VERILOG_FILE blitter.v
-set_global_assignment -name VHDL_FILE TG68K_ALU.vhd
-set_global_assignment -name VHDL_FILE TG68K_Pack.vhd
-set_global_assignment -name VHDL_FILE TG68KdotC_Kernel.vhd
-set_global_assignment -name SDC_FILE mist.sdc
-set_global_assignment -name VERILOG_FILE sdram.v
-set_global_assignment -name VERILOG_FILE clock.v
-set_global_assignment -name VERILOG_FILE mist_top.v
-set_global_assignment -name VERILOG_FILE user_io.v
-set_global_assignment -name VERILOG_FILE video.v
-set_global_assignment -name VERILOG_FILE video_modes.v
-set_global_assignment -name VERILOG_FILE osd.v
-set_global_assignment -name VERILOG_FILE data_io.v
-set_global_assignment -name VERILOG_FILE mfp.v
-set_global_assignment -name VERILOG_FILE dma.v
-set_global_assignment -name VERILOG_FILE sigma_delta_dac.v
-set_global_assignment -name VERILOG_FILE mmu.v
-set_global_assignment -name VERILOG_FILE ste_dma_snd.v
-set_global_assignment -name VERILOG_FILE ste_joystick.v
-set_global_assignment -name VERILOG_FILE mste_ctrl.v
 
 set_global_assignment -name ENABLE_BENEFICIAL_SKEW_OPTIMIZATION ON
 set_global_assignment -name SLD_NODE_CREATOR_ID 110 -section_id auto_signaltap_0
@@ -705,5 +681,32 @@ set_global_assignment -name SLD_NODE_PARAMETER_ASSIGNMENT "SLD_TRIGGER_IN_ENABLE
 set_global_assignment -name SLD_NODE_PARAMETER_ASSIGNMENT "SLD_ADVANCED_TRIGGER_ENTITY=basic,1," -section_id auto_signaltap_0
 set_global_assignment -name SLD_NODE_PARAMETER_ASSIGNMENT "SLD_TRIGGER_LEVEL_PIPELINE=1" -section_id auto_signaltap_0
 set_global_assignment -name SLD_NODE_PARAMETER_ASSIGNMENT "SLD_ENABLE_ADVANCED_TRIGGER=0" -section_id auto_signaltap_0
-set_global_assignment -name SLD_FILE "Z:/Proyectos/Mist/cores/mist/stp1_auto_stripped.stp"
+set_global_assignment -name SLD_NODE_PARAMETER_ASSIGNMENT "SLD_RAM_BLOCK_TYPE=M9K" -section_id auto_signaltap_0
+set_global_assignment -name SLD_FILE db/stp1_auto_stripped.stp
 set_instance_assignment -name PARTITION_HIERARCHY root_partition -to | -section_id Top
+set_global_assignment -name VERILOG_FILE cache.v
+set_global_assignment -name VERILOG_FILE dongle.v
+set_global_assignment -name VERILOG_FILE mfp_timer.v
+set_global_assignment -name VHDL_FILE vol_table_array.vhd
+set_global_assignment -name VHDL_FILE YM2149_volmix.vhd
+set_global_assignment -name VERILOG_FILE acia.v
+set_global_assignment -name VERILOG_FILE blitter.v
+set_global_assignment -name VHDL_FILE TG68K_ALU.vhd
+set_global_assignment -name VHDL_FILE TG68K_Pack.vhd
+set_global_assignment -name VHDL_FILE TG68KdotC_Kernel.vhd
+set_global_assignment -name SDC_FILE mist.sdc
+set_global_assignment -name VERILOG_FILE sdram.v
+set_global_assignment -name VERILOG_FILE clock.v
+set_global_assignment -name VERILOG_FILE mist_top.v
+set_global_assignment -name VERILOG_FILE user_io.v
+set_global_assignment -name VERILOG_FILE video.v
+set_global_assignment -name VERILOG_FILE video_modes.v
+set_global_assignment -name VERILOG_FILE osd.v
+set_global_assignment -name VERILOG_FILE data_io.v
+set_global_assignment -name VERILOG_FILE mfp.v
+set_global_assignment -name VERILOG_FILE dma.v
+set_global_assignment -name VERILOG_FILE sigma_delta_dac.v
+set_global_assignment -name VERILOG_FILE mmu.v
+set_global_assignment -name VERILOG_FILE ste_dma_snd.v
+set_global_assignment -name VERILOG_FILE ste_joystick.v
+set_global_assignment -name VERILOG_FILE mste_ctrl.v

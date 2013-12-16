@@ -51,8 +51,9 @@ module blitter (
 
 		input						br_in,
 		output reg 				br_out,
-		output 		  			irq
+		output 		  			irq,
 
+		input 					turbo				// 16Mhz blitter
 );
  
 assign irq = busy;
@@ -88,9 +89,12 @@ reg [3:0]  skew;
 reg        nfsr;
 reg        fxsr;
 
+// specify which bus cycles to use
+wire cycle_advance = (bus_cycle == 2'd0) || (turbo && (bus_cycle == 2'd2));
+wire cycle_read    = (bus_cycle == 2'd1) || (turbo && (bus_cycle == 2'd3));
 
 // ------------------ cpu interface --------------------
-
+ 
 // CPU READ
 always @(sel, rw, addr, src_y_inc, src_x_inc, src_addr, endmask1, endmask2, endmask3, 
 		dst_x_inc, dst_y_inc, dst_addr, x_count, y_count, hop, op, busy, hog,
@@ -141,9 +145,17 @@ reg [5:0] bus_coop_cnt /* synthesis noprune */;
 // state 3: extra source read cycle (fxsr)
 reg [1:0] state;
 
+// latch for read data
+reg [15:0] bm_data_in_latch;
+
+// latch incoming data at end of bus cycle
+always @(posedge clk)
+	if(cycle_read)
+		bm_data_in_latch <= bm_data_in;
+
 always @(negedge clk) begin
 
-	// ---------- böitter cpu register write interfce ............
+	// ---------- blitter cpu register write interfce ............
 	if(reset) begin
 		busy <= 1'b0; 
 		state <= 2'd0;
@@ -221,10 +233,9 @@ always @(negedge clk) begin
 	// -------------------------- blitter state machine ---------------------------------
 	// ----------------------------------------------------------------------------------
 
-
 	// entire state machine advances in bus_cycle 0
 	// (the cycle before the one being used by the cpu/blitter for memory access)
-	if(bus_cycle == 2'd0) begin
+	if(cycle_advance) begin
 
 		// grab bus if blitter is supposed to run (busy == 1) and we're not waiting for the bus
 		br_out <= busy && !wait4bus;
@@ -245,7 +256,7 @@ always @(negedge clk) begin
 		// blitter has just been setup, so init the state machine in first step
 		if(init) begin 
 			init <= 1'b0;
-
+ 
 			if(skip_src_read) begin                    // skip source read (state 0)
 				if(dest_required)			state <= 2'd1;  //   but dest needs to be read
 				else              		state <= 2'd2;  //   also dest needs to be read
@@ -257,8 +268,8 @@ always @(negedge clk) begin
 		if(br_out && !br_in) begin
 			// first extra source read (fxsr)
 			if(state == 2'd3) begin
-				if(src_x_inc[15] == 1'b0) 	src <= { src[15:0],  bm_data_in};
-				else								src <= { bm_data_in, src[31:16]};
+				if(src_x_inc[15] == 1'b0) 	src <= { src[15:0],  bm_data_in_latch};
+				else								src <= { bm_data_in_latch, src[31:16]};
 
 				src_addr <= src_addr + { {8{src_x_inc[15]}}, src_x_inc };
 				state <= 2'd0;
@@ -273,8 +284,8 @@ always @(negedge clk) begin
 			
 					src_addr <= src_addr + { {8{src_y_inc[15]}}, src_y_inc } - { {8{src_x_inc[15]}}, src_x_inc };
 				end else begin
-					if(src_x_inc[15] == 1'b0) 	src <= { src[15:0],  bm_data_in};
-					else								src <= { bm_data_in, src[31:16]};
+					if(src_x_inc[15] == 1'b0) 	src <= { src[15:0],  bm_data_in_latch};
+					else								src <= { bm_data_in_latch, src[31:16]};
 					
 					if(x_count != 1) 	// do signed add by sign expanding XXX_x_inc
 						src_addr <= src_addr + { {8{src_x_inc[15]}}, src_x_inc };
@@ -288,8 +299,7 @@ always @(negedge clk) begin
 			end
 
 			if(state == 2'd1) begin
-				dest <= bm_data_in;
-			
+				dest <= bm_data_in_latch;
 				state <= 2'd2;
 			end
 
@@ -342,7 +352,7 @@ always @(posedge clk) begin
 	bm_read <= 1'b0;
 	bm_write <= 1'b0;
 
-	if(br_out && !br_in && (y_count != 0) && (bus_cycle == 2'd0)) begin
+	if(br_out && !br_in && (y_count != 0) && cycle_advance) begin
 		if(state == 2'd0)      bm_read  <= 1'b1;
 		else if(state == 2'd1) bm_read  <= 1'b1;
 		else if(state == 2'd2) bm_write <= 1'b1;

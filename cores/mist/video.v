@@ -52,7 +52,7 @@ module video (
   // memory interface
   output reg [22:0] vaddr,   // video word address counter
   output          read,      // video read cycle
-  input [15:0]    data,      // video data read
+  input [63:0]    data,      // video data read
   
   // cpu register interface
   input           reg_clk,
@@ -659,13 +659,21 @@ always @(posedge clk) begin
 		syncmode_latch <= syncmode;
 	end else begin
 
-		// video transfer happens in cycle 3
+		// video transfer happens in cycle 3 (end of video cycle)
 		if(bus_cycle == 3) begin
 	
 			// read if memory enable is active
 			if(me) begin
 				// move incoming video data into data latch
-				data_latch[plane] <= data;
+				
+				// ST shifter only uses 16 out of possible 64 bits, so select the right word
+				case(vaddr[1:0])
+					2'd0: data_latch[plane] <= data[15: 0];
+					2'd1: data_latch[plane] <= data[31:16];
+					2'd2: data_latch[plane] <= data[47:32];
+					2'd3: data_latch[plane] <= data[63:48];
+				endcase
+				
 				vaddr <= vaddr + 23'd1;
 			end
 

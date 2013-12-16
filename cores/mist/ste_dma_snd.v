@@ -39,7 +39,7 @@ module ste_dma_snd (
 	input					hsync,     // to synchronize with video
 	output            read,
 	output [22:0]     saddr,
-	input [15:0]      data,
+	input [63:0]      data,
 	
 	// audio	
 	output reg [7:0]  audio_l,
@@ -242,19 +242,19 @@ reg [11:0] fifo_underflow /* synthesis noprune */;
 
 reg byte;   // byte-in-word toggle flag
 wire [15:0] fifo_out = fifo[readP];
-wire [7:0] mono_byte = byte?fifo_out[7:0]:fifo_out[15:8];  // TODO: check byte order!!
+wire [7:0] mono_byte = (!byte)?fifo_out[7:0]:fifo_out[15:8];  // TODO: check byte order!!
 
 // empty the fifo at the correct rate
 always @(posedge aclk) begin
 	if(reset) begin
 		readP <= 2'd0;
 		fifo_underflow <= 12'd0;
-		byte <= 1'b0;
 	end else begin
 		// no audio playing: silence
 		if(!ctrl[0]) begin
 			audio_l <= 8'd0;
 			audio_r <= 8'd0;
+			byte <= 1'b0;
 		end else begin
 			// audio enabled and data in fifo? play it!
 			if(!fifo_empty) begin
@@ -325,8 +325,14 @@ always @(posedge clk32) begin
 				if((!fifo_full) && hsync && (bus_cycle == 3)) begin
 						
  					if(snd_adr != snd_end_latched) begin
-						// read word from ram
-						fifo[writeP] <= data;
+						// read right word from ram using the 64 bit memory interface
+						case(snd_adr[1:0])
+							2'd0: fifo[writeP] <= data[15: 0];
+							2'd1: fifo[writeP] <= data[31:16];
+							2'd2: fifo[writeP] <= data[47:32];
+							2'd3: fifo[writeP] <= data[63:48];
+						endcase
+						
 						writeP <= writeP + 2'd1;     // advance fifo ptr
 						snd_adr <= snd_adr + 23'd1;  // advance address counter
 					end else begin

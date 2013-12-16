@@ -42,7 +42,7 @@ module sdram (
 	input          	clk_8,      // 8MHz chipset clock to which sdram state machine is synchonized
 	
 	input [15:0]  		din,			// data input from chipset/cpu
-	output reg [15:0] dout,			// data output to chipset/cpu
+	output reg [63:0] dout,			// data output to chipset/cpu
 	input [23:0]   	addr,       // 24 bit word address
 	input [1:0]    	ds,         // upper/lower data strobe
 	input 		 		oe,         // cpu/chipset requests read
@@ -72,7 +72,7 @@ localparam STATE_CMD_CONT  = STATE_CMD_START  + RASCAS_DELAY; // command can be 
 localparam STATE_READ      = STATE_CMD_CONT + CAS_LATENCY + 4'd1;
 localparam STATE_LAST      = 4'd15;  // last state in cycle
 
-reg [3:0] t /* synthesis noprune*/;
+reg [3:0] t;
 always @(posedge clk_128) begin
 	// 128Mhz counter synchronous to 8 Mhz clock
 	// force counter to pass state 0 exactly after the rising edge of clk_8
@@ -121,6 +121,11 @@ assign sd_we  = sd_cmd[0];
 // drive ram data lines when writing, set them as inputs otherwise
 assign sd_data = we?din:16'bZZZZZZZZZZZZZZZZ;
 
+// 4 byte read burst goes through four addresses
+reg [1:0] burst_addr;
+		
+reg [15:0] tmp;
+		
 always @(posedge clk_128) begin
 	sd_cmd <= CMD_INHIBIT;  // default: idle
 
@@ -141,29 +146,47 @@ always @(posedge clk_128) begin
 		end
 	end else begin
 		// normal operation
-	
+		
 		// -------------------  cpu/chipset read/write ----------------------
 		if(we || oe) begin
-			case(t)
-
-				// RAS
-				STATE_CMD_START: begin
-					sd_cmd <= CMD_ACTIVE;
-					sd_addr <= { 1'b0, addr[19:8] };
-					sd_ba <= addr[21:20];
-					sd_dqm <= ~ds;
-				end
-				
-				// CAS
-				STATE_CMD_CONT: begin
-					sd_cmd <= we?CMD_WRITE:CMD_READ;
-					sd_addr <= { 4'b0010, addr[22], addr[7:0] };  // auto precharge
-				end
-			
-				STATE_READ:
-					if(oe) dout <= sd_data;
-			endcase
 		
+			// RAS phase
+			if(t == STATE_CMD_START) begin
+				sd_cmd <= CMD_ACTIVE;
+				sd_addr <= { 1'b0, addr[19:8] };
+				sd_ba <= addr[21:20];
+				sd_dqm <= ~ds;
+					
+				// lowest address for burst read
+				burst_addr <= addr[1:0];
+			end
+				
+			// CAS phase 
+			if(t == STATE_CMD_CONT) begin
+				sd_cmd <= we?CMD_WRITE:CMD_READ;
+				sd_addr <= { 4'b0010, addr[22], addr[7:0] };  // auto precharge
+			end
+			
+			// read phase
+			if(oe) begin						
+				// de-multiplexing the data directly into the 64 bit buffer seems to be
+				// timing sensitive and result sin read errors. Thus this goes through the 
+				// tmp register
+				if((t >= STATE_READ) && (t < STATE_READ+4'd4))
+					tmp <= sd_data;
+
+				if((t >= STATE_READ + 4'd1) && (t < STATE_READ+4'd5)) begin			
+					// store 16 bit read result in right slot of 64 bit return value
+					case (burst_addr) 
+						2'd0: dout[15: 0] <= tmp;
+						2'd1: dout[31:16] <= tmp;
+						2'd2: dout[47:32] <= tmp;
+						2'd3: dout[63:48] <= tmp;
+					endcase
+	
+					burst_addr <= burst_addr + 2'd1;
+				end
+			end		
 		end
 		
 		// ------------------------ no access --------------------------

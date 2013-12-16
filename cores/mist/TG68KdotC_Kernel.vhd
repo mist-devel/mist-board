@@ -769,10 +769,10 @@ PROCESS (clk, setdisp, memaddr_a, briefdata, memaddr_delta, setdispbyte, datatyp
 					trap_vector(7 downto 0) <= X"2C";
 				END IF;	
 				IF trap_trap='1' THEN
-					trap_vector(7 downto 2) <= "10"&opcode(3 downto 0);
+					trap_vector(7 downto 0) <= "10" & opcode(3 downto 0) & "00";
 				END IF;	
-				IF trap_interrupt='1' THEN
-					trap_vector(9 downto 2) <= IPL_vec;      --TH
+				IF trap_interrupt='1' or set_vectoraddr = '1' THEN
+					trap_vector(9 downto 0) <= IPL_vec & "00";      --TH
 				END IF;	
                                 -- TH TODO: non-autovector IRQs
 			END IF;
