@@ -747,7 +747,7 @@ always @(posedge clk_128) begin
 					if(tg68_rw && (tg68_busstate == 2'b00))
 						cacheUpdate <= 1'b1;
 						
-					fromCache <= 4'd2;
+					fromCache <= 4'd1;
 				end
 			end
 		end		
