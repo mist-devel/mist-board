@@ -94,8 +94,11 @@ always @(posedge clk_8) begin
 		if(cpu_cycle) begin
 			// timeout only when cpu owns the bus and when
 			// neither dtack nor another bus master are active
+			
+			// also cacheable areas should never generate a
+			// bus error (TODO: check for write on first eight words)
 			if(dtack_timeout != 3'd7) begin
-				if(!tg68_dtack || br || tg68_as)
+				if(!tg68_dtack || br || tg68_as || cacheable)
 					dtack_timeout <= 3'd0;
 				else
 					dtack_timeout <= dtack_timeout + 3'd1;
@@ -690,12 +693,16 @@ always @(posedge clk_8) begin
 	tg68_lds <= tg68_lds_S;
 	tg68_rw <= tg68_rw_S;
 end
-	
-localparam CPU_THROTTLE = 4'd4;
-reg [3:0] fromCache;	
+
+// the CPU throttle counter limits the CPU speed to a rate the tg68 core can
+// handle. With a throttle of "4" the core will run effectively at 32MHz which
+// is equivalent to ~64MHz on a real 68000. This speed will never be achieved 
+// since memory and peripheral access slows the cpu further
+localparam CPU_THROTTLE = 4'd5;
 reg [3:0] clkcnt;
 
-// TODO: make sure 8Mhz cycles are complete and were from the start
+reg [15:0] cacheReadLatch;
+
 always @(posedge clk_128) begin
 	// count 0..15 within a 8MHz cycle 
 	if(((clkcnt == 15) && ( clk_8 == 0)) ||
@@ -706,10 +713,14 @@ always @(posedge clk_128) begin
 	// default: cpu does not run
 	clkena <= 1'b0;
 	cacheUpdate <= 1'b0;
-	cacheRead <= 1'b0;
+
+	// assume the cpu uses the following 8 Mhz cycles
+	if(clkcnt == 15)
+		cpuDoes8MhzCycle <= 1'b1; 
 
 	// only run cpu if throttle counter has run down
 	if((cpu_throttle == 4'd0) && !reset) begin
+		cacheRead <= 1'b0;
 
 		// cpu does internal processing -> let it do this immediately
 		// don't let this happen in the cpu cycle as this may result in a 
@@ -719,35 +730,27 @@ always @(posedge clk_128) begin
 			clkena <= 1'b1;
 			cpu_throttle <= CPU_THROTTLE;
 			cpuDoes8MhzCycle <= 1'b0; 
-		end else if((fromCache != 0) && !br && steroids && tg68_rw_S && 
-					(tg68_busstate == 2'b00) && cache_hit && cacheable) begin
+		end else if( !br && steroids && (tg68_busstate == 2'b00) && cache_hit && cacheable) begin
 			clkena <= 1'b1;
 			cacheRead <= 1'b1;
+			cacheReadLatch <= cache_data_out;
 			cpu_throttle <= CPU_THROTTLE;
 			cpuDoes8MhzCycle <= 1'b0;
-			fromCache <= fromCache - 4'd1;
 		end begin
-			// cpu does io -> force it to wait for end of its bus cycle
-			
-			// three cases:
-			// cpu addresses ram (incl. rom) -> terminate transfer early
-			// cpu addresses io -> terminate transfer after current cycle
-			// ...
-			
-			// assume the cpu uses the following 8 Mhz cycles
-			if(clkcnt == 15)
-				cpuDoes8MhzCycle <= 1'b1; 
-
-			if(clkcnt == 13) begin	// 15
+			// this ends a normal 8MHz bus cycle. This requires that the 
+			// cpu/chipset had the entire cycle and not e.g. started just in
+			// the middle. This is verified using the puDoes8MhzCycle signal
+			// which is invalidated whenever the cpu uses a 
+		
+			// clkcnt == 14 -> clkena in cycle 15 -> cpu runs in cycle 15
+			if(clkcnt == 13) begin
 				if(cpu_uses_8mhz_cycle && cpuDoes8MhzCycle) begin 
 					clkena <= 1'b1;
 					cpu_throttle <= CPU_THROTTLE;
 
 					// update cache on cpu instruction read
-					if(tg68_rw && (tg68_busstate == 2'b00))
+					if(tg68_busstate == 2'b00)
 						cacheUpdate <= 1'b1;
-						
-					fromCache <= 4'd1;
 				end
 			end
 		end		
@@ -757,14 +760,14 @@ end
 
 wire [1:0] tg68_busstate;
 
-// rewire cache
-wire [15:0] cpu_data_in_cache = cacheRead?cache_data_out:cpu_data_in;
+// feed data from cache into the cpu
+wire [15:0] cpu_data_in = cacheRead?cacheReadLatch:system_data_out;
 
 TG68KdotC_Kernel #(2,2,2,2,2,2) tg68k (
 	.clk          	(clk_128 		),
 	.nReset       	(~reset			),
 	.clkena_in		(clkena			), 
-	.data_in       (cpu_data_in_cache	),
+	.data_in       (cpu_data_in	),
 	.IPL				(ipl           ),
 	.IPL_autovector (1'b0         ),
 	.berr         	(tg68_berr     ),
@@ -805,7 +808,7 @@ cache cache (
 	.clk_128  		( clk_128					),
 	.clk_8    		( clk_8						),
 	.reset 			( reset						), 
-	.flush			( 1'b0						), 
+	.flush			( br							), 
 
 	// use the tg68_*_S signals here to quickly react on cpu requests
 	.addr     		( tg68_adr_S[23:1]		),
@@ -911,7 +914,7 @@ wire cpu_cycle_wr = data_io_br?data_io_write:(blitter_br?blitter_master_write:(a
 wire ram_wr = video_cycle?video_cycle_wr:(cpu_cycle?cpu_cycle_wr:1'b0);
 
 wire [15:0] ram_data_out;
-wire [15:0] cpu_data_in = cpu2mem?ram_data_out:io_data_out;
+wire [15:0] system_data_out = cpu2mem?ram_data_out:io_data_out;
 wire [15:0] ram_data_in = data_io_br?data_io_dout:(blitter_br?blitter_master_data_out:tg68_dat_out);
 
 // data strobe
