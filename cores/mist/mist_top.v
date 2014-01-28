@@ -1,16 +1,15 @@
 /********************************************/
 /*                                          */
 /********************************************/
- 
- 
+
 module mist_top (
   // clock inputsxque	
   input wire [ 2-1:0] 	CLOCK_27, // 27 MHz
   // LED outputs
   output wire 		LED, // LED Yellow
   // UART
-  output wire 		UART_TX, // UART Transmitter
-  input wire 		UART_RX, // UART Receiver
+  output wire 		UART_TX, // UART Transmitter (MIDI out)
+  input wire 		UART_RX, // UART Receiver (MIDI in)
   // VGA
   output wire 		VGA_HS, // VGA H_SYNC
   output wire 		VGA_VS, // VGA V_SYNC
@@ -65,7 +64,7 @@ wire io_dtack = vreg_sel || mmu_sel || mfp_sel || mfp_iack ||
 // required to properly detect that a blitter is not present.
 // a bus error is now generated once no dtack is seen for 63 clock cycles.
 wire tg68_clr_berr;
-wire tg68_berr = (dtack_timeout == 3'd7);
+wire tg68_berr = (dtack_timeout == 4'd15);
 	
 // count bus errors for debugging purposes. we can thus trigger for a
 // certain bus error
@@ -86,27 +85,35 @@ always @(posedge clk_8) begin
 	end
 end
 
-reg [2:0] dtack_timeout;
+reg bus_ok, cpu_cycle_L;
+always @(negedge clk_8) begin
+	// bus error if cpu owns bus, but no dtack, nor ram access,
+	// nor fast cpu cycle
+	bus_ok <= tg68_dtack || br || cpu2mem || cpu_fast_cycle;
+	cpu_cycle_L <= cpu_cycle;
+end
+
+reg [3:0] dtack_timeout;
 always @(posedge clk_8) begin
 	if(reset || tg68_clr_berr) begin
-		dtack_timeout <= 3'd0;
+		dtack_timeout <= 4'd0;
 	end else begin
-		if(cpu_cycle) begin
+		if(cpu_cycle_L) begin
 			// timeout only when cpu owns the bus and when
 			// neither dtack nor another bus master are active
 			
-			// also cacheable areas should never generate a
-			// bus error (TODO: check for write on first eight words)
-			if(dtack_timeout != 3'd7) begin
-				if(!tg68_dtack || br || tg68_as || cacheable)
-					dtack_timeout <= 3'd0;
+			// also ram areas should never generate a
+			// bus error for reading. But rom does for writing
+			if(dtack_timeout != 4'd15) begin
+				if(bus_ok)
+					dtack_timeout <= 4'd0;
 				else
-					dtack_timeout <= dtack_timeout + 3'd1;
+					dtack_timeout <= dtack_timeout + 4'd1;
 			end 
 		end
 	end
 end
-		
+
 // no tristate busses exist inside the FPGA. so bus request doesn't do
 // much more than halting the cpu by suppressing dtack
 `define BRWIRE
@@ -120,21 +127,20 @@ always @(negedge clk_8)
 `endif
 	
 // request interrupt ack from mfp for IPL == 6
-wire mfp_iack = cpu_cycle && cpu2iack && address_strobe && (tg68_adr[3:1] == 3'b110);
+wire mfp_iack = cpu_cycle && cpu2iack && tg68_as && (tg68_adr[3:1] == 3'b110);
 
-// the tg68k core with the wrapper of the minimig doesn't support non-autovector
-// interrupts. Also the existing support for them inside the tg68 kernel is/was broken.
-// For the atari i've fixed the non-autovector support inside the kernel and switched
-// entirely to non-autovector interrupts. This means that i now have to provide
+// the tg68k core doesn't reliably support mixed usage of autovector and non-autovector
+// interrupts.
+// For the atari we've fixed the non-autovector support inside the kernel and switched
+// entirely to non-autovector interrupts. This means that we now have to provide
 // the vectors for those interrupts that oin the ST are autovector ones. This needs
 // to be done for IPL2 (hbi) and IPL4 (vbi)
-wire auto_iack = cpu_cycle && cpu2iack && address_strobe && 
-     ((tg68_adr[3:1] == 3'b100) || (tg68_adr[3:1] == 3'b010));
+wire auto_iack = cpu_cycle && cpu2iack && tg68_as &&
+	((tg68_adr[3:1] == 3'b100) || (tg68_adr[3:1] == 3'b010));
 wire [7:0] auto_vector_vbi = (auto_iack && (tg68_adr[3:1] == 3'b100))?8'h1c:8'h00;
 wire [7:0] auto_vector_hbi = (auto_iack && (tg68_adr[3:1] == 3'b010))?8'h1a:8'h00;
-   
 wire [7:0] auto_vector = auto_vector_vbi | auto_vector_hbi;
- 
+
 // interfaces not implemented:
 // $fff00000 - $fff000ff  - IDE  
 // $ffff8780 - $ffff878f  - SCSI
@@ -142,10 +148,10 @@ wire [7:0] auto_vector = auto_vector_vbi | auto_vector_hbi;
 // $fffffc20 - $fffffc3f  - RTC
 // $ffff8e00 - $ffff8e0f  - VME  (only fake implementation)
 
-wire io_sel = cpu_cycle && cpu2io && address_strobe ;
+wire io_sel = cpu_cycle && cpu2io && tg68_as ;
  
 // dongle interface at $fb0000 - $fbffff
-wire dongle_sel  = dongle_present && cpu_cycle && address_strobe && tg68_rw && (tg68_adr[23:16] == 8'hfb);
+wire dongle_sel  = dongle_present && cpu_cycle && tg68_as && tg68_rw && (tg68_adr[23:16] == 8'hfb);
 wire [7:0] dongle_data_out;
 
 // mmu 8 bit interface at $ff8000 - $ff8001
@@ -176,7 +182,7 @@ wire [15:0] ste_dma_snd_data_out;
 // mfp 8 bit interface at $fffa00 - $fffa3f
 wire mfp_sel  = io_sel && ({tg68_adr[15:6], 6'd0} == 16'hfa00);
 wire [7:0] mfp_data_out;
-
+ 
 // acia 8 bit interface at $fffc00 - $fffc07
 wire acia_sel = io_sel && ({tg68_adr[15:8], 8'd0} == 16'hfc00);
 wire [7:0] acia_data_out;
@@ -203,9 +209,9 @@ wire [15:0] io_data_out = vreg_data_out | dma_data_out | blitter_data_out |
 wire init = ~pll_locked;
 
 video video (
-	.clk         	(clk_32        ),
+	.clk         	(clk_32     ),
    .clk27       	(CLOCK_27[0]),
-	.bus_cycle   	(bus_cycle     ),
+	.bus_cycle   	(bus_cycle  ),
 	
 	// spi for OSD
    .sdi           (SPI_DI    	),
@@ -337,12 +343,27 @@ acia acia (
 wire [23:1] blitter_master_addr;
 wire blitter_master_write;
 wire blitter_master_read;
-wire blitter_br;
 wire blitter_irq;
 wire [15:0] blitter_master_data_out;
 
+wire blitter_br = blitter_br_out;
+wire blitter_bg = 1'b1;
+
+//wire blitter_bg = blitter_br;
+
+//reg blitter_br;
+//always @(posedge clk_128) begin
+//	if(blitter_br_out && (tg68_busstate == 2'd0))
+//		blitter_br <= 1'b1;
+		
+//	else if(!blitter_br_out)
+//		blitter_br <= 1'b0;
+//end
+
+wire blitter_br_out;
+
 blitter blitter (
-	.bus_cycle 	(bus_cycle_8  ),
+	.bus_cycle 	(bus_cycle        ),
 
 	// cpu interface
 	.clk       	(clk_8            ),
@@ -362,7 +383,8 @@ blitter blitter (
    .bm_data_in (ram_data_out),
 
 	.br_in     (data_io_br       ),
-	.br_out    (blitter_br       ),
+	.br_out    (blitter_br_out   ),
+	.bg        (blitter_bg       ),
 	.irq       (blitter_irq      ),
 	
 	.turbo     (steroids         )
@@ -386,7 +408,7 @@ dongle dongle (
 	.sel      (dongle_sel  ),
 	.present  (dongle_present),
 	.addr     (tg68_adr[15:1]),
-	.cpu_as   (address_strobe),
+	.cpu_as   (cpu_cycle && tg68_as && !br),
 	.uds      (tg68_uds    ),
 	.rw       (tg68_rw     ),
 	.dout     (dongle_data_out)
@@ -552,26 +574,22 @@ clock clock (
 );
 
 //// 8MHz clock ////
-wire [3:0] bus_cycle;
 reg [3:0] clk_cnt;
-reg [1:0] bus_cycle_8;
-
+reg [1:0] bus_cycle;
 
 always @ (posedge clk_32, negedge pll_locked) begin
-
 	if (!pll_locked) begin
 		clk_cnt <= #1 4'b0010;
-		bus_cycle_8 <= 2'd3;
+		bus_cycle <= 2'd0;
 	end else begin 
 		clk_cnt <=  #1 clk_cnt + 4'd1;
-		if(clk_cnt[1:0] == 2'd2) begin
-			bus_cycle_8 <= bus_cycle_8 + 2'd1;
+		if(clk_cnt[1:0] == 2'd1) begin
+			bus_cycle <= bus_cycle + 2'd1;
 		end
 	end
 end
 
 assign clk_8 = clk_cnt[1];
-assign bus_cycle = clk_cnt - 4'd2;
 
 // bus cycle counter for debugging
 reg [31:0] cycle_counter /* synthesis noprune */;
@@ -583,62 +601,55 @@ always @ (posedge clk_8) begin
 end
 
  
-// tg68
+// tg68 bus interface. These are the signals which are latched
+// for the 8MHz bus.
 wire [15:0] tg68_dat_in;
 reg [15:0] tg68_dat_out;
 reg [31:0] tg68_adr;
 wire [2:0] tg68_IPL;
 wire       tg68_dtack;
-reg        tg68_as;
 reg        tg68_uds;
 reg        tg68_lds;
 reg        tg68_rw;
+reg [2:0]  tg68_fc;
 
 wire reset = system_ctrl[0];
 
 // ------------- generate VBI (IPL = 4) --------------
-wire vbi_ack; 
-assign vbi_ack = cpu2iack && address_strobe && (tg68_adr[3:1] == 3'b100);
+reg vsD, vsD2, vbi;
+wire vbi_ack = cpu2iack && cpu_cycle && tg68_as && (tg68_adr[3:1] == 3'b100);
 
-reg vsD, vsD2, vsI, vbi;
-always @(negedge clk_8)
+always @(negedge clk_8) begin
 	vsD <= st_vs;
-
-always @(posedge clk_8) begin
 	vsD2 <= vsD;           // delay by one
-	vsI <= vsD && !vsD2;   // create single event
 
 	if(reset || vbi_ack)
 		vbi <= 1'b0;
-	else if(vsI)
+	else if(vsD && !vsD2)
 		vbi <= 1'b1;
 end
 
 // ------------- generate HBI (IPL = 2) --------------
-wire hbi_ack; 
-assign hbi_ack = cpu2iack && address_strobe && (tg68_adr[3:1] == 3'b010);
+reg hsD, hsD2, hbi;
+wire hbi_ack = cpu2iack && cpu_cycle && tg68_as && (tg68_adr[3:1] == 3'b010);
 
-reg hsD, hsD2, hsI, hbi;
-always @(negedge clk_8)
+always @(negedge clk_8) begin
 	hsD <= st_hs;
-
-always @(posedge clk_8) begin
 	hsD2 <= hsD;           // delay by one
-	hsI <= hsD && !hsD2;   // create single event
 
 	if(reset || hbi_ack)
 		hbi <= 1'b0;
-	else if(hsI)
+	else if(hsD && !hsD2)
 		hbi <= 1'b1;
 end
 
 wire mfp_irq;
-reg [2:0] ipl;
-always @(posedge clk_8) begin
-	if(reset) begin
-		ipl <= 3'b111;
-	end else begin
 
+reg [2:0] ipl;
+always @(posedge clk_128) begin
+	if(reset)
+		ipl <= 3'b111;
+ else begin
 		// ipl[0] is tied high on the atari
 		if(mfp_irq)   ipl <= 3'b001;  // mfp has IPL 6
 		else if(vbi)  ipl <= 3'b011;  // vbi has IPL 4
@@ -651,19 +662,14 @@ end
 /* ------------------------------  TG68 CPU interface  ---------------------- */
 /* -------------------------------------------------------------------------- */
 	
-// signal indicating that the cpu is making use of the current 8mhz cycle
-// this means that the cpu owns the bus and either a normal bus cycle
-// ends or a bus error has happened.
-wire cpu_uses_8mhz_cycle = cpu_cycle && !br && (!tg68_dtack || tg68_berr || (tg68_busstate == 2'b01));
- 
-wire cpu_req_bus = !(tg68_busstate == 2'b01);
-
 // the 128 Mhz cpu clock is gated by clkena. Since the CPU cannot run at full 128MHz
 // speed a certain amount of idle cycles have to be inserted between two subsequent
 // cpu clocks. This idle time is implemented using the cpu_throttle counter.
 reg [3:0] cpu_throttle;
  
 reg clkena;
+reg iCacheStore;
+reg dCacheStore;
 reg cacheUpdate;
 reg cacheRead;
 reg cpuDoes8MhzCycle;
@@ -672,16 +678,16 @@ reg cpuDoes8MhzCycle;
 // requirements
 wire [15:0] tg68_dat_out_S;
 wire [31:0] tg68_adr_S;
+wire [2:0]  tg68_fc_S;
 wire        tg68_uds_S;
 wire        tg68_lds_S;
 wire        tg68_rw_S;
-
-reg address_strobe;    // should be "cpu_active" oe similar
+reg         tg68_as;
+reg         cpu_fast_cycle;  // signal indicating that the cpu runs from cache 
 
 always @(posedge clk_8) begin
 	// tg68 core does not provide a as signal, so we generate it
-	tg68_as <= ~(tg68_busstate != 2'b01);
-	address_strobe <= cpu_cycle_is_next && !tg68_as && !br;
+	tg68_as <= (tg68_busstate != 2'b01) && !br;
  
 	// all other output signals are simply latched to make sure
 	// they don't change within a 8Mhz cycle even if the CPU
@@ -692,6 +698,7 @@ always @(posedge clk_8) begin
 	tg68_uds <= tg68_uds_S;
 	tg68_lds <= tg68_lds_S;
 	tg68_rw <= tg68_rw_S;
+	tg68_fc <= tg68_fc_S;
 end
 
 // the CPU throttle counter limits the CPU speed to a rate the tg68 core can
@@ -701,7 +708,7 @@ end
 localparam CPU_THROTTLE = 4'd5;
 reg [3:0] clkcnt;
 
-reg [15:0] cacheReadLatch;
+reg trigger /* synthesis noprune */;
 
 always @(posedge clk_128) begin
 	// count 0..15 within a 8MHz cycle 
@@ -712,44 +719,69 @@ always @(posedge clk_128) begin
 
 	// default: cpu does not run
 	clkena <= 1'b0;
+	iCacheStore <= 1'b0;
+	dCacheStore <= 1'b0;
 	cacheUpdate <= 1'b0;
+	trigger <= 1'b0;
 
-	// assume the cpu uses the following 8 Mhz cycles
-	if(clkcnt == 15)
+	// cpuDoes8MhzCycle has same timing as tg68_as
+	if(clkcnt == 15) begin	
 		cpuDoes8MhzCycle <= 1'b1; 
+		cpu_fast_cycle <= 1'b0;
+	end
+
+	// evaluate cache one cycle before cpu is allowed to access the bus again
+	// to make sure cache signals are routed to the cpu if the cpu is supposed
+	// to use it	
+	if(cpu_throttle == 4'd1) // tg68_busstate[0] == 0 -> cpu read access
+		if(!br && steroids && (tg68_busstate[0] == 1'b0) && cache_hit)
+			cacheRead <= 1'b1;
+			
+	if(clkena)
+		cacheRead <= 1'b0;
 
 	// only run cpu if throttle counter has run down
 	if((cpu_throttle == 4'd0) && !reset) begin
-		cacheRead <= 1'b0;
-
+		
 		// cpu does internal processing -> let it do this immediately
-		// don't let this happen in the cpu cycle as this may result in a 
-		// read/write state which suddenly happens right in the middle of
-		// the ongoing cpu cycle
-		if(tg68_busstate == 2'b01) begin	
+		// cpu wants to read and the requested data is available from the cache -> run immediately
+		if((tg68_busstate == 2'b01) || cacheRead) begin
 			clkena <= 1'b1;
-			cpu_throttle <= CPU_THROTTLE;
-			cpuDoes8MhzCycle <= 1'b0; 
-		end else if( !br && steroids && (tg68_busstate == 2'b00) && cache_hit && cacheable) begin
-			clkena <= 1'b1;
-			cacheRead <= 1'b1;
-			cacheReadLatch <= cache_data_out;
 			cpu_throttle <= CPU_THROTTLE;
 			cpuDoes8MhzCycle <= 1'b0;
-		end begin
+			cpu_fast_cycle <= 1'b1;
+		end else begin
 			// this ends a normal 8MHz bus cycle. This requires that the 
 			// cpu/chipset had the entire cycle and not e.g. started just in
-			// the middle. This is verified using the puDoes8MhzCycle signal
-			// which is invalidated whenever the cpu uses a 
-		
+			// the middle. This is verified using the cpuDoes8MhzCycle signal
+			// which is invalidated whenever the cpu uses a internal cycle or 
+			// runs from cache
+ 
 			// clkcnt == 14 -> clkena in cycle 15 -> cpu runs in cycle 15
-			if(clkcnt == 13) begin
-				if(cpu_uses_8mhz_cycle && cpuDoes8MhzCycle) begin 
-					clkena <= 1'b1;
-					cpu_throttle <= CPU_THROTTLE;
-
-					// update cache on cpu instruction read
+			if((clkcnt == 13) && cpuDoes8MhzCycle && cpu_cycle && !br && (tg68_dtack || tg68_berr)) begin
+				clkena <= 1'b1;
+				cpu_throttle <= CPU_THROTTLE;
+				cpuDoes8MhzCycle <= 1'b0;
+					
+				// ---------- cache debugging ---------------
+				// if the cache reports a hit, it should be the same data that's also
+				// returned by ram. Otherwise the cache is broken
+//				if(cache_hit && (tg68_busstate[0] == 1'b0)) begin
+//					if(cache_data_out != system_data_out)
+//						trigger <= 1'b1;
+//				end
+						
+				if(cacheable && tg68_dtack) begin
+					// store data in instruction cache on cpu instruction read
 					if(tg68_busstate == 2'b00)
+						iCacheStore <= 1'b1;
+	 
+					// store data in data cache on cpu data read
+					if(tg68_busstate == 2'b10)
+						dCacheStore <= 1'b1;
+						
+					// update cache on data write
+					if(tg68_busstate == 2'b11)
 						cacheUpdate <= 1'b1;
 				end
 			end
@@ -758,10 +790,14 @@ always @(posedge clk_128) begin
 		cpu_throttle <= cpu_throttle - 4'd1;
 end
 
+// TODO: generate cacheUpdate from ram_wr, so other bus masters also trigger this
+// same goes for cache lds/uds and the address used for update16 !!!!
+
 wire [1:0] tg68_busstate;
 
 // feed data from cache into the cpu
-wire [15:0] cpu_data_in = cacheRead?cacheReadLatch:system_data_out;
+wire [15:0] cache_data_out = data_cache_hit?data_cache_data_out:inst_cache_data_out;
+wire [15:0] cpu_data_in = cacheRead?cache_data_out:system_data_out;
 
 TG68KdotC_Kernel #(2,2,2,2,2,2) tg68k (
 	.clk          	(clk_128 		),
@@ -769,7 +805,7 @@ TG68KdotC_Kernel #(2,2,2,2,2,2) tg68k (
 	.clkena_in		(clkena			), 
 	.data_in       (cpu_data_in	),
 	.IPL				(ipl           ),
-	.IPL_autovector (1'b0         ),
+	.IPL_autovector(1'b0          ),
 	.berr         	(tg68_berr     ),
 	.clr_berr     	(tg68_clr_berr ),
 	.CPU           (system_ctrl[5:4] ),  // 00=68000
@@ -780,13 +816,15 @@ TG68KdotC_Kernel #(2,2,2,2,2,2) tg68k (
 	.nWr           (tg68_rw_S     ),
 	.busstate	 	(tg68_busstate ), // 00-> fetch code 10->read data 11->write data 01->no memaccess
 	.nResetOut	   (              ),
-	.FC            (              )
+	.FC            (tg68_fc_S     )
 );
 
 /* ------------------------------------------------------------------------------ */
 /* ---------------------------------- cpu cache --------------------------------- */
 /* ------------------------------------------------------------------------------ */
 
+wire cache_hit = cacheable && (data_cache_hit || inst_cache_hit);
+ 
 // Any type of memory that may use a cache. Since it's a pure read cache we don't
 // have to differentiate between ram and rom. Cartridge is not cached since me might
 // attach dongles there someday
@@ -797,14 +835,11 @@ wire cacheable = ((tg68_adr_S[23:22] == 2'b00) ||       // ordinary 4MB
 						(tg68_adr_S[23:18] == 6'b111000) ||   // 256k TOS
 						(tg68_adr_S[23:17] == 7'b1111110) ||  // first 128k of 192k TOS
 		 				(tg68_adr_S[23:16] == 8'b11111110) ); // second 64k of 192k TOS
-					  
-wire cache_hit /* synthesis keep */;
-wire [15:0] cache_data_out /* synthesis keep */;
+					   
+wire data_cache_hit;
+wire [15:0] data_cache_data_out;
 
-wire tg68_rd = (tg68_busstate != 2'b01) && !tg68_rw_S;
-wire tg68_wr = (tg68_busstate != 2'b01) &&  tg68_rw_S;
-
-cache cache (
+cache data_cache (
 	.clk_128  		( clk_128					),
 	.clk_8    		( clk_8						),
 	.reset 			( reset						), 
@@ -812,18 +847,47 @@ cache cache (
 
 	// use the tg68_*_S signals here to quickly react on cpu requests
 	.addr     		( tg68_adr_S[23:1]		),
-//	.ds        		( { tg68_uds_S, tg68_lds_S } 		),
-	.wr       		( tg68_wr           		),
-	.rd         	( tg68_rd           		),
+	.ds        		( { ~tg68_lds_S, ~tg68_uds_S } ),
 
-	// at the same time the 8mhz ram access is required to monitor
-	// cpu accesses to the ram as well as other bus masters
-	
-	.hit				( cache_hit 				),
-	.dout				( cache_data_out			),
+	// the interface to the cpus read interface is pretty simple
+	.hit				( data_cache_hit 			),
+	.dout				( data_cache_data_out	),
 
-	.update64      ( cacheUpdate				),
+	// interface to update entire cache lines on ram read
+	.store         ( dCacheStore				),
 	.din64         ( ram_data_out_64       ),
+	
+	// this is a write through cache. Thus the cpus write access to ram
+	// is not intercepted but only used to update matching cache lines
+	.update        ( cacheUpdate           ),
+	.din16         ( ram_data_in           )
+);
+
+wire inst_cache_hit;
+wire [15:0] inst_cache_data_out;
+
+cache instruction_cache (
+	.clk_128  		( clk_128					),
+	.clk_8    		( clk_8						),
+	.reset 			( reset						), 
+	.flush			( br							), 
+
+	// use the tg68_*_S signals here to quickly react on cpu requests
+	.addr     		( tg68_adr_S[23:1]		),
+	.ds        		( { ~tg68_lds_S, ~tg68_uds_S } ),
+
+	// the interface to the cpus read interface is pretty simple
+	.hit				( inst_cache_hit 			),
+	.dout				( inst_cache_data_out	),
+
+	// interface to update entire cache lines on ram read
+	.store         ( iCacheStore				),
+	.din64         ( ram_data_out_64       ),
+	
+	// this is a write through cache. Thus the cpus write access to ram
+	// is not intercepted but only used to update matching cache lines
+	.update        ( cacheUpdate           ),
+	.din16         ( ram_data_in           )
 );
 
 /* ------------------------------------------------------------------------------ */
@@ -872,11 +936,11 @@ wire cpu2mem = cpu2ram14 || (tg68_rw && (cpu2tos192k || cpu2tos256k || cpu2cart)
 // io from 0xff0000
 wire cpu2io = (tg68_adr[23:16] == 8'hff);
 
-// irq ack happens on 0xfffffX
-wire cpu2iack = (tg68_adr[23:4] == 20'hfffff);
+// irq ack happens
+wire cpu2iack = (tg68_fc == 3'b111);
 					  
-// generate dtack (for st ram only and rom, no dtack for rom write)
-assign tg68_dtack = ~(((cpu2mem && address_strobe) || io_dtack ) && !br);
+// generate dtack (for st ram and rom on read, no dtack for rom write)
+assign tg68_dtack = ((cpu2mem && cpu_cycle && tg68_as) || io_dtack ) && !br;
 
 /* ------------------------------------------------------------------------------ */
 /* ------------------------------- bus multiplexer ------------------------------ */
@@ -888,16 +952,11 @@ wire second_cpu_slot = (mste && enable_16mhz) || steroids;
 
 // Two of the four cycles are being used. One for video (+STE audio) and one for
 // cpu, DMA and Blitter. A third is optionally being used for faster CPU
-wire video_cycle = (bus_cycle[3:2] == 0);
-wire cpu_cycle = (bus_cycle[3:2] == 1) || (second_cpu_slot && (bus_cycle[3:2] == 3));
-
-// if things are to be latched is usually required to know what type the next cycle
-// will be
-wire video_cycle_is_next = (bus_cycle[3:2] == 3);
-wire cpu_cycle_is_next = (bus_cycle[3:2] == 0) || (second_cpu_slot && (bus_cycle[3:2] == 2));
+wire video_cycle = (bus_cycle == 0);
+wire cpu_cycle = (bus_cycle == 1) || (second_cpu_slot && (bus_cycle == 3));
 
 // ----------------- RAM address --------------
-wire [22:0] video_cycle_addr = (st_hs&&ste)?ste_dma_snd_addr:video_address;
+wire [22:0] video_cycle_addr = (st_hs && ste)?ste_dma_snd_addr:video_address;
 wire [22:0] cpu_cycle_addr = data_io_br?data_io_addr:(blitter_br?blitter_master_addr:tg68_adr[23:1]);
 wire [22:0] ram_address = video_cycle?video_cycle_addr:cpu_cycle_addr;
 
@@ -905,12 +964,12 @@ wire [22:0] ram_address = video_cycle?video_cycle_addr:cpu_cycle_addr;
 // memory access during the video cycle is shared between video and ste_dma_snd
 wire video_cycle_oe = (st_hs && ste)?ste_dma_snd_read:video_read;
 // memory access during the cpu cycle is shared between blitter and cpu
-wire cpu_cycle_oe = data_io_br?data_io_read:(blitter_br?blitter_master_read:(address_strobe && tg68_rw && cpu2mem));
+wire cpu_cycle_oe = data_io_br?data_io_read:(blitter_br?blitter_master_read:(cpu_cycle && tg68_as && tg68_rw && cpu2mem));
 wire ram_oe = video_cycle?video_cycle_oe:(cpu_cycle?cpu_cycle_oe:1'b0);
 
 // ----------------- RAM write -----------------
 wire video_cycle_wr = 1'b0;
-wire cpu_cycle_wr = data_io_br?data_io_write:(blitter_br?blitter_master_write:(address_strobe && ~tg68_rw && cpu2ram));
+wire cpu_cycle_wr = data_io_br?data_io_write:(blitter_br?blitter_master_write:(cpu_cycle && tg68_as && ~tg68_rw && cpu2ram));
 wire ram_wr = video_cycle?video_cycle_wr:(cpu_cycle?cpu_cycle_wr:1'b0);
 
 wire [15:0] ram_data_out;
@@ -921,27 +980,19 @@ wire [15:0] ram_data_in = data_io_br?data_io_dout:(blitter_br?blitter_master_dat
 wire ram_uds = video_cycle?1'b1:((blitter_br||data_io_br)?1'b1:~tg68_uds);
 wire ram_lds = video_cycle?1'b1:((blitter_br||data_io_br)?1'b1:~tg68_lds);
  
-assign SDRAM_CKE         = 1'b1;
-
 // sdram controller has 64 bit output
 wire [63:0] ram_data_out_64;
-
-// latch lowest address bits for 64 bit word decomposition at the 
-// begin of a cpu cycle
-//reg [1:0] ram_word_sel;
-//always @(posedge clk_8)
-//	ram_word_sel <= cpu_cycle_addr[1:0];
-
-wire [1:0] ram_word_sel = cpu_cycle_addr[1:0] /* synthesis keep */;
 
 // select right word of 64 bit ram output for those devices that only want 16 bits
 // this is only used for the cpu and other bus masters opoerating within the cpu 
 // cycle but neither video nor dma audio use it. They are both fed with 64 bits
 assign ram_data_out =
-	(ram_word_sel == 2'd0)?ram_data_out_64[15:0]:
-	((ram_word_sel == 2'd1)?ram_data_out_64[31:16]:
-	((ram_word_sel == 2'd2)?ram_data_out_64[47:32]:
-	  ram_data_out_64[63:48]));
+ 	 (cpu_cycle_addr[1:0] == 2'd0)?ram_data_out_64[15:0]:
+	((cpu_cycle_addr[1:0] == 2'd1)?ram_data_out_64[31:16]:
+	((cpu_cycle_addr[1:0] == 2'd2)?ram_data_out_64[47:32]:
+	                               ram_data_out_64[63:48]));
+
+assign SDRAM_CKE         = 1'b1;
 
 sdram sdram (
 	// interface to the MT48LC16M16 chip
@@ -1020,12 +1071,12 @@ wire [22:0] data_io_addr;
 wire [15:0] data_io_dout;
 wire data_io_write, data_io_read;
 wire data_io_br;
-
+ 
 data_io data_io (
 		// system control
 		.clk_8 		(clk_8			),
 		.reset		(init          ),
-		.bus_cycle  (bus_cycle[3:2]),
+		.bus_cycle  (bus_cycle     ),
 		.ctrl_out   (system_ctrl   ),
 
 		// spi

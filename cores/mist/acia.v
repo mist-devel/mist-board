@@ -99,16 +99,15 @@ always @(negedge clk) begin
 			readTimer <= 14'd11138;
 		end
    end
-end
-
+end 
+ 
 // ------------------ cpu interface --------------------
 
 wire ikbd_irq = ikbd_cr[7] && ikbd_rx_data_available;  // rx irq
 
-wire [7:0] ikbd_rx_data = fifoIn[readPin];
-
-wire ikbd_rx_data_available;
-assign ikbd_rx_data_available = (readPin != writePin) && (readTimer == 0);
+wire [7:0] ikbd_rx_data = ikbd_rx_data_available?fifoIn[readPin]:fifoIn[readPin-4'd1];
+ 
+wire ikbd_rx_data_available = (readPin != writePin) && (readTimer == 0);
 
 // in a real ST the irqs are active low open collector outputs and are simply wired
 // tegether ("wired or")

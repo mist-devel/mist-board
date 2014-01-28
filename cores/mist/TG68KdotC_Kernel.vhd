@@ -269,7 +269,7 @@ architecture logic of TG68KdotC_Kernel is
 	signal set_oddout      	: std_logic;
 	signal PCbase       	: std_logic;
 	signal set_PCbase       : std_logic;
-		
+		 
 	signal last_data_read  	: std_logic_vector(31 downto 0);
 	signal last_data_in  	: std_logic_vector(31 downto 0);
 

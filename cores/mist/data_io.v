@@ -50,13 +50,18 @@ reg brI;         // signals to bring br into local clock domain
 // address auto increment takes place at the beginning of each transfer
 assign addr = (cmd==2)?(addrR[22:0]-23'd1):addrR[22:0];
 
+// latch bus cycle to have it stable at the end of the cycle (rising edge of clk8)
+reg [1:0] bus_cycle_L;
+always @(negedge clk_8)
+	bus_cycle_L <= bus_cycle;
+
 // generate state signals required to control the sdram host interface
 always @(posedge clk_8) begin
 	// start io transfers clock cycles after bus_cycle 0 
    // (after the cpu cycle)
-	writeD <= writeCmd && ((bus_cycle == 3) || writeD);
+	writeD <= writeCmd && ((bus_cycle_L == 3) || writeD);
 	writeD2 <= writeD;
-	readD <= readCmd && ((bus_cycle == 3) || readD);
+	readD <= readCmd && ((bus_cycle_L == 3) || readD);
 	readD2 <= readD;
 
 	br <= brI;

@@ -28,6 +28,17 @@
 // NTSC 32042400 Hz
 // MIST 31875000 Hz
 
+// real ST timing
+
+// Starting with VBI
+// Atari Timing as hatari sees it: sync 34, border 29, disp 200, 47 border, 3 ?? = 313, vbi@310
+// 47 bottom border lines seesm to be too much, some intros have artifacts in the lower lines
+// 38 bottom border lines seems to be good
+
+// 60Hz sync 5, border 29, disp 200, 29 border = 263, vbi@261
+
+// vbl at cycle counter 64 (64 cycles after hbl)
+
 module video_modes (
 	inout mono,   // select monochrome mode (and not color)
 	input pal,    // select pal mode (and not ntsc) if a color mode is selected
@@ -42,11 +53,11 @@ module video_modes (
 
 localparam H_ACT    = 10'd640;
 localparam V_ACT    = 10'd400;
-
+ 
 // TIMING CONSTRAINTS:
 // The total width (act+both blank+2*border+sync) must be a multiple of 16, for
 // scan doubled modes a multiple of 8
-
+ 
 // ---------------------------------------------------------------------------
 // -----------------------------  pal56 timing -------------------------------
 // ---------------------------------------------------------------------------
@@ -57,9 +68,9 @@ localparam V_ACT    = 10'd400;
 
 wire [121:0] pal56_config_str;
 conf pal56_conf(
-// front porch      sync width      back porch       border width    sync polarity
-	.h_fp ( 10'd44), .h_s (10'd120), .h_bp ( 10'd44), .h_bd (10'd40), .h_sp (1'b1),
-	.v_fp ( 10'd24), .v_s (  10'd4), .v_bp ( 10'd24), .v_bd (10'd80), .v_sp (1'b1),
+     // front porch      sync width      back porch       border width                    sync polarity
+	.h_fp ( 10'd44), .h_s (10'd120), .h_bp ( 10'd44), .h_bd (10'd40),                 .h_sp (1'b1),
+	.v_fp ( 10'd24), .v_s (  10'd4), .v_bp ( 10'd24), .v_tb (10'd80), .v_bb (10'd80), .v_sp (1'b1),
 	.str  (pal56_config_str)
 );
 
@@ -73,9 +84,10 @@ conf pal56_conf(
 
 wire [121:0] pal50_config_str;
 conf pal50_conf(
-// front porch      sync width      back porch       border width    sync polarity
-	.h_fp ( 10'd80), .h_s ( 10'd64), .h_bp ( 10'd80), .h_bd (10'd80), .h_sp (1'b1),
-	.v_fp ( 10'd30), .v_s (  10'd6), .v_bp ( 10'd30), .v_bd (10'd80), .v_sp (1'b1),
+     // front porch      sync width      back porch       border width                    sync polarity
+	.h_fp ( 10'd80), .h_s ( 10'd64), .h_bp ( 10'd80), .h_bd (10'd80),                 .h_sp (1'b1),
+//	.v_fp ( 10'd42), .v_s (  10'd8), .v_bp ( 10'd42), .v_tb (10'd58), .v_bb (10'd76), .v_sp (1'b1),
+   .v_fp ( 10'd30), .v_s (  10'd6), .v_bp ( 10'd30), .v_tb (10'd80), .v_bb (10'd80), .v_sp (1'b1),
 	.str  (pal50_config_str)
 );
 
@@ -89,9 +101,9 @@ conf pal50_conf(
 
 wire [121:0] ntsc_config_str;
 conf ntsc_conf(
-// front porch      sync width      back porch       border width    sync polarity
-	.h_fp ( 10'd76), .h_s ( 10'd64), .h_bp ( 10'd76), .h_bd (10'd80), .h_sp (1'b1),
-	.v_fp ( 10'd20), .v_s (  10'd6), .v_bp ( 10'd20), .v_bd (10'd40), .v_sp (1'b0),
+     // front porch      sync width      back porch       border width                    sync polarity
+	.h_fp ( 10'd76), .h_s ( 10'd64), .h_bp ( 10'd76), .h_bd (10'd80),                 .h_sp (1'b1),
+	.v_fp ( 10'd20), .v_s (  10'd6), .v_bp ( 10'd20), .v_tb (10'd40), .v_bb (10'd40), .v_sp (1'b0),
 	.str  (ntsc_config_str)
 );
 
@@ -105,9 +117,9 @@ conf ntsc_conf(
 
 wire [121:0] mono_config_str;
 conf mono_conf(
-// front porch      sync width      back porch       border width    sync polarity
-	.h_fp (10'd108), .h_s ( 10'd40), .h_bp (10'd108), .h_bd ( 10'd0), .h_sp (1'b0),
-	.v_fp ( 10'd48), .v_s (  10'd5), .v_bp ( 10'd48), .v_bd ( 10'd0), .v_sp (1'b0),
+     // front porch      sync width      back porch       border width                    sync polarity
+	.h_fp (10'd108), .h_s ( 10'd40), .h_bp (10'd108), .h_bd ( 10'd0),                 .h_sp (1'b0),
+	.v_fp ( 10'd48), .v_s (  10'd5), .v_bp ( 10'd48), .v_tb ( 10'd0), .v_bb ( 10'd0), .v_sp (1'b0),
 	.str  (mono_config_str)
 );
 
@@ -130,7 +142,8 @@ module conf (
 	input [9:0] v_fp, // vertical front porch width
 	input [9:0] v_s,  // vertical sync width
 	input [9:0] v_bp, // vertical back porch width
-	input [9:0] v_bd, // vertical border width
+	input [9:0] v_tb, // vertical border width top
+	input [9:0] v_bb, // vertical border width bottom
 	input       v_sp, // vertical sync polarity
 
 	output [121:0] str
@@ -151,11 +164,11 @@ wire [60:0] h_str = { h_sp,
 			
 wire [60:0] v_str = { v_sp, 
 			V_ACT - 10'd1, 
-			V_ACT + v_bd - 10'd1,
-			V_ACT + v_bd + v_fp - 10'd1, 
-			V_ACT + v_bd + v_fp + v_s - 10'd1, 
-			V_ACT + v_bd + v_fp + v_s + v_bp - 10'd1, 
-			V_ACT + v_bd + v_fp + v_s + v_bp + v_bd - 10'd1};
+			V_ACT + v_bb - 10'd1,
+			V_ACT + v_bb + v_fp - 10'd1, 
+			V_ACT + v_bb + v_fp + v_s - 10'd1, 
+			V_ACT + v_bb + v_fp + v_s + v_bp - 10'd1, 
+			V_ACT + v_bb + v_fp + v_s + v_bp + v_tb - 10'd1};
 			
 assign str = { h_str, v_str };
 

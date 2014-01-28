@@ -155,7 +155,11 @@ always @(posedge clk_128) begin
 				sd_cmd <= CMD_ACTIVE;
 				sd_addr <= { 1'b0, addr[19:8] };
 				sd_ba <= addr[21:20];
-				sd_dqm <= ~ds;
+				
+				// always return both bytes in a read. The cpu may not
+				// need it, but the caches need to be able to store everything
+				if(!we) sd_dqm <= 2'b00;
+				else    sd_dqm <= ~ds;
 					
 				// lowest address for burst read
 				burst_addr <= addr[1:0];

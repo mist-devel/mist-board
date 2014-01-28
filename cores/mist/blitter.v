@@ -23,10 +23,6 @@
 // http://mikro.naprvyraz.sk/docs/ST_E/BLITTER.TXT
 // http://paradox.atari.org/files/BLIT_FAQ.TXT
 
-// TODO:
-// - Try to use bus cycle 3 as well to make a "turbo blitter" being twice as fast
-// - Don't spend a whole state 0 if nfsr && last_word_in_row
-
 module blitter (
 		input [1:0] 			bus_cycle,
 
@@ -52,6 +48,7 @@ module blitter (
 		input						br_in,
 		output reg 				br_out,
 		output 		  			irq,
+		input						bg,
 
 		input 					turbo				// 16Mhz blitter
 );
@@ -92,6 +89,13 @@ reg        fxsr;
 // specify which bus cycles to use
 wire cycle_advance = (bus_cycle == 2'd0) || (turbo && (bus_cycle == 2'd2));
 wire cycle_read    = (bus_cycle == 2'd1) || (turbo && (bus_cycle == 2'd3));
+
+// latch bus cycle information to use at the end of the cycle (posedge clk)
+reg cycle_advanceL, cycle_readL;
+always @(negedge clk) begin
+	cycle_advanceL <= cycle_advance;
+	cycle_readL <= cycle_read;
+end
 
 // ------------------ cpu interface --------------------
  
@@ -150,7 +154,7 @@ reg [15:0] bm_data_in_latch;
 
 // latch incoming data at end of bus cycle
 always @(posedge clk)
-	if(cycle_read)
+	if(cycle_readL)
 		bm_data_in_latch <= bm_data_in;
 
 always @(negedge clk) begin
@@ -249,8 +253,11 @@ always @(negedge clk) begin
 
 		// change between both states (bus grabbed and bus released)
 		if(bus_coop_cnt == 0) begin
-			bus_coop_cnt <= 6'd63;
-			wait4bus <= !wait4bus;
+			// release bus immediately, grab bus only if bg is set
+			if(!wait4bus || (wait4bus && bg)) begin
+				bus_coop_cnt <= 6'd63;
+				wait4bus <= !wait4bus;
+			end
 		end
 		
 		// blitter has just been setup, so init the state machine in first step
@@ -352,7 +359,7 @@ always @(posedge clk) begin
 	bm_read <= 1'b0;
 	bm_write <= 1'b0;
 
-	if(br_out && !br_in && (y_count != 0) && cycle_advance) begin
+	if(br_out && !br_in && (y_count != 0) && cycle_advanceL) begin
 		if(state == 2'd0)      bm_read  <= 1'b1;
 		else if(state == 2'd1) bm_read  <= 1'b1;
 		else if(state == 2'd2) bm_write <= 1'b1;

@@ -19,7 +19,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
-
+  
 module cache (
       input 	    clk_128,
       input 	    clk_8,
@@ -27,15 +27,18 @@ module cache (
       input 	    flush, 
 	      
       input [22:0] addr, // cpu word address
-      input 	    wr,
-      input 	    rd,
+      input [1:0]	 ds,   // upper (0) and lower (1) data strobe
 
-      output [15:0] dout,
+      output reg [15:0] dout,
       output        hit,
 
-		// interface to update entire caches when read from ram
+		// interface to store entire cache lines when read from ram
 		input [63:0]  din64,
-		input         update64
+		input         store,
+		
+		// interface to update existing cache lines on cpu ram write
+		input [15:0]  din16,
+		input         update
 );
 
 reg [3:0] t;
@@ -48,52 +51,99 @@ always @(posedge clk_128) begin
             t <= t + 4'd1;
 end
 
-// de-multiplex 64 bit data into word requested by cpu
-assign dout = (word == 2'd0)?current_data[15: 0]:
-	           (word == 2'd1)?current_data[31:16]:
-	           (word == 2'd2)?current_data[47:32]:
-	                          current_data[63:48];
-
-// wire entry according to line/address
-wire [63:0] current_data = data_latch[line];
-
 // cache size configuration
-localparam BITS = 5;	
-localparam ENTRIES = 32;     // 2 ** BITS
-localparam ALLZERO = 32'd0;  // 2 ** BITS zero bits
+// the cache sizein bytes is 8*(2^BITS), e.g. 2kBytes if BITS == 8
+localparam BITS = 6;	
+localparam ENTRIES = 64;     // 2 ** BITS
+localparam ALLZERO = 64'd0;  // 2 ** BITS zero bits
 								
 // _word_ address mapping example with 16 cache lines (BITS == 4)
 // 22 21 20 19 18 17 16 15 14 13 12 11 10  9  8  7  6  5  4  3  2  1  0
 //  T  T  T  T  T  T  T  T  T  T  T  T  T  T  T  T  T  L  L  L  L  W  W
 // T = stored in tag RAM
 // L = cache line
-// W = 16 bit word select
-wire [21-BITS-1:0] tag = addr[22:2+BITS] /* synthesis keep */;
-wire [BITS-1:0] line = addr[2+BITS-1:2];
-wire [1:0] word = addr[1:0];
+// W = 16 bit word select 
+wire [21-BITS-1:0] tag = addr[22:2+BITS];
+reg [BITS-1:0] line;
 
 /* ------------------------------------------------------------------------------ */
 /* --------------------------------- cache memory ------------------------------- */
 /* ------------------------------------------------------------------------------ */
 
-reg [63:0]        data_latch [ENTRIES-1:0];
+reg [63:56]       data_latch_7 [ENTRIES-1:0];
+reg [55:48]       data_latch_6 [ENTRIES-1:0];
+reg [47:40]       data_latch_5 [ENTRIES-1:0];
+reg [39:32]       data_latch_4 [ENTRIES-1:0];
+reg [31:24]       data_latch_3 [ENTRIES-1:0];
+reg [23:16]       data_latch_2 [ENTRIES-1:0];
+reg [15: 8]       data_latch_1 [ENTRIES-1:0];
+reg [ 7: 0]       data_latch_0 [ENTRIES-1:0];
+
 reg [21-BITS-1:0] tag_latch  [ENTRIES-1:0];
 reg [ENTRIES-1:0] valid;
 
+reg [21-BITS-1:0] current_tag;
+
 // signal indicating the currently selected cache line is valid and matches the
 // address the cpu is currently requesting
-assign hit = valid[line] && (tag_latch[line] == tag);
+// assign hit = valid[line] && (tag_latch[line] == tag);
+assign hit = valid[line] && (current_tag == tag);
 
+// permanently output data according to current line
+// de-multiplex 64 bit data into word requested by cpu
+always @(posedge clk_128) begin
+	dout <= (addr[1:0] == 2'd0)?{data_latch_1[line], data_latch_0[line]}:
+           (addr[1:0] == 2'd1)?{data_latch_3[line], data_latch_2[line]}:
+           (addr[1:0] == 2'd2)?{data_latch_5[line], data_latch_4[line]}:
+										 {data_latch_7[line], data_latch_6[line]};
+	current_tag <= tag_latch[line];
+end
+
+always @(negedge clk_128)
+	line <= addr[2+BITS-1:2];
+	
 always @(posedge clk_128) begin
    if(reset || flush) begin
 		valid <= ALLZERO;
    end else begin
-
-		// update64 indicates that a whole cache line is to be updated
-		if(update64) begin
-			data_latch[line] <= din64;
+		// store indicates that a whole cache line is to be stored
+		if(store) begin
+			data_latch_7[line] <= din64[63:56];
+			data_latch_6[line] <= din64[55:48];
+			data_latch_5[line] <= din64[47:40];
+			data_latch_4[line] <= din64[39:32];
+			data_latch_3[line] <= din64[31:24];
+			data_latch_2[line] <= din64[23:16];
+			data_latch_1[line] <= din64[15: 8];
+			data_latch_0[line] <= din64[ 7: 0];
+			
 			tag_latch[line] <= tag;
 			valid[line] <= 1'b1;
+		end
+		
+		// cpu (or other bus master!) writes to ram, so update cache contents if necessary
+		else if(update && hit) begin
+			// no need to care for "tag_latch" or "valid" as they simply stay the same
+
+			if(addr[1:0] == 2'd0) begin
+				if(ds[1]) data_latch_0[line] <= din16[7:0];
+				if(ds[0]) data_latch_1[line] <= din16[15:8];
+			end 
+			
+			if(addr[1:0] == 2'd1) begin
+				if(ds[1]) data_latch_2[line] <= din16[7:0];
+				if(ds[0]) data_latch_3[line] <= din16[15:8];
+			end
+
+			if(addr[1:0] == 2'd2) begin
+				if(ds[1]) data_latch_4[line] <= din16[7:0];
+				if(ds[0]) data_latch_5[line] <= din16[15:8];
+			end
+
+			if(addr[1:0] == 2'd3) begin
+				if(ds[1]) data_latch_6[line] <= din16[7:0];
+				if(ds[0]) data_latch_7[line] <= din16[15:8];
+			end
 		end
    end
 end

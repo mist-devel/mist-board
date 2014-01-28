@@ -20,15 +20,7 @@
 // You should have received a copy of the GNU General Public License 
 // along with this program.  If not, see <http://www.gnu.org/licenses/>. 
 
-// TODO:
-// - async timing
-
-// Overscan:
-// http://codercorner.com/fullscrn.txt
-// Examples: automation 000 + 001 + 097: bottom border
-//           automation 196: top + bottom border
-
-// Todo STE:
+// Implemented STE features
 // http://alive.atari.org/alive12/ste_hwsc.php
 // http://atari-ste.anvil-soft.com/html/devdocu2.htm
 // + 3*4 bit palette (4096 colors)
@@ -36,13 +28,15 @@
 // + video counter writeable
 // + pixel offset
 // + line offset
-// - undocumented 16 pixel "line offset overscan"
+// + botton overscan 
+// + top overscan (this is really an unreliable hack which barely works for obsession pinball)
+// + undocumented 16 pixel "line offset overscan"
 
 module video (
   // system interface
   input clk,                      // 31.875 MHz
   input clk27,                    // 27.000 Mhz
-  input [3:0] bus_cycle,          // bus-cycle for sync
+  input [1:0] bus_cycle,          // bus-cycle for sync
 
   // SPI interface for OSD
   input         sck,
@@ -79,9 +73,9 @@ module video (
   input 					ste,             // enable STE featurss
   
   // signals not affected by scan doubler for internal use like irqs
-  output      st_de,
-  output      st_vs,
-  output      st_hs
+  output            st_de,
+  output reg        st_vs,
+  output reg        st_hs
 );
 
 localparam LINE_WIDTH  = 10'd640;
@@ -93,21 +87,70 @@ localparam STATE_BORDER = 2'd2;
 localparam STATE_DISP   = 2'd3;
 
 // ---------------------------------------------------------------------------
+// --------------------------- internal state counter ------------------------
+// ---------------------------------------------------------------------------
+
+reg [1:0] t;
+always @(posedge clk) begin
+	// 32Mhz counter synchronous to 8 Mhz clock
+	// force counter to pass state 0 exactly after the rising edge of clk_reg (8Mhz)
+	if(((t == 2'd3)  && ( reg_clk == 0)) ||
+		((t == 2'd0) && ( reg_clk == 1)) ||
+		((t != 2'd3) && (t != 2'd0)))
+			t <= t + 2'd1;
+end
+
+// create internal bus_cycle signal which is stable on the positive clock
+// edge and extends the previous state by half a 32 Mhz clock cycle
+reg [3:0] bus_cycle_L;
+always @(negedge clk)
+	bus_cycle_L <= { bus_cycle, t };
+
+// ---------------------------------------------------------------------------
 // ------------------------------ internal signals ---------------------------
 // ---------------------------------------------------------------------------
 
 // st_de is the internal display enable signal as used by the mfp. This is used
 // by software to generate a line interrupt and to e.g. do 512 color effects.
-// st_de is active low. Using memory enable (me) for this makes sure the cpu has
+// st_de is active low. Using display enable (de) for this makes sure the cpu has
 // plenty of time before data for the next line is starting to be fetched
-assign st_de = ~me;
+assign st_de = ~de;
 
-// hsync irq is generated at the rising edge of st_hs
-assign st_hs = (st_h_state == STATE_SYNC);
+always @(posedge clk) begin
 
-// vsync irq is generated at the rising edge of st_vs
-assign st_vs = (v_state == STATE_SYNC);
+	// hsync irq is generated after the rightmost border pixel column has been displayed
 
+	// Run st timing at full speed if no scan doubler is being used. Otherwise run
+	// it at half speed
+	if((!scan_doubler_enable) || vga_hcnt[0]) begin
+
+		// hsync starts at begin of blanking phase
+		if(st_hcnt == (t1_h_blank_right - memory_prefetch))
+			st_hs <= 1'b1;
+
+		// hsync ends at begin of left border
+		if(st_hcnt == (t4_h_border_left - memory_prefetch))
+			st_hs <= 1'b0;
+	end
+
+	// vsync irq is generated right after the last border line has been displayed
+
+	// TODO: check where these additional -10'd2 come from. Obsession pinball
+	// needs this to get the colors right. This means it's needed for the correct 
+	// relationship between vbi and hbi. But why?
+ 
+	// v_event is the begin of hsync. The hatari video.h says vbi happens 64 clock cycles
+	// ST hor counter runs at 16Mhz, thus the trigger is 128 events after h_sync
+	// xyz
+	if(st_h_active && (st_hcnt == (v_event))) begin		
+		// vsync starts at begin of blanking phase
+		if(vcnt == t7_v_blank_bot - de_v_offset - 10'd2)   st_vs <= 1'b1;
+		
+		// vsync ends at begin of top border
+		if(vcnt == t10_v_border_top - de_v_offset - 10'd2) st_vs <= 1'b0;
+	end
+end
+		
 // ---------------------------------------------------------------------------
 // -------------------------------- video mode -------------------------------
 // ---------------------------------------------------------------------------
@@ -143,14 +186,12 @@ wire [9:0] t4_h_border_left  = config_string[80:71];
 wire [9:0] t5_h_end          = config_string[70:61];
 
 wire v_sync_pol              = config_string[60];
-// in overscan mode the bottom border is removed and data is displayed instead
-wire [9:0] t6_v_border_bot   = overscan?config_string[49:40]:config_string[59:50];
+wire [9:0] t6_v_border_bot   = config_string[59:50];
 wire [9:0] t7_v_blank_bot    = config_string[49:40];
 wire [9:0] t8_v_sync         = config_string[39:30];
 wire [9:0] t9_v_blank_top    = config_string[29:20];
 wire [9:0] t10_v_border_top  = config_string[19:10];
 wire [9:0] t11_v_end         = config_string[9:0];
-
 
 // default video mode is monochrome
 parameter DEFAULT_MODE = 2'd2;
@@ -182,6 +223,7 @@ reg [3:0] palette_b[15:0];
 // STE-only registers
 reg [7:0] line_offset;            	// number of words to skip at the end of each line
 reg [3:0] pixel_offset;             // number of pixels to skip at begin of line
+reg ste_overscan_enable;            // STE has a special 16 bit overscan
 
 // ---------------------------------------------------------------------------
 // ----------------------------- CPU register read ---------------------------
@@ -247,6 +289,7 @@ always @(negedge reg_clk) begin
 		// disable STE hard scroll features
 		line_offset <= 8'h00;
 		pixel_offset <= 4'h0;
+		ste_overscan_enable <= 1'b0;
 
 		if(DEFAULT_MODE == 0) begin
 			// TOS default palette, can be disabled after tests
@@ -292,12 +335,22 @@ always @(negedge reg_clk) begin
 			// writing special STE registers
 			if(ste && !reg_lds) begin
 				if(reg_addr == 6'h07) line_offset <= reg_din[7:0];
-				if(reg_addr == 6'h32) pixel_offset <= reg_din[3:0];
+				if(reg_addr == 6'h32) begin
+					pixel_offset <= reg_din[3:0];
+					ste_overscan_enable <= 1'b0;
+				end
 				
 				// Writing the video address counter happens directly inside the 
 				// memory engine further below!!!
 			end
-				
+
+			// byte write of 0 to ff8264 while ff8365 (pixel_offset) != 0 results in extra
+			// ste overscan
+			if(ste && !reg_uds && reg_lds) begin
+				if((reg_addr == 6'h32) && (pixel_offset != 0))
+					ste_overscan_enable <= 1'b1;
+			end
+			
 			// the color palette registers, always write bit 3 with zero if not in 
 			// ste mode as this is the lsb of ste
 			if(reg_addr >= 6'h20 && reg_addr < 6'h30 ) begin
@@ -353,7 +406,7 @@ osd osd (
 // mono uses the lsb of blue palette entry 0 to invert video
 wire [3:0] blue0 = palette_b[0];
 wire mono_bit = blue0[0]^shift_0[15];
-wire [3:0] mono_rgb = de?{mono_bit, mono_bit, mono_bit, mono_bit}:4'b1000;
+wire [3:0] mono_rgb = { mono_bit, mono_bit, mono_bit, mono_bit };
 
 // ------------------------- colour video signal -----------------------------
 
@@ -368,7 +421,7 @@ wire [3:0] color_b = { color[ 2:0], color[ 3] };
 wire [3:0] stvid_r = mono?mono_rgb:color_r;
 wire [3:0] stvid_g = mono?mono_rgb:color_g;
 wire [3:0] stvid_b = mono?mono_rgb:color_b;
-
+ 
 // shift registers for up to 4 planes
 reg [15:0] shift_0, shift_1, shift_2, shift_3;
 
@@ -435,7 +488,12 @@ end
 // the top border should also be easy. Opening the side borders is basically 
 // impossible as this requires a 100% perfect CPU and shifter timing.
 
-reg last_syncmode, overscan_detect, overscan;
+reg last_syncmode;
+reg [3:0] bottom_overscan_cnt;
+reg [3:0] top_overscan_cnt;
+
+wire bottom_overscan = (bottom_overscan_cnt != 0) /* synthesis keep */;
+wire top_overscan = (top_overscan_cnt != 0) /* synthesis keep */;
 
 always @(posedge clk) begin
    last_syncmode <= syncmode[1];  // delay syncmode to detect changes
@@ -443,18 +501,29 @@ always @(posedge clk) begin
    // this is the magic used to do "overscan".
    // the magic actually involves more than writing zero (60hz)
    // within line 200. But this is sufficient for our detection
-   if(vcnt[9:2] == 8'd99) begin
-		// syncmode has changed from 1 to 0 (50 to 60 hz)
-      if((syncmode[1] == 1'b0) && (last_syncmode == 1'b1))
-			overscan_detect <= 1'b1;
-   end
 	
-	// latch overscan state at topleft screen edge
-	if((vga_hcnt == t4_h_border_left) && (vcnt == t10_v_border_top)) begin
-		// save and reset overscan
-      overscan <= overscan_detect;
-      overscan_detect <= 1'b0;		
-	end	
+   // trigger in line 198/199
+   if((vcnt == { 8'd97, 2'b00} ) && (vga_hcnt == 10'd0) && (bottom_overscan_cnt != 0))
+		bottom_overscan_cnt  <= bottom_overscan_cnt - 4'd1;
+
+   if((vcnt[9:2] == 8'd98)||(vcnt[9:2] == 8'd99)||(vcnt[9:2] == 8'd100)) begin
+		// syncmode has changed from 1 to 0 (50 to 60 hz)
+		if((syncmode[1] == 1'b0) && (last_syncmode == 1'b1))
+			bottom_overscan_cnt <= 4'd15;
+   end 
+	  
+   // trigger in line 284/285
+   if((vcnt == {8'd133, 2'b00 }) && (vga_hcnt == 10'd0) && (top_overscan_cnt != 0))
+		top_overscan_cnt  <= top_overscan_cnt - 4'd1;
+
+	if((vcnt[9:2] == 8'd134)||(vcnt[9:2] == 8'd135)||(vcnt[9:2] == 8'd136)) begin
+		// syncmode has changed from 1 to 0 (50 to 60 hz)
+		if((syncmode[1] == 1'b0) && (last_syncmode == 1'b1))
+			top_overscan_cnt <= 4'd15;
+   end
+
+//	top_overscan <= 1'b1;
+//	bottom_overscan <= 1'b1;
 end
 
 // ---------------------------------------------------------------------------
@@ -497,7 +566,7 @@ ste_shifter ste_shifter_3 (
 
 // move data into STE hard scroll shift registers 
 always @(posedge clk) begin
-	if((bus_cycle == 4'd14) && (plane == 2'd0)) begin
+	if((bus_cycle_L == 4'd14) && (plane == 2'd0)) begin
 		// shift up 16 pixels and load new data into lower bits of shift registers
 		ste_shift_0 <= { ste_shift_0[15:0], data_latch[0] };
 		ste_shift_1 <= { ste_shift_1[15:0], (planes > 3'd1)?data_latch[1]:16'h0000 };
@@ -521,7 +590,7 @@ reg [15:0] sd_shift_0, sd_shift_1, sd_shift_2, sd_shift_3;
 
 // msb of the shift registers is the index used to access the palette registers.
 // Return border color index (0) if outside display area
-wire [3:0] sd_index = (!me_v)?4'd0:
+wire [3:0] sd_index = (!de_v)?4'd0:
 	{ sd_shift_3[15], sd_shift_2[15], sd_shift_1[15], sd_shift_0[15]};
 								
 // line buffer for two lines of 720 pixels (640 + 2 * 40 border) 3 * 4 (STE!) bit rgb data
@@ -537,19 +606,18 @@ always @(posedge clk) begin
 		
 	// vertical state changes at end of hsync (begin of left blank)
 	if(vga_hcnt == v_event) begin
-		// reset state counter two vga lines before screen start since scan doubler
+		// reset state counter two vga lines before display start since scan doubler
 		// starts prefetching data two vga lines before
-		if(vcnt == (t11_v_end-10'd2))	sd_vcnt <= 2'd0;
-		else                   			sd_vcnt <= sd_vcnt + 2'd1;
+		if(vcnt == (de_v_start-10'd2))	sd_vcnt <= 2'd0;
+		else                					sd_vcnt <= sd_vcnt + 2'd1;
 	end
 		
 	// permanently move data from data_latch into scan doublers shift registers
-	if((bus_cycle == 4'd15) && (plane == 2'd0)) begin
-
+ 	if((bus_cycle_L == 4'd15) && (plane == 2'd0)) begin
 		// normally data is directly moved from the input latches into the 
 		// shift registers. Only on an ste with pixel scrolling enabled
 		// the data is moved through additional shift registers
-		if(!ste || (pixel_offset == 0)) begin
+		if(!ste || (pixel_offset == 0) || ste_overscan_enable) begin
 			// load data into shift registers as required by color depth
 			sd_shift_0 <= data_latch[0];
 			sd_shift_1 <= (planes > 3'd1)?data_latch[1]:16'h0000;
@@ -606,53 +674,60 @@ end
 // ------------------------------- memory engine -----------------------------
 // ---------------------------------------------------------------------------
 
-assign read = (bus_cycle[3:2] == 0) && me;  // memory enable can directly be used as a ram read signal
+assign read = (bus_cycle == 0) && de;  // display enable can directly be used as a ram read signal
 
 // current plane to be read from memory
 reg [1:0] plane;  
 
 // To be able to output the first pixel we need to have one word for every plane already
-// present in memory. We thus need a "memory enable" signal which is (depending on color depth)
+// present in memory. We thus need a display enable signal which is (depending on color depth)
 // 16, 32 or 64 pixel ahead of display enable
-reg me, me_v;
+reg de, de_v;
 
 // required pixel offset allowing for prefetch of 16 pixels in 1, 2 or 4 planes (16, 32 or 64 cycles)
 wire [9:0] memory_prefetch = scan_doubler_enable?{ 4'd0, planes, 3'd0 }:{ 3'd0, planes, 4'd0 };
+wire [9:0] ste_overscan = ste_overscan_enable?memory_prefetch:10'd0;
 // ste is starting another 16 pixels earlier if horizontal hard scroll is being used
-wire [9:0] ste_prefetch    = (ste && (pixel_offset != 0))?memory_prefetch:10'd0;
-wire [9:0] me_h_start      = t5_h_end - memory_prefetch - ste_prefetch;
-wire [9:0] me_h_end        = t0_h_border_right - memory_prefetch;
+wire [9:0] ste_prefetch    = (ste && ((pixel_offset != 0) && !ste_overscan_enable))?memory_prefetch:10'd0;
+wire [9:0] de_h_start      = t5_h_end - memory_prefetch - ste_prefetch;
+wire [9:0] de_h_end        = t0_h_border_right - memory_prefetch + ste_overscan;
+
+// extra lines required by overscan
+wire [9:0] de_v_top_extra  = top_overscan?10'd58:10'd0;       // 29 extra ST lines at top
+wire [9:0] de_v_bot_extra  = bottom_overscan?10'd76:10'd0;    // 38 extra ST lines at bottom
 // line offset required for scan doubler
-wire [9:0] me_v_offset     = scan_doubler_enable?10'd2:10'd0;
-wire [9:0] me_v_start      = t11_v_end - me_v_offset;
-wire [9:0] me_v_end        = t6_v_border_bot - me_v_offset;
+wire [9:0] de_v_offset     = scan_doubler_enable?10'd2:10'd0;
+
+// calculate lines in which active display starts end ends
+wire [9:0] de_v_start      = t11_v_end - de_v_offset - de_v_top_extra;
+wire [9:0] de_v_end        = t6_v_border_bot - de_v_offset + de_v_bot_extra;
 
 // with scan doubler being active, there are two main clock cycles per st hor counter
 // st_h_active makes sure these events only trigger once
-wire st_h_active = (!scan_doubler_enable || bus_cycle[0]);
+wire st_h_active = (!scan_doubler_enable || t[0]);
  
 always @(posedge clk) begin
 
 	// line in which memory access is enabled
 	// in scan doubler mode two lines ahead of vertical display enable
 	if(vga_hcnt == v_event) begin
-		if(vcnt == me_v_start)  me_v <= 1'b1;
-		if(vcnt == me_v_end)    me_v <= 1'b0;
+		if(vcnt == de_v_start)  de_v <= 1'b1;
+		if(vcnt == de_v_end)    de_v <= 1'b0;
 	end
 		
-	// memory enable signal 16/32/64 bits (16*planes) ahead of display enable (de)
+	// display enable signal 16/32/64 bits (16*planes) ahead of display enable (de)
 	// include bus cycle to stay in sync in scna doubler mode
-	if(me_v && st_h_active) begin
-		if(st_hcnt == me_h_start)  me <= 1'b1;
-		if(st_hcnt == me_h_end)    me <= 1'b0;
+	if(de_v && st_h_active) begin
+		if(st_hcnt == de_h_start)  de <= 1'b1;
+		if(st_hcnt == de_h_end)    de <= 1'b0;
 	end
-
+ 
 	// make sure each line starts with plane 0
-	if(st_hcnt == me_h_start)
+	if(st_hcnt == de_h_start)
 		plane <= 2'd0;
 	
-	// The video address counter is reloaded slightly before vsync
-	if((vga_hcnt == t4_h_border_left) && (vcnt == t8_v_sync - 10'd3)) begin
+	// The video address counter is reloaded right before display starts 
+	if((vga_hcnt == t3_h_blank_left) && (vcnt == t7_v_blank_bot)) begin
 		vaddr <= _v_bas_ad;
 
 		// copy syncmode
@@ -660,10 +735,10 @@ always @(posedge clk) begin
 	end else begin
 
 		// video transfer happens in cycle 3 (end of video cycle)
-		if(bus_cycle == 3) begin
+		if(bus_cycle_L == 3) begin
 	
-			// read if memory enable is active
-			if(me) begin
+			// read if display enable is active
+			if(de) begin
 				// move incoming video data into data latch
 				
 				// ST shifter only uses 16 out of possible 64 bits, so select the right word
@@ -689,12 +764,12 @@ always @(posedge clk) begin
 	// STE has additional ways to influence video address
 	if(ste) begin
 		// add line offset at the end of each video line
-		if(me_v && st_h_active && (st_hcnt == t2_h_sync))
+		if(de_v && st_h_active && (st_hcnt == t2_h_sync))
 			vaddr <= vaddr + line_offset;
 
 		// STE vaddr write handling
 		// bus_cycle 6 is in the middle of a cpu cycle
-		if((bus_cycle == 6) && ste_vaddr_write) begin
+		if((bus_cycle_L == 6) && ste_vaddr_write) begin
 			if(reg_addr == 6'h02) vaddr[22:15] <= reg_din[7:0];
 			if(reg_addr == 6'h03) vaddr[14: 7] <= reg_din[7:0];
 			if(reg_addr == 6'h04) vaddr[ 6: 0] <= reg_din[7:1];
@@ -723,7 +798,6 @@ reg [1:0] v_state;  		// 0=sync, 1=blank, 2=border, 3=display
 // blank level is also used during sync
 wire blank  = 	(v_state == STATE_BLANK) || (vga_h_state == STATE_BLANK) || 
 					(v_state == STATE_SYNC) || (vga_h_state == STATE_SYNC);
-wire de     = (v_state == STATE_DISP) && (vga_h_state == STATE_DISP);
 
 // time in horizontal timing where vertical states change (at the begin of the sync phase)
 wire [9:0] v_event = t2_h_sync;
@@ -741,7 +815,7 @@ always @(posedge clk) begin
 	// the scan doubler is a special case as the atari line timing then expands over two vga
 	// lines and may/must be asynchronous to the vga timing at the end of the first line
 	if(vga_hcnt == t5_h_end) begin
-		if((bus_cycle == 4'd15) || (scan_doubler_enable && sd_vcnt[0]))
+		if((bus_cycle_L == 4'd15) || (scan_doubler_enable && sd_vcnt[0]))
 			vga_hcnt <= 10'd0;
 	end else
 		vga_hcnt <= vga_hcnt + 10'd1;
@@ -770,7 +844,7 @@ always @(posedge clk) begin
 
 		// generate horizontal video signal states
 		if( st_hcnt == t2_h_sync )                                        	st_h_state <= STATE_SYNC;
-		if((st_hcnt == t0_h_border_right) || (st_hcnt == t4_h_border_left))  st_h_state <= STATE_BORDER;
+		if((st_hcnt == t0_h_border_right + ste_overscan) || (st_hcnt == t4_h_border_left))  st_h_state <= STATE_BORDER;
 		if((st_hcnt == t1_h_blank_right) || (st_hcnt == t3_h_blank_left))    st_h_state <= STATE_BLANK;
 		if( st_hcnt == t5_h_end)                                          	st_h_state <= STATE_DISP;
 	end

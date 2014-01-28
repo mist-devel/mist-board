@@ -57,11 +57,19 @@ always @(posedge XCLK_I) begin
 			prescaler_counter <= prescaler_counter + 8'd1;
 	end
 end
-   
+
+// pulse is generate in rising edge and detected in main mfp on falling edge   
+always @(posedge CLK) begin
+	T_O_PULSE <= 1'b0;
+	
+	if (!RST && count && (down_counter === 8'd1))
+		T_O_PULSE <= 1'b1;
+end
+
 always @(negedge CLK) begin
       
 	if (RST === 1'b1) begin
-      T_O_PULSE <= 1'b0;
+//      T_O_PULSE <= 1'b0;
       T_O     <= 1'b0;
       control <= 4'd0;
       data    <= 8'd0;
@@ -76,7 +84,7 @@ always @(negedge CLK) begin
 		xclk_r <= (prescaler_counter === 8'd0);
 		xclk_r2 <= xclk_r;
 
-      T_O_PULSE <= 1'b0;
+//      T_O_PULSE <= 1'b0;
 	 
       // if a write request comes from the main unit
       // then write the data to the appropriate register.
@@ -118,7 +126,7 @@ always @(negedge CLK) begin
 					// pulse the timer out
 					T_O <= ~T_O;
 					down_counter <= data;
-					T_O_PULSE <= 1'b1;
+//					T_O_PULSE <= 1'b1;
 		  
 				end else begin
 		  

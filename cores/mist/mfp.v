@@ -136,83 +136,54 @@ reg [7:0] aer, ddr, gpip;
 reg [15:0] ipr, ier, imr, isr;   // interrupt registers
 reg [7:0] vr;
 
-// any pending and not masked interrupt causes the irq line to go high
-// if highest_irq_pending != higest_irq_active then there's a high prio
-// irq in service and no irq is generated until this one is finished
-//assign irq = ((ipr & imr) != 16'h0000) && (highest_irq_active == highest_irq_pending);
-
-// handle pending and in service irqs
-//wire [15:0] irq_active_map = (ipr | isr) & imr;
-
-// (i am pretty sure this can be done much more elegant ...)
-// check the number of the highest active irq
-//wire [3:0] highest_irq_active=
-//	( irq_active_map[15] == 1'b1)?4'd15:
-//	((irq_active_map[15:14] == 2'b01)?4'd14:
-//	((irq_active_map[15:13] == 3'b001)?4'd13:
-//	((irq_active_map[15:12] == 4'b0001)?4'd12:
-//	((irq_active_map[15:11] == 5'b00001)?4'd11:
-//	((irq_active_map[15:10] == 6'b000001)?4'd10:
-//	((irq_active_map[15:9] == 7'b0000001)?4'd9:
-//	((irq_active_map[15:8] == 8'b00000001)?4'd8:
-//	((irq_active_map[15:7] == 9'b000000001)?4'd7:
-//	((irq_active_map[15:6] == 10'b000000001)?4'd6:
-//	((irq_active_map[15:5] == 11'b0000000001)?4'd5:
-//	((irq_active_map[15:4] == 12'b00000000001)?4'd4:
-//	((irq_active_map[15:3] == 13'b000000000001)?4'd3:
-//	((irq_active_map[15:2] == 14'b0000000000001)?4'd2:
-//	((irq_active_map[15:1] == 15'b00000000000001)?4'd1:
-//	((irq_active_map[15:0] == 16'b000000000000001)?4'd0:
-//		4'd0)))))))))))))));
-
 // generate irq signal if an irq is pending and no other irq of same or higher prio is in service
-assign irq = ((ipr & imr) != 16'h0000) && ((isr == 16'h0000) || (highest_irq_pending > irq_in_service));
+assign irq = ((ipr & imr) != 16'h0000) && (highest_irq_pending >= irq_in_service);
    
 // check number of current interrupt in service
 wire [3:0] irq_in_service =
-	( isr[15]    == 1'b1)?4'd15:
-	((isr[15:14] == 2'b01)?4'd14:
-	((isr[15:13] == 3'b001)?4'd13:
-	((isr[15:12] == 4'b0001)?4'd12:
-	((isr[15:11] == 5'b00001)?4'd11:
-	((isr[15:10] == 6'b000001)?4'd10:
-	((isr[15:9]  == 7'b0000001)?4'd9:
-	((isr[15:8]  == 8'b00000001)?4'd8:
-	((isr[15:7]  == 9'b000000001)?4'd7:
-	((isr[15:6]  == 10'b000000001)?4'd6:
-	((isr[15:5]  == 11'b0000000001)?4'd5:
-	((isr[15:4]  == 12'b00000000001)?4'd4:
-	((isr[15:3]  == 13'b000000000001)?4'd3:
-	((isr[15:2]  == 14'b0000000000001)?4'd2:
-	((isr[15:1]  == 15'b00000000000001)?4'd1:
-	((isr[15:0]  == 16'b000000000000001)?4'd0:
-			4'd0)))))))))))))));
+	(isr[15]    ==  1'b1)?4'd15:
+	(isr[15:14] ==  2'b1)?4'd14:
+	(isr[15:13] ==  3'b1)?4'd13:
+	(isr[15:12] ==  4'b1)?4'd12:
+	(isr[15:11] ==  5'b1)?4'd11:
+	(isr[15:10] ==  6'b1)?4'd10:
+	(isr[15:9]  ==  7'b1)?4'd9:
+	(isr[15:8]  ==  8'b1)?4'd8:
+	(isr[15:7]  ==  9'b1)?4'd7:
+	(isr[15:6]  == 10'b1)?4'd6:
+	(isr[15:5]  == 11'b1)?4'd5:
+	(isr[15:4]  == 12'b1)?4'd4:
+	(isr[15:3]  == 13'b1)?4'd3:
+	(isr[15:2]  == 14'b1)?4'd2:
+	(isr[15:1]  == 15'b1)?4'd1:
+	(isr[15:0]  == 16'b1)?4'd0:
+		4'd0;
 
 wire [15:0] irq_pending_map = ipr & imr;
 
 // check the number of the highest pending irq 
 wire [3:0] highest_irq_pending =
-	( irq_pending_map[15]    == 1'b1)?4'd15:
-	((irq_pending_map[15:14] == 2'b01)?4'd14:
-	((irq_pending_map[15:13] == 3'b001)?4'd13:
-	((irq_pending_map[15:12] == 4'b0001)?4'd12:
-	((irq_pending_map[15:11] == 5'b00001)?4'd11:
-	((irq_pending_map[15:10] == 6'b000001)?4'd10:
-	((irq_pending_map[15:9]  == 7'b0000001)?4'd9:
-	((irq_pending_map[15:8]  == 8'b00000001)?4'd8:
-	((irq_pending_map[15:7]  == 9'b000000001)?4'd7:
-	((irq_pending_map[15:6]  == 10'b000000001)?4'd6:
-	((irq_pending_map[15:5]  == 11'b0000000001)?4'd5:
-	((irq_pending_map[15:4]  == 12'b00000000001)?4'd4:
-	((irq_pending_map[15:3]  == 13'b000000000001)?4'd3:
-	((irq_pending_map[15:2]  == 14'b0000000000001)?4'd2:
-	((irq_pending_map[15:1]  == 15'b00000000000001)?4'd1:
-	((irq_pending_map[15:0]  == 16'b000000000000001)?4'd0:
-			4'd0)))))))))))))));
+	(irq_pending_map[15]    ==  1'b1)?4'd15:
+	(irq_pending_map[15:14] ==  2'b1)?4'd14:
+	(irq_pending_map[15:13] ==  3'b1)?4'd13:
+	(irq_pending_map[15:12] ==  4'b1)?4'd12:
+	(irq_pending_map[15:11] ==  5'b1)?4'd11:
+	(irq_pending_map[15:10] ==  6'b1)?4'd10:
+	(irq_pending_map[15:9]  ==  7'b1)?4'd9:
+	(irq_pending_map[15:8]  ==  8'b1)?4'd8:
+	(irq_pending_map[15:7]  ==  9'b1)?4'd7:
+	(irq_pending_map[15:6]  == 10'b1)?4'd6:
+	(irq_pending_map[15:5]  == 11'b1)?4'd5:
+	(irq_pending_map[15:4]  == 12'b1)?4'd4:
+	(irq_pending_map[15:3]  == 13'b1)?4'd3:
+	(irq_pending_map[15:2]  == 14'b1)?4'd2:
+	(irq_pending_map[15:1]  == 15'b1)?4'd1:
+	(irq_pending_map[15:0]  == 16'b1)?4'd0:
+		4'd0;
 	
 // gpip as output to the cpu (ddr bit == 1 -> gpip pin is output)
 wire [7:0] gpip_cpu_out = (i & ~ddr) | (gpip & ddr);
-	
+
 // cpu read interface
 always @(iack, sel, ds, rw, addr, gpip_cpu_out, aer, ddr, ier, ipr, isr, imr, 
 	vr, serial_data_out_fifo_full, timera_dat_o, timerb_dat_o,
@@ -234,7 +205,7 @@ always @(iack, sel, ds, rw, addr, gpip_cpu_out, aer, ddr, ier, ipr, isr, imr,
 		if(addr == 5'h08) dout = isr[7:0];
 		if(addr == 5'h0a) dout = imr[7:0];
 		if(addr == 5'h0b) dout = vr;
-	
+	 
 		// timers
 		if(addr == 5'h0c) dout = { 3'b000, timera_ctrl_o};
 		if(addr == 5'h0d) dout = { 3'b000, timerb_ctrl_o};
@@ -248,36 +219,41 @@ always @(iack, sel, ds, rw, addr, gpip_cpu_out, aer, ddr, ier, ipr, isr, imr,
 		if(addr == 5'h16) dout = serial_data_out_fifo_full?8'h00:8'h80;
 		
 	end else if(iack) begin
-		dout = { vr[7:4], highest_irq_pending };
+		dout = irq_vec;
 	end
 end
-
-// delay inputs to detect changes
-reg [7:0] iD, iD2;
 
 // mask of input irqs which are overwritten by timer a/b inputs
 wire [7:0] ti_irq_mask = { 3'b000, pulse_mode, 3'b000};
 wire [7:0] ti_irq      = { 3'b000, t_i[0], t_i[1], 3'b000};
 
+// delay inputs to detect changes
+reg [7:0] iD, iD2;
 reg iackD;
-always @(posedge clk) begin
+
+// latch to keep irq vector stable during irq ack cycle
+reg [7:0] irq_vec;
+
+always @(negedge clk) begin
    iackD <= iack;
 
+	// update the irq vector periodically unless we are in the
+	// middle of an interrupt acknowledge phase
+	if(!iack)
+		irq_vec <= { vr[7:4], highest_irq_pending };
+	
 	// delay inputs for irq generation, apply aer (irq edge)
 	iD <= aer ^ ((i & ~ti_irq_mask) | (ti_irq & ti_irq_mask));
 	iD2 <= iD;
-end
-	
-always @(negedge clk) begin
 
 	if(reset) begin
 		ipr <= 16'h0000; ier <= 16'h0000; 
 		imr <= 16'h0000; isr <= 16'h0000;
 		writePout <= 0;
-	end else begin
-
+	end else begin 
+ 
 		// ack pending irqs and set isr if enabled
-		if(iackD) begin
+		if(iack && !iackD) begin
 			// remove active bit from ipr
 			ipr[highest_irq_pending] <= 1'b0;
 		
@@ -319,6 +295,7 @@ always @(negedge clk) begin
 
 			if(addr == 5'h06) ipr[7:0] <= ipr[7:0] & din;
 			if(addr == 5'h08)	isr[7:0] <= isr[7:0] & din;  // zero bits are cleared
+				
 			if(addr == 5'h0a)	imr[7:0] <= din;
 			if(addr == 5'h0b) vr <= din;
 			

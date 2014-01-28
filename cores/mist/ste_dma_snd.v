@@ -35,7 +35,7 @@ module ste_dma_snd (
 
 	// memory interface
 	input 				clk32,     // 31.875 MHz
-	input [3:0] 		bus_cycle, // bus-cycle
+	input [1:0] 		bus_cycle, // bus-cycle
 	input					hsync,     // to synchronize with video
 	output            read,
 	output [22:0]     saddr,
@@ -48,9 +48,28 @@ module ste_dma_snd (
 	output            xsint,
 	output 				xsint_d
 );
+// ---------------------------------------------------------------------------
+// --------------------------- internal state counter ------------------------
+// ---------------------------------------------------------------------------
+
+reg [1:0] t /* synthesis noprune */ ;
+always @(posedge clk32) begin
+	// 32Mhz counter synchronous to 8 Mhz clock
+	// force counter to pass state 0 exactly after the rising edge of clk (8Mhz)
+	if(((t == 2'd3)  && ( clk == 0)) ||
+		((t == 2'd0) && ( clk == 1)) ||
+		((t != 2'd3) && (t != 2'd0)))
+			t <= t + 2'd1;
+end
+
+// create internal bus_cycle signal which is stable on the positive clock
+// edge and extends the previous state by half a 32 Mhz clock cycle
+reg [3:0] bus_cycle_L;
+always @(negedge clk32)
+	bus_cycle_L <= { bus_cycle, t };
 
 assign saddr = snd_adr;   // drive data
-assign read = (bus_cycle[3:2] == 0) && hsync && !fifo_full && dma_enable;
+assign read = (bus_cycle == 0) && hsync && !fifo_full && dma_enable;
 
 // ---------------------------------------------------------------------------
 // ------------------------------ clock generation ---------------------------
@@ -322,7 +341,8 @@ always @(posedge clk32) begin
 				frame_done <= (snd_adr == snd_end_latched-23'd1);
  
 				// fifo not full? read something during hsync using the video cycle
-				if((!fifo_full) && hsync && (bus_cycle == 3)) begin
+				// bus_cycle_L = 3 is the end of the video cycle
+				if((!fifo_full) && hsync && (bus_cycle_L == 3)) begin
 						
  					if(snd_adr != snd_end_latched) begin
 						// read right word from ram using the 64 bit memory interface
