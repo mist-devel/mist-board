@@ -1,0 +1,455 @@
+This chapter describes the standard syntax module which is available
+with the extension @code{std}.
+
+@section Legal
+
+    This module is copyright in 2002-2013 by Volker Barthelmann.
+
+    This archive may be redistributed without modifications and used
+    for non-commercial purposes.
+
+    Distributing modified versions and commercial usage needs my written
+    consent.
+
+    Certain modules may fall under additional copyrights.
+
+@section Additional options for this version
+ 
+This syntax module provides the following additional options:
+ 
+@table @option
+ 
+@item -ac
+ Immediately allocate common symbols in .bss/.sbss section and
+ define them as externally visible.
+@item -nodotneeded
+ Recognize assembly directives without a leading dot (@code{.}).
+@item -sdlimit=<n>
+ Put data up to a maximum size of n bytes into the small-data
+ sections. Default is n=0, which means the function is disabled.
+
+@end table
+
+@section General Syntax
+
+Labels have to be terminated with a colon (@code{:}).
+Local labels are preceded by '@code{.}' and have to contain digits only.
+Local labels are valid between two global label definitions.
+
+Make sure that you don't define a label on the same line as a
+directive for conditional assembly (if, else, endif)! This is not supported.
+
+The operands are separated from the mnemonic by whitespace.
+Multiple operands are separated by comma (@code{,}).
+
+Comments are introduced by the comment character @code{#}. The rest
+of the line will be ignored. For the c16x, m68k, 650x and ARM backends,
+the comment character is @code{;} instead of @code{#}, although @code{#}
+is still allowed when being the first non-blank character on a line.
+
+Example:
+
+@code{mylabel:  inst.q1.q2 op1,op2,op3  # comment}
+
+In expressions, numbers starting with @code{0x} or @code{0X} are
+hexadecimal (e.g. @code{0xfb2c}). @code{0b} or @code{0B} introduces
+binary numbers (e.g. @code{0b1100101}). Other numbers starting with
+@code{0} are assumed to be octal numbers, e.g. @code{0237}. All
+numbers starting with a non-zero digit are decimal, e.g. @code{1239}.
+
+@section Directives
+
+The following directives are supported by this syntax module (if the
+CPU- and output-module allow it):
+
+@table @code
+@item .2byte <exp1>[,<exp2>...]
+ See @code{.uahalf}.
+
+@item .4byte <exp1>[,<exp2>...]
+See @code{.uaword}. 
+
+@item .8byte <exp1>[,<exp2>...]
+See @code{.uaquad}. 
+
+@item .ascii <exp1>[,<exp2>,"<string1>"...]
+See @code{.byte}. 
+
+@item .abort <message>
+      Immediately break assembly with a fatal error, showing the <message>
+      from the operand field.
+
+@item  .asciiz "<string1>"[,"<string2>"...]
+See @code{.string}.    
+
+@item .align <bit_count>[,<fill>]
+      Insert as much fill bytes as required to reach an address where
+      <bit_count> low order bits are zero. For example @code{.align 2} would
+      make an alignment to the next 32-bit boundary.
+      Note that this directive
+
+@item .balign <byte_count>[,<fill>]
+      Insert as much fill bytes as required to reach an address which
+      is dividable by <byte_count>. For example @code{.balign 2} would
+      make an alignment to the next 16-bit boundary.
+
+@item .byte <exp1>[,<exp2>,"<string1>"...]
+      Assign the integer or string constant operands into successive
+      bytes of memory in the current section. Any combination of integer
+      and character string constant operands is permitted.
+
+@item .comm <symbol>,<size>[,<align>]
+      Defines a common symbol which has a size of <size> bytes. The
+      final size and alignment will be assigned by the linker, which
+      will use the highest size and alignment values of all common
+      symbols with the same name found. A common symbol is allocated
+      in the .bss section in the final executable. ".comm"-areas of
+      less than 8 bytes in size are aligned to word boundaries, other-
+      wise to doubleword boundaries.
+
+@item .endm
+        Ends a macro definition.
+
+@item .endr
+        Ends a repetition block.
+
+@item .equ <symbol>,<expression>
+        See @code{.set}.
+
+@item .err <message>
+      Immediately break assembly with a fatal error, showing the <message>
+      from the operand field.
+
+@item .extern  <symbol>[,<symbol>...]
+        See @code{.global}.
+
+@item .fail <expression>
+      Cause a warning when <expresion> is greater or equal 500. Otherwise
+      cause an error.
+
+@item .file "string"
+      Set the filename of the input source. This may be used by some
+      output modules. By default, the input filename passed on the
+      command line is used.
+
+@item .global <symbol>[,<symbol>...]
+      Flag <symbol> as an external symbol, which means that <symbol> is
+      visible to all modules in the linking process. It may be either
+      defined or undefined.   
+
+@item .globl <symbol>[,<symbol>...]
+      See @code{.global}.
+
+@item .half <exp1>[,<exp2>...]
+      If the current section location counter is not on a halfword
+      boundary, advance it to the next halfword boundary. Then, assign
+      the values of the operands into successive halfwords of memory in
+      the current section.
+
+@item .if <expression>
+      Conditionally assemble the following lines if <expression> is non-zero.
+
+@item .ifeq <expression>
+      Conditionally assemble the following lines if <expression> is zero.
+
+@item .ifne <expression>
+      Conditionally assemble the following lines if <expression> is non-zero.
+
+@item .ifgt <expression>
+      Conditionally assemble the following lines if <expression> is
+      greater than zero.
+
+@item .ifge <expression>
+      Conditionally assemble the following lines if <expression> is
+      greater than zero or equal.
+
+@item .iflt <expression>
+      Conditionally assemble the following lines if <expression> is
+      less than zero.
+
+@item .ifle <expression>
+      Conditionally assemble the following lines if <expression> is
+      less than zero or equal.
+
+@item .ifb <operand>
+      Conditionally assemble the following lines when <operand> is
+      completely blank, except an optional comment.
+
+@item .ifnb <operand>
+      Conditionally assemble the following lines when <operand> is
+      non-blank.
+
+@item .ifdef <symbol>
+      Conditionally assemble the following lines if <symbol> is defined.
+
+@item .ifndef <symbol>
+      Conditionally assemble the following lines if <symbol> is undefined.
+
+@item .incbin <file>
+      Inserts the binary contents of <file> into the object code at
+      this position. The file will be searched first in the current
+      directory, then in all paths defined by @option{-I} or
+      @code{.incdir} in the order of occurence.
+
+@item .incdir <path>
+      Add another path to search for include files to the list of
+      known paths. Paths defined with @option{-I} on the command line are
+      searched first.
+
+@item .include <file>
+      Include source text of <file> at this position. The include file
+      will be searched first in the current directory, then in all
+      paths defined by @option{-I} or @code{.incdir} in the order of
+      occurence.
+
+@item .int <exp1>[,<exp2>...]
+      See @code{.word}.
+
+@item .lcomm <symbol>,<size>[,<alignment>] 
+      Allocate <size> bytes of space in the .bss section and assign
+      the value to that location to <symbol>. If <alignment> is given,
+      then the space will be aligned to an address having <alignment>
+      low zero bits or 2, whichever is greater.
+      <symbol> may be made globally visible by the .globl directive.
+
+@item .list
+      The following lines will appear in the listing file, if it was
+      requested.
+
+@item .local <symbol>[,<symbol>...]
+      Flag <symbol> as a local symbol, which means that <symbol> is
+      local for the current file and invisible to other modules in
+      the linking process.
+
+@item .long <exp1>[,<exp2>...]
+      See @code{.word}.
+
+@item .macro <name> [<arguments>...]
+      Defines a macro which can be referenced by <name>. The macro
+      definition is closed by an @code{.endm} directive. When calling
+      a macro you may pass up to 9 arguments, separated by comma. Those
+      arguments are referenced within the macro context as @code{\1} to
+      @code{\9}, or optionally by named arguments, which may be specified
+      after the <name>, separated by commas.
+      Argument @code{\0} is set to the macro's first qualifier
+      (mnemonic extension), when given.
+      The special argument @code{\@@} inserts a unique id,
+      useful for defining labels.
+      @code{\()} may be used as a separator between the name of a macro
+      argument and the subsequent text.
+
+@item .nolist
+      The following lines will not be visible in a listing file.
+
+@item .org <exp>
+      Defines the start address for the subsequent code.
+      When <exp> starts with a current-pc symbol and a plus (@code{+})
+      operator, then the directive behaves like @code{.space}.
+
+@item .quad <exp1>[,<exp2>...]
+      If the current section location counter is not on a quadword
+      boundary, advance it to the next quadword boundary. Then, assign
+      the values of the operands into successive quadwords of memory in
+      the current section.
+
+@item .rept <expression>
+      Repeats the assembly of the block between @code{.rept} and @code{.endr}
+      <expression> number of times. <expression> has to be positive.
+
+@item .section <name>[,"<attributes>"]
+      Starts a new section named <name> or reactivate an old one. If
+      attributes are given for an already existing section, they must
+      match exactly. The section's name will also be defined as a new
+      symbol, which represents the section's start address.
+      The "<attributes>" string may consist of the following characters:
+
+      Section Contents:
+@table @code
+@item c 
+         section has code
+
+@item d 
+         section has initialized data
+
+@item u 
+         section has uninitialized data
+
+@item i 
+         section has directives (info section)
+
+@item n 
+         section can be discarded
+            
+@item R 
+         remove section at link time
+            
+@item a 
+         section is allocated in memory
+@end table
+
+      Section Protection:
+
+@table @code          
+@item r 
+         section is readable
+            
+@item w 
+         section is writable
+           
+@item  x 
+         section is executable
+           
+@item  s 
+         section is sharable
+@end table
+
+      Section Alignment: A digit, which is ignored. The assembler will
+      automatically align the section to the highest alignment restriction
+      used within.
+
+      Memory flags (Amiga hunk format only):
+
+@table @code
+            
+@item C 
+         load section to Chip RAM
+           
+@item  F 
+         load section to Fast RAM 
+
+@end table
+
+@item .set <symbol>,<expression>
+      Create a new program symbol with the name <symbol> and assign to it
+      the value of <expression>. If <symbol> is already assigned, it will
+      contain a new value from now on.
+ 
+@item .size <symbol>,<size>
+      Set the size in bytes of an object defined at <symbol>. 
+
+@item .short <exp1>[,<exp2>...]
+      See @code{.half}.
+ 
+@item .space <exp>[,<fill>]
+      See @code{.space}.
+
+@item .space <exp>[,<fill>]
+      Insert <exp> zero or <fill> bytes into the current section.
+
+@item .stabs "<name>",<type>,<other>,<desc>,<exp>
+      Add an stab-entry for debugging, including a symbol-string and
+      an expression.
+
+@item .stabn <type>,<other>,<desc>,<exp>
+      Add an stab-entry for debugging, without a symbol-string.
+
+@item .stabd <type>,<other>,<desc>
+      Add an stab-entry for debugging, without symbol-string and value.
+
+@item .string "<string1>"[,"<string2>"...]
+        Like @code{.byte}, but adds a terminating zero-byte.
+
+@item .type <symbol>,<type>
+      Set type of symbol called <symbol> to <type>, which must be one of:
+@table @code
+      @item 1: Object
+      @item 2: Function
+      @item 3: Section
+      @item 4: File
+@end table
+      The predefined symbols @code{@@object} and 
+        @code{@@function} are available for
+      this purpose.
+ 
+@item .uahalf <exp1>[,<exp2>...]
+      Assign the values of the operands into successive two-byte areas of
+      memory in the current section regardless of section alignment.
+ 
+@item .ualong <exp1>[,<exp2>...]
+      See @code{.uaword}.
+
+@item .uaquad <exp1>[,<exp2>...]
+      Assign the values of the operands into successive eight-byte areas of
+      memory in the current section regardless of section alignment.
+
+@item .uashort <exp1>[,<exp2>...]
+      See @code{.uahalf}.
+ 
+@item .uaword <exp1>[,<exp2>...]
+      Assign the values of the operands into successive four-byte areas
+      of memory in the current section regardless of section alignment.
+
+@item .weak <symbol>[,<symbol>...]
+      Flag <symbol> as a weak symbol, which means that <symbol> is
+      visible to all modules in the linking process and may be replaced
+      by any global symbol with the same name.
+      When a weak symbol remains undefined its value defaults to 0.
+ 
+@item .word <exp1>[,<exp2>...]
+      If the current section location counter is not on a word boundary
+      advance it to the next word boundary. Then assign the values of the
+      operands into successive words of memory in the current section. 
+
+@end table
+
+Predefined section directives:
+@table @code
+@item .bss
+      .section ".bss","aurw"
+@item .data
+      .section ".data","adrw"
+@item .rodata
+      .section ".rodata","adr"
+@item .sbss
+      .section ".sbss","aurw"
+@item .sdata
+      .section ".sdata","adrw"
+@item .sdata2
+      .section ".sdata2","adr"
+@item .stab
+      .section ".stab","dr"
+@item .stabstr
+      .section ".stabstr","dr"
+@item .text
+      .section ".text","acrx"
+@item .tocd
+      .section ".tocd","adrw"
+@end table
+
+@section Known Problems
+
+    Some known problems of this module at the moment:
+
+@itemize @minus
+
+@item None.
+
+@end itemize
+
+@section Error Messages
+
+This module has the following error messages:
+
+@itemize @minus
+@item 1001: mnemonic expected
+@item 1002: invalid extension
+@item 1003: no space before operands
+@item 1004: too many closing parentheses
+@item 1005: missing closing parentheses
+@item 1006: missing operand
+@item 1007: scratch at end of line
+@item 1008: \" expected
+@item 1009: invalid data operand
+@item 1010: , expected
+@item 1011: identifier expected
+@item 1012: illegal escape sequence \\%c
+@item 1013: expression must be constant
+@item 1014: unexpected endm without macro
+@item 1015: endif without if
+@item 1016: if without endif
+@item 1017: maximum if-nesting depth exceeded (%d levels)
+@item 1018: else without if
+@item 1019: syntax error
+@item 1020: unexpected endr without rept
+@item 1021: symbol <%s> already defined with %s scope
+@end itemize

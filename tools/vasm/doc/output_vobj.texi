@@ -1,0 +1,45 @@
+This chapter describes the simple binary output module which can be
+selected with the @option{-Fvobj} option.
+
+@section Legal
+
+    This module is copyright in 2002-2011 by Volker Barthelmann.
+
+    This archive may be redistributed without modifications and used
+    for non-commercial purposes.
+
+    Distributing modified versions and commercial usage needs my written
+    consent.
+
+    Certain modules may fall under additional copyrights.
+
+@section Additional options for this version
+None.
+
+@section General
+
+This output module outputs the @code{vobj} object format, a simple
+portable proprietary object file format of @code{vasm}.
+
+As this format is not yet fixed, it is not described here.
+
+@section Restrictions
+
+None.
+
+@section Known Problems
+
+    Some known problems of this module at the moment:
+
+@itemize @minus
+
+@item None.
+
+@end itemize
+
+@section Error Messages
+
+This module has the following error messages:
+@itemize @minus
+@item None.
+@end itemize

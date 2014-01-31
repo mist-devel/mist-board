@@ -1,0 +1,50 @@
+This chapter describes the simple binary output module which can be
+selected with the @option{-Fbin} option.
+
+@section Legal
+
+    This module is copyright in 2002,2008 by Volker Barthelmann.
+
+    This archive may be redistributed without modifications and used
+    for non-commercial purposes.
+
+    Distributing modified versions and commercial usage needs my written
+    consent.
+
+    Certain modules may fall under additional copyrights.
+
+@section Additional options for this version
+ 
+@table @option
+    @item -cbm-prg
+        Writes a Commodore PRG header in front of the output file, which
+        consists of two bytes in little-endian order, defining the load
+        address of the program.
+@end table
+ 
+@section General
+
+This output module outputs the contents of all sections as simple
+binary data without any header or additional information. When there
+are multiple sections, they must not overlap. Gaps between sections
+are filled with zero bytes. Undefined symbols are not allowed.
+
+@section Known Problems
+
+    Some known problems of this module at the moment:
+
+@itemize @minus
+
+@item None.
+
+@end itemize
+
+@section Error Messages
+
+This module has the following error messages:
+
+@itemize @minus
+@item 3001: sections must not overlap
+@item 3007: undefined symbol <%s>
+
+@end itemize

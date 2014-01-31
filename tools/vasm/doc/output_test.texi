@@ -1,0 +1,45 @@
+This chapter describes the test output module which can be
+selected with the @option{-Ftest} option.
+
+@section Legal
+
+    This module is copyright in 2002 by Volker Barthelmann.
+
+    This archive may be redistributed without modifications and used
+    for non-commercial purposes.
+
+    Distributing modified versions and commercial usage needs my written
+    consent.
+
+    Certain modules may fall under additional copyrights.
+
+@section Additional options for this version
+ 
+This output module provides no additional options.
+ 
+@section General
+
+This output module outputs a textual description of the contents of
+all sections. It is mainly intended for debugging.
+
+
+@section Restrictions
+
+None.
+
+@section Known Problems
+
+    Some known problems of this module at the moment:
+
+@itemize @minus
+
+@item None.
+
+@end itemize
+
+@section Error Messages
+
+This module has the following error messages:
+@itemize @minus
+@item None.
+@end itemize
