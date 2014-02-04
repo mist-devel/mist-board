@@ -346,13 +346,6 @@ wire blitter_master_read;
 wire blitter_irq;
 wire [15:0] blitter_master_data_out;
 
-// The bg signal works a little different as usual. The blitter
-// will only apply br when bg allows it to do so. Forcing bussatte == 0
-// make sure that the bus is never transferred in the middle of an 
-// instruction. This is required since some instructions use d to control
-// the blitter are atomic on a real ST
-wire blitter_bg = (tg68_busstate == 2'd0);
-
 blitter blitter (
 	.bus_cycle 	(bus_cycle        ),
 
@@ -375,7 +368,7 @@ blitter blitter (
 
 	.br_in     (data_io_br       ),
 	.br_out    (blitter_br       ),
-	.bg        (blitter_bg       ),
+	.bg        (1'b1             ),  // blitter grabs bus at any time
 	.irq       (blitter_irq      ),
 	
 	.turbo     (steroids         )

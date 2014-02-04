@@ -78,6 +78,7 @@ reg [1:0]  hop;
 reg [3:0]  op;
 
 reg [3:0]  line_number;
+reg [3:0]  line_number_latch;
 reg        smudge;
 reg        hog;
 reg        busy;
@@ -102,7 +103,7 @@ end
 // CPU READ
 always @(sel, rw, addr, src_y_inc, src_x_inc, src_addr, endmask1, endmask2, endmask3, 
 		dst_x_inc, dst_y_inc, dst_addr, x_count, y_count, hop, op, busy, hog,
-		smudge, line_number, fxsr, nfsr, skew) begin
+		smudge, line_number_latch, fxsr, nfsr, skew) begin
 	dout = 16'h0000;
 
 	if(sel && rw) begin
@@ -128,7 +129,7 @@ always @(sel, rw, addr, src_y_inc, src_x_inc, src_addr, endmask1, endmask2, endm
 	   // since reading them has no side effect we can return the 8 bit registers
 	   // without caring for uds/lds
 	   if(addr == 5'h1d) dout <= { 6'b000000, hop, 4'b0000, op };
-	   if(addr == 5'h1e) dout <= { busy, hog, smudge, 1'b0, line_number, fxsr, nfsr, 2'b00, skew };
+	   if(addr == 5'h1e) dout <= { busy, hog, smudge, 1'b0, line_number_latch, fxsr, nfsr, 2'b00, skew };
 	end
 end
 
@@ -197,7 +198,7 @@ always @(negedge clk) begin
 			if((addr == 5'h1d) && ~lds) op <= din[3:0];
 
 			if((addr == 5'h1e) && ~uds) begin
-				line_number <= din[11:8];
+				line_number_latch <= din[11:8];
 				smudge <= din[13];
 				hog <= din[14];
 
@@ -256,6 +257,7 @@ always @(negedge clk) begin
 		// blitter has just been setup, so init the state machine in first step
 		if(init) begin 
 			init <= 1'b0;
+			line_number <= line_number_latch;
  
 			if(skip_src_read) begin                    // skip source read (state 0)
 				if(dest_required)			state <= 2'd1;  //   but dest needs to be read
@@ -320,8 +322,8 @@ always @(negedge clk) begin
 
 						// do signed add by sign expanding XXX_y_inc
 						dst_addr <= dst_addr + { {8{dst_y_inc[15]}}, dst_y_inc };
-						if(dst_y_inc[15]) line_number <= line_number + 4'd1;
-						else              line_number <= line_number - 4'd1;
+						if(!dst_y_inc[15]) line_number <= line_number + 4'd1;
+						else               line_number <= line_number - 4'd1;
 			
 						x_count <= x_count_latch;
 						y_count <= y_count - 8'd1;
@@ -341,11 +343,6 @@ always @(negedge clk) begin
 				else											state <= 2'd0;  // normal source read state
 			end
 		end
-		
-//		if(busy && (y_count == 0)) begin	
-			// undo last src inc
-	//		src_addr <= src_addr - { {8{src_x_inc[15]}}, src_x_inc };
-	//	end
 	end
 end
 
