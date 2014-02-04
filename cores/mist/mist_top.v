@@ -346,21 +346,12 @@ wire blitter_master_read;
 wire blitter_irq;
 wire [15:0] blitter_master_data_out;
 
-wire blitter_br = blitter_br_out;
-wire blitter_bg = 1'b1;
-
-//wire blitter_bg = blitter_br;
-
-//reg blitter_br;
-//always @(posedge clk_128) begin
-//	if(blitter_br_out && (tg68_busstate == 2'd0))
-//		blitter_br <= 1'b1;
-		
-//	else if(!blitter_br_out)
-//		blitter_br <= 1'b0;
-//end
-
-wire blitter_br_out;
+// The bg signal works a little different as usual. The blitter
+// will only apply br when bg allows it to do so. Forcing bussatte == 0
+// make sure that the bus is never transferred in the middle of an 
+// instruction. This is required since some instructions use d to control
+// the blitter are atomic on a real ST
+wire blitter_bg = (tg68_busstate == 2'd0);
 
 blitter blitter (
 	.bus_cycle 	(bus_cycle        ),
@@ -383,7 +374,7 @@ blitter blitter (
    .bm_data_in (ram_data_out),
 
 	.br_in     (data_io_br       ),
-	.br_out    (blitter_br_out   ),
+	.br_out    (blitter_br       ),
 	.bg        (blitter_bg       ),
 	.irq       (blitter_irq      ),
 	
@@ -904,34 +895,30 @@ wire MEM14M  = (system_ctrl[3:1] == 3'd5);
 // rom is also at 0x000000 to 0x000007
 wire cpu2lowrom = (tg68_adr[23:3] == 21'd0);
  
-// ram from 0x000000 to 0x400000
+// ordinary ram from 0x000000 to 0x400000, more if enabled
 wire cpu2ram = (!cpu2lowrom) && (
-								  (tg68_adr[23:22] == 2'b00) ||   // ordinary 4MB
-	((MEM14M || MEM8M) &&  (tg68_adr[23:22] == 2'b01)) ||  // 8MB 
-	(MEM14M            && ((tg68_adr[23:22] == 2'b10) ||   // 12MB
-	                       (tg68_adr[23:21] == 3'b110)))); // 14MB 
-
-wire cpu2ram14 = (!cpu2lowrom) && (
-                 (tg68_adr[23:22] == 2'b00) ||  // ordinary 4MB
-					  (tg68_adr[23:22] == 2'b01) ||  // 8MB 
-					  (tg68_adr[23:22] == 2'b10) ||  // 12MB
-	              (tg68_adr[23:21] == 3'b110));  // 14MB 
+								  (tg68_adr[23:22] == 2'b00)    ||  // ordinary 4MB
+	((MEM14M || MEM8M) &&  (tg68_adr[23:22] == 2'b01))   ||  // 8MB 
+	(MEM14M            && ((tg68_adr[23:22] == 2'b10)    ||  // 12MB
+	                       (tg68_adr[23:21] == 3'b110))) ||  // 14MB
+	(steroids          &&  (tg68_adr[23:19] == 5'b11101)));  // 512k at $e80000 for STEroids
 
 // 256k tos from 0xe00000 to 0xe40000
-wire cpu2tos256k = (tg68_adr[23:18] == 6'b111000) || 
-							cpu2lowrom;
+wire cpu2tos256k = (tg68_adr[23:18] == 6'b111000);
 
 // 192k tos from 0xfc0000 to 0xff0000
 wire cpu2tos192k = (tg68_adr[23:17] == 7'b1111110)  || 
-		 				 (tg68_adr[23:16] == 8'b11111110) || 
-							cpu2lowrom;
+		 				 (tg68_adr[23:16] == 8'b11111110);
 
 // 128k cartridge from 0xfa0000 to 0xfbffff
 wire cpu2cart = (tg68_adr[23:16] == 8'hfa) || 
      ((tg68_adr[23:16] == 8'hfb) && !dongle_present);  // include fb0000 only if no dongle present
 
+// all rom areas
+wire cpu2rom = cpu2lowrom || cpu2tos192k || cpu2tos256k || cpu2cart;
+	 
 // cpu to any type of mem (rw on ram, read on rom)
-wire cpu2mem = cpu2ram14 || (tg68_rw && (cpu2tos192k || cpu2tos256k || cpu2cart));
+wire cpu2mem = cpu2ram || (tg68_rw && cpu2rom);
 							
 // io from 0xff0000
 wire cpu2io = (tg68_adr[23:16] == 8'hff);

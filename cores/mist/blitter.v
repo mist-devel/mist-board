@@ -197,14 +197,7 @@ always @(negedge clk) begin
 			if((addr == 5'h1d) && ~lds) op <= din[3:0];
 
 			if((addr == 5'h1e) && ~uds) begin
-
-				// HACK: The tg68 does not have atomic read-modify-write cycles
-				// and may be interrupted by the blitter in between. We thus don't
-				// accept changes to the line_number register as long as the blitter
-				// is running since TOS polls the busy flag in the same register	
-				// using bset which in turn can mess up the line_number
-				if(!busy) line_number <= din[11:8];
-				
+				line_number <= din[11:8];
 				smudge <= din[13];
 				hog <= din[14];
 
@@ -272,7 +265,7 @@ always @(negedge clk) begin
 		end
 			
 		// advance state machine only if bus is owned
-		if(br_out && !br_in) begin
+		if(br_out && !br_in && (y_count != 0)) begin
 			// first extra source read (fxsr)
 			if(state == 2'd3) begin
 				if(src_x_inc[15] == 1'b0) 	src <= { src[15:0],  bm_data_in_latch};
@@ -348,6 +341,11 @@ always @(negedge clk) begin
 				else											state <= 2'd0;  // normal source read state
 			end
 		end
+		
+//		if(busy && (y_count == 0)) begin	
+			// undo last src inc
+	//		src_addr <= src_addr - { {8{src_x_inc[15]}}, src_x_inc };
+	//	end
 	end
 end
 

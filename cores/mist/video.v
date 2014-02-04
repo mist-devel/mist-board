@@ -194,13 +194,14 @@ wire [9:0] t10_v_border_top  = config_string[19:10];
 wire [9:0] t11_v_end         = config_string[9:0];
 
 // default video mode is monochrome
-parameter DEFAULT_MODE = 2'd2;
+parameter DEFAULT_MODE = 3'd2;
 
 // shiftmode register
-reg [1:0] shmode;
-wire mono = (shmode == 2'd2);
-wire mid  = (shmode == 2'd1);
-wire low  = (shmode == 2'd0);
+reg [2:0] shmode;
+wire ttmid = (shmode == 3'd4);
+wire mono  = (shmode == 3'd2);
+wire mid   = (shmode == 3'd1);
+wire low   = (shmode == 3'd0);
 
 // derive number of planes from shiftmode
 wire [2:0] planes = mono?3'd1:(mid?3'd2:3'd4);
@@ -225,6 +226,8 @@ reg [7:0] line_offset;            	// number of words to skip at the end of each
 reg [3:0] pixel_offset;             // number of pixels to skip at begin of line
 reg ste_overscan_enable;            // STE has a special 16 bit overscan
 
+wire mistvid = 1'b1;   // enable MiST extended video mode(s)
+   
 // ---------------------------------------------------------------------------
 // ----------------------------- CPU register read ---------------------------
 // ---------------------------------------------------------------------------
@@ -269,7 +272,7 @@ always @(reg_sel, reg_rw, reg_uds, reg_lds, reg_addr, _v_bas_ad, shmode, vaddr,
 		end
 
 		// shift mode register
-		if(reg_addr == 6'h30)      reg_dout <= { 6'h00, shmode, 8'h00    };
+		if(reg_addr == 6'h30)      reg_dout <= { 5'h00, shmode, 8'h00    };
 	end
 end
 
@@ -369,8 +372,9 @@ always @(negedge reg_clk) begin
 					end
 				end
 			end
-        
-			if(reg_addr == 6'h30 && !reg_uds) shmode <= reg_din[9:8];
+
+		        // make msb writeable if MiST video modes are enabled
+			if(reg_addr == 6'h30 && !reg_uds) shmode <= { mistvid?reg_din[10]:1'b0, reg_din[9:8] };
 		end
 	end
 end
@@ -470,13 +474,19 @@ always @(posedge clk) begin
 	end	
 
 	if(!scan_doubler_enable) begin
-		// hires mode: shift one plane only and reload 
-		// shift_0 register every 16 clocks
-		if(vga_hcnt[3:0] == 4'hf) shift_0       <= data_latch[0];
-		else      				     shift_0[15:1] <= shift_0[14:0];
-		
-		// TODO: Color modes not using scan doubler
-		
+		// hires mode: shift all planes and reload 
+		// shift registers every 16 clocks
+		if(vga_hcnt[3:0] == 4'hf) begin	
+			shift_0       <= data_latch[0];
+			shift_1       <= data_latch[1];
+			shift_2       <= data_latch[2];
+			shift_3       <= data_latch[3];
+		end else begin
+			shift_0[15:1] <= shift_0[14:0];
+			shift_1[15:1] <= shift_1[14:0];
+			shift_2[15:1] <= shift_2[14:0];
+			shift_3[15:1] <= shift_3[14:0];
+		end
 	end
 end
 
@@ -492,38 +502,40 @@ reg last_syncmode;
 reg [3:0] bottom_overscan_cnt;
 reg [3:0] top_overscan_cnt;
 
-wire bottom_overscan = (bottom_overscan_cnt != 0) /* synthesis keep */;
-wire top_overscan = (top_overscan_cnt != 0) /* synthesis keep */;
+wire bottom_overscan = (bottom_overscan_cnt != 0);
+wire top_overscan = (top_overscan_cnt != 0);
 
 always @(posedge clk) begin
-   last_syncmode <= syncmode[1];  // delay syncmode to detect changes
+	if(reg_reset) begin
+		top_overscan_cnt <= 4'd0;
+		bottom_overscan_cnt <= 4'd0;
+	end else begin
+		last_syncmode <= syncmode[1];  // delay syncmode to detect changes
 	 
-   // this is the magic used to do "overscan".
-   // the magic actually involves more than writing zero (60hz)
-   // within line 200. But this is sufficient for our detection
+		// this is the magic used to do "overscan".
+		// the magic actually involves more than writing zero (60hz)
+		// within line 200. But this is sufficient for our detection
 	
-   // trigger in line 198/199
-   if((vcnt == { 8'd97, 2'b00} ) && (vga_hcnt == 10'd0) && (bottom_overscan_cnt != 0))
-		bottom_overscan_cnt  <= bottom_overscan_cnt - 4'd1;
+		// trigger in line 198/199
+		if((vcnt == { 8'd97, 2'b00} ) && (vga_hcnt == 10'd0) && (bottom_overscan_cnt != 0))
+			bottom_overscan_cnt  <= bottom_overscan_cnt - 4'd1;
 
-   if((vcnt[9:2] == 8'd98)||(vcnt[9:2] == 8'd99)||(vcnt[9:2] == 8'd100)) begin
-		// syncmode has changed from 1 to 0 (50 to 60 hz)
-		if((syncmode[1] == 1'b0) && (last_syncmode == 1'b1))
-			bottom_overscan_cnt <= 4'd15;
-   end 
+		if((vcnt[9:2] == 8'd98)||(vcnt[9:2] == 8'd99)||(vcnt[9:2] == 8'd100)) begin
+			// syncmode has changed from 1 to 0 (50 to 60 hz)
+			if((syncmode[1] == 1'b0) && (last_syncmode == 1'b1))
+				bottom_overscan_cnt <= 4'd15;
+		end 
 	  
-   // trigger in line 284/285
-   if((vcnt == {8'd133, 2'b00 }) && (vga_hcnt == 10'd0) && (top_overscan_cnt != 0))
-		top_overscan_cnt  <= top_overscan_cnt - 4'd1;
+		// trigger in line 284/285
+		if((vcnt == {8'd133, 2'b00 }) && (vga_hcnt == 10'd0) && (top_overscan_cnt != 0))
+			top_overscan_cnt  <= top_overscan_cnt - 4'd1;
 
-	if((vcnt[9:2] == 8'd134)||(vcnt[9:2] == 8'd135)||(vcnt[9:2] == 8'd136)) begin
-		// syncmode has changed from 1 to 0 (50 to 60 hz)
-		if((syncmode[1] == 1'b0) && (last_syncmode == 1'b1))
-			top_overscan_cnt <= 4'd15;
-   end
-
-//	top_overscan <= 1'b1;
-//	bottom_overscan <= 1'b1;
+		if((vcnt[9:2] == 8'd134)||(vcnt[9:2] == 8'd135)||(vcnt[9:2] == 8'd136)) begin
+			// syncmode has changed from 1 to 0 (50 to 60 hz)
+			if((syncmode[1] == 1'b0) && (last_syncmode == 1'b1))
+				top_overscan_cnt <= 4'd15;
+		end
+	end
 end
 
 // ---------------------------------------------------------------------------
@@ -725,9 +737,13 @@ always @(posedge clk) begin
 	// make sure each line starts with plane 0
 	if(st_hcnt == de_h_start)
 		plane <= 2'd0;
+
+	// according to hatari the video counter is reloaded 3 lines before 
+	// the vbi occurs. This is right after the display has been painted.
+	// The video address counter is reloaded right after display ends 
 	
-	// The video address counter is reloaded right before display starts 
-	if((vga_hcnt == t3_h_blank_left) && (vcnt == t7_v_blank_bot)) begin
+	// TODO: -1 and pacmania works ...
+	if((vga_hcnt == t3_h_blank_left) && (vcnt == (t7_v_blank_bot-de_v_offset+10'd1))) begin
 		vaddr <= _v_bas_ad;
 
 		// copy syncmode
@@ -739,17 +755,28 @@ always @(posedge clk) begin
 	
 			// read if display enable is active
 			if(de) begin
+			
 				// move incoming video data into data latch
+				if(ttmid) begin
+					// TT mid compatible part fetches all 4 planes at once
+				   data_latch[0] <= data[15: 0];
+				   data_latch[1] <= data[31:16];
+				   data_latch[2] <= data[47:32];
+				   data_latch[3] <= data[63:48];
+
+				   vaddr <= vaddr + 23'd4;
+				end else begin
+	
+				   // ST shifter only uses 16 out of possible 64 bits, so select the right word
+				   case(vaddr[1:0])
+						2'd0: data_latch[plane] <= data[15: 0];
+						2'd1: data_latch[plane] <= data[31:16];
+						2'd2: data_latch[plane] <= data[47:32];
+						2'd3: data_latch[plane] <= data[63:48];
+				   endcase
 				
-				// ST shifter only uses 16 out of possible 64 bits, so select the right word
-				case(vaddr[1:0])
-					2'd0: data_latch[plane] <= data[15: 0];
-					2'd1: data_latch[plane] <= data[31:16];
-					2'd2: data_latch[plane] <= data[47:32];
-					2'd3: data_latch[plane] <= data[63:48];
-				endcase
-				
-				vaddr <= vaddr + 23'd1;
+				   vaddr <= vaddr + 23'd1;
+				end
 			end
 
 			// advance plane counter
