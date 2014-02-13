@@ -70,6 +70,13 @@
 
 // RK:
 // 2012-11-11 - two-stage sigma-delta modulator added
+// 2013-02-10 - two stage sigma-delta updated:
+//  - used AMR's silence fix
+//  - added interpolator at sigma-delta input
+//  - all bits of the x3/4 input signal are used, dithering removed
+//  - two LFSR PRNGs are combined and high-pass filtered for a HP triangular PDF noise
+//  - random noise is applied directly in front of the quantizer, which helps randomize the output stream
+//  - some noise shaping (filtering) added to the error feedback signal
 
 
 module audio
@@ -87,8 +94,7 @@ module audio
 	output	reg [3:0] dmal,			//dma request 
 	output	reg [3:0] dmas,			//dma special 
 	output	left,					//audio bitstream out left
-	output	right					//audio bitstream out right
-  ,
+	output	right,					//audio bitstream out right
 	output	[14:0]ldata,		//left DAC data
 	output	[14:0]rdata 		//right DAC data
 );
@@ -239,7 +245,7 @@ audiomixer mix (
 //instantiate sigma/delta modulator
 sigmadelta dac
 (
-  .clk(clk28m),
+  .clk(clk),
   .ldatasum(ldata),
   .rdatasum(rdata),
   .left(left),
@@ -345,54 +351,99 @@ module sigmadelta
 	input 	clk,				//bus clock
 	input	[14:0] ldatasum,			// left channel data
 	input	[14:0] rdatasum,			// right channel data
-	output	reg left,				//left bitstream output
-	output	reg right				//right bitsteam output
+	output	reg left=0,				//left bitstream output
+	output	reg right=0				//right bitsteam output
 );
-
 
 //--------------------------------------------------------------------------------------
 
-
-// lfsr
-// TODO good for dithering, better noise needed for additive
-reg [24-1:0] seed = 24'h654321;
-always @ (posedge clk) begin
-  if ((~|seed) || (&seed)) // TODO
-    seed <= #1 24'h654321;
-  else
-    seed <= #1 {seed[22:0], ~(seed[23] ^ seed[22] ^ seed[21] ^ seed[16])};
-end
-
+// local signals
 localparam DW = 15;
 localparam CW = 2;
-localparam RW  = 2;
+localparam RW  = 4;
 localparam A1W = 2;
-localparam A2W = 4;
+localparam A2W = 5;
 
-wire [DW+0  -1:0] sd_l_er0, sd_r_er0;
-wire [DW+A1W-1:0] sd_l_aca1,  sd_r_aca1;
-wire [DW+A2W-1:0] sd_l_aca2,  sd_r_aca2;
-reg  [DW+A1W-1:0] sd_l_ac1=0, sd_r_ac1=0;
-reg  [DW+A2W-1:0] sd_l_ac2=0, sd_r_ac2=0;
+wire [DW+2+0  -1:0] sd_l_er0, sd_r_er0;
+reg  [DW+2+0  -1:0] sd_l_er0_prev=0, sd_r_er0_prev=0;
+wire [DW+A1W+2-1:0] sd_l_aca1,  sd_r_aca1;
+wire [DW+A2W+2-1:0] sd_l_aca2,  sd_r_aca2;
+reg  [DW+A1W+2-1:0] sd_l_ac1=0, sd_r_ac1=0;
+reg  [DW+A2W+2-1:0] sd_l_ac2=0, sd_r_ac2=0;
+wire [DW+A2W+3-1:0] sd_l_quant, sd_r_quant;
+
+// LPF noise LFSR
+reg [24-1:0] seed1 = 24'h654321;
+reg [19-1:0] seed2 = 19'h12345;
+reg [24-1:0] seed_sum=0, seed_prev=0, seed_out=0;
+always @ (posedge clk) begin
+  if (&seed1)
+    seed1 <= #1 24'h654321;
+  else
+    seed1 <= #1 {seed1[22:0], ~(seed1[23] ^ seed1[22] ^ seed1[21] ^ seed1[16])};
+end
+always @ (posedge clk) begin
+  if (&seed2)
+    seed2 <= #1 19'h12345;
+  else
+    seed2 <= #1 {seed2[17:0], ~(seed2[18] ^ seed2[17] ^ seed2[16] ^ seed2[13] ^ seed2[0])};
+end
+always @ (posedge clk) begin
+  seed_sum  <= #1 seed1 + {5'b0, seed2};
+  seed_prev <= #1 seed_sum;
+  seed_out  <= #1 seed_sum - seed_prev;
+end
+
+// linear interpolate
+localparam ID=4; // counter size, also 2^ID = interpolation rate
+reg  [ID+0-1:0] int_cnt = 0;
+always @ (posedge clk) int_cnt <= #1 int_cnt + 'd1;
+
+reg  [DW+0-1:0] ldata_cur=0, ldata_prev=0;
+reg  [DW+0-1:0] rdata_cur=0, rdata_prev=0;
+wire [DW+1-1:0] ldata_step, rdata_step;
+reg  [DW+ID-1:0] ldata_int=0, rdata_int=0;
+wire [DW+0-1:0] ldata_int_out, rdata_int_out;
+assign ldata_step = ldata_cur - ldata_prev;
+assign rdata_step = rdata_cur - rdata_prev;
+always @ (posedge clk) begin
+  if (~|int_cnt) begin
+    ldata_prev <= #1 ldata_cur;
+    ldata_cur  <= #1 ldatasum; //{~ldatasum[DW-1], ldatasum[DW-2:0]}; // convert to offset binary, samples no longer signed!
+    rdata_prev <= #1 rdata_cur;
+    rdata_cur  <= #1 rdatasum; //{~rdatasum[DW-1], rdatasum[DW-2:0]}; // convert to offset binary, samples no longer signed!
+    ldata_int  <= #1 {ldata_cur[DW-1], ldata_cur, {ID{1'b0}}};
+    rdata_int  <= #1 {rdata_cur[DW-1], rdata_cur, {ID{1'b0}}};
+  end else begin
+    ldata_int  <= #1 ldata_int + {{ID{ldata_step[DW+1-1]}}, ldata_step};
+    rdata_int  <= #1 rdata_int + {{ID{rdata_step[DW+1-1]}}, rdata_step};
+  end
+end
+assign ldata_int_out = ldata_int[DW+ID-1:ID];
+assign rdata_int_out = rdata_int[DW+ID-1:ID];
+//assign ldata_int_out = ldatasum[DW-1:0];
+//assign rdata_int_out = rdatasum[DW-1:0];
 
 // input gain x3
 wire [DW+2-1:0] ldata_gain, rdata_gain;
-assign ldata_gain = {ldatasum[DW-1], ldatasum, ldatasum[DW-2]} + {{(2){ldatasum[DW-1]}}, ldatasum};
-assign rdata_gain = {rdatasum[DW-1], rdatasum, rdatasum[DW-2]} + {{(2){rdatasum[DW-1]}}, rdatasum};
+assign ldata_gain = {ldata_int_out[DW-1], ldata_int_out, 1'b0} + {{(2){ldata_int_out[DW-1]}}, ldata_int_out};
+assign rdata_gain = {rdata_int_out[DW-1], rdata_int_out, 1'b0} + {{(2){rdata_int_out[DW-1]}}, rdata_int_out};
 
+/*
 // random dither to 15 bits
-reg [DW-1:0] ldata, rdata;
+reg [DW-1:0] ldata=0, rdata=0;
 always @ (posedge clk) begin
-  ldata <= #1 ldata_gain[DW+2-1:2] + ( (~(&ldata_gain[DW+2-1-1:2]) && (ldata_gain[1:0] > seed[1:0])) ? 1 : 0 );
-  rdata <= #1 rdata_gain[DW+2-1:2] + ( (~(&ldata_gain[DW+2-1-1:2]) && (ldata_gain[1:0] > seed[1:0])) ? 1 : 0 );
+  ldata <= #1 ldata_gain[DW+2-1:2] + ( (~(&ldata_gain[DW+2-1-1:2]) && (ldata_gain[1:0] > seed_out[1:0])) ? 15'd1 : 15'd0 );
+  rdata <= #1 rdata_gain[DW+2-1:2] + ( (~(&ldata_gain[DW+2-1-1:2]) && (ldata_gain[1:0] > seed_out[1:0])) ? 15'd1 : 15'd0 );
 end
+*/
 
 // accumulator adders
-assign sd_l_aca1 = {{(A1W){ldata[DW-1]}}, ldata} - {{(A1W){sd_l_er0[DW-1]}}, sd_l_er0} + {{(DW+A1W-RW){seed[RW-1]}}, seed[RW+6-1:6]} + sd_l_ac1; // TODO random additive noise could be removed
-assign sd_r_aca1 = {{(A1W){rdata[DW-1]}}, rdata} - {{(A1W){sd_r_er0[DW-1]}}, sd_r_er0} + {{(DW+A1W-RW){seed[RW-1]}}, seed[RW+6-1:6]} + sd_r_ac1;
+assign sd_l_aca1 = {{(A1W){ldata_gain[DW+2-1]}}, ldata_gain} - {{(A1W){sd_l_er0[DW+2-1]}}, sd_l_er0} + sd_l_ac1;
+assign sd_r_aca1 = {{(A1W){rdata_gain[DW+2-1]}}, rdata_gain} - {{(A1W){sd_r_er0[DW+2-1]}}, sd_r_er0} + sd_r_ac1;
 
-assign sd_l_aca2 = {{(A2W-A1W){sd_l_aca1[DW+A1W-1]}}, sd_l_aca1} - {{(A2W){sd_l_er0[DW-1]}}, sd_l_er0} /*+ {{(DW+A2W-RW){seed[RW-1]}}, seed[RW-1:0]}*/ + sd_l_ac2;
-assign sd_r_aca2 = {{(A2W-A1W){sd_r_aca1[DW+A1W-1]}}, sd_r_aca1} - {{(A2W){sd_r_er0[DW-1]}}, sd_r_er0} /*+ {{(DW+A2W-RW){seed[RW-1]}}, seed[RW-1:0]}*/ + sd_r_ac2;
+assign sd_l_aca2 = {{(A2W-A1W){sd_l_aca1[DW+A1W+2-1]}}, sd_l_aca1} - {{(A2W){sd_l_er0[DW+2-1]}}, sd_l_er0} - {{(A2W+1){sd_l_er0_prev[DW+2-1]}}, sd_l_er0_prev[DW+2-1:1]} + sd_l_ac2;
+assign sd_r_aca2 = {{(A2W-A1W){sd_r_aca1[DW+A1W+2-1]}}, sd_r_aca1} - {{(A2W){sd_r_er0[DW+2-1]}}, sd_r_er0} - {{(A2W+1){sd_r_er0_prev[DW+2-1]}}, sd_r_er0_prev[DW+2-1:1]} + sd_r_ac2;
 
 // accumulators
 always @ (posedge clk) begin
@@ -402,14 +453,22 @@ always @ (posedge clk) begin
   sd_r_ac2 <= #1 sd_r_aca2;
 end
 
+// value for quantizaton
+assign sd_l_quant = {sd_l_ac2[DW+A2W+2-1], sd_l_ac2} + {{(DW+A2W+3-RW){seed_out[RW-1]}}, seed_out[RW-1:0]};
+assign sd_r_quant = {sd_r_ac2[DW+A2W+2-1], sd_r_ac2} + {{(DW+A2W+3-RW){seed_out[RW-1]}}, seed_out[RW-1:0]};
+
 // error feedback
-assign sd_l_er0 = sd_l_ac2[DW+A2W-1] ? {1'b1, {(DW-1){1'b0}}} : {1'b0, {(DW-1){1'b1}}};
-assign sd_r_er0 = sd_r_ac2[DW+A2W-1] ? {1'b1, {(DW-1){1'b0}}} : {1'b0, {(DW-1){1'b1}}};
+assign sd_l_er0 = sd_l_quant[DW+A2W+3-1] ? {1'b1, {(DW+2-1){1'b0}}} : {1'b0, {(DW+2-1){1'b1}}};
+assign sd_r_er0 = sd_r_quant[DW+A2W+3-1] ? {1'b1, {(DW+2-1){1'b0}}} : {1'b0, {(DW+2-1){1'b1}}};
+always @ (posedge clk) begin
+  sd_l_er0_prev <= #1 (&sd_l_er0) ? sd_l_er0 : sd_l_er0+1;
+  sd_r_er0_prev <= #1 (&sd_r_er0) ? sd_r_er0 : sd_r_er0+1;
+end
 
 // output
 always @ (posedge clk) begin
-  left  <= #1 ~sd_l_er0[DW-1];
-  right <= #1 ~sd_r_er0[DW-1];
+  left  <= #1 (~|ldata_gain) ? ~left  : ~sd_l_er0[DW+2-1];
+  right <= #1 (~|rdata_gain) ? ~right : ~sd_r_er0[DW+2-1];
 end
 
 endmodule
@@ -507,6 +566,9 @@ reg		intreq2;				//buffered interrupt request
 reg		dmasen;					//pointer register reloading request
 reg		penhi;					//enable high byte of sample buffer
 
+reg silence;  // AMR: disable audio if repeat length is 1
+reg silence_d;  // AMR: disable audio if repeat length is 1
+reg dmaena_d;
 
 //--------------------------------------------------------------------------------------
  
@@ -568,11 +630,32 @@ assign perfin = (percnt[15:0]==1 && cck) ? 1'b1 : 1'b0;
 
 //length counter 
 always @(posedge clk)
-	if (lencntrld && cck)//load length counter from audio length register
-		lencnt[15:0] <= audlen[15:0];
-	else if (lencount && cck)//length counter count down
-		lencnt[15:0] <= lencnt[15:0] - 16'd1;
-		
+  begin
+    if (lencntrld && cck)//load length counter from audio length register
+    begin
+      lencnt[15:0] <= (audlen[15:0]);
+      silence<=1'b0;
+      if(audlen==1 || audlen==0)
+        silence<=1'b1;
+    end
+    else if (lencount && cck)//length counter count down
+      lencnt[15:0] <= (lencnt[15:0] - 1);
+
+    // Silence fix
+    dmaena_d<=dmaena;
+    if(dmaena_d==1'b1 && dmaena==1'b0)
+    begin
+      silence_d<=1'b1; // Prevent next write from unsilencing the channel.
+      silence<=1'b1;
+    end
+    if(AUDxDAT && cck)  // Unsilence the channel if the CPU writes to AUDxDAT
+      if(silence_d)
+        silence_d<=1'b0;
+      else
+        silence<=1'b0;
+      
+  end
+	
 assign lenfin = (lencnt[15:0]==1 && cck) ? 1'b1 : 1'b0;
 
 //--------------------------------------------------------------------------------------
@@ -584,7 +667,8 @@ always @(posedge clk)
 	else if (pbufld1 && cck)
 		datbuf[15:0] <= auddat[15:0];
 
-assign sample[7:0] = penhi ? datbuf[15:8] : datbuf[7:0];
+//assign sample[7:0] = penhi ? datbuf[15:8] : datbuf[7:0];
+assign sample[7:0] = silence ? 8'b0 : (penhi ? datbuf[15:8] : datbuf[7:0]);
 
 //volume output
 assign volume[6:0] = audvol[6:0];
