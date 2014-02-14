@@ -404,8 +404,8 @@ reg  [DW+0-1:0] rdata_cur=0, rdata_prev=0;
 wire [DW+1-1:0] ldata_step, rdata_step;
 reg  [DW+ID-1:0] ldata_int=0, rdata_int=0;
 wire [DW+0-1:0] ldata_int_out, rdata_int_out;
-assign ldata_step = ldata_cur - ldata_prev;
-assign rdata_step = rdata_cur - rdata_prev;
+assign ldata_step = {ldata_cur[DW-1], ldata_cur} - {ldata_prev[DW-1], ldata_prev}; // signed subtract
+assign rdata_step = {rdata_cur[DW-1], rdata_cur} - {rdata_prev[DW-1], rdata_prev}; // signed subtract
 always @ (posedge clk) begin
   if (~|int_cnt) begin
     ldata_prev <= #1 ldata_cur;
@@ -421,8 +421,6 @@ always @ (posedge clk) begin
 end
 assign ldata_int_out = ldata_int[DW+ID-1:ID];
 assign rdata_int_out = rdata_int[DW+ID-1:ID];
-//assign ldata_int_out = ldatasum[DW-1:0];
-//assign rdata_int_out = rdatasum[DW-1:0];
 
 // input gain x3
 wire [DW+2-1:0] ldata_gain, rdata_gain;
