@@ -11,7 +11,12 @@ HEX2MIF_DIR = ../../sw/hex2mif/
 
 
 ### programs ###
-VASM    = $(VASM_DIR)vasmm68k_mot
+ifneq (,$(findstring Windows,$(OS)))
+    VASM    = $(VASM_DIR)vasmm68k_mot.exe
+else
+    VASM    = $(VASM_DIR)vasmm68k_mot
+endif
+
 XXD     = xxd
 HEX2MEM = $(HEX2MEM_DIR)hex2mem.py
 HEX2MIF = $(HEX2MIF_DIR)hex2mif.py

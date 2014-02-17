@@ -111,7 +111,7 @@ def main():
     fo.write(     "endmodule\n\n")
  
   # done
-  print "File %s written successfully, using %dx%d memory (%d bits), will be probably inferred into %d Altera M4Ks." % (fon, idx+1, mw*4, (idx+1)*mw*4, int(math.ceil((idx+1)*mw*4/4096)))
+  print ("File %s written successfully, using %dx%d memory (%d bits), will be probably inferred into %d Altera M4Ks." % (fon, idx+1, mw*4, (idx+1)*mw*4, int(math.ceil((idx+1)*mw*4/4096))))
 
 # END main
 
