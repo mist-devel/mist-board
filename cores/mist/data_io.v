@@ -52,9 +52,13 @@ assign addr = (cmd==2)?(addrR[22:0]-23'd1):addrR[22:0];
 
 // latch bus cycle to have it stable at the end of the cycle (rising edge of clk8)
 reg [1:0] bus_cycle_L;
-always @(negedge clk_8)
+always @(negedge clk_8) begin
 	bus_cycle_L <= bus_cycle;
 
+	if(bus_cycle == 0)
+		br <= brI;
+end
+	
 // generate state signals required to control the sdram host interface
 always @(posedge clk_8) begin
 	// start io transfers clock cycles after bus_cycle 0 
@@ -64,8 +68,6 @@ always @(posedge clk_8) begin
 	readD <= readCmd && ((bus_cycle_L == 3) || readD);
 	readD2 <= readD;
 
-	br <= brI;
-	
 	// at the end of a read cycle latch the incoming ram data for later spi transmission
 	if(read)	ram_data <= data_in;
 	

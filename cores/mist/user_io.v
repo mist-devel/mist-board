@@ -17,10 +17,14 @@ module user_io(
 		// serial data from mfp to io controller
 		output reg       serial_strobe_out,
 		input            serial_data_out_available,
-		input [7:0]       serial_data_out,
+		input [7:0]      serial_data_out,
+		
+		// serial data from io controller to mfp
+		output reg       serial_strobe_in,
+		output reg [7:0] serial_data_in,
 
-		output [1:0] BUTTONS,
-		output [1:0] SWITCHES
+		output [1:0] 	  BUTTONS,
+		output [1:0]     SWITCHES
 	   );
 
 	reg 					toggle;
@@ -82,6 +86,7 @@ module user_io(
 			if(cnt == 9) begin
 				ikbd_strobe_in <= 1'b0;
 				ikbd_strobe_out <= 1'b0;
+				serial_strobe_in <= 1'b0;
 				serial_strobe_out <= 1'b0;
 			end
 			
@@ -92,12 +97,18 @@ module user_io(
 					 but_sw[0] <= SPI_MOSI; 
 				end
 
+				// send ikbd byte to acia
 			   if(cmd == 2) begin
-					 ikbd_data_in[7:1] <= sbuf; 
-					 ikbd_data_in[0] <= SPI_MOSI; 
+					 ikbd_data_in <= { sbuf, SPI_MOSI }; 
 					 ikbd_strobe_in <= 1'b1;
 				end
-				
+
+				// send serial byte to mfp
+			   if(cmd == 4) begin
+					 serial_data_in <= { sbuf, SPI_MOSI }; 
+					 serial_strobe_in <= 1'b1;
+				end
+
 				// give strobe after second ikbd byte (toggle ==1)
 			   if((cmd == 3) && toggle)
 					 ikbd_strobe_out <= 1'b1;

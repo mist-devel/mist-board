@@ -111,9 +111,9 @@ always @(posedge clk_8) begin
 					dtack_timeout <= dtack_timeout + 4'd1;
 			end 
 		end
-	end
+	end 
 end
-
+ 
 // no tristate busses exist inside the FPGA. so bus request doesn't do
 // much more than halting the cpu by suppressing dtack
 `define BRWIRE
@@ -305,11 +305,13 @@ mfp mfp (
 	.irq	    (mfp_irq     ),
 	.iack	    (mfp_iack    ),
 
-	// serial/rs232 interface
+	// serial/rs232 interface io-controller<->mfp
 	.serial_data_out_available 	(serial_data_from_mfp_available),
 	.serial_strobe_out 				(serial_strobe_from_mfp),
 	.serial_data_out 	   			(serial_data_from_mfp),
-	
+	.serial_strobe_in 				(serial_strobe_to_mfp),
+	.serial_data_in 	   			(serial_data_to_mfp),
+
 	// input signals
 	.clk_ext   (clk_mfp       ),  // 2.457MHz clock
 	.t_i       (mfp_timer_in  ),  // timer a/b inputs
@@ -545,7 +547,7 @@ wire clk_8;
 wire clk_32;
 wire clk_128;
 wire clk_mfp;
-    
+     
 // use pll
 clock clock (
   .areset       (1'b0             ), // async reset input
@@ -667,32 +669,17 @@ wire        tg68_uds_S;
 wire        tg68_lds_S;
 wire        tg68_rw_S;
 reg         tg68_as;
-reg         cpu_fast_cycle;  // signal indicating that the cpu runs from cache 
-
-always @(posedge clk_8) begin
-	// tg68 core does not provide a as signal, so we generate it
-	tg68_as <= (tg68_busstate != 2'b01) && !br;
- 
-	// all other output signals are simply latched to make sure
-	// they don't change within a 8Mhz cycle even if the CPU
-	// advances. This would be a problem if e.g. The CPU would try
-	// to start a bus cycle while the 8Mhz cycle is in progress
-	tg68_dat_out <= tg68_dat_out_S;
-	tg68_adr <= tg68_adr_S;
-	tg68_uds <= tg68_uds_S;
-	tg68_lds <= tg68_lds_S;
-	tg68_rw <= tg68_rw_S;
-	tg68_fc <= tg68_fc_S;
-end
+reg         cpu_fast_cycle;  // signal indicating that the cpu runs from cache, used to calm berr
 
 // the CPU throttle counter limits the CPU speed to a rate the tg68 core can
 // handle. With a throttle of "4" the core will run effectively at 32MHz which
 // is equivalent to ~64MHz on a real 68000. This speed will never be achieved 
 // since memory and peripheral access slows the cpu further
-localparam CPU_THROTTLE = 4'd5;
+localparam CPU_THROTTLE = 4'd6;
 reg [3:0] clkcnt;
-
+ 
 reg trigger /* synthesis noprune */;
+reg panic /* synthesis noprune */; 
 
 always @(posedge clk_128) begin
 	// count 0..15 within a 8MHz cycle 
@@ -707,11 +694,30 @@ always @(posedge clk_128) begin
 	dCacheStore <= 1'b0;
 	cacheUpdate <= 1'b0;
 	trigger <= 1'b0;
+	panic <= 1'b0;
 
-	// cpuDoes8MhzCycle has same timing as tg68_as
-	if(clkcnt == 15) begin	
-		cpuDoes8MhzCycle <= 1'b1; 
+	if(clkcnt == 15) begin
+		// 8Mhz cycle must not start directly after the cpu has been clocked
+		// as the address may not be stable then
+
+		// cpuDoes8MhzCycle has same timing as tg68_as
+		if(!clkena && !br) cpuDoes8MhzCycle <= 1'b1; 
+
 		cpu_fast_cycle <= 1'b0;
+
+		// tg68 core does not provide a as signal, so we generate it
+		tg68_as <= !clkena && (tg68_busstate != 2'b01) && !br;
+ 
+		// all other output signals are simply latched to make sure
+		// they don't change within a 8Mhz cycle even if the CPU
+		// advances. This would be a problem if e.g. The CPU would try
+		// to start a bus cycle while the 8Mhz cycle is in progress
+		tg68_dat_out <= tg68_dat_out_S;
+		tg68_adr <= tg68_adr_S;
+		tg68_uds <= tg68_uds_S;
+		tg68_lds <= tg68_lds_S;
+		tg68_rw <= tg68_rw_S;
+		tg68_fc <= tg68_fc_S;	
 	end
 
 	// evaluate cache one cycle before cpu is allowed to access the bus again
@@ -731,6 +737,11 @@ always @(posedge clk_128) begin
 		// cpu wants to read and the requested data is available from the cache -> run immediately
 		if((tg68_busstate == 2'b01) || cacheRead) begin
 			clkena <= 1'b1;
+
+			// cpu must never try to fetch instructions from non-mem
+			if((tg68_busstate == 2'b00) && !cpu2mem) 
+				panic <= 1'b1;
+			
 			cpu_throttle <= CPU_THROTTLE;
 			cpuDoes8MhzCycle <= 1'b0;
 			cpu_fast_cycle <= 1'b1;
@@ -747,6 +758,10 @@ always @(posedge clk_128) begin
 				cpu_throttle <= CPU_THROTTLE;
 				cpuDoes8MhzCycle <= 1'b0;
 					
+				// cpu must never try to fetch instructions from non-mem
+				if((tg68_busstate == 2'b00) && !cpu2mem) 
+					panic <= 1'b1;
+
 				// ---------- cache debugging ---------------
 				// if the cache reports a hit, it should be the same data that's also
 				// returned by ram. Otherwise the cache is broken
@@ -1023,6 +1038,8 @@ wire ikbd_data_from_acia_available;
 wire [7:0] serial_data_from_mfp;
 wire serial_strobe_from_mfp;
 wire serial_data_from_mfp_available;
+wire [7:0] serial_data_to_mfp;
+wire serial_strobe_to_mfp;
 
 //// user io has an extra spi channel outside minimig core ////
 user_io user_io(
@@ -1043,6 +1060,8 @@ user_io user_io(
       .serial_strobe_out(serial_strobe_from_mfp),
       .serial_data_out(serial_data_from_mfp),
       .serial_data_out_available(serial_data_from_mfp_available),
+      .serial_strobe_in(serial_strobe_to_mfp),
+      .serial_data_in(serial_data_to_mfp),
 		
 		.CORE_TYPE(8'ha3)    // mist core id
 );

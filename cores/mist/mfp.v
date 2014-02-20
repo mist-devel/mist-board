@@ -18,6 +18,10 @@ module mfp (
 	input  		 serial_strobe_out,
 	output [7:0] serial_data_out,
 
+	// serial rs223 connection from io controller
+   input 		serial_strobe_in,
+   input [7:0] serial_data_in,
+
 	// inputs
 	input 		 clk_ext,   // external 2.457MHz
 	input [1:0]	 t_i,  // timer input
@@ -27,17 +31,55 @@ module mfp (
 localparam FIFO_ADDR_BITS = 4;
 localparam FIFO_DEPTH = (1 << FIFO_ADDR_BITS);
 
-// 
+// fifo for data from mfp to io controller
 reg [7:0] fifoOut [FIFO_DEPTH-1:0];
 reg [FIFO_ADDR_BITS-1:0] writePout, readPout;
+
+// fifo for data from io-controller to mfp
+reg [7:0] fifoIn [FIFO_DEPTH-1:0];
+reg [FIFO_ADDR_BITS-1:0] writePin, readPin;
 
 assign serial_data_out_available = (readPout != writePout);
 assign serial_data_out = fifoOut[readPout];
 
+wire serial_data_in_available = (readPin != writePin) /* synthesis keep */;
+wire [7:0] serial_data_in_cpu = serial_data_in_available?fifoIn[readPin]:fifoIn[readPin-4'd1];
+
 // signal "fifo is full" via uart config bit
 wire serial_data_out_fifo_full = (readPout === (writePout + 4'd1));
 
-// ---------------- send mfp uart data to io controller ------------
+// ---------------- mfp uart data to/from io controller ------------
+reg serial_strobe_inD, serial_strobe_inD2;	
+reg serial_cpu_data_read;
+
+always @(negedge clk) begin
+	serial_strobe_inD <= serial_strobe_in;
+	serial_strobe_inD2 <= serial_strobe_inD;
+	
+	// read on uart data register
+	serial_cpu_data_read <= 1'b0;
+	if(sel && ~ds && rw && (addr == 5'h17))
+		serial_cpu_data_read <= 1'b1;
+
+	if(reset) begin
+		// reset read and write counters
+		readPin <= 4'd0;
+		writePin <= 4'd0;
+	end else begin
+		// store bytes received from IO controller via SPI
+	   if(serial_strobe_inD && !serial_strobe_inD2) begin
+			// store data in fifo
+			fifoIn[writePin] <= serial_data_in;
+			writePin <= writePin + 4'd1;
+	   end 
+
+		// advance read pointer on every cpu read
+	   if(serial_cpu_data_read && serial_data_in_available)
+			readPin <= readPin + 4'd1;
+   end
+end 
+ 
+ 
 reg serial_strobe_outD, serial_strobe_outD2;
 always @(posedge clk) begin
 	serial_strobe_outD <= serial_strobe_out;
@@ -184,6 +226,10 @@ wire [3:0] highest_irq_pending =
 // gpip as output to the cpu (ddr bit == 1 -> gpip pin is output)
 wire [7:0] gpip_cpu_out = (i & ~ddr) | (gpip & ddr);
 
+// cpu controllable uart control bits
+reg [1:0] uart_rx_ctrl;
+reg [3:0] uart_tx_ctrl;
+
 // cpu read interface
 always @(iack, sel, ds, rw, addr, gpip_cpu_out, aer, ddr, ier, ipr, isr, imr, 
 	vr, serial_data_out_fifo_full, timera_dat_o, timerb_dat_o,
@@ -216,7 +262,9 @@ always @(iack, sel, ds, rw, addr, gpip_cpu_out, aer, ddr, ier, ipr, isr, imr,
 		if(addr == 5'h12) dout = timerd_dat_o;
 		
 		// uart: report "tx buffer empty" if fifo is not full
-		if(addr == 5'h16) dout = serial_data_out_fifo_full?8'h00:8'h80;
+		if(addr == 5'h15) dout = {  serial_data_in_available, 5'b00000 , uart_rx_ctrl}; 
+		if(addr == 5'h16) dout = { !serial_data_out_fifo_full, 3'b000 , uart_tx_ctrl}; 
+		if(addr == 5'h17) dout = serial_data_in_cpu;
 		
 	end else if(iack) begin
 		dout = irq_vec;
@@ -234,6 +282,8 @@ reg iackD;
 // latch to keep irq vector stable during irq ack cycle
 reg [7:0] irq_vec;
 
+reg [1:0] usart_irqD;
+
 always @(negedge clk) begin
    iackD <= iack;
 
@@ -246,6 +296,10 @@ always @(negedge clk) begin
 	iD <= aer ^ ((i & ~ti_irq_mask) | (ti_irq & ti_irq_mask));
 	iD2 <= iD;
 
+	// delay usart states to react on changes
+	usart_irqD[0] <= !serial_data_out_fifo_full;
+	usart_irqD[1] <= serial_data_in_available;
+	
 	if(reset) begin
 		ipr <= 16'h0000; ier <= 16'h0000; 
 		imr <= 16'h0000; isr <= 16'h0000;
@@ -274,6 +328,10 @@ always @(negedge clk) begin
 		if(!iD[5] && iD2[5] && ier[ 7]) ipr[ 7] <= 1'b1;   // dma
 		if(!iD[7] && iD2[7] && ier[15]) ipr[15] <= 1'b1;   // mono detect
 
+		// output fifo just became "not full" or input fifo became "not empty"
+		if(!usart_irqD[0] && !serial_data_out_fifo_full && ier[10]) ipr[10] <= 1'b1;
+		if(!usart_irqD[1] &&  serial_data_in_available  && ier[12]) ipr[12] <= 1'b1;
+
 		if(sel && ~ds && ~rw) begin
 			if(addr == 5'h00) gpip <= din;
 			if(addr == 5'h01)	aer <= din;
@@ -298,6 +356,10 @@ always @(negedge clk) begin
 				
 			if(addr == 5'h0a)	imr[7:0] <= din;
 			if(addr == 5'h0b) vr <= din;
+
+			// ------- uart ------------
+			if(addr == 5'h15) uart_rx_ctrl <= din[1:0];
+			if(addr == 5'h16) uart_tx_ctrl <= din[3:0];
 			
 			if(addr == 5'h17) begin
 				fifoOut[writePout] <= din;
