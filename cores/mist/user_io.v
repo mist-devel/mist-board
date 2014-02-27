@@ -23,6 +23,11 @@ module user_io(
 		output reg       serial_strobe_in,
 		output reg [7:0] serial_data_in,
 
+		// parallel data from psg/ym to io controller
+		output reg       parallel_strobe_out,
+		input            parallel_data_out_available,
+		input [7:0]      parallel_data_out,
+
 		output [1:0] 	  BUTTONS,
 		output [1:0]     SWITCHES
 	   );
@@ -55,6 +60,14 @@ module user_io(
 				else
 					SPI_MISO <= serial_data_out[15-cnt];
 			end
+			
+			// parallel psg/ym->io controller
+			if(cmd == 6) begin
+				if(!toggle)
+					SPI_MISO <= parallel_data_out_available;
+				else
+					SPI_MISO <= parallel_data_out[15-cnt];
+			end
 		end
 	end
 		
@@ -65,6 +78,7 @@ module user_io(
 		  ikbd_strobe_in <= 1'b0;
 		  ikbd_strobe_out <= 1'b0;
 		  serial_strobe_out <= 1'b0;
+		  parallel_strobe_out <= 1'b0;
 		end else begin
 			sbuf[6:1] <= sbuf[5:0];
 			sbuf[0] <= SPI_MOSI;
@@ -88,6 +102,7 @@ module user_io(
 				ikbd_strobe_out <= 1'b0;
 				serial_strobe_in <= 1'b0;
 				serial_strobe_out <= 1'b0;
+				parallel_strobe_out <= 1'b0;
 			end
 			
 			// payload byte
@@ -116,6 +131,10 @@ module user_io(
 				// give strobe after second serial byte (toggle ==1)
 			   if((cmd == 5) && toggle)
 					 serial_strobe_out <= 1'b1;
+					 
+				// give strobe after second parallel byte (toggle ==1)
+			   if((cmd == 6) && toggle)
+					 parallel_strobe_out <= 1'b1;
 			end
 		end
 	end
