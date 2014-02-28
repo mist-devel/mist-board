@@ -21,6 +21,7 @@ module mfp (
 	// serial rs223 connection from io controller
    input 		serial_strobe_in,
    input [7:0] serial_data_in,
+	output      serial_data_in_full,
 
 	// inputs
 	input 		 clk_ext,   // external 2.457MHz
@@ -28,72 +29,57 @@ module mfp (
  	input [7:0]  i     // input port
 );
 
-localparam FIFO_ADDR_BITS = 4;
-localparam FIFO_DEPTH = (1 << FIFO_ADDR_BITS);
+// --- mfp output fifo ---
+// filled by the CPU when writing to the mfp uart data register
+// emptied by the io controller when reading via SPI
+io_fifo mfp_out_fifo (
+	.reset 				(reset),		
 
-// fifo for data from mfp to io controller
-reg [7:0] fifoOut [FIFO_DEPTH-1:0];
-reg [FIFO_ADDR_BITS-1:0] writePout, readPout;
+	.in_clk   			(!clk),          // latch incoming data on negedge
+	.in 					(din),
+	.in_strobe 			(1'b0),
+	.in_enable			(sel && ~ds && ~rw && (addr == 5'h17)),
 
-// fifo for data from io-controller to mfp
-reg [7:0] fifoIn [FIFO_DEPTH-1:0];
-reg [FIFO_ADDR_BITS-1:0] writePin, readPin;
+	.out_clk          (clk),
+	.out 					(serial_data_out),
+	.out_strobe 		(serial_strobe_out),
+	.out_enable 		(1'b0),
 
-assign serial_data_out_available = (readPout != writePout);
-assign serial_data_out = fifoOut[readPout];
+	.full             (serial_data_out_fifo_full),
+	.data_available 	(serial_data_out_available)
+);
 
-wire serial_data_in_available = (readPin != writePin) /* synthesis keep */;
-wire [7:0] serial_data_in_cpu = serial_data_in_available?fifoIn[readPin]:fifoIn[readPin-4'd1];
+// --- mfp input fifo ---
+// filled by the io controller when writing via SPI
+// emptied by CPU when reading the mfp uart data register
+io_fifo mfp_in_fifo (
+	.reset 				(reset),		
 
-// signal "fifo is full" via uart config bit
-wire serial_data_out_fifo_full = (readPout === (writePout + 4'd1));
+	.in_clk   			(!clk),          // latch incoming data on negedge
+	.in 					(serial_data_in),
+	.in_strobe 			(serial_strobe_in),
+	.in_enable			(1'b0),
+
+	.out_clk          (!clk),
+	.out 					(serial_data_in_cpu),
+	.out_strobe 		(1'b0),
+	.out_enable 		(serial_cpu_data_read && serial_data_in_available),
+
+	.full					(serial_data_in_full),
+	.data_available 	(serial_data_in_available)
+);
 
 // ---------------- mfp uart data to/from io controller ------------
-reg serial_strobe_inD, serial_strobe_inD2;	
 reg serial_cpu_data_read;
+wire serial_data_in_available;
+wire [7:0] serial_data_in_cpu;
 
 always @(negedge clk) begin
-	serial_strobe_inD <= serial_strobe_in;
-	serial_strobe_inD2 <= serial_strobe_inD;
-	
 	// read on uart data register
 	serial_cpu_data_read <= 1'b0;
 	if(sel && ~ds && rw && (addr == 5'h17))
 		serial_cpu_data_read <= 1'b1;
-
-	if(reset) begin
-		// reset read and write counters
-		readPin <= 4'd0;
-		writePin <= 4'd0;
-	end else begin
-		// store bytes received from IO controller via SPI
-	   if(serial_strobe_inD && !serial_strobe_inD2) begin
-			// store data in fifo
-			fifoIn[writePin] <= serial_data_in;
-			writePin <= writePin + 4'd1;
-	   end 
-
-		// advance read pointer on every cpu read
-	   if(serial_cpu_data_read && serial_data_in_available)
-			readPin <= readPin + 4'd1;
-   end
 end 
- 
- 
-reg serial_strobe_outD, serial_strobe_outD2;
-always @(posedge clk) begin
-	serial_strobe_outD <= serial_strobe_out;
-	serial_strobe_outD2 <= serial_strobe_outD;
-
-	if(reset)
-		readPout <= 4'd0;
-	else
-		if(serial_strobe_outD && !serial_strobe_outD2)
-			readPout <= readPout + 4'd1;
-end
-
-// timer to let bytes arrive at a reasonable speed
-reg [13:0] readTimer;
 
 wire write = sel && ~ds && ~rw;
 
@@ -303,7 +289,6 @@ always @(negedge clk) begin
 	if(reset) begin
 		ipr <= 16'h0000; ier <= 16'h0000; 
 		imr <= 16'h0000; isr <= 16'h0000;
-		writePout <= 0;
 	end else begin 
  
 		// ack pending irqs and set isr if enabled
@@ -361,10 +346,7 @@ always @(negedge clk) begin
 			if(addr == 5'h15) uart_rx_ctrl <= din[1:0];
 			if(addr == 5'h16) uart_tx_ctrl <= din[3:0];
 			
-			if(addr == 5'h17) begin
-				fifoOut[writePout] <= din;
-				writePout <= writePout + 4'd1;
-			end
+			// write to addr == 5'h17 is handled by the output fifo
 		end
 	end
 end

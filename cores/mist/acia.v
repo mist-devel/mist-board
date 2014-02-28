@@ -23,21 +23,49 @@ module acia (
    output [7:0] ikbd_data_out
 );
 
-localparam FIFO_ADDR_BITS = 4;
-localparam FIFO_DEPTH = (1 << FIFO_ADDR_BITS);
+// --- ikbd output fifo ---
+// filled by the CPU when writing to the acia data register
+// emptied by the io controller when reading via SPI
+io_fifo ikbd_out_fifo (
+	.reset 				(reset),		
 
-// input FIFO to store ikbd bytes received from IO controller
-reg [7:0] fifoIn [FIFO_DEPTH-1:0];
-reg [FIFO_ADDR_BITS-1:0] writePin, readPin;
+	.in_clk   			(!clk),          // latch incoming data on negedge
+	.in 					(din),
+	.in_strobe 			(1'b0),
+	.in_enable			(sel && ~ds && ~rw && (addr == 2'd1)),
 
-// output FIFO to store ikbd bytes to be sent to IO controller
-reg [7:0] fifoOut [FIFO_DEPTH-1:0];
-reg [FIFO_ADDR_BITS-1:0] writePout, readPout;
+	.out_clk          (clk),
+	.out 					(ikbd_data_out),
+	.out_strobe 		(ikbd_strobe_out),
+	.out_enable 		(1'b0),
+
+	.data_available 	(ikbd_data_out_available)
+);
+
+// --- ikbd input fifo ---
+// filled by the io controller when writing via SPI
+// emptied by the CPU when reading the acia data register
+io_fifo ikbd_in_fifo (
+	.reset 				(reset || (ikbd_cr[1:0] == 2'b11)),
+
+	.in_clk   			(!clk),          // latch incoming data on negedge
+	.in 					(ikbd_data_in),
+	.in_strobe 			(ikbd_strobe_in),
+	.in_enable			(1'b0),
+
+	.out_clk          (!clk),
+	.out 					(ikbd_rx_data),
+	.out_strobe 		(1'b0),
+	.out_enable       (ikbd_cpu_data_read && ikbd_rx_data_available),
+
+	.data_available 	(ikbd_rx_data_available)
+);
 
 // timer to let bytes arrive at a reasonable speed
 reg [13:0] readTimer;
 
-reg ikbd_strobe_inD, ikbd_strobe_inD2;	
+// delay the cpu read to be able to do things afterwards like e.g. incrementing 
+// the fifo pointers
 reg ikbd_cpu_data_read;
 reg midi_cpu_data_read;
 
@@ -55,9 +83,6 @@ always @(negedge clk) begin
 		if(readTimer > 0)
 			readTimer <= readTimer - 14'd1;
 
-	ikbd_strobe_inD <= ikbd_strobe_in;
-	ikbd_strobe_inD2 <= ikbd_strobe_inD;
-	
 	// read on ikbd data register
 	ikbd_cpu_data_read <= 1'b0;
 	if(sel && ~ds && rw && (addr == 2'd1)) begin
@@ -70,28 +95,8 @@ always @(negedge clk) begin
 	if(sel && ~ds && rw && (addr == 2'd3))
 		midi_cpu_data_read <= 1'b1;
 
-	if(reset) begin
-		// reset read and write counters
-		readPin <= 4'd0;
-		writePin <= 4'd0;
-	end else begin
-
-		// ikbd acia master reset
-		if(ikbd_cr[1:0] == 2'b11) begin
-			readPin <= 4'd0;
-			writePin <= 4'd0;
-		end
-			
-		// store bytes received from IO controller via SPI
-	   if(ikbd_strobe_inD && !ikbd_strobe_inD2) begin
-			// store data in fifo
-			fifoIn[writePin] <= ikbd_data_in;
-			writePin <= writePin + 4'd1;
-	   end 
-
+	if(!reset) begin
 	   if(ikbd_cpu_data_read && ikbd_rx_data_available) begin
-			readPin <= readPin + 4'd1;
-		
 			// Some programs (e.g. bolo) need a pause between two ikbd bytes.
 			// The ikbd runs at 7812.5 bit/s 1 start + 8 data + 1 stop bit. 
 			// One byte is 1/718.25 seconds. A pause of ~1ms is thus required
@@ -103,31 +108,20 @@ end
  
 // ------------------ cpu interface --------------------
 
-wire ikbd_irq = ikbd_cr[7] && ikbd_rx_data_available;  // rx irq
+wire [7:0] ikbd_rx_data;
+wire ikbd_rx_data_available;
 
-wire [7:0] ikbd_rx_data = ikbd_rx_data_available?fifoIn[readPin]:fifoIn[readPin-4'd1];
- 
-wire ikbd_rx_data_available = (readPin != writePin) && (readTimer == 0);
+wire ikbd_irq = ikbd_cr[7] && cpu_ikbd_rx_data_available;  // rx irq
+
+// the cpu is only being told that data is available if the timer has run down. This
+// to prevent the CPU from being flooded with data at more then 7812.5bit/s
+wire cpu_ikbd_rx_data_available = ikbd_rx_data_available && (readTimer == 0);
 
 // in a real ST the irqs are active low open collector outputs and are simply wired
 // tegether ("wired or")
 assign irq = ikbd_irq || midi_irq;
 
-assign ikbd_data_out_available = (readPout != writePout);
-assign ikbd_data_out = fifoOut[readPout];
-
 // ---------------- send acia data to io controller ------------
-reg ikbd_strobe_outD, ikbd_strobe_outD2;
-always @(posedge clk) begin
-	ikbd_strobe_outD <= ikbd_strobe_out;
-	ikbd_strobe_outD2 <= ikbd_strobe_outD;
-
-	if(reset)
-		readPout <= 4'd0;
-	else
-		if(ikbd_strobe_outD && !ikbd_strobe_outD2)
-			readPout <= readPout + 4'd1;
-end
 
 always @(sel, ds, rw, addr, ikbd_rx_data_available, ikbd_rx_data, ikbd_irq, 
 		midi_rx_data, midi_rx_data_available, midi_tx_empty, midi_irq) begin
@@ -135,7 +129,7 @@ always @(sel, ds, rw, addr, ikbd_rx_data_available, ikbd_rx_data, ikbd_irq,
 
 	if(sel && ~ds && rw) begin
       // keyboard acia read
-      if(addr == 2'd0) dout = { ikbd_irq, 6'b000001, ikbd_rx_data_available };
+      if(addr == 2'd0) dout = { ikbd_irq, 6'b000001, cpu_ikbd_rx_data_available};
       if(addr == 2'd1) dout = ikbd_rx_data;
       
       // midi acia read
@@ -254,7 +248,6 @@ always @(negedge clk) begin
 		midi_reg_data_cnt <= 8'd0;
 		midi_reg_ctrl_cnt <= 8'd0;
 
-      writePout <= 4'd0;
 		midi_tx_cnt <= 8'd0;
 		midi_tx_data_valid <= 1'b0;
    end else begin
@@ -264,12 +257,9 @@ always @(negedge clk) begin
 			if(addr == 2'd0)
 				ikbd_cr <= din;
 
-			// keyboard acia data register writes into buffer 
-			if(addr == 2'd1) begin
-				fifoOut[writePout] <= din;
-				writePout <= writePout + 4'd1;
-			end
-
+			// keyboard acia data register omn addr 2 writes happen in the fifo 
+			// ...
+			
 			// write to midi control register
 			if(addr == 2'd2) begin
 				midi_cr <= din;
