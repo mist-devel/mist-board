@@ -28,6 +28,11 @@ module user_io(
 		input            parallel_data_out_available,
 		input [7:0]      parallel_data_out,
 
+		// midi data from acia to io controller
+		output reg       midi_strobe_out,
+		input            midi_data_out_available,
+		input [7:0]      midi_data_out,
+
 		output [1:0] 	  BUTTONS,
 		output [1:0]     SWITCHES
 	   );
@@ -68,6 +73,14 @@ module user_io(
 				else
 					SPI_MISO <= parallel_data_out[15-cnt];
 			end
+			
+			// midi->io controller
+			if(cmd == 8) begin
+				if(!toggle)
+					SPI_MISO <= midi_data_out_available;
+				else
+					SPI_MISO <= midi_data_out[15-cnt];
+			end
 		end
 	end
 		
@@ -79,6 +92,7 @@ module user_io(
 		  ikbd_strobe_out <= 1'b0;
 		  serial_strobe_out <= 1'b0;
 		  parallel_strobe_out <= 1'b0;
+		  midi_strobe_out <= 1'b0;
 		end else begin
 			sbuf[6:1] <= sbuf[5:0];
 			sbuf[0] <= SPI_MOSI;
@@ -103,6 +117,7 @@ module user_io(
 				serial_strobe_in <= 1'b0;
 				serial_strobe_out <= 1'b0;
 				parallel_strobe_out <= 1'b0;
+				midi_strobe_out <= 1'b0;
 			end
 			
 			// payload byte
@@ -135,6 +150,10 @@ module user_io(
 				// give strobe after second parallel byte (toggle ==1)
 			   if((cmd == 6) && toggle)
 					 parallel_strobe_out <= 1'b1;
+					 
+				// give strobe after second midi byte (toggle ==1)
+			   if((cmd == 8) && toggle)
+					 midi_strobe_out <= 1'b1;
 			end
 		end
 	end

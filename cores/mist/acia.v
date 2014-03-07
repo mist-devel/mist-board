@@ -13,14 +13,19 @@ module acia (
 	output midi_out,
 	input midi_in,
 	
-	// data from io controller to acia
+	// data from io controller to ikbd acia
    input ikbd_strobe_in,
    input [7:0] ikbd_data_in,
 
-	// data from acia to io controller
+	// data from ikbd acia to io controller
    output ikbd_data_out_available,
    input ikbd_strobe_out,
-   output [7:0] ikbd_data_out
+   output [7:0] ikbd_data_out,
+
+	// data from midi acia to io controller
+   output midi_data_out_available,
+   input midi_strobe_out,
+   output [7:0] midi_data_out
 );
 
 // --- ikbd output fifo ---
@@ -32,7 +37,7 @@ io_fifo ikbd_out_fifo (
 	.in_clk   			(!clk),          // latch incoming data on negedge
 	.in 					(din),
 	.in_strobe 			(1'b0),
-	.in_enable			(sel && ~ds && ~rw && (addr == 2'd1)),
+	.in_enable			(sel && ~ds && ~rw && (addr == 2'd1)),   // ikbd acia data write
 
 	.out_clk          (clk),
 	.out 					(ikbd_data_out),
@@ -61,6 +66,26 @@ io_fifo ikbd_in_fifo (
 	.data_available 	(ikbd_rx_data_available)
 );
 
+// --- midi output fifo ---
+// filled by the CPU when writing to the acia data register
+// emptied by the io controller when reading via SPI
+// This happens in parallel to the real midi generation, so 
+// physical and USB MIDI can be used at the same time
+io_fifo midi_out_fifo (
+	.reset 				(reset),		
+
+	.in_clk   			(!clk),          // latch incoming data on negedge
+	.in 					(din),
+	.in_strobe 			(1'b0),
+	.in_enable			(sel && ~ds && ~rw && (addr == 2'd3)),  // midi acia data write
+
+	.out_clk          (clk),
+	.out 					(midi_data_out),
+	.out_strobe 		(midi_strobe_out),
+	.out_enable 		(1'b0),
+
+	.data_available 	(midi_data_out_available)
+);
 // timer to let bytes arrive at a reasonable speed
 reg [13:0] readTimer;
 

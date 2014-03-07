@@ -51,9 +51,6 @@ wire [22:0] video_address;
 wire st_de, st_hs, st_vs;
 wire [15:0] video_adj;
 
-// on-board io
-wire [1:0] buttons;
-
 // generate dtack for all implemented peripherals
 wire io_dtack = vreg_sel || mmu_sel || mfp_sel || mfp_iack || 
      acia_sel || psg_sel || dma_sel || auto_iack || blitter_sel || 
@@ -330,16 +327,21 @@ acia acia (
 	.dout     (acia_data_out),
 	.irq      (acia_irq     ),
 	
-	// MIDI interface
+	// physical MIDI interface
 	.midi_out (UART_TX      ),
 	.midi_in  (UART_RX      ),
-	
+	 
 	// ikbd interface
 	.ikbd_data_out_available 	(ikbd_data_from_acia_available),
 	.ikbd_strobe_out 				(ikbd_strobe_from_acia),
 	.ikbd_data_out 	   		(ikbd_data_from_acia),
 	.ikbd_strobe_in 				(ikbd_strobe_to_acia),
-	.ikbd_data_in 	   			(ikbd_data_to_acia)
+	.ikbd_data_in 	   			(ikbd_data_to_acia),
+
+	// redirected midi interface
+	.midi_data_out_available 	(midi_data_from_acia_available),
+	.midi_strobe_out 				(midi_strobe_from_acia),
+	.midi_data_out 	   		(midi_data_from_acia)
 );
 
 wire [23:1] blitter_master_addr;
@@ -1057,6 +1059,11 @@ wire [7:0] ikbd_data_from_acia;
 wire ikbd_strobe_from_acia;
 wire ikbd_data_from_acia_available;
 
+// connection to transfer midi data from acia to io controller
+wire [7:0] midi_data_from_acia;
+wire midi_strobe_from_acia;
+wire midi_data_from_acia_available;
+
 // connection to transfer serial/rs232 data from mfp to io controller
 wire [7:0] serial_data_from_mfp;
 wire serial_strobe_from_mfp;
@@ -1071,11 +1078,11 @@ wire parallel_data_out_available;
 
 //// user io has an extra spi channel outside minimig core ////
 user_io user_io(
+		// the spi interface
 		.SPI_CLK(SPI_SCK),
 		.SPI_SS_IO(CONF_DATA0),
 		.SPI_MISO(user_io_sdo),
 		.SPI_MOSI(SPI_DI),
-		.BUTTONS(buttons),
 		
 		// ikbd interface
       .ikbd_strobe_out(ikbd_strobe_from_acia),
@@ -1095,6 +1102,11 @@ user_io user_io(
       .parallel_strobe_out(parallel_strobe_out),
       .parallel_data_out(parallel_data_out),
       .parallel_data_out_available(parallel_data_out_available),
+
+		// midi interface
+      .midi_strobe_out(midi_strobe_from_acia),
+      .midi_data_out(midi_data_from_acia),
+      .midi_data_out_available(midi_data_from_acia_available),
 
 		.CORE_TYPE(8'ha3)    // mist core id
 );
