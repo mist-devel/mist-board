@@ -2,7 +2,7 @@
 /*                                          */
 /********************************************/
 
-module mist_top (
+module mist_top ( 
   // clock inputsxque	
   input wire [ 2-1:0] 	CLOCK_27, // 27 MHz
   // LED outputs
@@ -54,7 +54,8 @@ wire [15:0] video_adj;
 // generate dtack for all implemented peripherals
 wire io_dtack = vreg_sel || mmu_sel || mfp_sel || mfp_iack || 
      acia_sel || psg_sel || dma_sel || auto_iack || blitter_sel || 
-	  ste_joy_sel || ste_dma_snd_sel || mste_ctrl_sel || vme_sel || dongle_sel; 
+	  ste_joy_sel || ste_dma_snd_sel || mste_ctrl_sel || vme_sel || 
+	  rom_sel[1] || rom_sel[0]; 
 
 // the original tg68k did not contain working support for bus fault exceptions. While earlier
 // TOS versions cope with that, TOS versions with blitter support need this to work as this is
@@ -122,7 +123,7 @@ always @(negedge clk_8)
 	if(video_cycle)
 		br <= data_io_br || blitter_br;
 `endif
-	
+
 // request interrupt ack from mfp for IPL == 6
 wire mfp_iack = cpu_cycle && cpu2iack && tg68_as && (tg68_adr[3:1] == 3'b110);
 
@@ -146,10 +147,14 @@ wire [7:0] auto_vector = auto_vector_vbi | auto_vector_hbi;
 // $ffff8e00 - $ffff8e0f  - VME  (only fake implementation)
 
 wire io_sel = cpu_cycle && cpu2io && tg68_as ;
- 
-// dongle interface at $fb0000 - $fbffff
-wire dongle_sel  = dongle_present && cpu_cycle && tg68_as && tg68_rw && (tg68_adr[23:16] == 8'hfb);
-wire [7:0] dongle_data_out;
+
+// TODO: from sysconfig
+wire ethernec_present = 1'b1;
+
+// romport interface at $fa0000 - $fbffff
+wire rom_sel_all = ethernec_present && cpu_cycle && tg68_as && tg68_rw && ({tg68_adr[23:17], 1'b0} == 8'hfa);
+wire [1:0] rom_sel = { rom_sel_all && tg68_adr[16], rom_sel_all && !tg68_adr[16] };
+wire [15:0] rom_data_out;
 
 // mmu 8 bit interface at $ff8000 - $ff8001
 wire mmu_sel  = io_sel && ({tg68_adr[15:1], 1'd0} == 16'h8000);
@@ -197,10 +202,10 @@ wire dma_sel  = io_sel && ({tg68_adr[15:4], 4'd0} == 16'h8600);
 wire [15:0] dma_data_out;
 
 // de-multiplex the various io data output ports into one 
-wire [7:0] io_data_out_8u = acia_data_out | psg_data_out | dongle_data_out;
+wire [7:0] io_data_out_8u = acia_data_out | psg_data_out;
 wire [7:0] io_data_out_8l = mmu_data_out | mfp_data_out | auto_vector | mste_ctrl_data_out;
 wire [15:0] io_data_out = vreg_data_out | dma_data_out | blitter_data_out | 
-				ste_joy_data_out | ste_dma_snd_data_out |
+				ste_joy_data_out | ste_dma_snd_data_out | rom_data_out |
 				{8'h00, io_data_out_8l} | {io_data_out_8u, 8'h00};
 
 wire init = ~pll_locked;
@@ -391,16 +396,13 @@ ste_joystick ste_joystick (
 	.dout     (ste_joy_data_out),
 );
 
-wire     dongle_present;   // true if the dongle modules contains functonality
-dongle dongle (
+ethernec ethernec (
 	.clk      (clk_8       ),
-	.sel      (dongle_sel  ),
-	.present  (dongle_present),
+	.sel      (rom_sel     ),
 	.addr     (tg68_adr[15:1]),
-	.cpu_as   (cpu_cycle && tg68_as && !br),
+	.lds      (tg68_lds    ),
 	.uds      (tg68_uds    ),
-	.rw       (tg68_rw     ),
-	.dout     (dongle_data_out)
+	.dout     (rom_data_out)
 );
 
 wire [22:0] ste_dma_snd_addr;
@@ -944,8 +946,7 @@ wire cpu2tos192k = (tg68_adr[23:17] == 7'b1111110)  ||
 		 				 (tg68_adr[23:16] == 8'b11111110);
 
 // 128k cartridge from 0xfa0000 to 0xfbffff
-wire cpu2cart = (tg68_adr[23:16] == 8'hfa) || 
-     ((tg68_adr[23:16] == 8'hfb) && !dongle_present);  // include fb0000 only if no dongle present
+wire cpu2cart = ({tg68_adr[23:17], 1'b0} == 8'hfa) && !ethernec_present;
 
 // all rom areas
 wire cpu2rom = cpu2lowrom || cpu2tos192k || cpu2tos256k || cpu2cart;

@@ -308,7 +308,7 @@ set_instance_assignment -name GLOBAL_SIGNAL "GLOBAL CLOCK" -to clk_32
 
 set_global_assignment -name ENABLE_BENEFICIAL_SKEW_OPTIMIZATION ON
 set_global_assignment -name VERILOG_FILE cache.v
-set_global_assignment -name VERILOG_FILE dongle.v
+set_global_assignment -name VERILOG_FILE ethernec.v
 set_global_assignment -name VERILOG_FILE mfp_timer.v
 set_global_assignment -name VHDL_FILE vol_table_array.vhd
 set_global_assignment -name VHDL_FILE YM2149_volmix.vhd
