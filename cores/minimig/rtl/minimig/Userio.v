@@ -198,7 +198,9 @@ assign _sjoy2[5:0] = joy2enable ? {_xjoy2[5], sel_autofire ^ _xjoy2[4], _xjoy2[3
 
 always @(joy2enable or _xjoy2 or osd_ctrl)
 	if (~joy2enable)
-		if (~_xjoy2[5] || (~_xjoy2[3] && ~_xjoy2[2]))
+// TH 3/31/14: Disabled special OSD control
+//		if (~_xjoy2[5] || (~_xjoy2[3] && ~_xjoy2[2]))
+		if (~_xjoy2[5])
 			t_osd_ctrl = KEY_MENU;
 		else if (~_xjoy2[4])
 			t_osd_ctrl = KEY_ENTER;
@@ -210,10 +212,10 @@ always @(joy2enable or _xjoy2 or osd_ctrl)
 			t_osd_ctrl = KEY_LEFT;
 		else if (~_xjoy2[0])
 			t_osd_ctrl = KEY_RIGHT;
-    else if (~_xjoy2[1] && ~_xjoy2[3])
-      t_osd_ctrl = KEY_PGUP;
-    else if (~_xjoy2[0] && ~_xjoy2[2])
-      t_osd_ctrl = KEY_PGDOWN;
+//    else if (~_xjoy2[1] && ~_xjoy2[3])
+//      t_osd_ctrl = KEY_PGUP;
+//    else if (~_xjoy2[0] && ~_xjoy2[2])
+//      t_osd_ctrl = KEY_PGDOWN;
 		else
 			t_osd_ctrl = osd_ctrl;
 	else
