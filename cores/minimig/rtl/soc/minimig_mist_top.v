@@ -8,7 +8,7 @@
 
 `define MINIMIG_DE1
 //`define SOC_SIM
-
+ 
 module minimig_mist_top (
   // clock inputs
   input wire [ 2-1:0] 	CLOCK_32, // 32 MHz
