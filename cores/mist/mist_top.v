@@ -46,6 +46,8 @@ wire ste = system_ctrl[23] || system_ctrl[24];
 wire mste = system_ctrl[24];
 wire steroids = system_ctrl[23] && system_ctrl[24];  // a STE on steroids
 
+wire ethernec_present = system_ctrl[25];
+
 wire video_read;
 wire [22:0] video_address;
 wire st_de, st_hs, st_vs;
@@ -147,9 +149,6 @@ wire [7:0] auto_vector = auto_vector_vbi | auto_vector_hbi;
 // $ffff8e00 - $ffff8e0f  - VME  (only fake implementation)
 
 wire io_sel = cpu_cycle && cpu2io && tg68_as ;
-
-// TODO: from sysconfig
-wire ethernec_present = 1'b1;
 
 // romport interface at $fa0000 - $fbffff
 wire rom_sel_all = ethernec_present && cpu_cycle && tg68_as && tg68_rw && ({tg68_adr[23:17], 1'b0} == 8'hfa);
@@ -397,12 +396,24 @@ ste_joystick ste_joystick (
 );
 
 ethernec ethernec (
-	.clk      (clk_8       ),
-	.sel      (rom_sel     ),
-	.addr     (tg68_adr[15:1]),
-	.lds      (tg68_lds    ),
-	.uds      (tg68_uds    ),
-	.dout     (rom_data_out)
+	.clk        (clk_8       ),
+	.sel        (rom_sel     ),
+	.addr       (tg68_adr[15:1]),
+	.dout       (rom_data_out),
+	
+	.status     (eth_status),
+	
+	.mac_begin  (eth_mac_begin),
+	.mac_strobe (eth_mac_strobe),
+	.mac_byte   (eth_mac_byte),
+	
+	.tx_begin   (eth_tx_read_begin),
+	.tx_strobe  (eth_tx_read_strobe),
+	.tx_byte    (eth_tx_read_byte),
+	
+	.rx_begin   (eth_rx_write_begin),
+	.rx_strobe  (eth_rx_write_strobe),
+	.rx_byte    (eth_rx_write_byte)
 );
 
 wire [22:0] ste_dma_snd_addr;
@@ -1077,39 +1088,61 @@ wire [7:0] parallel_data_out;
 wire parallel_strobe_out;
 wire parallel_data_out_available;
 
+// connection between io controller and ethernet controller
+//   mac address transfer io controller -> ethernec
+wire [31:0] eth_status;
+wire [7:0] eth_mac_byte;
+wire eth_mac_strobe, eth_mac_begin;
+wire [7:0] eth_tx_read_byte;
+wire eth_tx_read_strobe, eth_tx_read_begin;
+wire [7:0] eth_rx_write_byte;
+wire eth_rx_write_strobe, eth_rx_write_begin;
+
 //// user io has an extra spi channel outside minimig core ////
 user_io user_io(
 		// the spi interface
-		.SPI_CLK(SPI_SCK),
-		.SPI_SS_IO(CONF_DATA0),
-		.SPI_MISO(user_io_sdo),
-		.SPI_MOSI(SPI_DI),
+		.SPI_CLK                	(SPI_SCK),
+		.SPI_SS_IO						(CONF_DATA0),
+		.SPI_MISO						(user_io_sdo),
+		.SPI_MOSI						(SPI_DI),
 		
 		// ikbd interface
-      .ikbd_strobe_out(ikbd_strobe_from_acia),
-      .ikbd_data_out(ikbd_data_from_acia),
-      .ikbd_data_out_available(ikbd_data_from_acia_available),
-      .ikbd_strobe_in(ikbd_strobe_to_acia),
-      .ikbd_data_in(ikbd_data_to_acia),
+      .ikbd_strobe_out				(ikbd_strobe_from_acia),
+      .ikbd_data_out					(ikbd_data_from_acia),
+      .ikbd_data_out_available	(ikbd_data_from_acia_available),
+      .ikbd_strobe_in				(ikbd_strobe_to_acia),
+      .ikbd_data_in					(ikbd_data_to_acia),
 		
 		// serial/rs232 interface
-      .serial_strobe_out(serial_strobe_from_mfp),
-      .serial_data_out(serial_data_from_mfp),
-      .serial_data_out_available(serial_data_from_mfp_available),
-      .serial_strobe_in(serial_strobe_to_mfp),
-      .serial_data_in(serial_data_to_mfp),
+      .serial_strobe_out			(serial_strobe_from_mfp),
+      .serial_data_out				(serial_data_from_mfp),
+      .serial_data_out_available	(serial_data_from_mfp_available),
+      .serial_strobe_in				(serial_strobe_to_mfp),
+      .serial_data_in				(serial_data_to_mfp),
 		
 		// parallel interface
-      .parallel_strobe_out(parallel_strobe_out),
-      .parallel_data_out(parallel_data_out),
+      .parallel_strobe_out			(parallel_strobe_out),
+      .parallel_data_out			(parallel_data_out),
       .parallel_data_out_available(parallel_data_out_available),
 
 		// midi interface
-      .midi_strobe_out(midi_strobe_from_acia),
-      .midi_data_out(midi_data_from_acia),
-      .midi_data_out_available(midi_data_from_acia_available),
+      .midi_strobe_out				(midi_strobe_from_acia),
+      .midi_data_out					(midi_data_from_acia),
+      .midi_data_out_available	(midi_data_from_acia_available),
 
-		.CORE_TYPE(8'ha3)    // mist core id
+		// ethernet
+		.eth_status                (eth_status),
+		.eth_mac_begin					(eth_mac_begin),
+		.eth_mac_strobe				(eth_mac_strobe),
+		.eth_mac_byte					(eth_mac_byte),
+		.eth_tx_read_begin			(eth_tx_read_begin),
+		.eth_tx_read_strobe			(eth_tx_read_strobe),
+		.eth_tx_read_byte				(eth_tx_read_byte),
+		.eth_rx_write_begin			(eth_rx_write_begin),
+		.eth_rx_write_strobe			(eth_rx_write_strobe),
+		.eth_rx_write_byte			(eth_rx_write_byte),
+		
+		.CORE_TYPE						(8'ha3)    // mist core id
 );
 
 wire [22:0] data_io_addr;

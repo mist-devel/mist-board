@@ -20,18 +20,6 @@
 // You should have received a copy of the GNU General Public License 
 // along with this program.  If not, see <http://www.gnu.org/licenses/>. 
 
-// Implemented STE features
-// http://alive.atari.org/alive12/ste_hwsc.php
-// http://atari-ste.anvil-soft.com/html/devdocu2.htm
-// + 3*4 bit palette (4096 colors)
-// + lowest video base address byte
-// + video counter writeable
-// + pixel offset
-// + line offset
-// + botton overscan 
-// + top overscan (this is really an unreliable hack which barely works for obsession pinball)
-// + undocumented 16 pixel "line offset overscan"
-
 module video (
   // system interface
   input clk,                      // 31.875 MHz
@@ -717,6 +705,10 @@ wire [9:0] de_v_end        = t6_v_border_bot - de_v_offset + de_v_bot_extra;
 // with scan doubler being active, there are two main clock cycles per st hor counter
 // st_h_active makes sure these events only trigger once
 wire st_h_active = (!scan_doubler_enable || t[0]);
+
+// latch to store STE updated video address
+//reg [2:0] vaddrL_valid;
+//reg [22:0] vaddrL;
  
 always @(posedge clk) begin
 
@@ -790,8 +782,42 @@ always @(posedge clk) begin
 
 	// STE has additional ways to influence video address
 	if(ste) begin
+
+		// STE vaddr write handling
+		// bus_cycle 6 is in the middle of a cpu cycle
+//		if((bus_cycle_L == 6) && ste_vaddr_write) begin
+//			if(reg_addr == 6'h02) begin 
+//				vaddrL[22:15] <= reg_din[7:0];
+//				vaddrL_valid[2] = 1'b1;
+//			end
+				
+//			if(reg_addr == 6'h03) begin
+//				vaddrL[14: 7] <= reg_din[7:0];
+//				vaddrL_valid[1] = 1'b1;
+//			end
+				
+//			if(reg_addr == 6'h04) begin
+//				vaddrL[ 6: 0] <= reg_din[7:1];
+//				vaddrL_valid[0] = 1'b1;
+//			end
+//		end 
+	
+		// vaddr changes take place at the end of the video line
+//		if(de_v && st_h_active && (st_hcnt == t2_h_sync)) begin
+//			if(vaddrL_valid != 3'b000) begin
+//				if(vaddrL_valid[2]) vaddr[22:15] <= vaddrL[22:15];
+//				if(vaddrL_valid[1]) vaddr[14:7] <= vaddrL[14:7];
+//				if(vaddrL_valid[0]) vaddr[6:0] <= vaddrL[6:0];
+//				vaddrL_valid <= 3'b000;
+//			end else
+				// add line offset at the end of each video line
+//				vaddr <= vaddr + line_offset;
+//		end
+
+	
 		// add line offset at the end of each video line
-		if(de_v && st_h_active && (st_hcnt == t2_h_sync))
+//		if(de_v && st_h_active && (st_hcnt == t2_h_sync))
+		if(de_v && st_h_active && (st_hcnt == de_h_end))
 			vaddr <= vaddr + line_offset;
 
 		// STE vaddr write handling

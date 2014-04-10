@@ -41,7 +41,7 @@ always @(sel, rw, uds, lds, addr) begin
 
    if(sel && rw) begin
       if(addr == 5'h00) dout = 16'hffff;   // no fire button pressed
-      if(addr == 5'h02) dout = 16'hffff;   // direction set
+      if(addr == 5'h01) dout = 16'hffff;   // no direction set
    end
    
 end
