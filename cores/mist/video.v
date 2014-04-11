@@ -132,10 +132,10 @@ always @(posedge clk) begin
 	// xyz
 	if(st_h_active && (st_hcnt == (v_event))) begin		
 		// vsync starts at begin of blanking phase
-		if(vcnt == t7_v_blank_bot - de_v_offset - 10'd2)   st_vs <= 1'b1;
+		if(vcnt == t7_v_blank_bot - de_v_offset - 10'd0)   st_vs <= 1'b1;  //XXX 2!
 		
 		// vsync ends at begin of top border
-		if(vcnt == t10_v_border_top - de_v_offset - 10'd2) st_vs <= 1'b0;
+		if(vcnt == t10_v_border_top - de_v_offset - 10'd0) st_vs <= 1'b0;  //XXX 2!
 	end
 end
 		
@@ -707,9 +707,6 @@ wire [9:0] de_v_end        = t6_v_border_bot - de_v_offset + de_v_bot_extra;
 wire st_h_active = (!scan_doubler_enable || t[0]);
 
 // latch to store STE updated video address
-//reg [2:0] vaddrL_valid;
-//reg [22:0] vaddrL;
- 
 always @(posedge clk) begin
 
 	// line in which memory access is enabled
@@ -735,7 +732,7 @@ always @(posedge clk) begin
 	// The video address counter is reloaded right after display ends 
 	
 	// TODO: -1 and pacmania works ...
-	if((vga_hcnt == t3_h_blank_left) && (vcnt == (t7_v_blank_bot-de_v_offset+10'd1))) begin
+	if((vga_hcnt == t3_h_blank_left) && (vcnt == (t7_v_blank_bot-de_v_offset-10'd3))) begin  // +1
 		vaddr <= _v_bas_ad;
 
 		// copy syncmode
@@ -782,41 +779,7 @@ always @(posedge clk) begin
 
 	// STE has additional ways to influence video address
 	if(ste) begin
-
-		// STE vaddr write handling
-		// bus_cycle 6 is in the middle of a cpu cycle
-//		if((bus_cycle_L == 6) && ste_vaddr_write) begin
-//			if(reg_addr == 6'h02) begin 
-//				vaddrL[22:15] <= reg_din[7:0];
-//				vaddrL_valid[2] = 1'b1;
-//			end
-				
-//			if(reg_addr == 6'h03) begin
-//				vaddrL[14: 7] <= reg_din[7:0];
-//				vaddrL_valid[1] = 1'b1;
-//			end
-				
-//			if(reg_addr == 6'h04) begin
-//				vaddrL[ 6: 0] <= reg_din[7:1];
-//				vaddrL_valid[0] = 1'b1;
-//			end
-//		end 
-	
-		// vaddr changes take place at the end of the video line
-//		if(de_v && st_h_active && (st_hcnt == t2_h_sync)) begin
-//			if(vaddrL_valid != 3'b000) begin
-//				if(vaddrL_valid[2]) vaddr[22:15] <= vaddrL[22:15];
-//				if(vaddrL_valid[1]) vaddr[14:7] <= vaddrL[14:7];
-//				if(vaddrL_valid[0]) vaddr[6:0] <= vaddrL[6:0];
-//				vaddrL_valid <= 3'b000;
-//			end else
-				// add line offset at the end of each video line
-//				vaddr <= vaddr + line_offset;
-//		end
-
-	
 		// add line offset at the end of each video line
-//		if(de_v && st_h_active && (st_hcnt == t2_h_sync))
 		if(de_v && st_h_active && (st_hcnt == de_h_end))
 			vaddr <= vaddr + line_offset;
 
