@@ -14,6 +14,9 @@ module user_io(
 		input            ikbd_data_out_available,
 		input [7:0]      ikbd_data_out,
 
+		// four extra joysticks
+		output reg [5:0] joy0, joy1, joy2, joy3,
+		
 		// serial data from mfp to io controller
 		output reg       serial_strobe_out,
 		input            serial_data_out_available,
@@ -230,7 +233,21 @@ module user_io(
 					 eth_rx_write_byte <= { sbuf, SPI_MOSI }; 
 					 eth_rx_write_strobe <= 1'b1;
 				end
-			end
+
+				// four extra joysticks ...
+				if(cmd == 8'h10)
+					 joy0 <= { sbuf[4:0], SPI_MOSI }; 
+
+				if(cmd == 8'h11)
+					 joy1 <= { sbuf[4:0], SPI_MOSI }; 
+
+				if(cmd == 8'h12)
+					 joy2 <= { sbuf[4:0], SPI_MOSI }; 
+
+				if(cmd == 8'h13)
+					 joy3 <= { sbuf[4:0], SPI_MOSI }; 
+
+			 end
 		end
 	end
       

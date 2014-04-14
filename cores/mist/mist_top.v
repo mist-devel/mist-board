@@ -48,6 +48,10 @@ wire steroids = system_ctrl[23] && system_ctrl[24];  // a STE on steroids
 
 wire ethernec_present = system_ctrl[25];
 
+// usb target port on io controller is used for redirection of
+// 0=nothing 1=rs232 2=printer 3=midi
+wire [1:0] usb_redirection = system_ctrl[27:26];
+
 wire video_read;
 wire [22:0] video_address;
 wire st_de, st_hs, st_vs;
@@ -289,8 +293,12 @@ wire ste_dma_snd_xsirq, ste_dma_snd_xsirq_delayed;
 wire mfp_io7 = system_ctrl[8] ^ (ste?ste_dma_snd_xsirq:1'b0);
 
 // input 0 is busy from printer which is pulled up when the printer cannot accept further data
+// if no printer redirection is being used this is wired to the extra joystick ports provided
+// by the "gauntlet2 adapter". If no extra joystick ports are present this will return 1
+wire mfp_io0 = (usb_redirection == 2'd2)?parallel_fifo_full:~joy0[4];
+
 // inputs 1,2 and 6 are inputs from serial which have pullups before an inverter
-wire [7:0] mfp_gpio_in = {mfp_io7, 1'b0, !dma_irq, !acia_irq, !blitter_irq, 2'b00, parallel_fifo_full};
+wire [7:0] mfp_gpio_in = {mfp_io7, 1'b0, !dma_irq, !acia_irq, !blitter_irq, 2'b00, mfp_io0};
 wire [1:0] mfp_timer_in = {st_de, ste?ste_dma_snd_xsirq_delayed:parallel_fifo_full};
 
 mfp mfp (
@@ -498,12 +506,19 @@ reg [1:0] sclk;
 always @ (posedge clk_8)
 	sclk <= sclk + 2'd1;
 
-wire [7:0] port_a_out /* synthesis keep */;
-wire [7:0] port_b_out /* synthesis keep */;
+wire [7:0] port_a_out;
+wire [7:0] port_b_out;
 assign floppy_side = port_a_out[0];
 assign floppy_sel = port_a_out[2:1];
 
 wire [7:0] ym_audio_out_l, ym_audio_out_r;
+
+// extra joysticks are wired to the printer port
+// using the "gauntlet2 interface", fire of 
+// joystick 0 is connected to the mfp I0 (busy)
+wire [7:0] port_b_in = { ~joy0[0], ~joy0[1], ~joy0[2], ~joy0[3], 
+								 ~joy1[0], ~joy1[1], ~joy1[2], ~joy1[3]}; 
+wire [7:0] port_a_in = { 2'b11, ~joy1[4], 5'b11111 }; 
 
 YM2149 ym2149 (
 	.I_DA						( tg68_dat_out[15:8]		),
@@ -524,12 +539,12 @@ YM2149 ym2149 (
 	.stereo 					(system_ctrl[22]			),
 	
 	// port a
-	.I_IOA           		( 8'd0 						),
+	.I_IOA           		( port_a_in 				),
 	.O_IOA              	( port_a_out				),
 	.O_IOA_OE_L      		(								),
 
 	// port b
-	.I_IOB               ( 8'd0						),
+	.I_IOB               ( port_b_in					),
 	.O_IOB              	( port_b_out				),
 	.O_IOB_OE_L         	(								),
   
@@ -1088,6 +1103,9 @@ wire [7:0] parallel_data_out;
 wire parallel_strobe_out;
 wire parallel_data_out_available;
 
+// extra joystick interface
+wire [5:0] joy0, joy1;
+
 // connection between io controller and ethernet controller
 //   mac address transfer io controller -> ethernec
 wire [31:0] eth_status;
@@ -1112,6 +1130,10 @@ user_io user_io(
       .ikbd_data_out_available	(ikbd_data_from_acia_available),
       .ikbd_strobe_in				(ikbd_strobe_to_acia),
       .ikbd_data_in					(ikbd_data_to_acia),
+
+		// extra joysticks
+		.joy0                  		(joy0),
+		.joy1                  		(joy1),
 		
 		// serial/rs232 interface
       .serial_strobe_out			(serial_strobe_from_mfp),

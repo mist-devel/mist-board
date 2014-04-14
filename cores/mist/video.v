@@ -129,13 +129,12 @@ always @(posedge clk) begin
  
 	// v_event is the begin of hsync. The hatari video.h says vbi happens 64 clock cycles
 	// ST hor counter runs at 16Mhz, thus the trigger is 128 events after h_sync
-	// xyz
 	if(st_h_active && (st_hcnt == (v_event))) begin		
 		// vsync starts at begin of blanking phase
-		if(vcnt == t7_v_blank_bot - de_v_offset - 10'd0)   st_vs <= 1'b1;  //XXX 2!
+		if(vcnt == t7_v_blank_bot - de_v_offset + 10'd4)   st_vs <= 1'b1;  //XXX -2!
 		
 		// vsync ends at begin of top border
-		if(vcnt == t10_v_border_top - de_v_offset - 10'd0) st_vs <= 1'b0;  //XXX 2!
+		if(vcnt == t10_v_border_top - de_v_offset + 10'd0) st_vs <= 1'b0;  //XXX -2!
 	end
 end
 		
@@ -508,7 +507,8 @@ always @(posedge clk) begin
 		if((vcnt == { 8'd97, 2'b00} ) && (vga_hcnt == 10'd0) && (bottom_overscan_cnt != 0))
 			bottom_overscan_cnt  <= bottom_overscan_cnt - 4'd1;
 
-		if((vcnt[9:2] == 8'd98)||(vcnt[9:2] == 8'd99)||(vcnt[9:2] == 8'd100)) begin
+		if((vcnt[9:2] == 8'd97)||(vcnt[9:2] == 8'd98)||(vcnt[9:2] == 8'd99)||
+			(vcnt[9:2] == 8'd100)||(vcnt[9:2] == 8'd101)) begin
 			// syncmode has changed from 1 to 0 (50 to 60 hz)
 			if((syncmode[1] == 1'b0) && (last_syncmode == 1'b1))
 				bottom_overscan_cnt <= 4'd15;
@@ -518,7 +518,8 @@ always @(posedge clk) begin
 		if((vcnt == {8'd133, 2'b00 }) && (vga_hcnt == 10'd0) && (top_overscan_cnt != 0))
 			top_overscan_cnt  <= top_overscan_cnt - 4'd1;
 
-		if((vcnt[9:2] == 8'd134)||(vcnt[9:2] == 8'd135)||(vcnt[9:2] == 8'd136)) begin
+		if((vcnt[9:2] == 8'd133)||(vcnt[9:2] == 8'd134)||(vcnt[9:2] == 8'd135)||
+			(vcnt[9:2] == 8'd136)||(vcnt[9:2] == 8'd137)) begin
 			// syncmode has changed from 1 to 0 (50 to 60 hz)
 			if((syncmode[1] == 1'b0) && (last_syncmode == 1'b1))
 				top_overscan_cnt <= 4'd15;
@@ -730,9 +731,7 @@ always @(posedge clk) begin
 	// according to hatari the video counter is reloaded 3 lines before 
 	// the vbi occurs. This is right after the display has been painted.
 	// The video address counter is reloaded right after display ends 
-	
-	// TODO: -1 and pacmania works ...
-	if((vga_hcnt == t3_h_blank_left) && (vcnt == (t7_v_blank_bot-de_v_offset-10'd3))) begin  // +1
+	if((vga_hcnt == t3_h_blank_left) && (vcnt == (t7_v_blank_bot-de_v_offset+10'd1))) begin  // +1
 		vaddr <= _v_bas_ad;
 
 		// copy syncmode
