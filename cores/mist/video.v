@@ -122,19 +122,15 @@ always @(posedge clk) begin
 	end
 
 	// vsync irq is generated right after the last border line has been displayed
-
-	// TODO: check where these additional -10'd2 come from. Obsession pinball
-	// needs this to get the colors right. This means it's needed for the correct 
-	// relationship between vbi and hbi. But why?
  
 	// v_event is the begin of hsync. The hatari video.h says vbi happens 64 clock cycles
 	// ST hor counter runs at 16Mhz, thus the trigger is 128 events after h_sync
 	if(st_h_active && (st_hcnt == (v_event))) begin		
 		// vsync starts at begin of blanking phase
-		if(vcnt == t7_v_blank_bot - de_v_offset + 10'd4)   st_vs <= 1'b1;  //XXX -2!
+		if(vcnt == t7_v_blank_bot - de_v_offset + 10'd4)   st_vs <= 1'b1;
 		
 		// vsync ends at begin of top border
-		if(vcnt == t10_v_border_top - de_v_offset + 10'd0) st_vs <= 1'b0;  //XXX -2!
+		if(vcnt == t10_v_border_top - de_v_offset + 10'd0) st_vs <= 1'b0;
 	end
 end
 		
@@ -731,7 +727,7 @@ always @(posedge clk) begin
 	// according to hatari the video counter is reloaded 3 lines before 
 	// the vbi occurs. This is right after the display has been painted.
 	// The video address counter is reloaded right after display ends 
-	if((vga_hcnt == t3_h_blank_left) && (vcnt == (t7_v_blank_bot-de_v_offset+10'd1))) begin  // +1
+	if((vga_hcnt == t3_h_blank_left) && (vcnt == (t7_v_blank_bot-de_v_offset+10'd1))) begin
 		vaddr <= _v_bas_ad;
 
 		// copy syncmode

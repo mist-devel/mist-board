@@ -223,7 +223,7 @@ module user_io(
 					 eth_mac_byte <= { sbuf, SPI_MOSI }; 
 					 eth_mac_strobe <= 1'b1;
 				end
-				
+				  
 				// give strobe after each eth byte read
 			   if(cmd == 8'h0b)
 					 eth_tx_read_strobe <= 1'b1;
@@ -232,6 +232,7 @@ module user_io(
 			   if(cmd == 8'h0c) begin
 					 eth_rx_write_byte <= { sbuf, SPI_MOSI }; 
 					 eth_rx_write_strobe <= 1'b1;
+//					 eth_rx_write_begin <= 1'b1;
 				end
 
 				// four extra joysticks ...
