@@ -28,6 +28,8 @@ module osd (
   input         ss,
   input         sdi,
 
+  output reg 	osd_enable,
+
   // current video beam position
   input [9:0]   hcnt,
   input [9:0]   vcnt,
@@ -57,7 +59,6 @@ reg [7:0]       cmd;
 reg [4:0]       cnt;
 reg [10:0]      bcnt;
 
-reg osd_enable;
 reg [7:0] osd_buffer [2047:0];  // the OSD buffer itself
 
 // the OSD has its own SPI interface to the io controller

@@ -59,7 +59,8 @@ module video (
   input [1:0] 			scanlines,       // scanlines (00-none 01-25% 10-50% 11-100%)
   input [15:0] 		adjust,          // hor/ver video adjust
   input 					ste,             // enable STE featurss
-  
+  output             osd_enable,
+ 
   // signals not affected by scan doubler for internal use like irqs
   output            st_de,
   output reg        st_vs,
@@ -374,6 +375,8 @@ osd osd (
 	.sdi   		(sdi			),
 	.sck  		(sck			),
 	.ss    		(ss			),
+	
+	.osd_enable (osd_enable ),
 
 	// feed ST video signal into OSD
 	.clk        (clk        ),

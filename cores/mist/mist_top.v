@@ -46,6 +46,8 @@ wire ste = system_ctrl[23] || system_ctrl[24];
 wire mste = system_ctrl[24];
 wire steroids = system_ctrl[23] && system_ctrl[24];  // a STE on steroids
 
+// ethernec is enabled by the io controller whenever a USB 
+// ethernet interface is detected
 wire ethernec_present = system_ctrl[25];
 
 // usb target port on io controller is used for redirection of
@@ -213,6 +215,60 @@ wire [15:0] io_data_out = vreg_data_out | dma_data_out | blitter_data_out |
 
 wire init = ~pll_locked;
 
+/* -------------------------- Viking video card -------------------- */
+
+// viking/sm194 is enabled and max 8MB memory may be enabled
+wire viking_mem_ok = MEM512K || MEM1M || MEM2M || MEM4M || MEM8M;
+wire viking_enable    = system_ctrl[28] && viking_mem_ok;
+
+// check for cpu access to 0xcxxxxx with viking enabled to switch video
+// output once the driver loads
+reg viking_in_use;
+always @(negedge clk_128) begin
+	if(reset)
+		viking_in_use <= 1'b0;
+	else
+		if(clkena && viking_enable && (tg68_adr[23:18] == 6'b110000))
+			viking_in_use <= 1'b1;
+end
+
+// video output multiplexer to switch between shifter and viking
+wire viking_active = viking_in_use && !osd_enable;
+assign VGA_HS = viking_active?viking_hs:shifter_hs;
+assign VGA_VS = viking_active?viking_vs:shifter_vs;
+assign VGA_R = viking_active?viking_r:shifter_r;
+assign VGA_G = viking_active?viking_g:shifter_g;
+assign VGA_B = viking_active?viking_b:shifter_b;
+
+wire viking_hs, viking_vs;
+wire [5:0] viking_r, viking_g, viking_b;
+
+wire [22:0] viking_address;
+wire viking_read;
+
+viking viking (
+	.reset        	(reset    	),
+	.pclk         	(clk_128    ),    // pixel 
+	.bus_cycle   	(bus_cycle  ),
+	
+	// memory interface
+	.bclk      	(clk_8      	),    // system bus clock = 8Mhz
+   .addr       (viking_address ),
+	.data       (ram_data_out_64),
+	.read       (viking_read    ),
+
+	// video output 
+	.hs		(viking_hs			),
+	.vs		(viking_vs			),
+	.r    	(viking_r        	),
+	.g    	(viking_g       	),
+	.b    	(viking_b        	)
+);
+
+wire osd_enable;
+wire shifter_hs, shifter_vs;
+wire [5:0] shifter_r, shifter_g, shifter_b;
+
 video video (
 	.clk         	(clk_32     ),
    .clk27       	(CLOCK_27[0]),
@@ -222,6 +278,7 @@ video video (
    .sdi           (SPI_DI    	),
    .sck           (SPI_SCK   	),
    .ss            (SPI_SS3   	),
+	.osd_enable    (osd_enable ),
 
 	// cpu register interface
 	.reg_clk      (clk_8       ),
@@ -238,11 +295,11 @@ video video (
 	.data       (ram_data_out_64),
 	.read       (video_read    ),
 	
-	.hs			(VGA_HS			),
-	.vs			(VGA_VS			),
-	.video_r    (VGA_R        	),
-	.video_g    (VGA_G        	),
-	.video_b    (VGA_B        	),
+	.hs			(shifter_hs		),
+	.vs			(shifter_vs		),
+	.video_r    (shifter_r    	),
+	.video_g    (shifter_g    	),
+	.video_b    (shifter_b    	),
 
 	// configuration signals
 	.adjust     (video_adj    	),
@@ -955,14 +1012,16 @@ wire MEM14M  = (system_ctrl[3:1] == 3'd5);
 
 // rom is also at 0x000000 to 0x000007
 wire cpu2lowrom = (tg68_adr[23:3] == 21'd0);
- 
+
 // ordinary ram from 0x000000 to 0x400000, more if enabled
 wire cpu2ram = (!cpu2lowrom) && (
-								  (tg68_adr[23:22] == 2'b00)    ||  // ordinary 4MB
-	((MEM14M || MEM8M) &&  (tg68_adr[23:22] == 2'b01))   ||  // 8MB 
-	(MEM14M            && ((tg68_adr[23:22] == 2'b10)    ||  // 12MB
-	                       (tg68_adr[23:21] == 3'b110))) ||  // 14MB
-	(steroids          &&  (tg68_adr[23:19] == 5'b11101)));  // 512k at $e80000 for STEroids
+								  (tg68_adr[23:22] == 2'b00)     ||  // ordinary 4MB
+	((MEM14M || MEM8M) &&  (tg68_adr[23:22] == 2'b01))    ||  // 8MB 
+	(MEM14M            && ((tg68_adr[23:22] == 2'b10)     ||  // 12MB
+	                       (tg68_adr[23:21] == 3'b110)))  ||  // 14MB
+	(steroids          &&  (tg68_adr[23:19] == 5'b11101)) ||  // 512k at $e80000 for STEroids
+	(viking_enable     &&  (tg68_adr[23:18] == 6'b110000))    // 256k at 0xc00000 for viking card
+);
 
 // 256k tos from 0xe00000 to 0xe40000
 wire cpu2tos256k = (tg68_adr[23:18] == 6'b111000);
@@ -1001,23 +1060,23 @@ wire second_cpu_slot = (mste && enable_16mhz) || steroids;
 // cpu, DMA and Blitter. A third is optionally being used for faster CPU
 wire video_cycle = (bus_cycle == 0);
 wire cpu_cycle = (bus_cycle == 1) || (second_cpu_slot && (bus_cycle == 3));
+wire viking_cycle = (bus_cycle == 2);
 
 // ----------------- RAM address --------------
 wire [22:0] video_cycle_addr = (st_hs && ste)?ste_dma_snd_addr:video_address;
 wire [22:0] cpu_cycle_addr = data_io_br?data_io_addr:(blitter_br?blitter_master_addr:tg68_adr[23:1]);
-wire [22:0] ram_address = video_cycle?video_cycle_addr:cpu_cycle_addr;
+wire [22:0] ram_address = viking_cycle?viking_address:(video_cycle?video_cycle_addr:cpu_cycle_addr);
 
 // ----------------- RAM read -----------------
 // memory access during the video cycle is shared between video and ste_dma_snd
 wire video_cycle_oe = (st_hs && ste)?ste_dma_snd_read:video_read;
 // memory access during the cpu cycle is shared between blitter and cpu
 wire cpu_cycle_oe = data_io_br?data_io_read:(blitter_br?blitter_master_read:(cpu_cycle && tg68_as && tg68_rw && cpu2mem));
-wire ram_oe = video_cycle?video_cycle_oe:(cpu_cycle?cpu_cycle_oe:1'b0);
+wire ram_oe = viking_cycle?viking_read:(video_cycle?video_cycle_oe:(cpu_cycle?cpu_cycle_oe:1'b0));
 
 // ----------------- RAM write -----------------
-wire video_cycle_wr = 1'b0;
 wire cpu_cycle_wr = data_io_br?data_io_write:(blitter_br?blitter_master_write:(cpu_cycle && tg68_as && ~tg68_rw && cpu2ram));
-wire ram_wr = video_cycle?video_cycle_wr:(cpu_cycle?cpu_cycle_wr:1'b0);
+wire ram_wr = (viking_cycle||video_cycle)?1'b0:(cpu_cycle?cpu_cycle_wr:1'b0);
 
 wire [15:0] ram_data_out;
 wire [15:0] system_data_out = cpu2mem?ram_data_out:io_data_out;
