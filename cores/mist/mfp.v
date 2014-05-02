@@ -1,3 +1,22 @@
+// mfp.v
+//
+// Atari ST multi function peripheral (MFP) for the MiST board
+// http://code.google.com/p/mist-board/
+//
+// Copyright (c) 2014 Till Harbaum <till@harbaum.org>
+//
+// This source file is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published
+// by the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This source file is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
 
 module mfp (
@@ -309,7 +328,15 @@ always @(negedge clk) begin
 
 		// input port irqs are edge sensitive
 		if(!iD[3] && iD2[3] && ier[ 3]) ipr[ 3] <= 1'b1;   // blitter
-      if(!iD[4] && iD2[4] && ier[ 6]) ipr[ 6] <= 1'b1;   // acia
+		
+		// HACK WARNING:
+		// The acia irq handling is somewhat broken. It should be edge sensitive like
+		// all others (and a real mfp can't do different). But this causes the
+		// acia irq to get stuck in cubase. Making it level sensitive cures this.
+		// But this is obviously not the correct solution ...
+//      if(!iD[4] && iD2[4] && ier[ 6]) ipr[ 6] <= 1'b1;   // edge sensitive acia
+      if(!i[4] && ier[ 6]) ipr[ 6] <= 1'b1;   // level sensitive acia
+		
 		if(!iD[5] && iD2[5] && ier[ 7]) ipr[ 7] <= 1'b1;   // dma
 		if(!iD[7] && iD2[7] && ier[15]) ipr[15] <= 1'b1;   // mono detect
 

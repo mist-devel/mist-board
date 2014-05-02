@@ -25,7 +25,6 @@
 // it on screen.
 
 module viking (
-		input 				reset,
 	   input 				pclk,     	// 128 MHz pixel clock
 
 		// memory interface

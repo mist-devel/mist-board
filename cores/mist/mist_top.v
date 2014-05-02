@@ -222,18 +222,23 @@ wire viking_mem_ok = MEM512K || MEM1M || MEM2M || MEM4M || MEM8M;
 wire viking_enable    = system_ctrl[28] && viking_mem_ok;
 
 // check for cpu access to 0xcxxxxx with viking enabled to switch video
-// output once the driver loads
-reg viking_in_use;
+// output once the driver loads. 256 accesses to the viking memory range
+// are considered a valid sign that the driver is working. Without driver
+// others may also probe that area which is why we want to see 256 accesses
+reg [7:0] viking_in_use;
+
 always @(negedge clk_128) begin
-	if(reset)
-		viking_in_use <= 1'b0;
+	if(peripheral_reset)
+		viking_in_use <= 8'h00;
 	else
-		if(clkena && viking_enable && (tg68_adr[23:18] == 6'b110000))
-			viking_in_use <= 1'b1;
+		// cpu writes to $c0xxxx
+		if(clkena && !br && (tg68_busstate == 2'b11) && viking_enable && 
+			(tg68_adr[23:18] == 6'b110000) && (viking_in_use != 8'hff))
+			viking_in_use <= viking_in_use + 8'h01;
 end
 
 // video output multiplexer to switch between shifter and viking
-wire viking_active = viking_in_use && !osd_enable;
+wire viking_active = (viking_in_use == 8'hff) && !osd_enable;
 assign VGA_HS = viking_active?viking_hs:shifter_hs;
 assign VGA_VS = viking_active?viking_vs:shifter_vs;
 assign VGA_R = viking_active?viking_r:shifter_r;
@@ -247,7 +252,6 @@ wire [22:0] viking_address;
 wire viking_read;
 
 viking viking (
-	.reset        	(reset    	),
 	.pclk         	(clk_128    ),    // pixel 
 	.bus_cycle   	(bus_cycle  ),
 	
@@ -778,8 +782,13 @@ wire [2:0]  tg68_fc_S;
 wire        tg68_uds_S;
 wire        tg68_lds_S;
 wire        tg68_rw_S;
+
 reg         tg68_as;
 reg         cpu_fast_cycle;  // signal indicating that the cpu runs from cache, used to calm berr
+
+// the tg68 can itself generate a reset signal
+wire tg68_reset;  
+wire peripheral_reset = reset || !tg68_reset;
 
 // the CPU throttle counter limits the CPU speed to a rate the tg68 core can
 // handle. With a throttle of "4" the core will run effectively at 32MHz which
@@ -908,6 +917,7 @@ wire [1:0] tg68_busstate;
 wire [15:0] cache_data_out = data_cache_hit?data_cache_data_out:inst_cache_data_out;
 wire [15:0] cpu_data_in = cacheRead?cache_data_out:system_data_out;
 
+
 TG68KdotC_Kernel #(2,2,2,2,2,2) tg68k (
 	.clk          	(clk_128 		),
 	.nReset       	(~reset			),
@@ -924,7 +934,7 @@ TG68KdotC_Kernel #(2,2,2,2,2,2) tg68k (
 	.nLDS          (tg68_lds_S    ),
 	.nWr           (tg68_rw_S     ),
 	.busstate	 	(tg68_busstate ), // 00-> fetch code 10->read data 11->write data 01->no memaccess
-	.nResetOut	   (              ),
+	.nResetOut	   (tg68_reset    ),
 	.FC            (tg68_fc_S     )
 );
 
