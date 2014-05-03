@@ -375,6 +375,9 @@ mfp mfp (
 	.irq	    (mfp_irq     ),
 	.iack	    (mfp_iack    ),
 
+	// the midi irq hack is only enabled if usb redirection is set to midi
+	.midi_irq_hack (usb_redirection == 3'd3),
+	
 	// serial/rs232 interface io-controller<->mfp
 	.serial_data_out_available 	(serial_data_from_mfp_available),
 	.serial_strobe_out 				(serial_strobe_from_mfp),

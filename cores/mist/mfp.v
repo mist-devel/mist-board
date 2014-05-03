@@ -32,6 +32,8 @@ module mfp (
 	output 		 irq,
 	input 		 iack,
 
+	input 		midi_irq_hack,
+	
 	// serial rs232 connection to io controller
 	output 		 serial_data_out_available,
 	input  		 serial_strobe_out,
@@ -334,8 +336,11 @@ always @(negedge clk) begin
 		// all others (and a real mfp can't do different). But this causes the
 		// acia irq to get stuck in cubase. Making it level sensitive cures this.
 		// But this is obviously not the correct solution ...
-//      if(!iD[4] && iD2[4] && ier[ 6]) ipr[ 6] <= 1'b1;   // edge sensitive acia
-      if(!i[4] && ier[ 6]) ipr[ 6] <= 1'b1;   // level sensitive acia
+		if(!midi_irq_hack) begin
+			if(!iD[4] && iD2[4] && ier[ 6]) 	ipr[ 6] <= 1'b1;   // normal operation: edge sensitive acia
+		end else begin
+			if(!i[4] && ier[ 6]) 				ipr[ 6] <= 1'b1;   // hack: level sensitive acia
+		end
 		
 		if(!iD[5] && iD2[5] && ier[ 7]) ipr[ 7] <= 1'b1;   // dma
 		if(!iD[7] && iD2[7] && ier[15]) ipr[15] <= 1'b1;   // mono detect
