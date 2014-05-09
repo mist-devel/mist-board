@@ -215,6 +215,11 @@ always @(negedge clk) begin
 	// writing the data register triggers the transfer
 	if((sel && !rw && (addr == 5'h11)) || (mw_cnt != 0)) begin
 
+		// decrease shift counter. Do this before the register write as
+		// register write has priority and should reload the counter
+		if(mw_cnt != 0) 
+			mw_cnt <= mw_cnt - 7'd1;
+
 		if(sel && !rw && (addr == 5'h11)) begin
 			// first bit is evaluated imediately					
 			mw_data_reg <= { din[14:0], 1'b0 }; 
@@ -232,10 +237,6 @@ always @(negedge clk) begin
 			// notify client of valid bits
 			mw_clk <= mw_mask_reg[15];
 		end
-
-		// decrease shift counter
-		if(mw_cnt != 0) 
-			mw_cnt <= mw_cnt - 7'd1;
 
 		// indicate end of transfer
 		mw_done <= (mw_cnt == 7'h01);

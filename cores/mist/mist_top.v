@@ -77,7 +77,7 @@ wire tg68_berr = (dtack_timeout == 4'd15);
 reg [3:0] berr_cnt_out /* synthesis noprune */;
 reg [3:0] berr_cnt;
 reg berrD;
-always @(posedge clk_8) begin
+always @(negedge clk_8) begin
 	berrD <= tg68_berr;
 
 	if(reset) begin
@@ -94,14 +94,23 @@ end
 reg bus_ok, cpu_cycle_L;
 always @(negedge clk_8) begin
 	// bus error if cpu owns bus, but no dtack, nor ram access,
-	// nor fast cpu cycle
-	bus_ok <= tg68_dtack || br || cpu2mem || cpu_fast_cycle;
+	// nor fast cpu cycle nor cpu does internsal processing
+	bus_ok <= tg68_dtack || br || cpu2mem || cpu_fast_cycle || (tg68_busstate == 2'b01);
 	cpu_cycle_L <= cpu_cycle;
 end
 
+reg berr_reset;
+always @(negedge clk_32) begin
+	if(reset)
+		berr_reset <= 1'b1;
+	else if(clkenaD)
+		berr_reset <= tg68_clr_berr;
+end
+
 reg [3:0] dtack_timeout;
-always @(posedge clk_8) begin
-	if(reset || tg68_clr_berr) begin
+always @(posedge clk_32 or posedge berr_reset) begin
+//	if(reset || tg68_clr_berr) begin
+	if(berr_reset) begin
 		dtack_timeout <= 4'd0;
 	end else begin
 		if(cpu_cycle_L) begin
@@ -113,7 +122,7 @@ always @(posedge clk_8) begin
 			if(dtack_timeout != 4'd15) begin
 				if(bus_ok)
 					dtack_timeout <= 4'd0;
-				else
+				else if(clkcnt == 3) // increase timout at the end of the cpu cycle
 					dtack_timeout <= dtack_timeout + 4'd1;
 			end 
 		end
@@ -464,7 +473,7 @@ ste_joystick ste_joystick (
 	.uds      (tg68_uds    ),
 	.lds      (tg68_lds    ),
 	.rw       (tg68_rw     ),
-	.dout     (ste_joy_data_out),
+	.dout     (ste_joy_data_out)
 );
 
 ethernec ethernec (
@@ -764,12 +773,7 @@ end
 /* -------------------------------------------------------------------------- */
 /* ------------------------------  TG68 CPU interface  ---------------------- */
 /* -------------------------------------------------------------------------- */
-	
-// the 128 Mhz cpu clock is gated by clkena. Since the CPU cannot run at full 128MHz
-// speed a certain amount of idle cycles have to be inserted between two subsequent
-// cpu clocks. This idle time is implemented using the cpu_throttle counter.
-reg [3:0] cpu_throttle;
- 
+	 
 reg clkena;
 reg iCacheStore;
 reg dCacheStore;
@@ -793,43 +797,48 @@ reg         cpu_fast_cycle;  // signal indicating that the cpu runs from cache, 
 wire tg68_reset;  
 wire peripheral_reset = reset || !tg68_reset;
 
-// the CPU throttle counter limits the CPU speed to a rate the tg68 core can
-// handle. With a throttle of "4" the core will run effectively at 32MHz which
-// is equivalent to ~64MHz on a real 68000. This speed will never be achieved 
-// since memory and peripheral access slows the cpu further
-localparam CPU_THROTTLE = 4'd6;
-reg [3:0] clkcnt;
- 
-reg trigger /* synthesis noprune */;
-reg panic /* synthesis noprune */; 
+// 32MHz counter running synchronous to the 8Mhz clock. This is used to
+// synchronize the 32MHz cpu to the 8MHz system bus
+reg [1:0] clkcnt;
+always @(posedge clk_32) begin
+	// count 0..3 within a 8MHz cycle 
+	if(((clkcnt == 3) && ( clk_8 == 0)) ||
+		((clkcnt == 0) && ( clk_8 == 1)) ||
+		((clkcnt != 3) && (clkcnt != 0)))
+			clkcnt <= clkcnt + 2'd1;
+end
 
-always @(posedge clk_128) begin
-	// count 0..15 within a 8MHz cycle 
-	if(((clkcnt == 15) && ( clk_8 == 0)) ||
-		((clkcnt ==  0) && ( clk_8 == 1)) ||
-		((clkcnt != 15) && (clkcnt != 0)))
-			clkcnt <= clkcnt + 4'd1;
+// generate signal indicating the CPU may run from cache (cpu is active, 
+// performs a read and the caches are able to provide the requested data)
+wire cacheReady = !br && steroids && (tg68_busstate[0] == 1'b0) && cache_hit;
 
+// a clkena delayed by 180 deg is being used to 
+// read from the cache
+reg clkenaD;
+always @(posedge clk_32)
+	clkenaD <= clkena;
+
+// the TG68 core works on the rising clock edge. We thus prepare everything
+// on the falling clock edge
+always @(negedge clk_32) begin
 	// default: cpu does not run
 	clkena <= 1'b0;
 	iCacheStore <= 1'b0;
 	dCacheStore <= 1'b0;
 	cacheUpdate <= 1'b0;
-	trigger <= 1'b0;
-	panic <= 1'b0;
-
-	if(clkcnt == 15) begin
+	
+	if(clkcnt == 3) begin
 		// 8Mhz cycle must not start directly after the cpu has been clocked
 		// as the address may not be stable then
 
 		// cpuDoes8MhzCycle has same timing as tg68_as
-		if(!clkena && !br) cpuDoes8MhzCycle <= 1'b1; 
-
-		cpu_fast_cycle <= 1'b0;
+		if(!clkena && !br && tg68_busstate != 2'b01) cpuDoes8MhzCycle <= 1'b1; 
 
 		// tg68 core does not provide a as signal, so we generate it
-		tg68_as <= !clkena && (tg68_busstate != 2'b01) && !br;
+		tg68_as <= (!clkena && tg68_busstate != 2'b01) && !br;
  
+		cpu_fast_cycle <= 1'b0;
+
 		// all other output signals are simply latched to make sure
 		// they don't change within a 8Mhz cycle even if the CPU
 		// advances. This would be a problem if e.g. The CPU would try
@@ -842,32 +851,29 @@ always @(posedge clk_128) begin
 		tg68_fc <= tg68_fc_S;	
 	end
 
-	// evaluate cache one cycle before cpu is allowed to access the bus again
-	// to make sure cache signals are routed to the cpu if the cpu is supposed
-	// to use it	
-	if(cpu_throttle == 4'd1) // tg68_busstate[0] == 0 -> cpu read access
-		if(!br && steroids && (tg68_busstate[0] == 1'b0) && cache_hit)
-			cacheRead <= 1'b1;
-			
-	if(clkena)
-		cacheRead <= 1'b0;
+	cacheRead <= cacheReady;
 
 	// only run cpu if throttle counter has run down
-	if((cpu_throttle == 4'd0) && !reset) begin
+	if(!reset) begin
 		
-		// cpu does internal processing -> let it do this immediately
-		// cpu wants to read and the requested data is available from the cache -> run immediately
-		if((tg68_busstate == 2'b01) || cacheRead) begin
+		if(cacheReady && !br) begin
 			clkena <= 1'b1;
-
-			// cpu must never try to fetch instructions from non-mem
-			if((tg68_busstate == 2'b00) && !cpu2mem) 
-				panic <= 1'b1;
-			
-			cpu_throttle <= CPU_THROTTLE;
 			cpuDoes8MhzCycle <= 1'b0;
 			cpu_fast_cycle <= 1'b1;
-		end else begin
+		end else
+ 			
+		// cpu does internal processing -> let it do this immediately
+		// cpu wants to read and the requested data is available from the cache -> run immediately
+
+		// todo: non steroids can run this full throttle
+		if((tg68_busstate == 2'b01) && !br) begin
+			clkena <= 1'b1; 
+
+			cpuDoes8MhzCycle <= 1'b0;
+			cpu_fast_cycle <= 1'b1;
+		end else 
+		
+		begin
 			// this ends a normal 8MHz bus cycle. This requires that the 
 			// cpu/chipset had the entire cycle and not e.g. started just in
 			// the middle. This is verified using the cpuDoes8MhzCycle signal
@@ -875,23 +881,10 @@ always @(posedge clk_128) begin
 			// runs from cache
  
 			// clkcnt == 14 -> clkena in cycle 15 -> cpu runs in cycle 15
-			if((clkcnt == 13) && cpuDoes8MhzCycle && cpu_cycle && !br && (tg68_dtack || tg68_berr)) begin
+			if((clkcnt == 3) && cpuDoes8MhzCycle && cpu_cycle && !br && (tg68_dtack || tg68_berr)) begin
 				clkena <= 1'b1;
-				cpu_throttle <= CPU_THROTTLE;
 				cpuDoes8MhzCycle <= 1'b0;
-					
-				// cpu must never try to fetch instructions from non-mem
-				if((tg68_busstate == 2'b00) && !cpu2mem) 
-					panic <= 1'b1;
-
-				// ---------- cache debugging ---------------
-				// if the cache reports a hit, it should be the same data that's also
-				// returned by ram. Otherwise the cache is broken
-//				if(cache_hit && (tg68_busstate[0] == 1'b0)) begin
-//					if(cache_data_out != system_data_out)
-//						trigger <= 1'b1;
-//				end
-						
+											
 				if(cacheable && tg68_dtack) begin
 					// store data in instruction cache on cpu instruction read
 					if(tg68_busstate == 2'b00)
@@ -907,8 +900,7 @@ always @(posedge clk_128) begin
 				end
 			end
 		end		
-	end else
-		cpu_throttle <= cpu_throttle - 4'd1;
+	end
 end
 
 // TODO: generate cacheUpdate from ram_wr, so other bus masters also trigger this
@@ -922,7 +914,7 @@ wire [15:0] cpu_data_in = cacheRead?cache_data_out:system_data_out;
 
 
 TG68KdotC_Kernel #(2,2,2,2,2,2) tg68k (
-	.clk          	(clk_128 		),
+	.clk          	(clk_32 			),
 	.nReset       	(~reset			),
 	.clkena_in		(clkena			), 
 	.data_in       (cpu_data_in	),
@@ -968,6 +960,7 @@ cache data_cache (
 	.flush			( br							), 
 
 	// use the tg68_*_S signals here to quickly react on cpu requests
+	.strobe        ( clkenaD               ),
 	.addr     		( tg68_adr_S[23:1]		),
 	.ds        		( { ~tg68_lds_S, ~tg68_uds_S } ),
 
@@ -995,6 +988,7 @@ cache instruction_cache (
 	.flush			( br							), 
 
 	// use the tg68_*_S signals here to quickly react on cpu requests
+	.strobe        ( clkenaD               ),
 	.addr     		( tg68_adr_S[23:1]		),
 	.ds        		( { ~tg68_lds_S, ~tg68_uds_S } ),
 
@@ -1032,7 +1026,7 @@ wire cpu2ram = (!cpu2lowrom) && (
 	((MEM14M || MEM8M) &&  (tg68_adr[23:22] == 2'b01))    ||  // 8MB 
 	(MEM14M            && ((tg68_adr[23:22] == 2'b10)     ||  // 12MB
 	                       (tg68_adr[23:21] == 3'b110)))  ||  // 14MB
-	(steroids          &&  (tg68_adr[23:19] == 5'b11101)) ||  // 512k at $e80000 for STEroids
+//	(steroids          &&  (tg68_adr[23:19] == 5'b11101)) ||  // 512k at $e80000 for STEroids
 	(viking_enable     &&  (tg68_adr[23:18] == 6'b110000))    // 256k at 0xc00000 for viking card
 );
 
@@ -1135,7 +1129,7 @@ sdram sdram (
 	.ds        		( { ram_uds, ram_lds } 		),
 	.we       		( ram_wr           			),
 	.oe         	( ram_oe           			),
-	.dout       	( ram_data_out_64  			),
+	.dout       	( ram_data_out_64  			)
 );
 
 // multiplex spi_do, drive it from user_io if that's selected, drive

@@ -26,10 +26,11 @@ module cache (
       input 	    reset, 
       input 	    flush, 
 	      
+		input			 strobe,
       input [22:0] addr, // cpu word address
       input [1:0]	 ds,   // upper (0) and lower (1) data strobe
 
-      output reg [15:0] dout,
+      output [15:0] dout,
       output        hit,
 
 		// interface to store entire cache lines when read from ram
@@ -64,7 +65,7 @@ localparam ALLZERO = 64'd0;  // 2 ** BITS zero bits
 // L = cache line
 // W = 16 bit word select 
 wire [21-BITS-1:0] tag = addr[22:2+BITS];
-reg [BITS-1:0] line;
+wire [BITS-1:0] line = addr[2+BITS-1:2];
 
 /* ------------------------------------------------------------------------------ */
 /* --------------------------------- cache memory ------------------------------- */
@@ -78,7 +79,7 @@ reg [31:24]       data_latch_3 [ENTRIES-1:0];
 reg [23:16]       data_latch_2 [ENTRIES-1:0];
 reg [15: 8]       data_latch_1 [ENTRIES-1:0];
 reg [ 7: 0]       data_latch_0 [ENTRIES-1:0];
-
+ 
 reg [21-BITS-1:0] tag_latch  [ENTRIES-1:0];
 reg [ENTRIES-1:0] valid;
 
@@ -89,60 +90,72 @@ reg [21-BITS-1:0] current_tag;
 // assign hit = valid[line] && (tag_latch[line] == tag);
 assign hit = valid[line] && (current_tag == tag);
 
+reg [15:0] dout_latch_0;
+reg [15:0] dout_latch_1;
+reg [15:0] dout_latch_2;
+reg [15:0] dout_latch_3;
+
 // permanently output data according to current line
 // de-multiplex 64 bit data into word requested by cpu
+assign dout = 	(addr[1:0] == 0)?dout_latch_0:
+					(addr[1:0] == 1)?dout_latch_1:
+					(addr[1:0] == 2)?dout_latch_2:
+					dout_latch_3;
+
 always @(posedge clk_128) begin
-	dout <= (addr[1:0] == 2'd0)?{data_latch_1[line], data_latch_0[line]}:
-           (addr[1:0] == 2'd1)?{data_latch_3[line], data_latch_2[line]}:
-           (addr[1:0] == 2'd2)?{data_latch_5[line], data_latch_4[line]}:
-										 {data_latch_7[line], data_latch_6[line]};
+	dout_latch_0 <= {data_latch_1[line], data_latch_0[line]};
+	dout_latch_1 <= {data_latch_3[line], data_latch_2[line]};
+	dout_latch_2 <= {data_latch_5[line], data_latch_4[line]};
+	dout_latch_3 <= {data_latch_7[line], data_latch_6[line]};
 	current_tag <= tag_latch[line];
 end
 
-always @(negedge clk_128)
-	line <= addr[2+BITS-1:2];
-	
 always @(posedge clk_128) begin
    if(reset || flush) begin
 		valid <= ALLZERO;
    end else begin
-		// store indicates that a whole cache line is to be stored
-		if(store) begin
-			data_latch_7[line] <= din64[63:56];
-			data_latch_6[line] <= din64[55:48];
-			data_latch_5[line] <= din64[47:40];
-			data_latch_4[line] <= din64[39:32];
-			data_latch_3[line] <= din64[31:24];
-			data_latch_2[line] <= din64[23:16];
-			data_latch_1[line] <= din64[15: 8];
-			data_latch_0[line] <= din64[ 7: 0];
+		// the store and update signals are valid in the last cycle only. The cpu runs
+		// at 32MHz and is valid if t=14,15,0,1
+		if(t==15) begin
+
+			// store indicates that a whole cache line is to be stored
+			if(store) begin
+				data_latch_7[line] <= din64[63:56];
+				data_latch_6[line] <= din64[55:48];
+				data_latch_5[line] <= din64[47:40];
+				data_latch_4[line] <= din64[39:32];
+				data_latch_3[line] <= din64[31:24];
+				data_latch_2[line] <= din64[23:16];
+				data_latch_1[line] <= din64[15: 8];
+				data_latch_0[line] <= din64[ 7: 0];
 			
-			tag_latch[line] <= tag;
-			valid[line] <= 1'b1;
-		end
+				tag_latch[line] <= tag;
+				valid[line] <= 1'b1;
+			end
 		
-		// cpu (or other bus master!) writes to ram, so update cache contents if necessary
-		else if(update && hit) begin
-			// no need to care for "tag_latch" or "valid" as they simply stay the same
+			// cpu (or other bus master!) writes to ram, so update cache contents if necessary
+			else if(update && hit) begin
+				// no need to care for "tag_latch" or "valid" as they simply stay the same
 
-			if(addr[1:0] == 2'd0) begin
-				if(ds[1]) data_latch_0[line] <= din16[7:0];
-				if(ds[0]) data_latch_1[line] <= din16[15:8];
-			end 
+				if(addr[1:0] == 2'd0) begin
+					if(ds[1]) data_latch_0[line] <= din16[7:0];
+					if(ds[0]) data_latch_1[line] <= din16[15:8];
+				end 
 			
-			if(addr[1:0] == 2'd1) begin
-				if(ds[1]) data_latch_2[line] <= din16[7:0];
-				if(ds[0]) data_latch_3[line] <= din16[15:8];
-			end
+				if(addr[1:0] == 2'd1) begin
+					if(ds[1]) data_latch_2[line] <= din16[7:0];
+					if(ds[0]) data_latch_3[line] <= din16[15:8];
+				end
 
-			if(addr[1:0] == 2'd2) begin
-				if(ds[1]) data_latch_4[line] <= din16[7:0];
-				if(ds[0]) data_latch_5[line] <= din16[15:8];
-			end
+				if(addr[1:0] == 2'd2) begin
+					if(ds[1]) data_latch_4[line] <= din16[7:0];
+					if(ds[0]) data_latch_5[line] <= din16[15:8];
+				end
 
-			if(addr[1:0] == 2'd3) begin
-				if(ds[1]) data_latch_6[line] <= din16[7:0];
-				if(ds[0]) data_latch_7[line] <= din16[15:8];
+				if(addr[1:0] == 2'd3) begin
+					if(ds[1]) data_latch_6[line] <= din16[7:0];
+					if(ds[0]) data_latch_7[line] <= din16[15:8];
+				end
 			end
 		end
    end
