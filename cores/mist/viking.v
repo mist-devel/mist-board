@@ -28,6 +28,7 @@ module viking (
 	   input 				pclk,     	// 128 MHz pixel clock
 
 		// memory interface
+		input 				himem,      // use memory behind rom
 	   input 				bclk,     	// 8 MHz bus clock
 		input [1:0] 		bus_cycle,	// bus-cycle for bus access sync
 		output reg [22:0]	addr,   		// video word address
@@ -42,7 +43,8 @@ module viking (
 	   output [5:0] 		b
 );
 
-localparam BASE = 23'h600000;   // c00000
+localparam BASE    = 23'h600000;   // c00000
+localparam BASE_HI = 23'h740000;   // e80000
 		
 // total width must be multiple of 64, so video runs synchronous
 // to main bus
@@ -125,7 +127,7 @@ reg [63:0] shift_register;
 always@(posedge pclk) begin
 	// last line on screen
 	if(v_cnt == V+VFP+VS+VBP-2)
-		addr <= BASE;
+		addr <= himem?BASE_HI:BASE;
 	else if(me && bus_cycle_L == 6'h30)   // directly after read 
 		addr <= addr + 23'd4;              // advance 4 words (64 bits)
 		

@@ -53,14 +53,12 @@ always @(posedge clk_128) begin
 end
 
 // cache size configuration
-// the cache sizein bytes is 8*(2^BITS), e.g. 2kBytes if BITS == 8
-localparam BITS = 6;	
-localparam ENTRIES = 64;     // 2 ** BITS
-localparam ALLZERO = 64'd0;  // 2 ** BITS zero bits
+// the cache size in bytes is 8*(2^BITS), e.g. 2kBytes if BITS == 8
+localparam BITS = 8;	
 								
 // _word_ address mapping example with 16 cache lines (BITS == 4)
 // 22 21 20 19 18 17 16 15 14 13 12 11 10  9  8  7  6  5  4  3  2  1  0
-//  T  T  T  T  T  T  T  T  T  T  T  T  T  T  T  T  T  L  L  L  L  W  W
+//  T  T  T  T  T  T  T  T  T  T  T  T  T  L  L  L  L  L  L  L  L  W  W
 // T = stored in tag RAM
 // L = cache line
 // W = 16 bit word select 
@@ -71,16 +69,18 @@ wire [BITS-1:0] line = addr[2+BITS-1:2];
 /* --------------------------------- cache memory ------------------------------- */
 /* ------------------------------------------------------------------------------ */
 
-reg [63:56]       data_latch_7 [ENTRIES-1:0];
-reg [55:48]       data_latch_6 [ENTRIES-1:0];
-reg [47:40]       data_latch_5 [ENTRIES-1:0];
-reg [39:32]       data_latch_4 [ENTRIES-1:0];
-reg [31:24]       data_latch_3 [ENTRIES-1:0];
-reg [23:16]       data_latch_2 [ENTRIES-1:0];
-reg [15: 8]       data_latch_1 [ENTRIES-1:0];
-reg [ 7: 0]       data_latch_0 [ENTRIES-1:0];
+// 8 bytes wide storage
+parameter ENTRIES = 2 ** BITS;
+reg [7:0] data_latch_7 [ENTRIES-1:0];
+reg [7:0] data_latch_6 [ENTRIES-1:0];
+reg [7:0] data_latch_5 [ENTRIES-1:0];
+reg [7:0] data_latch_4 [ENTRIES-1:0];
+reg [7:0] data_latch_3 [ENTRIES-1:0];
+reg [7:0] data_latch_2 [ENTRIES-1:0];
+reg [7:0] data_latch_1 [ENTRIES-1:0];
+reg [7:0] data_latch_0 [ENTRIES-1:0];
  
-reg [21-BITS-1:0] tag_latch  [ENTRIES-1:0];
+reg [21-BITS-1:0] tag_latch [ENTRIES-1:0];
 reg [ENTRIES-1:0] valid;
 
 reg [21-BITS-1:0] current_tag;
@@ -112,7 +112,7 @@ end
 
 always @(posedge clk_128) begin
    if(reset || flush) begin
-		valid <= ALLZERO;
+		valid <= { ENTRIES {1'b0} };
    end else begin
 		// the store and update signals are valid in the last cycle only. The cpu runs
 		// at 32MHz and is valid if t=14,15,0,1
@@ -137,25 +137,27 @@ always @(posedge clk_128) begin
 			else if(update && hit) begin
 				// no need to care for "tag_latch" or "valid" as they simply stay the same
 
-				if(addr[1:0] == 2'd0) begin
-					if(ds[1]) data_latch_0[line] <= din16[7:0];
-					if(ds[0]) data_latch_1[line] <= din16[15:8];
-				end 
+				case(addr[1:0]) 
+					0: begin
+							if(ds[1]) data_latch_0[line] <= din16[7:0];
+							if(ds[0]) data_latch_1[line] <= din16[15:8];
+						end
 			
-				if(addr[1:0] == 2'd1) begin
-					if(ds[1]) data_latch_2[line] <= din16[7:0];
-					if(ds[0]) data_latch_3[line] <= din16[15:8];
-				end
+					1: begin
+							if(ds[1]) data_latch_2[line] <= din16[7:0];
+							if(ds[0]) data_latch_3[line] <= din16[15:8];
+						end
 
-				if(addr[1:0] == 2'd2) begin
-					if(ds[1]) data_latch_4[line] <= din16[7:0];
-					if(ds[0]) data_latch_5[line] <= din16[15:8];
-				end
+					2: begin
+							if(ds[1]) data_latch_4[line] <= din16[7:0];
+							if(ds[0]) data_latch_5[line] <= din16[15:8];
+						end
 
-				if(addr[1:0] == 2'd3) begin
-					if(ds[1]) data_latch_6[line] <= din16[7:0];
-					if(ds[0]) data_latch_7[line] <= din16[15:8];
-				end
+					3:  begin
+							if(ds[1]) data_latch_6[line] <= din16[7:0];
+							if(ds[0]) data_latch_7[line] <= din16[15:8];
+						end
+				endcase
 			end
 		end
    end

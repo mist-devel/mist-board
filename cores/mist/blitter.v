@@ -143,6 +143,8 @@ reg wait4bus;
 // counter for cooperative (non-hog) bus access
 reg [5:0] bus_coop_cnt /* synthesis noprune */;
 
+reg bus_owned;
+
 // the state machine runs through most states for every word it processes
 // state 0: normal source read cycle
 // state 1: destination read cycle
@@ -236,7 +238,8 @@ always @(negedge clk) begin
 	if(cycle_advance) begin
 
 		// grab bus if blitter is supposed to run (busy == 1) and we're not waiting for the bus
-		br_out <= busy && !wait4bus;
+		br_out <= busy && (!wait4bus || (wait4bus && (bus_coop_cnt == 0)));
+		bus_owned <= busy && !wait4bus;
 		
 		// clear busy flag if blitter is done
 		if(y_count == 0) busy <= 1'b0;
@@ -267,7 +270,7 @@ always @(negedge clk) begin
 		end
 			
 		// advance state machine only if bus is owned
-		if(br_out && !br_in && (y_count != 0)) begin
+		if(bus_owned && !br_in && (y_count != 0)) begin
 			// first extra source read (fxsr)
 			if(state == 2'd3) begin
 				if(src_x_inc[15] == 1'b0) 	src <= { src[15:0],  bm_data_in_latch};
@@ -354,7 +357,7 @@ always @(posedge clk) begin
 	bm_read <= 1'b0;
 	bm_write <= 1'b0;
 
-	if(br_out && !br_in && (y_count != 0) && cycle_advanceL) begin
+	if(bus_owned && !br_in && (y_count != 0) && cycle_advanceL) begin
 		if(state == 2'd0)      bm_read  <= 1'b1;
 		else if(state == 2'd1) bm_read  <= 1'b1;
 		else if(state == 2'd2) bm_write <= 1'b1;

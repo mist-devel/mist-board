@@ -95,7 +95,7 @@ reg bus_ok, cpu_cycle_L;
 always @(negedge clk_8) begin
 	// bus error if cpu owns bus, but no dtack, nor ram access,
 	// nor fast cpu cycle nor cpu does internsal processing
-	bus_ok <= tg68_dtack || br || cpu2mem || cpu_fast_cycle || (tg68_busstate == 2'b01);
+	bus_ok <= tg68_dtack || br || cpu2mem || (tg68_busstate == 2'b01);
 	cpu_cycle_L <= cpu_cycle;
 end
 
@@ -131,15 +131,7 @@ end
  
 // no tristate busses exist inside the FPGA. so bus request doesn't do
 // much more than halting the cpu by suppressing dtack
-`define BRWIRE
-`ifdef BRWIRE
 wire br = data_io_br || blitter_br; // dma/blitter are only other bus masters
-`else
-reg br;
-always @(negedge clk_8)
-	if(video_cycle)
-		br <= data_io_br || blitter_br;
-`endif
 
 // request interrupt ack from mfp for IPL == 6
 wire mfp_iack = cpu_cycle && cpu2iack && tg68_as && (tg68_adr[3:1] == 3'b110);
@@ -226,9 +218,10 @@ wire init = ~pll_locked;
 
 /* -------------------------- Viking video card -------------------- */
 
-// viking/sm194 is enabled and max 8MB memory may be enabled
+// viking/sm194 is enabled and max 8MB memory may be enabled. In steroids mode
+// video memory is moved to $e80000 and all stram up to 14MB may be used
 wire viking_mem_ok = MEM512K || MEM1M || MEM2M || MEM4M || MEM8M;
-wire viking_enable    = system_ctrl[28] && viking_mem_ok;
+wire viking_enable = (system_ctrl[28] && viking_mem_ok) || steroids;
 
 // check for cpu access to 0xcxxxxx with viking enabled to switch video
 // output once the driver loads. 256 accesses to the viking memory range
@@ -236,13 +229,13 @@ wire viking_enable    = system_ctrl[28] && viking_mem_ok;
 // others may also probe that area which is why we want to see 256 accesses
 reg [7:0] viking_in_use;
 
-always @(negedge clk_128) begin
+always @(posedge clk_32) begin
 	if(peripheral_reset)
 		viking_in_use <= 8'h00;
 	else
-		// cpu writes to $c0xxxx
+		// cpu writes to $c0xxxx or $e80000
 		if(clkena && !br && (tg68_busstate == 2'b11) && viking_enable && 
-			(tg68_adr[23:18] == 6'b110000) && (viking_in_use != 8'hff))
+			(tg68_adr[23:18] == (steroids?6'b111010:6'b110000)) && (viking_in_use != 8'hff))
 			viking_in_use <= viking_in_use + 8'h01;
 end
 
@@ -265,6 +258,7 @@ viking viking (
 	.bus_cycle   	(bus_cycle  ),
 	
 	// memory interface
+	.himem		(steroids      ),
 	.bclk      	(clk_8      	),    // system bus clock = 8Mhz
    .addr       (viking_address ),
 	.data       (ram_data_out_64),
@@ -436,6 +430,13 @@ wire blitter_irq;
 wire blitter_br;
 wire [15:0] blitter_master_data_out;
 
+reg blitter_bg;
+
+// give bus to blitter
+always @(posedge clk_8) begin
+	blitter_bg <= blitter_br;
+end
+
 blitter blitter (
 	.bus_cycle 	(bus_cycle        ),
 
@@ -458,7 +459,7 @@ blitter blitter (
 
 	.br_in     (data_io_br       ),
 	.br_out    (blitter_br       ),
-	.bg        (1'b1             ),  // blitter grabs bus at any time
+	.bg        (blitter_bg       ),
 	.irq       (blitter_irq      ),
 	
 	.turbo     (steroids         )
@@ -791,7 +792,6 @@ wire        tg68_lds_S;
 wire        tg68_rw_S;
 
 reg         tg68_as;
-reg         cpu_fast_cycle;  // signal indicating that the cpu runs from cache, used to calm berr
 
 // the tg68 can itself generate a reset signal
 wire tg68_reset;  
@@ -810,7 +810,7 @@ end
 
 // generate signal indicating the CPU may run from cache (cpu is active, 
 // performs a read and the caches are able to provide the requested data)
-wire cacheReady = !br && steroids && (tg68_busstate[0] == 1'b0) && cache_hit;
+wire cacheReady = steroids && cache_hit;
 
 // a clkena delayed by 180 deg is being used to 
 // read from the cache
@@ -826,51 +826,45 @@ always @(negedge clk_32) begin
 	iCacheStore <= 1'b0;
 	dCacheStore <= 1'b0;
 	cacheUpdate <= 1'b0;
+	 
+	if(br || reset)
+		tg68_as <= 1'b0; 
+
+	// run cpu if it owns the bus
+	if(!reset && !br) begin
 	
-	if(clkcnt == 3) begin
-		// 8Mhz cycle must not start directly after the cpu has been clocked
-		// as the address may not be stable then
+		if(clkcnt == 3) begin
+			// 8Mhz cycle must not start directly after the cpu has been clocked
+			// as the address may not be stable then
 
-		// cpuDoes8MhzCycle has same timing as tg68_as
-		if(!clkena && !br && tg68_busstate != 2'b01) cpuDoes8MhzCycle <= 1'b1; 
+			// cpuDoes8MhzCycle has same timing as tg68_as
+			if(tg68_busstate != 2'b01) cpuDoes8MhzCycle <= 1'b1; 
 
-		// tg68 core does not provide a as signal, so we generate it
-		tg68_as <= (!clkena && tg68_busstate != 2'b01) && !br;
- 
-		cpu_fast_cycle <= 1'b0;
+			// tg68 core does not provide a as signal, so we generate it
+			tg68_as <= (tg68_busstate != 2'b01); 
 
-		// all other output signals are simply latched to make sure
-		// they don't change within a 8Mhz cycle even if the CPU
-		// advances. This would be a problem if e.g. The CPU would try
-		// to start a bus cycle while the 8Mhz cycle is in progress
-		tg68_dat_out <= tg68_dat_out_S;
-		tg68_adr <= tg68_adr_S;
-		tg68_uds <= tg68_uds_S;
-		tg68_lds <= tg68_lds_S;
-		tg68_rw <= tg68_rw_S;
-		tg68_fc <= tg68_fc_S;	
-	end
+			// writes are always full 8 Mhz cycles, reads only if caches cannot provide
+			// the required data
+	
+			// all other output signals are simply latched to make sure
+			// they don't change within a 8Mhz cycle even if the CPU
+			// advances. This would be a problem if e.g. The CPU would try
+			// to start a bus cycle while the 8Mhz cycle is in progress
+			tg68_dat_out <= tg68_dat_out_S;
+			tg68_adr <= tg68_adr_S;
+			tg68_uds <= tg68_uds_S;
+			tg68_lds <= tg68_lds_S;
+			tg68_rw <= tg68_rw_S;
+			tg68_fc <= tg68_fc_S;	
+		end
 
-	cacheRead <= cacheReady;
+		cacheRead <= cacheReady;
 
-	// only run cpu if throttle counter has run down
-	if(!reset) begin
-		
-		if(cacheReady && !br) begin
-			clkena <= 1'b1;
-			cpuDoes8MhzCycle <= 1'b0;
-			cpu_fast_cycle <= 1'b1;
-		end else
- 			
 		// cpu does internal processing -> let it do this immediately
-		// cpu wants to read and the requested data is available from the cache -> run immediately
-
-		// todo: non steroids can run this full throttle
-		if((tg68_busstate == 2'b01) && !br) begin
+		// or cpu wants to read and the requested data is available from the cache -> run immediately
+		if((tg68_busstate == 2'b01) || ((tg68_busstate[0] == 1'b0) && cacheReady)) begin
 			clkena <= 1'b1; 
-
 			cpuDoes8MhzCycle <= 1'b0;
-			cpu_fast_cycle <= 1'b1;
 		end else 
 		
 		begin
@@ -881,22 +875,16 @@ always @(negedge clk_32) begin
 			// runs from cache
  
 			// clkcnt == 14 -> clkena in cycle 15 -> cpu runs in cycle 15
-			if((clkcnt == 3) && cpuDoes8MhzCycle && cpu_cycle && !br && (tg68_dtack || tg68_berr)) begin
+			if((clkcnt == 3) && cpuDoes8MhzCycle && cpu_cycle && (tg68_dtack || tg68_berr)) begin
 				clkena <= 1'b1;
 				cpuDoes8MhzCycle <= 1'b0;
 											
 				if(cacheable && tg68_dtack) begin
-					// store data in instruction cache on cpu instruction read
-					if(tg68_busstate == 2'b00)
-						iCacheStore <= 1'b1;
-	 
-					// store data in data cache on cpu data read
-					if(tg68_busstate == 2'b10)
-						dCacheStore <= 1'b1;
-						
-					// update cache on data write
-					if(tg68_busstate == 2'b11)
-						cacheUpdate <= 1'b1;
+					case(tg68_busstate)
+						0: iCacheStore <= 1'b1;  // store data in instruction cache on cpu instruction read
+						2: dCacheStore <= 1'b1;  // store data in data cache on cpu data read
+						3: cacheUpdate <= 1'b1;  // update cache on data write
+					endcase
 				end
 			end
 		end		
@@ -1026,7 +1014,7 @@ wire cpu2ram = (!cpu2lowrom) && (
 	((MEM14M || MEM8M) &&  (tg68_adr[23:22] == 2'b01))    ||  // 8MB 
 	(MEM14M            && ((tg68_adr[23:22] == 2'b10)     ||  // 12MB
 	                       (tg68_adr[23:21] == 3'b110)))  ||  // 14MB
-//	(steroids          &&  (tg68_adr[23:19] == 5'b11101)) ||  // 512k at $e80000 for STEroids
+	(steroids          &&  (tg68_adr[23:19] == 5'b11101)) ||  // 512k at $e80000 for STEroids
 	(viking_enable     &&  (tg68_adr[23:18] == 6'b110000))    // 256k at 0xc00000 for viking card
 );
 

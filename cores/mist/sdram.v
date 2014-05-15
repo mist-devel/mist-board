@@ -123,10 +123,13 @@ assign sd_data = we?din:16'bZZZZZZZZZZZZZZZZ;
 
 // 4 byte read burst goes through four addresses
 reg [1:0] burst_addr;
-		
-reg [15:0] tmp;
+
+reg [15:0] data_latch;
 		
 always @(posedge clk_128) begin
+	// permanently latch ram data to reduce delays
+	data_latch <= sd_data;
+	
 	sd_cmd <= CMD_INHIBIT;  // default: idle
 
 	if(reset != 0) begin
@@ -173,19 +176,13 @@ always @(posedge clk_128) begin
 			
 			// read phase
 			if(oe) begin						
-				// de-multiplexing the data directly into the 64 bit buffer seems to be
-				// timing sensitive and result sin read errors. Thus this goes through the 
-				// tmp register
-				if((t >= STATE_READ) && (t < STATE_READ+4'd4))
-					tmp <= sd_data;
-
-				if((t >= STATE_READ + 4'd1) && (t < STATE_READ+4'd5)) begin			
-					// store 16 bit read result in right slot of 64 bit return value
+				// de-multiplex the data directly into the 64 bit buffer
+				if((t >= STATE_READ+4'd1) && (t < STATE_READ+4'd1+4'd4)) begin
 					case (burst_addr) 
-						2'd0: dout[15: 0] <= tmp;
-						2'd1: dout[31:16] <= tmp;
-						2'd2: dout[47:32] <= tmp;
-						2'd3: dout[63:48] <= tmp;
+						2'd0: dout[15: 0] <= data_latch;
+						2'd1: dout[31:16] <= data_latch;
+						2'd2: dout[47:32] <= data_latch;
+						2'd3: dout[63:48] <= data_latch;
 					endcase
 	
 					burst_addr <= burst_addr + 2'd1;
