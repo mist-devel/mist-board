@@ -56,16 +56,23 @@ reg ps2_parity;
 
 assign ps2_clk = clk || (ps2_tx_state == 0);
 
+
 // ps2 transmitter
 // Takes a byte from the FIFO and sends it in a ps2 compliant serial format.
+reg ps2_r_inc;
 always@(posedge clk) begin
+	ps2_r_inc <= 1'b0;
+	
+	if(ps2_r_inc)
+		ps2_rptr <= ps2_rptr + 1;
+
 	// transmitter is idle?
 	if(ps2_tx_state == 0) begin
 		// data in fifo present?
 		if(ps2_wptr != ps2_rptr) begin
 			// load tx register from fifo
 			ps2_tx_byte <= ps2_fifo[ps2_rptr];
-			ps2_rptr <= ps2_rptr + 1;
+			ps2_r_inc <= 1'b1;
 			
 			// reset parity
 			ps2_parity <= 1'b1;
@@ -104,7 +111,12 @@ always@(posedge clk) begin
 end
 
 // SPI receiver
+//reg ps2_w_inc;
 always@(posedge SPI_CLK or posedge SPI_SS_IO) begin
+//	ps2_w_inc <= 1'b0;
+//	if(ps2_w_inc)
+//		ps2_wptr <= ps2_wptr + 1;
+
 	if(SPI_SS_IO == 1) begin
 	   cnt <= 1'b0;
 	end else begin

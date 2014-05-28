@@ -1,4 +1,4 @@
--- Copyright (C) 1991-2012 Altera Corporation
+-- Copyright (C) 1991-2014 Altera Corporation
 -- Your use of Altera Corporation's design tools, logic functions 
 -- and other software and tools, and its AMPP partner logic 
 -- functions, and any output files from any of the foregoing 
@@ -17,8 +17,8 @@
 --    Device Part: -
 --    Device Speed Grade: 8
 --    PLL Scan Chain: Fast PLL (144 bits)
---    File Name: /home/amr/FPGA/MiST/minimig/rtl/cycloneiii/7mhzclk.mif
---    Generated: Sun Mar  3 22:10:32 2013
+--    File Name: /home/tharbaum/tmp/mist/mist-board/cores/minimig/rtl/cycloneiii/7mhzclk.mif
+--    Generated: Tue May 20 16:17:49 2014
 
 WIDTH=1;
 DEPTH=144;
