@@ -119,12 +119,30 @@ user_io user_io(
 // Display starts at phi = 40 and ends at phi = 168 giving a total of 256
 // pixels horizontally
 
-// VGA output
-assign VGA_HS = ~hs;
-assign VGA_VS = ~vs;
-assign VGA_R = video6;
-assign VGA_G = video6;
-assign VGA_B = video6;
+// route cores vga output through OSD, extra parameters can be given to
+// fine tune the OSD position in x and y direction. The third parameter
+// adjusts the OSD color (0=dark grey, 1=blue, 2=green, 3=cyan, 4=red,
+// 5=purple, 6=yellow, 7=light grey)
+osd #(15,0,5) osd (
+	.pclk			( clk13			),
+
+	// spi for OSD
+   .sdi        ( SPI_DI       ),
+   .sck        ( SPI_SCK      ),
+   .ss         ( SPI_SS3      ),
+	
+	.red_in		( video6			),
+	.green_in	( video6			),
+	.blue_in		( video6			),
+	.hs_in		( ~hs				),
+	.vs_in		( ~vs				),
+	
+	.red_out		( VGA_R			),
+	.green_out	( VGA_G			),
+	.blue_out	( VGA_B			),
+	.hs_out		( VGA_HS			),
+	.vs_out		( VGA_VS			)
+);	
 
 wire [5:0] video6 = { vb, vb, vb, vb, vb, vb};
 
