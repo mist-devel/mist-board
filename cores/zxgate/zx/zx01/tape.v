@@ -204,7 +204,7 @@ data_io data_io (
 	// ram interface
 	.clk				( clk						),
 	.we				( 1'b0					),
-	.a					( byte_count[10:0] 	),
+	.a					( byte_count[13:0] 	),
 	.din				( 8'h00					),
 	.dout				( ram_data_out			)
 );

@@ -217,11 +217,11 @@ begin
               DO => d_cpu_i);
 
   c_SSRAM: SSRAM
-    generic map (AddrWidth => 11)
+    generic map (AddrWidth => 14)  -- 11
     port map (Clk => i_phi,
               CE_n => n_ramcs,
               WE_n => n_wr,
-              A => a_mem(10 downto 0),
+              A => a_mem(13 downto 0),  -- 10..0
               DIn => d_cpu_i,
               DOut => d_ram);
 

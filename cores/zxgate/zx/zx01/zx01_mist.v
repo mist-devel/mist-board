@@ -191,10 +191,10 @@ reg [7:0] sync_len;
 reg vs, csD;
 
 // horizontal display goes from 40 to 168. We add 16 border pixels left and right
-wire h_de = (sd_col >= 2*32) && (sd_col < 2*176); 
+wire h_de = (sd_col >= 2*32) && (sd_col < 2*182);   // 176
 
 // vertical display goes from line 32 to 224.We add 16 border pixels top and bottom
-wire v_de = (line_cnt >= 16) && (line_cnt < 240);  
+wire v_de = (line_cnt >= 16) && (line_cnt < 272);    // 240  
 
 wire hs = sd_col >= 2*192;
 
@@ -243,13 +243,13 @@ always @(posedge clk13) begin
 		// there are short/long lines
 		if(sd_col != 413)
 			trigger <= 1'b1;
-	
+	 
 		sd_col <= 9'd0;
 	end else
 		sd_col <= sd_col + 9'd1;
 		
    // change toggle bit at the end of each zx line
-	if(!csync && csD) begin
+	if(csync && !csD) begin
 		sd_toggle <= !sd_toggle;
 		line_cnt <= line_cnt + 10'd1;
 	end

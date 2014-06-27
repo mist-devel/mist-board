@@ -28,11 +28,11 @@ module data_io (
 
 	output        downloading,   // signal indicating an active download
 	output [15:0] size,          // number of bytes in input buffer
-	
+	 
 	// cpu ram interface
 	input 			clk,
 	input          we,
-	input [10:0]   a,
+	input [13:0]   a,
 	input [8:0]    din,
 	output [8:0]   dout
 );
@@ -113,7 +113,7 @@ data_io_ram data_io_ram (
 	.q_a				( dout				),
 	
 	// io controller port
-	.address_b		( addr[10:0]		),
+	.address_b		( addr[13:0]		),
 	.clock_b			( rclk				),
 	.data_b			( {sbuf, sdi}		),
 	.wren_b			( (cmd == UIO_FILE_TX_DAT) && !ss	)
