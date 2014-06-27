@@ -1,8 +1,24 @@
-
-
-// Changes done to zx01/zx97 code:
-// - removed open state from video in zx01.vhd
-// - Use rom megafunction for zx81 rom (replaced rom81XXXX.vhd by single rom81.vhd)
+//
+// zx01_mist.v
+//
+// zx01/zx81 toplevel for the MiST board
+// http://code.google.com/p/mist-board/
+//
+// Copyright (c) 2014 Till Harbaum <till@harbaum.org>
+//
+// This source file is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published
+// by the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This source file is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+//
 
 module zx01_mist ( 
   // clock inputsxque
@@ -48,13 +64,13 @@ assign SDRAM_nCS = 1'b1;   // disable ram
 // reset geenration
 reg [7:0] reset_cnt;
 always @(posedge clk) begin
-	if(!pll_locked)
+	if(!pll_locked || status[0])
 		reset_cnt <= 8'h0;
 	else if(reset_cnt != 8'd255)
 		reset_cnt <= reset_cnt + 8'd1;
 end 
 
-wire reset = reset_cnt != 8'd255;
+wire reset = (reset_cnt != 8'd255);
 
 // pll to generate appropriate clock
 wire clk13;
@@ -86,6 +102,8 @@ always @(posedge clk)
 wire ps2_clk;
 wire ps2_data;
 
+wire [7:0] status;
+
 user_io user_io(
 	// the spi interface
    .SPI_CLK     	(SPI_SCK			),
@@ -96,11 +114,17 @@ user_io user_io(
    .SWITCHES 		(switches		),
    .BUTTONS 		(buttons			),
 
+	// two joysticks supports
+	.JOY0				(              ),
+	.JOY1				(              ),
+
+	// status byte (bit 0 = io controller reset)
+	.status			( status       ),
+
+	// ps2 keyboard interface
 	.clk				(clk_12k			),   // should be 10-16kHz for ps2 clock
 	.ps2_data      (ps2_data		),
-	.ps2_clk       (ps2_clk  		),
-	
-   .CORE_TYPE   	(8'ha4			)    // 8 bit core id
+	.ps2_clk       (ps2_clk  		)
 );
 
 // ----------------------- Quick'n dirty scan doubler ---------------------------
@@ -244,6 +268,8 @@ always @(posedge clk13) begin
 	sd_video <= line_buffer[{!sd_toggle, sd_col}];
 end
 	
+wire tape_data;
+	
 zx01 zx01 (
 	.n_reset    (~reset     	),
 	.clock		(clk       		),
@@ -252,7 +278,7 @@ zx01 zx01 (
 	.v_inv    	(switches[1]	),
 	.usa_uk		(1'b0				),
 	.video    	(video			),
-	.tape_in		(1'b0				),
+	.tape_in		(tape_data		),
 	.tape_out	(csync      	),
 
 	// ignore LCD interface
@@ -260,6 +286,41 @@ zx01 zx01 (
 	.s				(           	),
 	.cp1			(           	),
 	.cp2      	(					)
+);
+
+// create 500kHz from 13 Mhz
+reg [4:0] clk_cnt;
+wire clk_500k = clk_cnt < 13;
+always @(posedge clk13) begin
+	clk_cnt <= clk_cnt + 5'd1;
+	if(clk_cnt == 5'd25)
+		clk_cnt <= 5'd0;
+end
+
+// tape transfers distort video, so we need a different kind
+// of feedback
+// we thus route type_data to led and to audio
+assign LED = !tape_data;
+
+// use a pwm to reduce audio output volume
+reg [7:0] aclk;
+always @(posedge clk13) 
+	aclk <= aclk + 8'd1;
+
+// limit volume to 1/8 => pwm < 32 
+wire tape_audio = tape_data && (aclk < 32);
+assign AUDIO_L = tape_audio;
+assign AUDIO_R = tape_audio;
+	
+tape tape (
+	// spi interface to io controller
+   .sdi        ( SPI_DI       ),
+   .sck        ( SPI_SCK      ),
+   .ss         ( SPI_SS2      ),
+
+	.clk        ( clk_500k     ),
+	.play       ( buttons[1]   ),
+   .tape_out   ( tape_data    )
 );
 
 endmodule

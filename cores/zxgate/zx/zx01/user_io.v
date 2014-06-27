@@ -1,4 +1,24 @@
-// MiST user_io
+//
+// user_io.v
+//
+// user_io for the MiST board
+// http://code.google.com/p/mist-board/
+//
+// Copyright (c) 2014 Till Harbaum <till@harbaum.org>
+//
+// This source file is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published
+// by the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This source file is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+//
 
 module user_io(
 	input      		SPI_CLK,
@@ -6,21 +26,27 @@ module user_io(
 	output     		reg SPI_MISO,
 	input      		SPI_MOSI,
 	
-	input [7:0] 	CORE_TYPE,
-	
 	output [5:0] 	JOY0,
 	output [5:0] 	JOY1,
 	output [1:0] 	BUTTONS,
 	output [1:0] 	SWITCHES,
+
+	output reg [7:0]   status,
 	
 	input 	  		clk,
 	output	 		ps2_clk,
 	output reg 		ps2_data
 );
 
+// config string, it is assumed that any core returning a string here
+// also supports the OSD
+//                   0123456789abcdef 
+wire [127:0] name = "ZX01;P;         ";
+
 reg [6:0]         sbuf;
 reg [7:0]         cmd;
-reg [4:0] 	      cnt;
+reg [2:0] 	      bit_cnt;    // counts bits 0-7 0-7 ...
+reg [5:0]         byte_cnt;   // counts bytes
 reg [5:0]         joystick0;
 reg [5:0]         joystick1;
 reg [3:0] 	      but_sw;
@@ -29,16 +55,28 @@ assign JOY0 = joystick0;
 assign JOY1 = joystick1;
 assign BUTTONS = but_sw[1:0];
 assign SWITCHES = but_sw[3:2];
-   
+
+// this variant of user_io is for 8 bit cores (type == a4) only
+wire [7:0] core_type = 8'ha4;
+
 // drive MISO only when transmitting core id
 always@(negedge SPI_CLK or posedge SPI_SS_IO) begin
 	if(SPI_SS_IO == 1) begin
 	   SPI_MISO <= 1'bZ;
 	end else begin
-      if(cnt < 8) begin
-		  SPI_MISO <= CORE_TYPE[7-cnt];
+		// first byte returned is always core type, further bytes are 
+		// command dependent
+      if(byte_cnt == 0) begin
+		  SPI_MISO <= core_type[~bit_cnt];
 		end else begin
-	     SPI_MISO <= 1'bZ;
+			// reading config string
+		   if(cmd == 8'h14) begin
+				// returning a byte from string
+				if(byte_cnt < 6'd17)
+					SPI_MISO <= name[{~(byte_cnt-6'd1),~bit_cnt}];
+				else
+					SPI_MISO <= 1'b0;
+			end
 		end
    end
 end
@@ -55,7 +93,6 @@ reg [7:0] ps2_tx_byte;
 reg ps2_parity;
 
 assign ps2_clk = clk || (ps2_tx_state == 0);
-
 
 // ps2 transmitter
 // Takes a byte from the FIFO and sends it in a ps2 compliant serial format.
@@ -111,42 +148,42 @@ always@(posedge clk) begin
 end
 
 // SPI receiver
-//reg ps2_w_inc;
 always@(posedge SPI_CLK or posedge SPI_SS_IO) begin
-//	ps2_w_inc <= 1'b0;
-//	if(ps2_w_inc)
-//		ps2_wptr <= ps2_wptr + 1;
 
 	if(SPI_SS_IO == 1) begin
-	   cnt <= 1'b0;
+	   bit_cnt <= 3'd0;
+	   byte_cnt <= 5'd0;
 	end else begin
 		sbuf[6:0] <= { sbuf[5:0], SPI_MOSI };
-		// counter counts 0-7, 8-15, 8-15 ...
-		// 0-7 is command, 8-15 is payload
-		if(cnt != 15)  cnt <= cnt + 4'd1;
-		else				cnt <= 4'd8;
+		bit_cnt <= bit_cnt + 3'd1;
+		if(bit_cnt == 7) byte_cnt <= byte_cnt + 5'd1;
 
 		// finished reading command byte
-      if(cnt == 7)
-		   cmd <= { sbuf, SPI_MOSI};
+      if(bit_cnt == 7) begin
+			if(byte_cnt == 0)
+				cmd <= { sbuf, SPI_MOSI};
 
-      if(cnt == 15) begin
-		   if(cmd == 1)
-				but_sw <= { sbuf[2:0], SPI_MOSI }; 
+			if(byte_cnt != 0) begin
+				if(cmd == 8'h01)
+					but_sw <= { sbuf[2:0], SPI_MOSI }; 
 
-			if(cmd == 2)
-				joystick0 <= { sbuf[4:0], SPI_MOSI };
+				if(cmd == 8'h02)
+					joystick0 <= { sbuf[4:0], SPI_MOSI };
 				 
-			if(cmd == 3)
-				joystick1 <= { sbuf[4:0], SPI_MOSI };
+				if(cmd == 8'h03)
+					joystick1 <= { sbuf[4:0], SPI_MOSI };
 				 
-		   if(cmd == 5) begin
-				// store incoming keyboard bytes in 
-				ps2_fifo[ps2_wptr] <= { sbuf, SPI_MOSI }; 
-				ps2_wptr <= ps2_wptr + 1;
-			end
+				if(cmd == 8'h05) begin
+					// store incoming keyboard bytes in 
+					ps2_fifo[ps2_wptr] <= { sbuf, SPI_MOSI }; 
+					ps2_wptr <= ps2_wptr + 1;
+				end
 				
-		end	
+				if(cmd == 8'h15) begin
+					status <= { sbuf[4:0], SPI_MOSI };
+				end
+			end
+		end
 	end
 end
    
