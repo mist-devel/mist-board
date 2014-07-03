@@ -63,8 +63,14 @@ assign SDRAM_nCS = 1'b1;   // disable ram
 
 // reset geenration
 reg [7:0] reset_cnt;
+reg mem16kD, mem16kD2;
 always @(posedge clk) begin
-	if(!pll_locked || status[0])
+	mem16kD <= mem16k;
+	mem16kD2 <= mem16kD;
+
+	// reset on board setup, when io controller signals reset
+	// or when memory size changes
+	if(!pll_locked || reset_in || (mem16kD != mem16kD2))
 		reset_cnt <= 8'h0;
 	else if(reset_cnt != 8'd255)
 		reset_cnt <= reset_cnt + 8'd1;
@@ -102,9 +108,20 @@ always @(posedge clk)
 wire ps2_clk;
 wire ps2_data;
 
+// the configuration string is returned to the io controller to allow
+// it to control the menu on the OSD 
+parameter CONF_STR = {
+	"ZX01;P;",
+	"O1,Video standard,PAL,NTSC;",
+	"O2,Memory size,16k,1k;"
+};
+parameter CONF_STR_LEN = 7+27+22;
+
 wire [7:0] status;
 
-user_io user_io(
+user_io #(.STRLEN(CONF_STR_LEN)) user_io(
+	.conf_str		( CONF_STR     ),
+
 	// the spi interface
    .SPI_CLK     	(SPI_SCK			),
    .SPI_SS_IO   	(CONF_DATA0		),
@@ -126,6 +143,10 @@ user_io user_io(
 	.ps2_data      (ps2_data		),
 	.ps2_clk       (ps2_clk  		)
 );
+
+wire reset_in = status[0];
+wire ntsc = status[1];
+wire mem16k = !status[2];   // bit 2 of status register is 0 when 16k is enabled
 
 // ----------------------- Quick'n dirty scan doubler ---------------------------
 // This reveals a problem of the zx01: The video timing isn't perfect,
@@ -275,8 +296,9 @@ zx01 zx01 (
 	.clock		(clk       		),
    .kbd_clk		(ps2_clk      	),
 	.kbd_data	(ps2_data		),
-	.v_inv    	(switches[1]	),
-	.usa_uk		(1'b0				),
+	.v_inv    	(1'b0				),
+	.usa_uk		(ntsc				),
+	.mem16k		(mem16k			),
 	.video    	(video			),
 	.tape_in		(tape_data		),
 	.tape_out	(csync      	),

@@ -20,7 +20,11 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-module user_io(
+// parameter STRLEN and the actual length of conf_str have to match
+
+module user_io #(parameter STRLEN=0) (
+	input [(8*STRLEN)-1:0] conf_str,
+
 	input      		SPI_CLK,
 	input      		SPI_SS_IO,
 	output     		reg SPI_MISO,
@@ -32,7 +36,7 @@ module user_io(
 	output [1:0] 	SWITCHES,
 
 	output reg [7:0]   status,
-	
+		
 	input 	  		clk,
 	output	 		ps2_clk,
 	output reg 		ps2_data
@@ -41,7 +45,7 @@ module user_io(
 // config string, it is assumed that any core returning a string here
 // also supports the OSD
 //                   0123456789abcdef 
-wire [127:0] name = "ZX01;P;         ";
+//wire [127:0] name = "ZX01;P;         ";
 
 reg [6:0]         sbuf;
 reg [7:0]         cmd;
@@ -72,8 +76,8 @@ always@(negedge SPI_CLK or posedge SPI_SS_IO) begin
 			// reading config string
 		   if(cmd == 8'h14) begin
 				// returning a byte from string
-				if(byte_cnt < 6'd17)
-					SPI_MISO <= name[{~(byte_cnt-6'd1),~bit_cnt}];
+				if(byte_cnt < STRLEN + 1)
+					SPI_MISO <= conf_str[{STRLEN - byte_cnt,~bit_cnt}];
 				else
 					SPI_MISO <= 1'b0;
 			end

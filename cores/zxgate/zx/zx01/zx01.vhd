@@ -22,6 +22,7 @@ entity zx01 is
         kbd_data: in    std_ulogic;
         v_inv:    in    std_ulogic;
         usa_uk:   in   	std_ulogic;
+        mem16k:   in   	std_ulogic;
         video:    out   std_ulogic;
         tape_in:  in    std_ulogic;
         tape_out: out   std_ulogic;
@@ -125,6 +126,7 @@ architecture rtl of zx01 is
   signal a_mem_h:   std_ulogic_vector(14 downto 13);
   signal a_mem_l:   std_ulogic_vector(8 downto 0);
   signal a_mem:     std_logic_vector(14 downto 0);
+  signal a_ram:     std_logic_vector(13 downto 0);
   signal d_ram:     std_logic_vector(7 downto 0);
   signal d_rom:     std_logic_vector(7 downto 0);
   signal n_romcs:   std_ulogic;
@@ -217,14 +219,16 @@ begin
               DO => d_cpu_i);
 
   c_SSRAM: SSRAM
-    generic map (AddrWidth => 14)  -- 11
+    generic map (AddrWidth => 14)
     port map (Clk => i_phi,
               CE_n => n_ramcs,
               WE_n => n_wr,
-              A => a_mem(13 downto 0),  -- 10..0
+              A => a_ram,
               DIn => d_cpu_i,
               DOut => d_ram);
 
+  a_ram <= a_mem(13 downto 0) when mem16k = '1' else "0000" & a_mem(9 downto 0);
+				  
   c_ROM81: ROM81
     port map (clock => i_phi,
               address => a_mem(12 downto 0),
