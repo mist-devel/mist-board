@@ -45,6 +45,8 @@ port (
 	CLK				:	in std_logic;
 	-- Master reset
 	nRESET			:	in std_logic;
+	-- cpu requests bus
+	MREQ				:	in std_logic;
 	
 	-- 1.75 MHz clock enable for sound
 	CLKEN_PSG		:	out	std_logic;
@@ -52,6 +54,8 @@ port (
 	CLKEN_CPU		:	out std_logic;
 	-- 3.5 MHz clock enable (1 in 8) for cpu memory access
 	CLKEN_MEM		:	out std_logic;
+	-- 1.75 MHz clock enable (1 in 8) for data_io
+	CLKEN_DIO		:	out std_logic;
 	-- 14 MHz clock enable (out of phase with CPU)
 	CLKEN_VID		:	out std_logic
 	);
@@ -59,20 +63,25 @@ end clocks;
 
 -- Clock enables for uncontended VRAM access
 -- 0    1    2    3    4    5    6    7    8    9    10   11   12   13   14   15
--- CPU  VID       VID       VID       VID       VID       VID       VID       VID
---                                                                            PSG
+-- CPU  VID       VID       VID       VID  CPU  VID       VID       VID       VID
+--                                         DIO       MEM                      PSG
 
 architecture clocks_arch of clocks is
 signal counter	:	unsigned(3 downto 0);
+signal mreq_D	:	std_logic;
 begin
 	-- X000
-	CLKEN_CPU <= '1' when counter = "1000" or counter = "1100" else '0';
-	-- X011
-	CLKEN_MEM <= '1' when counter = "1001" or counter = "1101" else '0';
+	-- CPU may used 1000 state only if it doesn't use the memory bus
+	CLKEN_CPU <= '1' when (counter = "1000" and mreq_D = '0') 
+		or counter = "0000" else '0';
+	-- 1000
+	CLKEN_DIO <= '1' when counter = "1101" else '0';
+	-- 1001
+	CLKEN_MEM    <= '1' when counter = "1001" else '0';
 	-- XXX1
-	CLKEN_VID <= '1' when counter(0) = '1' else '0';
+	CLKEN_VID    <= '1' when counter(0) = '1' else '0';
 	-- 1111
-	CLKEN_PSG <= '1' when counter = "1111" else '0';
+	CLKEN_PSG    <= '1' when counter = "1111" else '0';
 	
 	process(nRESET,CLK)
 	begin
@@ -80,6 +89,7 @@ begin
 			counter <= (others => '0');
 		elsif falling_edge(CLK) then
 			counter <= counter + 1;
+			mreq_D <= MREQ;
 		end if;
 	end process;
 end clocks_arch;

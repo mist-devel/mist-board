@@ -16,7 +16,7 @@
 --
 -- * Neither the name of the author nor the names of other contributors may
 --   be used to endorse or promote products derived from this software without
---   specific prior written agreement from the author.
+--   specific prior written agreement from the author.T
 --
 -- * License is granted for non-commercial use only.  A fee may not be charged
 --   for redistributions as source code or in synthesized/hardware form without 
@@ -51,7 +51,7 @@ generic (
 	-- 0 = 48 K
 	-- 1 = 128 K
 	-- 2 = +2A/+3
-	MODEL				:	integer := 0
+	MODEL				:	integer := 1
 );
 	
 port (
@@ -104,7 +104,6 @@ architecture rtl of spectrum_mist is
 --------------------------------
 -- PLL
 -- 24 MHz input
--- 28 MHz master clock output
 -- 120 MHz sdram controller clock
 -- 120 MHz sdram clock (-2.5 ns phase shifted)
 --------------------------------
@@ -130,13 +129,17 @@ port (
 	CLK				:	in std_logic;
 	-- Master reset
 	nRESET			:	in std_logic;
-	
+	-- CPU requests bus
+	MREQ				:	in std_logic;
+
 	-- 1.75 MHz clock enable for sound
 	CLKEN_PSG		:	out	std_logic;
 	-- 3.5 MHz clock enable (1 in 8)
 	CLKEN_CPU		:	out std_logic;
-	-- 3.5 MHz clock enable (1 in 8)
+	-- 1.75 MHz clock enable (1 in 8)
 	CLKEN_MEM		:	out std_logic;
+	-- 1.75 MHz clock enable (1 in 8)
+	CLKEN_DIO		:	out std_logic;
 	-- 14 MHz clock enable (out of phase with CPU)
 	CLKEN_VID		:	out std_logic
 	);
@@ -176,9 +179,9 @@ end component;
 -- embedded ROM
 ---------
 
-component rom48 is
+component rom128 is
 port (
-	address    	: 	in		std_logic_vector(13 downto 0);
+	address    	: 	in		std_logic_vector(14 downto 0);
 	clock			: 	in 	std_logic;
 	q        	: 	out	std_logic_vector(7 downto 0)
 	);
@@ -189,7 +192,7 @@ end component;
 ---------
 
 -- config string used by the io controller to fill the OSD
-constant CONF_STR : string := "Spectrum;;";
+constant CONF_STR : string := "SPECTRUM;CSW;T1,Reset;";
 
 -- convert string to std_logic_vector to be given to user_io
 function to_slv(s: string) return std_logic_vector is 
@@ -223,27 +226,69 @@ component user_io
 end component user_io;
 
 ---------
+-- Data IO
+---------
+
+component data_io
+  generic ( ADDR_WIDTH : integer := 16;
+				START_ADDR : integer := 0);
+  port ( sck, ss, sdi 	:	in std_logic;
+
+			-- download info
+			downloading  	:  out std_logic;
+			size				:  out std_logic_vector(ADDR_WIDTH-1 downto 0);
+  
+			-- external ram interface
+			clk				:	in std_logic;
+			wr					:  out std_logic;
+			a					:  out std_logic_vector(ADDR_WIDTH-1 downto 0);
+			d					:  out std_logic_vector(7 downto 0)
+);
+end component data_io;
+
+---------
+-- Tape
+---------
+
+component tape
+  generic ( ADDR_WIDTH : integer := 16);
+  port (
+			clk				:	in std_logic;
+			reset				:	in std_logic;
+			iocycle			:	in std_logic;
+			audio_out  		:  out std_logic;
+			downloading  	:  in std_logic;
+			size				:  in std_logic_vector(ADDR_WIDTH-1 downto 0);
+			
+			-- external ram interface
+			rd					:  out std_logic;
+			a					:  out std_logic_vector(ADDR_WIDTH-1 downto 0);
+			d					:  in std_logic_vector(7 downto 0)
+);
+end component tape;
+
+---------
 -- OSD
 ---------
 
 component osd
   generic ( OSD_COLOR : integer );
-  port ( pclk : in std_logic;
-		sck, sdi, ss : in std_logic;
+  port ( pclk 			: in std_logic;
+		sck, sdi, ss 	: in std_logic;
 
 		-- VGA signals coming from core
-      red_in : in std_logic_vector(5 downto 0);
-      green_in : in std_logic_vector(5 downto 0);
-      blue_in : in std_logic_vector(5 downto 0);
-      hs_in : in std_logic;
-      vs_in : in std_logic;
+      red_in 			: in std_logic_vector(5 downto 0);
+      green_in 		: in std_logic_vector(5 downto 0);
+      blue_in 			: in std_logic_vector(5 downto 0);
+      hs_in 			: in std_logic;
+      vs_in 			: in std_logic;
 
       -- VGA signals going to video connector
-      red_out : out std_logic_vector(5 downto 0);
-      green_out : out std_logic_vector(5 downto 0);
-      blue_out : out std_logic_vector(5 downto 0);
-      hs_out : out std_logic;
-      vs_out : out std_logic
+      red_out		 	: out std_logic_vector(5 downto 0);
+      green_out 		: out std_logic_vector(5 downto 0);
+      blue_out 		: out std_logic_vector(5 downto 0);
+      hs_out 			: out std_logic;
+      vs_out 			: out std_logic
 	);
 end component osd;
 
@@ -402,6 +447,15 @@ component YM2149 is
   );
 end component;
 
+component sigma_delta_dac is
+  port (
+	CLK			: in std_logic;
+	RESET			: in std_logic;
+   DACin			: in std_logic_vector(7 downto 0);
+	DACout		: out std_logic
+  );
+end component;
+
 -------------------
 -- MMC interface
 -------------------
@@ -478,6 +532,20 @@ signal rom_do        :  std_logic_vector(7 downto 0);
 signal mem_do        :  std_logic_vector(7 downto 0);
 signal ps2_clk       :  std_logic;
 signal ps2_data      :  std_logic;
+signal ioctl_wr		:  std_logic;
+signal ioctl_addr		:  std_logic_vector(24 downto 0);
+signal ioctl_data		:  std_logic_vector(7 downto 0);
+signal ioctl_ram_wr  :  std_logic;
+signal ioctl_cycle   :  std_logic;
+signal ioctl_used    :  std_logic;
+signal ioctl_ram_addr : std_logic_vector(24 downto 0);
+signal ioctl_ram_data :  std_logic_vector(7 downto 0);
+signal ioctl_size    : std_logic_vector(24 downto 0);
+signal ioctl_download : std_logic;
+signal tape_rd			:  std_logic;
+signal tape_addr		:  std_logic_vector(24 downto 0);
+signal io_addr			:  std_logic_vector(24 downto 0);
+signal audio			:  std_logic;
 
 -- Master clock - 28 MHz
 signal clk112      	:	std_logic;
@@ -493,6 +561,7 @@ signal clk14k			:	std_logic;
 signal psg_clken		:	std_logic;
 signal cpu_clken		:	std_logic;
 signal mem_clken		:	std_logic;
+signal dio_clken		:	std_logic;
 signal vid_clken		:	std_logic;
 
 -- Address decoding
@@ -581,11 +650,6 @@ signal psg_do		:	std_logic_vector(7 downto 0) := "11111111";
 signal psg_bdir		:	std_logic;
 signal psg_bc1		:	std_logic;
 signal psg_aout		:	std_logic_vector(7 downto 0) := "00000000";
-signal pcm_lrclk	:	std_logic;
-signal pcm_outl		:	std_logic_vector(15 downto 0);
-signal pcm_outr		:	std_logic_vector(15 downto 0);
-signal pcm_inl		:	std_logic_vector(15 downto 0);
-signal pcm_inr		:	std_logic_vector(15 downto 0);
 
 -- ZXMMC interface
 signal zxmmc_do		:	std_logic_vector(7 downto 0);
@@ -625,9 +689,11 @@ begin
 	clken: clocks port map (
 		clock,
 		reset_n,
+		not cpu_mreq_n,
 		psg_clken,
 		cpu_clken,
 		mem_clken,
+		dio_clken,
 		vid_clken
 		);
 		
@@ -650,12 +716,74 @@ begin
 	SDRAM_CKE <= '1';
 	
 	-- embedded rom
-	rom: rom48 port map (
-		rom_addr(13 downto 0),
+	rom: rom128 port map (
+		rom_addr(14 downto 0),
 		mem_clken,
 		rom_do
 	);
 	
+	-- include the io controller. This controller differs from the one
+	-- in the zx01 because it does not come with its own embedded dual port ram.
+	-- Instead it provides signals to connect to an external ram
+	data_io_I: data_io 	
+	generic map (ADDR_WIDTH => 25, START_ADDR => 16#20000#)
+	port map (
+		sck 	=> 	SPI_SCK,
+		ss    =>  	SPI_SS2,
+		sdi	=>		SPI_DI,
+
+		downloading => ioctl_download,
+		size        => ioctl_size,
+
+		-- ram interface
+		clk 	=> 	clock,
+		wr    =>    ioctl_wr,
+		a     =>		ioctl_addr,
+		d     =>		ioctl_data
+	);
+
+	tape_I: tape 	
+	generic map (ADDR_WIDTH => 25)
+	port map (
+		clk 		=> 	clock,
+		reset    =>    not reset_n,
+		iocycle 	=> 	ioctl_cycle,
+		
+		audio_out => 	ula_ear_in,
+
+		downloading => ioctl_download,
+		size        => ioctl_size,
+
+		-- ram interface
+		rd    =>    tape_rd,
+		a     =>		tape_addr,
+		d     =>		sdram_do
+	);
+
+	LED <= '0';
+	
+	process(clock)
+	begin
+		if rising_edge(clock) then
+			if dio_clken = '1' then
+				if ioctl_ram_wr = '1' then
+					ioctl_ram_wr <= '0';
+					ioctl_used <= '1';
+					ioctl_ram_addr <= ioctl_addr;
+					ioctl_ram_data <= ioctl_data;
+				else	
+					ioctl_used <= '0';
+				end if;
+			end if;
+				
+			if ioctl_wr = '1' then
+				-- io controller sent a new byte. Store it until it can be
+				-- saved in RAM
+				ioctl_ram_wr <= '1';
+			end if;
+		end if;
+	end process;	
+		
 	-- generate ~14Khz ps2 clock from 28MHz
 	process(clock)
 	begin
@@ -687,6 +815,9 @@ begin
 		ps2_clk => ps2_clk,
 		ps2_data => ps2_data
 	);
+
+	-- map both joysticks onto the one supported by kempston
+	zxmmc_do <= "00" & (joystickA or joystickB);
 		
 	-- CPU
 	cpu: T80se port map (
@@ -727,7 +858,7 @@ begin
 	vid: video port map (
 		clock, vid_clken, reset_n,
 		'1',  -- VGA SW(7)
-		vid_a, vid_di, vid_rd_n, vid_wait_n,
+		vid_a, sdram_do, vid_rd_n, vid_wait_n,
 		ula_border,
 		vid_r_out, vid_g_out, vid_b_out,
 		vid_vsync_n, vid_hsync_n,
@@ -757,6 +888,23 @@ begin
 			);
 		psg_bdir <= psg_enable and cpu_rd_n;
 		psg_bc1 <= psg_enable and cpu_a(14);
+
+		-- map AY sound on left channel
+		dac_l : sigma_delta_dac port map (
+			CLK		=> clock,
+			RESET 	=> not reset_n,
+			DACin 	=> psg_aout,
+			DACout	=> AUDIO_L
+		);
+		
+		-- and beeper on right channel
+		dac_r : sigma_delta_dac port map (
+			CLK		=> clock,
+			RESET 	=> not reset_n,
+			DACin 	=> ula_ear_out & ula_mic_out & ula_ear_in & "00000",
+			DACout	=> AUDIO_R
+		);
+
 	end generate;
 	
 	-- ZXMMC interface
@@ -788,7 +936,7 @@ begin
 	process(clock, pll_locked, status, buttons)
 		variable reset_cnt : integer range 0 to 10000;
 	begin
-		if pll_locked = '0' or status(0) = '1' or buttons(1) = '1' then
+		if pll_locked = '0' or status(0) = '1' or status(1) = '1' or buttons(1) = '1' then
 			reset_cnt := 10000;
 		elsif rising_edge(clock) then
 			if reset_cnt /= 0 then
@@ -925,16 +1073,20 @@ begin
 	cpu_addr <= "0" & ram_addr when ram_enable = '1' or 
 				(rom_enable = '1' and zxmmc_rd_en = '1' and zxmmc_rom_nram = '0') else
 					"1" & rom_addr;
-	
+	 
 	-- Video from bank 7 (128K/+3)
 	-- Video from bank 5
 	-- 16-bit address, LSb selects high/low byte
 	vid_addr <= "001110" & vid_a(12 downto 0) when page_shadow_scr = '1' else
 					"001010" & vid_a(12 downto 0);
 
+	-- io address is driven by io controller on upload or by tape during replay
+	io_addr <= ioctl_ram_addr when ioctl_used='1' else tape_addr;
+					
 	-- map video controller address to sdram when video is active, else cpu
-	sdram_addr(24 downto 20) <= "00000";  -- only 1 of 32 MB used
-	sdram_addr(19 downto 0) <= "0" & vid_addr when vid_rd_n = '0' else cpu_addr;
+-- 	sdram_addr(24 downto 20) <= io_addr(24 downto 20) when ioctl_cycle ='1' else "00000";  -- only 1 of 32 MB used
+	sdram_addr <= io_addr when ioctl_cycle = '1' else
+		("000000" & vid_addr) when vid_rd_n = '0' else ("00000" & cpu_addr);
 
 	-- Synchronous outputs to SRAM
 	process(clock,reset_n)
@@ -951,11 +1103,9 @@ begin
 			-- synchonize cpu memory access to video memory access
 			if vid_clken = '1' then
 				cpu_cycle <= mem_clken;
+				ioctl_cycle <= dio_clken;
 			end if;
 		
-			-- Default to inputs
---			SRAM_DQ <= (others => 'Z');
-			
 			-- Register SRAM signals to outputs (clock must be at least 2x CPU clock)
 			if vid_clken = '1' then
 				-- Fetch data from previous CPU cycle
@@ -969,20 +1119,22 @@ begin
 					-- 16-bit address
 					ram_addr <= "1" & zxmmc_bank(3 downto 0) & cpu_a(13 downto 0);
 				end if;
-				if sram_write = '1' then
-					sdram_di <= cpu_do;
-				end if;
 			end if;
 		end if;
 		
 		if cpu_cycle = '1' then
 			sdram_oe <= not cpu_mreq_n and not cpu_rd_n;  -- any cpu read enables ram
 			sdram_we <= sram_write;    -- cpu_wr_n incl.  -- write only for memory used as ram
---			sdram_we <= '0';    -- cpu_wr_n incl.  -- write only for memory used as ram
+			sdram_di <= cpu_do;
+		elsif ioctl_cycle = '1' then
+			sdram_oe <= tape_rd;
+			sdram_we <= ioctl_used;
+			sdram_di <= ioctl_ram_data;
 		else
 			-- no cpu sccess. Thus do video access
 			sdram_oe <=  not vid_rd_n;
 			sdram_we <= '0';    -- video never writes
+			sdram_di <= "00000000";
 		end if;
 	end process;
 	
@@ -1028,23 +1180,8 @@ begin
 	end generate;
 	
 	-- Connect audio to PCM interface
-	pcm_outl <= ula_ear_out & psg_aout & ula_mic_out & "000000";
-	pcm_outr <= ula_ear_out & psg_aout & ula_mic_out & "000000";
-	
-	-- Hysteresis for EAR input (should help reliability)
-	process(clock)
-	variable in_val : integer;
-	begin
-		in_val := to_integer(signed(pcm_inl));
-		
-		if rising_edge(clock) then
-			if in_val < -15 then
-				ula_ear_in <= '0';
-			elsif in_val > 15 then
-				ula_ear_in <= '1';
-			end if;
-		end if;
-	end process;
+--	pcm_outl <= ula_ear_out & psg_aout & ula_mic_out & "000000";
+--	pcm_outr <= ula_ear_out & psg_aout & ula_mic_out & "000000";
 	
 	-- Connect ULA to video output
 	zx_red <= vid_r_out & "00";
@@ -1055,7 +1192,7 @@ begin
 
 	-- route video through osd
 	osd_d : osd
-	generic map (OSD_COLOR => 3)
+	generic map (OSD_COLOR => 6)
 	port map (
 		pclk => vid_clken,
       sck => SPI_SCK,

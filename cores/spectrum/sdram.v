@@ -24,9 +24,9 @@ module sdram (
 
 	// interface to the MT48LC16M16 chip
 	inout [15:0]  		sd_data,    // 16 bit bidirectional data bus
-	output reg [12:0]	sd_addr,    // 13 bit multiplexed address bus
-	output reg [1:0] 	sd_dqm,     // two byte masks
-	output reg [1:0] 	sd_ba,      // two banks
+	output [12:0]		sd_addr,    // 13 bit multiplexed address bus
+	output [1:0] 		sd_dqm,     // two byte masks
+	output [1:0] 		sd_ba,      // two banks
 	output 				sd_cs,      // a single chip select
 	output 				sd_we,      // write enable
 	output 				sd_ras,     // row address select
@@ -62,7 +62,7 @@ localparam MODE = { 3'b000, NO_WRITE_BURST, OP_MODE, CAS_LATENCY, ACCESS_TYPE, B
 // ---------------------------------------------------------------------
 
 localparam STATE_IDLE      = 3'd0;   // first state in cycle
-localparam STATE_CMD_START = 3'd0;   // state in which a new command can be started
+localparam STATE_CMD_START = 3'd1;   // state in which a new command can be started
 localparam STATE_CMD_CONT  = STATE_CMD_START  + RASCAS_DELAY; // 4 command can be continued
 localparam STATE_LAST      = 3'd7;   // last state in cycle
 
@@ -105,7 +105,7 @@ localparam CMD_PRECHARGE       = 4'b0010;
 localparam CMD_AUTO_REFRESH    = 4'b0001;
 localparam CMD_LOAD_MODE       = 4'b0000;
 
-reg [3:0] sd_cmd;   // current command sent to sd ram
+wire [3:0] sd_cmd;   // current command sent to sd ram
 
 // drive control signals according to current command
 assign sd_cs  = sd_cmd[3];
@@ -119,58 +119,35 @@ assign sd_we  = sd_cmd[0];
 // at a time when writing
 assign sd_data = we?{din, din}:16'bZZZZZZZZZZZZZZZZ;
 
-assign dout = addr[0]?sd_data[7:0]:sd_data[15:8];
+reg addr0;
+always @(posedge clk)
+	if((q == 1) && oe) addr0 <= addr[0];
 
-always @(posedge clk) begin
-	sd_cmd <= CMD_INHIBIT;  // default: idle
+assign dout = addr0?sd_data[7:0]:sd_data[15:8];
+
+wire [3:0] reset_cmd = 
+	((q == STATE_CMD_START) && (reset == 13))?CMD_PRECHARGE:
+	((q == STATE_CMD_START) && (reset ==  2))?CMD_LOAD_MODE:
+	CMD_INHIBIT;
+
+wire [3:0] run_cmd =
+	((we || oe) && (q == STATE_CMD_START))?CMD_ACTIVE:
+	(we && 			(q == STATE_CMD_CONT ))?CMD_WRITE:
+	(!we &&  oe &&	(q == STATE_CMD_CONT ))?CMD_READ:
+	(!we && !oe && (q == STATE_CMD_START))?CMD_AUTO_REFRESH:
+	CMD_INHIBIT;
 	
-	if(reset != 0) begin
-		// initialization takes place at the end of the reset phase
-		if(q == STATE_CMD_START) begin
+assign sd_cmd = (reset != 0)?reset_cmd:run_cmd;
 
-			if(reset == 13) begin
-				sd_cmd <= CMD_PRECHARGE;
-				sd_addr[10] <= 1'b1;      // precharge all banks
-			end
-				
-			if(reset == 2) begin
-				sd_cmd <= CMD_LOAD_MODE;
-				sd_addr <= MODE;
-			end
-			
-		end
-	end else begin
-		// normal operation
-		
-		// -------------------  cpu/chipset read/write ----------------------
-		if(we || oe) begin
-		
-			// RAS phase
-			if(q == STATE_CMD_START) begin
-				sd_cmd <= CMD_ACTIVE;
-				sd_addr <= addr[21:9];
-				sd_ba <= addr[23:22];
-				
-				// always return both bytes in a read. Only the correct byte
-				// is being stored during read. On write only one of the two
-				// bytes is enabled
-				if(!we) sd_dqm <= 2'b00;
-				else    sd_dqm <= { addr[0], ~addr[0] };
-			end
-				
-			// CAS phase 
-			if(q == STATE_CMD_CONT) begin
-				sd_cmd <= we?CMD_WRITE:CMD_READ;
-				sd_addr <= { 4'b0010, addr[24], addr[8:1] };  // auto precharge
-			end
-		end
-		
-		// ------------------------ no access --------------------------
-		else begin
-			if(q == STATE_CMD_START)
-				sd_cmd <= CMD_AUTO_REFRESH;
-		end
-	end
-end
+wire [12:0] reset_addr = (reset == 13)?13'b0010000000000:MODE;
+	
+wire [12:0] run_addr = 
+	(q == STATE_CMD_START)?addr[21:9]:{ 4'b0010, addr[24], addr[8:1]};
+
+assign sd_addr = (reset != 0)?reset_addr:run_addr;
+
+assign sd_ba = addr[23:22];
+
+assign sd_dqm = we?{ addr[0], ~addr[0] }:2'b00;
 
 endmodule
