@@ -1,0 +1,21 @@
+#!/bin/sh
+
+if [ $# -ne 2 ]
+then
+  echo "Usage: makenibs <dir> <imagefile>" 2>&1
+  exit 1
+fi
+
+rm -f $2
+
+IFS="
+"
+
+i=0
+for dsk in `find $1 -name "*.dsk" | sort`
+do
+  awk 'BEGIN {printf("%03x %s\n", ARGV[1], ARGV[2])}' $i "$dsk"
+  ./dsk2nib "$dsk" tmp.nib
+  cat tmp.nib >> $2
+  i=`expr $i + 1`
+done
