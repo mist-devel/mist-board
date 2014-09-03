@@ -57,6 +57,10 @@ module user_io(
 		output [1:0]     SWITCHES
 );
 
+// filter spi clock. the 8 bit gate delay is ~2.5ns in total
+wire [7:0] spi_sck_D = { spi_sck_D[6:0], SPI_CLK } /* synthesis keep */;
+wire spi_sck = (spi_sck && spi_sck_D != 8'h00) || (!spi_sck && spi_sck_D == 8'hff);
+
 	reg [1:0] 			byte_cnt;
    reg [6:0]         sbuf;
    reg [7:0]         cmd;
@@ -69,7 +73,7 @@ module user_io(
 	assign BUTTONS = but_sw[1:0];
 	assign SWITCHES = but_sw[3:2];
    
-   always@(negedge SPI_CLK) begin
+   always@(negedge spi_sck) begin
       if(bit_cnt <= 7)
 		  SPI_MISO <= CORE_TYPE[7-bit_cnt];
 		else begin
@@ -115,7 +119,7 @@ module user_io(
 		end
 	end
 		
-   always@(posedge SPI_CLK, posedge SPI_SS_IO) begin
+   always@(posedge spi_sck, posedge SPI_SS_IO) begin
 		if(SPI_SS_IO == 1) begin
         bit_cnt <= 4'd0;
 		  byte_cnt <= 2'd0;

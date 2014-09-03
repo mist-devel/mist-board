@@ -1,7 +1,7 @@
 /********************************************/
 /*                                          */
 /********************************************/
-
+ 
 module mist_top ( 
   // clock inputsxque	
   input wire [ 2-1:0] 	CLOCK_27, // 27 MHz
@@ -1008,6 +1008,10 @@ wire MEM14M  = (system_ctrl[3:1] == 3'd5);
 // rom is also at 0x000000 to 0x000007
 wire cpu2lowrom = (tg68_adr[23:3] == 21'd0);
 
+// the viking card has ram at 0xc00000 only in st/ste/mega ste mode. In STEroids the
+// video memory is at 0xe80000 and is always enabled
+wire viking_at_c0 = viking_enable && !steroids;
+
 // ordinary ram from 0x000000 to 0x400000, more if enabled
 wire cpu2ram = (!cpu2lowrom) && (
 								  (tg68_adr[23:22] == 2'b00)     ||  // ordinary 4MB
@@ -1015,7 +1019,7 @@ wire cpu2ram = (!cpu2lowrom) && (
 	(MEM14M            && ((tg68_adr[23:22] == 2'b10)     ||  // 12MB
 	                       (tg68_adr[23:21] == 3'b110)))  ||  // 14MB
 	(steroids          &&  (tg68_adr[23:19] == 5'b11101)) ||  // 512k at $e80000 for STEroids
-	(viking_enable     &&  (tg68_adr[23:18] == 6'b110000))    // 256k at 0xc00000 for viking card
+	(viking_at_c0      &&  (tg68_adr[23:18] == 6'b110000))    // 256k at 0xc00000 for viking card
 );
 
 // 256k tos from 0xe00000 to 0xe40000

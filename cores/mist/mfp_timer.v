@@ -51,7 +51,7 @@ always @(posedge XCLK_I) begin
 	if(RST === 1'b1) 
       prescaler_counter <= 8'd0;
 	else begin
-		if(prescaler_counter >= prescaler)
+ 		if(prescaler_counter >= prescaler-1)
 			prescaler_counter <= 8'd0;
 		else
 			prescaler_counter <= prescaler_counter + 8'd1;
