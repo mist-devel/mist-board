@@ -133,9 +133,19 @@ end
 // much more than halting the cpu by suppressing dtack
 wire br = data_io_br || blitter_br; // dma/blitter are only other bus masters
 
-// request interrupt ack from mfp for IPL == 6
-wire mfp_iack = cpu_cycle && cpu2iack && tg68_as && (tg68_adr[3:1] == 3'b110);
-
+// request interrupt ack from mfp for IPL == 6. This must not be done by 
+// combinatorics as it must be glitch free since the mfp does things on the
+// rising edge of iack. 
+reg mfp_iack;
+always @(posedge clk_32 or posedge reset) begin
+	if(reset)
+		mfp_iack <= 1'b0;
+	else begin
+		if(clkcnt == 0)
+			mfp_iack <= cpu_cycle && cpu2iack && tg68_as && (tg68_adr[3:1] == 3'b110);
+	end
+end
+			
 // the tg68k core doesn't reliably support mixed usage of autovector and non-autovector
 // interrupts.
 // For the atari we've fixed the non-autovector support inside the kernel and switched
@@ -377,9 +387,6 @@ mfp mfp (
 	.dout     (mfp_data_out),
 	.irq	    (mfp_irq     ),
 	.iack	    (mfp_iack    ),
-
-	// the midi irq hack is only enabled if usb redirection is set to midi
-	.midi_irq_hack (usb_redirection == 3'd3),
 	
 	// serial/rs232 interface io-controller<->mfp
 	.serial_data_out_available 	(serial_data_from_mfp_available),
@@ -828,11 +835,9 @@ always @(negedge clk_32) begin
 	cacheUpdate <= 1'b0;
 	 
 	if(br || reset)
-		tg68_as <= 1'b0; 
-
-	// run cpu if it owns the bus
-	if(!reset && !br) begin
-	
+		tg68_as <= 1'b0;
+	else begin
+		// run cpu if it owns the bus
 		if(clkcnt == 3) begin
 			// 8Mhz cycle must not start directly after the cpu has been clocked
 			// as the address may not be stable then
@@ -865,9 +870,9 @@ always @(negedge clk_32) begin
 		if((tg68_busstate == 2'b01) || ((tg68_busstate[0] == 1'b0) && cacheReady)) begin
 			clkena <= 1'b1; 
 			cpuDoes8MhzCycle <= 1'b0;
-		end else 
+		end 
 		
-		begin
+		else begin
 			// this ends a normal 8MHz bus cycle. This requires that the 
 			// cpu/chipset had the entire cycle and not e.g. started just in
 			// the middle. This is verified using the cpuDoes8MhzCycle signal

@@ -32,8 +32,6 @@ module mfp (
 	output 		 irq,
 	input 		 iack,
 
-	input 		midi_irq_hack,
-	
 	// serial rs232 connection to io controller
 	output 		 serial_data_out_available,
 	input  		 serial_strobe_out,
@@ -49,6 +47,8 @@ module mfp (
 	input [1:0]	 t_i,  // timer input
  	input [7:0]  i     // input port
 );
+
+wire serial_data_out_fifo_full;
 
 // --- mfp output fifo ---
 // filled by the CPU when writing to the mfp uart data register
@@ -121,7 +121,7 @@ mfp_timer timer_a (
    .DAT_I		(din),
    .DAT_O		(timera_dat_o),
    .DAT_WE		((addr == 5'h0f) && write),
-	.PULSE_MODE    (pulse_mode[1]),
+	.PULSE_MODE (pulse_mode[1]),
    .T_I			(t_i[0] ^ aer[4]),
    .T_O_PULSE	(timera_done)
 );
@@ -140,7 +140,7 @@ mfp_timer timer_b (
    .DAT_I		(din),
    .DAT_O		(timerb_dat_o),
    .DAT_WE		((addr == 5'h10) && write),
-	.PULSE_MODE    (pulse_mode[0]),
+	.PULSE_MODE (pulse_mode[0]),
    .T_I			(t_i[1] ^ aer[3]),
    .T_O_PULSE	(timerb_done)
 );
@@ -180,55 +180,29 @@ mfp_timer timer_d (
 );
 
 reg [7:0] aer, ddr, gpip;
-
+ 
 // the mfp can handle 16 irqs, 8 internal and 8 external
-reg [15:0] ipr, ier, imr, isr;   // interrupt registers
+reg [15:0] imr, ier;   // interrupt registers
 reg [7:0] vr;
 
 // generate irq signal if an irq is pending and no other irq of same or higher prio is in service
 assign irq = ((ipr & imr) != 16'h0000) && (highest_irq_pending >= irq_in_service);
    
 // check number of current interrupt in service
-wire [3:0] irq_in_service =
-	(isr[15]    ==  1'b1)?4'd15:
-	(isr[15:14] ==  2'b1)?4'd14:
-	(isr[15:13] ==  3'b1)?4'd13:
-	(isr[15:12] ==  4'b1)?4'd12:
-	(isr[15:11] ==  5'b1)?4'd11:
-	(isr[15:10] ==  6'b1)?4'd10:
-	(isr[15:9]  ==  7'b1)?4'd9:
-	(isr[15:8]  ==  8'b1)?4'd8:
-	(isr[15:7]  ==  9'b1)?4'd7:
-	(isr[15:6]  == 10'b1)?4'd6:
-	(isr[15:5]  == 11'b1)?4'd5:
-	(isr[15:4]  == 12'b1)?4'd4:
-	(isr[15:3]  == 13'b1)?4'd3:
-	(isr[15:2]  == 14'b1)?4'd2:
-	(isr[15:1]  == 15'b1)?4'd1:
-	(isr[15:0]  == 16'b1)?4'd0:
-		4'd0;
-
-wire [15:0] irq_pending_map = ipr & imr;
+wire [3:0] irq_in_service;
+mfp_hbit16 irq_in_service_index (
+	.value 	( isr					),
+	.index	( irq_in_service	)
+);
 
 // check the number of the highest pending irq 
-wire [3:0] highest_irq_pending =
-	(irq_pending_map[15]    ==  1'b1)?4'd15:
-	(irq_pending_map[15:14] ==  2'b1)?4'd14:
-	(irq_pending_map[15:13] ==  3'b1)?4'd13:
-	(irq_pending_map[15:12] ==  4'b1)?4'd12:
-	(irq_pending_map[15:11] ==  5'b1)?4'd11:
-	(irq_pending_map[15:10] ==  6'b1)?4'd10:
-	(irq_pending_map[15:9]  ==  7'b1)?4'd9:
-	(irq_pending_map[15:8]  ==  8'b1)?4'd8:
-	(irq_pending_map[15:7]  ==  9'b1)?4'd7:
-	(irq_pending_map[15:6]  == 10'b1)?4'd6:
-	(irq_pending_map[15:5]  == 11'b1)?4'd5:
-	(irq_pending_map[15:4]  == 12'b1)?4'd4:
-	(irq_pending_map[15:3]  == 13'b1)?4'd3:
-	(irq_pending_map[15:2]  == 14'b1)?4'd2:
-	(irq_pending_map[15:1]  == 15'b1)?4'd1:
-	(irq_pending_map[15:0]  == 16'b1)?4'd0:
-		4'd0;
+wire [3:0] highest_irq_pending;
+wire [15:0]	highest_irq_pending_mask;
+mfp_hbit16 irq_pending_index (
+	.value 	( ipr & imr						),
+	.index	( highest_irq_pending		),
+	.mask		( highest_irq_pending_mask	)
+);
 	
 // gpip as output to the cpu (ddr bit == 1 -> gpip pin is output)
 wire [7:0] gpip_cpu_out = (i & ~ddr) | (gpip & ddr);
@@ -250,12 +224,12 @@ always @(iack, sel, ds, rw, addr, gpip_cpu_out, aer, ddr, ier, ipr, isr, imr,
 		if(addr == 5'h02) dout = ddr;
 	
 		if(addr == 5'h03) dout = ier[15:8];
-		if(addr == 5'h05) dout = ipr[15:8];
-		if(addr == 5'h07) dout = isr[15:8];
-		if(addr == 5'h09) dout = imr[15:8];
 		if(addr == 5'h04) dout = ier[7:0];
 		if(addr == 5'h06) dout = ipr[7:0];
+		if(addr == 5'h05) dout = ipr[15:8];
+		if(addr == 5'h07) dout = isr[15:8];
 		if(addr == 5'h08) dout = isr[7:0];
+		if(addr == 5'h09) dout = imr[15:8];
 		if(addr == 5'h0a) dout = imr[7:0];
 		if(addr == 5'h0b) dout = vr;
 	 
@@ -276,102 +250,92 @@ always @(iack, sel, ds, rw, addr, gpip_cpu_out, aer, ddr, ier, ipr, isr, imr,
 	end else if(iack) begin
 		dout = irq_vec;
 	end
-end
+end 
 
 // mask of input irqs which are overwritten by timer a/b inputs
 wire [7:0] ti_irq_mask = { 3'b000, pulse_mode, 3'b000};
 wire [7:0] ti_irq      = { 3'b000, t_i[0], t_i[1], 3'b000};
 
-// delay inputs to detect changes
-reg [7:0] iD, iD2;
-reg iackD;
-
 // latch to keep irq vector stable during irq ack cycle
 reg [7:0] irq_vec;
 
-reg [1:0] usart_irqD;
+// IPR bits are always set on the rising edge of their input and are cleared asynchronously
+wire [7:0] gpio_irq = ~aer ^ ((i & ~ti_irq_mask) | (ti_irq & ti_irq_mask));
+
+// ------------------------ IPR register --------------------------
+wire [15:0] ipr;
+reg [15:0] ipr_reset;
+
+// map the 16 interrupt sources onto the 16 interrupt register bits
+wire [15:0]	ipr_set = {  
+	gpio_irq[7:6], timera_done, serial_data_in_available, 
+	1'b0 /* rcv err */, !serial_data_out_fifo_full, 1'b0 /* tx err */, timerb_done,
+	gpio_irq[5:4], timerc_done, timerb_done, gpio_irq[3:0]
+};
+
+mfp_srff16 ipr_latch (
+	.set    	( ipr_set & ier	),
+	.reset	( ipr_reset			),
+	.out		( ipr					)
+);
+ 
+// ------------------------ ISR register --------------------------
+wire [15:0] isr;
+reg [15:0] isr_reset;
+
+// move highest pending irq into isr when s bit set and iack raises
+wire [15:0] isr_set = (vr[3] && iack)?highest_irq_pending_mask:16'h0000;
+
+mfp_srff16 isr_latch (
+	.set    	( isr_set			),
+	.reset	( isr_reset			),
+	.out		( isr					)
+);
+
+// this needs to happen at the same time the isr is set so it doesn't hurt
+// if a new irq arrives in between these two events and a different irq is
+// moved from ipr to isr than reported to the cpu
+always @(posedge iack)
+	irq_vec <= { vr[7:4], highest_irq_pending };
 
 always @(negedge clk) begin
-   iackD <= iack;
+	ipr_reset <= 16'h0000; 
+	isr_reset <= 16'h0000; 
 
-	// update the irq vector periodically unless we are in the
-	// middle of an interrupt acknowledge phase
-	if(!iack)
-		irq_vec <= { vr[7:4], highest_irq_pending };
-	
-	// delay inputs for irq generation, apply aer (irq edge)
-	iD <= aer ^ ((i & ~ti_irq_mask) | (ti_irq & ti_irq_mask));
-	iD2 <= iD;
-
-	// delay usart states to react on changes
-	usart_irqD[0] <= !serial_data_out_fifo_full;
-	usart_irqD[1] <= serial_data_in_available;
-	
 	if(reset) begin
-		ipr <= 16'h0000; ier <= 16'h0000; 
-		imr <= 16'h0000; isr <= 16'h0000;
+		ipr_reset <= 16'hffff;
+		isr_reset <= 16'hffff;
+		ier <= 16'h0000; 
+		imr <= 16'h0000;
 	end else begin 
  
-		// ack pending irqs and set isr if enabled
-		if(iack && !iackD) begin
-			// remove active bit from ipr
-			ipr[highest_irq_pending] <= 1'b0;
-		
-			// move bit into isr if s-bit in vr is set
-			if(vr[3])
-				isr[highest_irq_pending] <= 1'b1;		
-		end
-
-		// map timer interrupts
-		if(timera_done && ier[13])	     ipr[13] <= 1'b1;   // timer_a
-		if(timerb_done && ier[ 8])	     ipr[ 8] <= 1'b1;	// timer_b
-		if(timerc_done && ier[ 5])	     ipr[ 5] <= 1'b1;	// timer_c
-		if(timerd_done && ier[ 4])	     ipr[ 4] <= 1'b1;	// timer_d
-
-		// input port irqs are edge sensitive
-		if(!iD[3] && iD2[3] && ier[ 3]) ipr[ 3] <= 1'b1;   // blitter
-		
-		// HACK WARNING:
-		// The acia irq handling is somewhat broken. It should be edge sensitive like
-		// all others (and a real mfp can't do different). But this causes the
-		// acia irq to get stuck in cubase. Making it level sensitive cures this.
-		// But this is obviously not the correct solution ...
-		if(!midi_irq_hack) begin
-			if(!iD[4] && iD2[4] && ier[ 6]) 	ipr[ 6] <= 1'b1;   // normal operation: edge sensitive acia
-		end else begin
-			if(!i[4] && ier[ 6]) 				ipr[ 6] <= 1'b1;   // hack: level sensitive acia
-		end
-		
-		if(!iD[5] && iD2[5] && ier[ 7]) ipr[ 7] <= 1'b1;   // dma
-		if(!iD[7] && iD2[7] && ier[15]) ipr[15] <= 1'b1;   // mono detect
-
-		// output fifo just became "not full" or input fifo became "not empty"
-		if(!usart_irqD[0] && !serial_data_out_fifo_full && ier[10]) ipr[10] <= 1'b1;
-		if(!usart_irqD[1] &&  serial_data_in_available  && ier[12]) ipr[12] <= 1'b1;
-
+		// remove active bit from ipr
+		if(iack)
+			ipr_reset[highest_irq_pending] <= 1'b1;
+	
 		if(sel && ~ds && ~rw) begin
+			// -------- GPIO ---------
 			if(addr == 5'h00) gpip <= din;
 			if(addr == 5'h01)	aer <= din;
 			if(addr == 5'h02)	ddr <= din;
 
+			// ------ IRQ handling -------
 			if(addr == 5'h03) begin
 				ier[15:8] <= din;
-				ipr[15:8] <= ipr[15:8] & din;  // clear pending interrupts
+				ipr_reset[15:8] <= ipr_reset[15:8] | ~din;
 			end
 				
-			if(addr == 5'h05)	ipr[15:8] <= ipr[15:8] & din;
-			if(addr == 5'h07)	isr[15:8] <= isr[15:8] & din;  // zero bits are cleared
-			if(addr == 5'h09)	imr[15:8] <= din;
-
 			if(addr == 5'h04) begin
 				ier[7:0] <= din;
-				ipr[7:0] <= ipr[7:0] & din;  // clear pending interrupts
+				ipr_reset[7:0] <= ipr_reset[7:0] | ~din;
 			end
-
-			if(addr == 5'h06) ipr[7:0] <= ipr[7:0] & din;
-			if(addr == 5'h08)	isr[7:0] <= isr[7:0] & din;  // zero bits are cleared
-				
-			if(addr == 5'h0a)	imr[7:0] <= din;
+			
+			if(addr == 5'h05)	ipr_reset[15:8] <= ipr_reset[15:8] | ~din;
+			if(addr == 5'h06) ipr_reset[7:0]  <= ipr_reset[7:0]  | ~din;
+			if(addr == 5'h07)	isr_reset[15:8] <= isr_reset[15:8] | ~din;  // zero bits are cleared
+			if(addr == 5'h08)	isr_reset[7:0]  <= isr_reset[7:0]  | ~din;  // -"-
+			if(addr == 5'h09)	imr[15:8] <= din;
+			if(addr == 5'h0a)	imr[7:0]  <= din;
 			if(addr == 5'h0b) vr <= din;
 
 			// ------- uart ------------

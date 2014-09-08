@@ -92,7 +92,6 @@ reg [13:0] readTimer;
 // delay the cpu read to be able to do things afterwards like e.g. incrementing 
 // the fifo pointers
 reg ikbd_cpu_data_read;
-reg midi_cpu_data_read;
 
 // the two control registers
 reg [7:0] ikbd_cr;
@@ -104,29 +103,25 @@ always @(negedge clk) begin
 	if(reset) begin
 		readTimer <= 14'd0;
 		ikbd_rx_counter <= 16'd0;
-	end else
+	end else begin
 		if(readTimer > 0)
 			readTimer <= readTimer - 14'd1;
 
-	// read on ikbd data register
-	ikbd_cpu_data_read <= 1'b0;
-	if(sel && ~ds && rw && (addr == 2'd1)) begin
-		ikbd_cpu_data_read <= 1'b1;
-		ikbd_rx_counter <= ikbd_rx_counter + 16'd1;
-	end
+		// read on ikbd data register
+		ikbd_cpu_data_read <= 1'b0;
+		if(sel && ~ds && rw && (addr == 2'd1)) begin
+			ikbd_cpu_data_read <= 1'b1;
+			ikbd_rx_counter <= ikbd_rx_counter + 16'd1;
+		end
 
-  	// read on midi data register
-	midi_cpu_data_read <= 1'b0;
-	if(sel && ~ds && rw && (addr == 2'd3))
-		midi_cpu_data_read <= 1'b1;
 
-	if(!reset) begin
-	   if(ikbd_cpu_data_read && ikbd_rx_data_available) begin
+		if(ikbd_cpu_data_read && ikbd_rx_data_available) begin
 			// Some programs (e.g. bolo) need a pause between two ikbd bytes.
 			// The ikbd runs at 7812.5 bit/s 1 start + 8 data + 1 stop bit. 
 			// One byte is 1/718.25 seconds. A pause of ~1ms is thus required
 			// 8000000/718.25 = 11138.18
-			readTimer <= 14'd11138;
+//			readTimer <= 14'd11138;
+			readTimer <= 14'd15000;
 		end
    end
 end 
@@ -188,9 +183,11 @@ always @(negedge clk) begin
 		midi_rx_data_available <= 1'b0;
 		midi_rx_filter <= 4'b1111;
    end else begin
-      if(midi_cpu_data_read)
+	
+		// read on midi data register
+		if(sel && ~ds && rw && (addr == 2'd3))
 			midi_rx_data_available <= 1'b0;   // read on midi data clears rx status
-      
+			
 		// midi acia master reset
 		if(midi_cr[1:0] == 2'b11) begin
 			midi_rx_cnt <= 8'd0;
@@ -208,6 +205,7 @@ always @(negedge clk) begin
 
 			// receiver not running
 			if(midi_rx_cnt == 8'd0) begin
+				// seeing start bit?
 				if(midi_in_filtered == 1'b0) begin
 					// expecing 10 bits starting half a bit time from now
 					midi_rx_cnt <= { 4'd10, 4'd7 };
@@ -238,7 +236,7 @@ end
 
 // --------------------------- midi transmitter -----------------------------
 assign midi_out = midi_tx_empty ? 1'b1: midi_tx_shift_reg[0];
-wire midi_tx_empty = (midi_tx_cnt == 4'd0);
+reg midi_tx_empty;
 reg [7:0] midi_tx_cnt;
 reg [7:0] midi_tx_data;
 reg midi_tx_data_valid;
@@ -258,8 +256,11 @@ always @(negedge clk) begin
 		end
 
 		// decreae transmit counter
-		if(midi_tx_cnt != 8'd0)
+		if(midi_tx_cnt != 8'd0) begin
 			midi_tx_cnt <= midi_tx_cnt - 8'd1;
+			if(midi_tx_cnt == 1)
+				midi_tx_empty <= 1'b1;
+		end
 
 		// restart immediately if another byte is in tx buffer 
 		if((midi_tx_cnt == 8'd1) && midi_tx_data_valid) begin
@@ -274,6 +275,7 @@ always @(negedge clk) begin
 		midi_reg_ctrl_cnt <= 8'd0;
 
 		midi_tx_cnt <= 8'd0;
+		midi_tx_empty <= 1'b1;
 		midi_tx_data_valid <= 1'b0;
    end else begin
       if(sel && ~ds && ~rw) begin
@@ -297,6 +299,7 @@ always @(negedge clk) begin
 					// transmitter idle? start immediately ...
 					midi_tx_shift_reg <= { 1'b1, din, 1'b0, 1'b1 };  // 8N1, lsb first
 					midi_tx_cnt <= { 4'd10, 4'd1 };   // 10 bits to go
+					midi_tx_empty <= 1'b0;
 				end else begin
 					// ... otherwise store in data buffer
 					midi_tx_data <= din;

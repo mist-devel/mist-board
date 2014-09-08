@@ -5,7 +5,6 @@
 // http://code.google.com/p/mist-board/
 // 
 // Copyright (c) 2013 Till Harbaum <till@harbaum.org> 
-// Modified by Juan Carlos González Amestoy.
 // 
 // This source file is free software: you can redistribute it and/or modify 
 // it under the terms of the GNU General Public License as published 

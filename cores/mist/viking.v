@@ -5,7 +5,6 @@
 // http://code.google.com/p/mist-board/
 // 
 // Copyright (c) 2013 Till Harbaum <till@harbaum.org> 
-// Modified by Juan Carlos González Amestoy.
 // 
 // This source file is free software: you can redistribute it and/or modify 
 // it under the terms of the GNU General Public License as published 
@@ -77,7 +76,7 @@ assign read = (bus_cycle == 2) && me;  // memory enable can directly be used as 
 // --------------------------- internal state counter ------------------------
 // ---------------------------------------------------------------------------
 
-reg [3:0] t /* synthesis noprune */;
+reg [3:0] t;
 always @(posedge pclk) begin
 	// 128 Mhz counter synchronous to 8 Mhz clock
 	// force counter to pass state 0 exactly after the rising edge of clk_reg (8Mhz)
@@ -89,7 +88,7 @@ end
 
 // create internal bus_cycle signal which is stable on the positive clock
 // edge and extends the previous state by half a 128 Mhz clock cycle
-reg [5:0] bus_cycle_L /* synthesis noprune */ ;
+reg [5:0] bus_cycle_L;
 always @(negedge pclk)
 	bus_cycle_L <= { bus_cycle, t };
 
@@ -141,9 +140,9 @@ always@(posedge pclk) begin
 end
  
 // memory enable (data is being read from memory)
-wire me	= (v_cnt < V)&&(h_cnt < H) /* synthesis keep */;	
+wire me	= (v_cnt < V)&&(h_cnt < H);	
 // display enable (data is being displayed)
-wire de	= (v_cnt < V)&&(h_cnt >= HBP1)&&(h_cnt < HBP1+H) /* synthesis keep */;	
+wire de	= (v_cnt < V)&&(h_cnt >= HBP1)&&(h_cnt < HBP1+H);	
 
 wire pix = de?(!shift_register[63]):1'b0;
 
