@@ -171,9 +171,10 @@ always @(posedge clk)
 
 // --------------------------- midi receiver -----------------------------
 reg [7:0] midi_rx_cnt;         // bit + sub-bit counter
-reg [9:0] midi_rx_shift_reg;   // shift register used during reception
+reg [8:0] midi_rx_shift_reg;   // shift register used during reception
 reg [7:0] midi_rx_data;  
 reg [3:0] midi_rx_filter;      // filter to reduce noise
+reg midi_rx_frame_error;
 reg midi_rx_data_available;
 reg midi_in_filtered;
 
@@ -199,7 +200,7 @@ always @(negedge clk) begin
 		if(midi_clk[3:0] == 4'd0) begin
 			midi_rx_filter <= { midi_rx_filter[2:0], midi_in};
 		
-			// midi in mist be stable for 4 cycles to change state
+			// midi input must be stable for 4 cycles to change state
 			if(midi_rx_filter == 4'b0000) midi_in_filtered <= 1'b0;
 			if(midi_rx_filter == 4'b1111) midi_in_filtered <= 1'b1;
 
@@ -208,26 +209,29 @@ always @(negedge clk) begin
 				// seeing start bit?
 				if(midi_in_filtered == 1'b0) begin
 					// expecing 10 bits starting half a bit time from now
-					midi_rx_cnt <= { 4'd10, 4'd7 };
+					midi_rx_cnt <= { 4'd9, 4'd7 };
 				end
 			end else begin
 				// receiver is running
 				midi_rx_cnt <= midi_rx_cnt - 8'd1;
-				
+
+			   // received a bit
 				if(midi_rx_cnt[3:0] == 4'd0) begin
 					// in the middle of the bit -> shift new bit into msb
-					midi_rx_shift_reg <= { midi_in_filtered, midi_rx_shift_reg[9:1] };
+					midi_rx_shift_reg <= { midi_in_filtered, midi_rx_shift_reg[8:1] };
 				end
 
-				// last bit received
+				// receiving last (stop) bit
 				if(midi_rx_cnt[7:0] == 8'd1) begin
-					// check data[0] for frame error (stop bit)
-					// TODO: report frame error via status register
-					if(midi_rx_shift_reg[9] == 1'b1) begin
+					if(midi_in_filtered == 1'b1) begin
 						// copy data into rx register 
 						midi_rx_data <= midi_rx_shift_reg[8:1];  // pure data w/o start and stop bits
 						midi_rx_data_available <= 1'b1;
-					end
+						midi_rx_frame_error <= 1'b0;
+					end else
+						// report frame error via status register
+						midi_rx_frame_error <= 1'b1;
+						
 				end
 			end
 		end
@@ -241,11 +245,7 @@ reg [7:0] midi_tx_cnt;
 reg [7:0] midi_tx_data;
 reg midi_tx_data_valid;
 reg [10:0] midi_tx_shift_reg;
- 
-// counter register writes for debugging
-reg [7:0] midi_reg_data_cnt /* synthesis noprune */;
-reg [7:0] midi_reg_ctrl_cnt /* synthesis noprune */;
- 
+  
 always @(negedge clk) begin
 
 	// 16 times midi clock
@@ -271,9 +271,6 @@ always @(negedge clk) begin
 	end
 
 	if(reset) begin
-		midi_reg_data_cnt <= 8'd0;
-		midi_reg_ctrl_cnt <= 8'd0;
-
 		midi_tx_cnt <= 8'd0;
 		midi_tx_empty <= 1'b1;
 		midi_tx_data_valid <= 1'b0;
@@ -288,10 +285,8 @@ always @(negedge clk) begin
 			// ...
 			
 			// write to midi control register
-			if(addr == 2'd2) begin
+			if(addr == 2'd2)
 				midi_cr <= din;
-				midi_reg_ctrl_cnt <= midi_reg_ctrl_cnt + 8'd1;
-			end
 
 			// write to midi data register
 			if(addr == 2'd3) begin
@@ -305,8 +300,6 @@ always @(negedge clk) begin
 					midi_tx_data <= din;
 					midi_tx_data_valid <= 1'b1;
 				end
-				
-				midi_reg_data_cnt <= midi_reg_data_cnt + 8'd1;				
 			end
 		end
    end
