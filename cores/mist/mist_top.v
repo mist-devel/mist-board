@@ -681,7 +681,7 @@ wire clk_8;
 wire clk_32;
 wire clk_128;
 wire clk_mfp;
-     
+
 // use pll
 clock clock (
   .areset       (1'b0             ), // async reset input
@@ -689,7 +689,7 @@ clock clock (
   .c0           (clk_128          ), // output clock c0 (128MHz)
   .c1           (clk_32           ), // output clock c1 (32MHz)
   .c2           (SDRAM_CLK        ), // output clock c2 (128MHz)
-  .c3           (clk_mfp          ), // output clock c3 (2.4576MHz)
+//  .c3           (clk_mfp          ), // output clock c3 (2.4576MHz)
   .locked       (pll_locked       )  // pll locked output
 );
 
@@ -710,6 +710,17 @@ always @ (posedge clk_32, negedge pll_locked) begin
 end
 
 assign clk_8 = clk_cnt[1];
+
+// MFP clock
+// required: 2.4576 MHz
+// derived from 27MHZ: 27*74/824 = 2.457525 MHz => 0.003% error
+// derived from 31.875MHz: 31.875*33/428=2.457652 MHz => 0.002% error
+// derived from 127.5 MHz: 127.5*58/3009 = 2.457627 MHz => 0.001% error
+// use pll
+pll_mfp1 pll_mfp1 (
+  .inclk0       (clk_128     ), // input clock (127.5MHz)
+  .c0           (clk_mfp     )  // output clock c0 (2.457627MHz)
+);
 
 // bus cycle counter for debugging
 reg [31:0] cycle_counter /* synthesis noprune */;
