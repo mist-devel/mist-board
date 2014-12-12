@@ -1,0 +1,12 @@
+Bus Error testing results (word access):
+
+$FF800E - $FF8200
+$FF820E - $FF8240
+$FF8280 - $FF8604
+$FF860E - $FF8800
+$FF8900 - $FF8A00
+$FF8A40 - $FFFA00
+$FFFA40 - $FFFC00
+$FFFE00 - $FFFFFE
+
+EOF!
