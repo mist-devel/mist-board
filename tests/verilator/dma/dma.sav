@@ -1,0 +1,113 @@
+[*]
+[*] GTKWave Analyzer v3.3.58 (w)1999-2014 BSI
+[*] Mon Jan 12 13:59:53 2015
+[*]
+[dumpfile] "/home/tharbaum/tmp/mist/tools/verilator_dma/dma.vcd"
+[dumpfile_mtime] "Mon Jan 12 13:29:12 2015"
+[dumpfile_size] 12524676
+[savefile] "/home/tharbaum/tmp/mist/tools/verilator_dma/dma.sav"
+[timestart] 46436
+[size] 1183 936
+[pos] -1 -1
+*-10.775101 49392 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+[treeopen] TOP.
+[treeopen] TOP.v.
+[sst_width] 202
+[signals_width] 262
+[sst_expanded] 1
+[sst_vpaned_height] 497
+@28
+TOP.v.clk
+TOP.v.reset
+TOP.v.bus_cycle[1:0]
+TOP.v.bus_cycle_L[1:0]
+TOP.v.ss
+TOP.v.sck
+TOP.v.sdi
+TOP.v.cycle_io
+TOP.v.cycle_advance
+@22
+TOP.v.fifo_wptr[3:0]
+TOP.v.fifo(0)[15:0]
+TOP.v.fifo(1)[15:0]
+TOP.v.fifo(2)[15:0]
+TOP.v.fifo(3)[15:0]
+TOP.v.fifo(4)[15:0]
+TOP.v.fifo(5)[15:0]
+TOP.v.fifo(6)[15:0]
+TOP.v.fifo(7)[15:0]
+TOP.v.fifo(8)[15:0]
+TOP.v.fifo(9)[15:0]
+TOP.v.fifo(10)[15:0]
+TOP.v.fifo(11)[15:0]
+TOP.v.fifo(12)[15:0]
+TOP.v.fifo(13)[15:0]
+TOP.v.fifo(14)[15:0]
+TOP.v.fifo(15)[15:0]
+@28
+TOP.v.fifo_data_in_strobe
+TOP.v.fifo_full
+TOP.v.cpu_sel
+TOP.v.cpu_rw
+@22
+TOP.v.cpu_addr[2:0]
+@28
+TOP.v.cpu_lds
+@22
+TOP.v.cpu_din[15:0]
+TOP.v.cpu_dout[15:0]
+@24
+TOP.v.ram_br
+@28
+[color] 2
+TOP.v.ram_write
+@22
+TOP.v.dma_addr[22:0]
+TOP.v.ram_dout[15:0]
+@28
+[color] 1
+TOP.v.ram_read
+[color] 1
+TOP.v.ram_read_done
+@22
+TOP.v.ram_din[15:0]
+@28
+TOP.v.dma_direction_in
+TOP.v.dma_direction_set
+@22
+TOP.v.sbuf[30:0]
+@28
+TOP.v.dma_direction_in
+[color] 5
+TOP.v.fifo_data_out_strobe
+TOP.v.fifo_data_out_strobe_clk
+@22
+TOP.v.fifo_rptr[3:0]
+@28
+TOP.v.io_data_out_strobe
+@29
+TOP.v.io_data_out_inc_strobe
+@22
+TOP.v.fifo_data_out[15:0]
+@28
+TOP.v.sck
+@24
+TOP.v.cnt[5:0]
+@22
+TOP.v.sdo_bit[3:0]
+TOP.v.bcnt[4:0]
+@28
+TOP.v.sdo
+TOP.v.fifo_read_in_progress
+TOP.v.fifo_read_cnt[2:0]
+TOP.v.fifo_write_in_progress
+@24
+TOP.v.fifo_write_cnt[2:0]
+@28
+TOP.v.sector_strobe_prepare
+TOP.v.sector_strobe
+@22
+TOP.v.word_cnt[7:0]
+TOP.v.dma_scnt[7:0]
+[pattern_trace] 1
+[pattern_trace] 0
