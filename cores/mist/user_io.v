@@ -61,19 +61,19 @@ module user_io(
 wire [7:0] spi_sck_D = { spi_sck_D[6:0], SPI_CLK } /* synthesis keep */;
 wire spi_sck = (spi_sck && spi_sck_D != 8'h00) || (!spi_sck && spi_sck_D == 8'hff);
 
-	reg [1:0] 			byte_cnt;
-   reg [6:0]         sbuf;
-   reg [7:0]         cmd;
-   reg [3:0] 	      bit_cnt;       // 0..15
-   reg [3:0] 	      but_sw;
+reg [1:0] 			byte_cnt;
+reg [6:0]         sbuf;
+reg [7:0]         cmd;
+reg [3:0] 	      bit_cnt;       // 0..15
+reg [3:0] 	      but_sw;
 
-	// counter runs 0..7,8..15,8..15,8..15
-	wire [2:0] tx_bit = ~(bit_cnt[2:0]);
+// counter runs 0..7,8..15,8..15,8..15
+wire [2:0] tx_bit = ~(bit_cnt[2:0]);
 	
-	assign BUTTONS = but_sw[1:0];
-	assign SWITCHES = but_sw[3:2];
+assign BUTTONS = but_sw[1:0];
+assign SWITCHES = but_sw[3:2];
    
-   always@(negedge spi_sck) begin
+always@(negedge spi_sck) begin
       if(bit_cnt <= 7)
 		  SPI_MISO <= CORE_TYPE[7-bit_cnt];
 		else begin

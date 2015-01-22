@@ -97,30 +97,23 @@ reg ikbd_cpu_data_read;
 reg [7:0] ikbd_cr;
 reg [7:0] midi_cr;
 	
-reg [15:0] ikbd_rx_counter /* synthesis noprune */; 
-	
 always @(negedge clk) begin
 	if(reset) begin
 		readTimer <= 14'd0;
-		ikbd_rx_counter <= 16'd0;
 	end else begin
 		if(readTimer > 0)
 			readTimer <= readTimer - 14'd1;
 
 		// read on ikbd data register
 		ikbd_cpu_data_read <= 1'b0;
-		if(sel && ~ds && rw && (addr == 2'd1)) begin
+		if(sel && ~ds && rw && (addr == 2'd1))
 			ikbd_cpu_data_read <= 1'b1;
-			ikbd_rx_counter <= ikbd_rx_counter + 16'd1;
-		end
-
 
 		if(ikbd_cpu_data_read && ikbd_rx_data_available) begin
 			// Some programs (e.g. bolo) need a pause between two ikbd bytes.
 			// The ikbd runs at 7812.5 bit/s 1 start + 8 data + 1 stop bit. 
 			// One byte is 1/718.25 seconds. A pause of ~1ms is thus required
 			// 8000000/718.25 = 11138.18
-//			readTimer <= 14'd11138;
 			readTimer <= 14'd15000;
 		end
    end
@@ -128,6 +121,7 @@ end
  
 // ------------------ cpu interface --------------------
 
+wire [7:0] ikbd_status = { ikbd_irq, 6'b000001, cpu_ikbd_rx_data_available};
 wire [7:0] ikbd_rx_data;
 wire ikbd_rx_data_available;
 
@@ -149,11 +143,11 @@ always @(sel, ds, rw, addr, ikbd_rx_data_available, ikbd_rx_data, ikbd_irq,
 
 	if(sel && ~ds && rw) begin
       // keyboard acia read
-      if(addr == 2'd0) dout = { ikbd_irq, 6'b000001, cpu_ikbd_rx_data_available};
+      if(addr == 2'd0) dout = ikbd_status;
       if(addr == 2'd1) dout = ikbd_rx_data;
       
       // midi acia read
-      if(addr == 2'd2) dout = { midi_irq, 5'b00000, midi_tx_empty, midi_rx_data_available};
+      if(addr == 2'd2) dout = midi_status;
       if(addr == 2'd3) dout = midi_rx_data;
    end
 end
@@ -161,6 +155,9 @@ end
 // ------------------------------ MIDI UART ---------------------------------
 wire midi_irq = (midi_cr[7] && midi_rx_data_available) ||    // rx irq
 	((midi_cr[6:5] == 2'b01) && midi_tx_empty);               // tx irq
+
+wire [7:0] midi_status = { midi_irq, 1'b0 /* parity err */, midi_rx_overrun, midi_rx_frame_error,
+									2'b00 /* CTS & DCD */, midi_tx_empty, midi_rx_data_available};
 
 // MIDI runs at 31250bit/s which is exactly 1/256 of the 8Mhz system clock
    
@@ -171,10 +168,11 @@ always @(posedge clk)
 
 // --------------------------- midi receiver -----------------------------
 reg [7:0] midi_rx_cnt;         // bit + sub-bit counter
-reg [8:0] midi_rx_shift_reg;   // shift register used during reception
+reg [7:0] midi_rx_shift_reg;   // shift register used during reception
 reg [7:0] midi_rx_data;  
 reg [3:0] midi_rx_filter;      // filter to reduce noise
 reg midi_rx_frame_error;
+reg midi_rx_overrun;
 reg midi_rx_data_available;
 reg midi_in_filtered;
 
@@ -183,17 +181,23 @@ always @(negedge clk) begin
 		midi_rx_cnt <= 8'd0;
 		midi_rx_data_available <= 1'b0;
 		midi_rx_filter <= 4'b1111;
+		midi_rx_overrun <= 1'b0;
+		midi_rx_frame_error <= 1'b0;
    end else begin
 	
 		// read on midi data register
-		if(sel && ~ds && rw && (addr == 2'd3))
+		if(sel && ~ds && rw && (addr == 2'd3)) begin
 			midi_rx_data_available <= 1'b0;   // read on midi data clears rx status
+			midi_rx_overrun <= 1'b0;
+		end
 			
 		// midi acia master reset
 		if(midi_cr[1:0] == 2'b11) begin
 			midi_rx_cnt <= 8'd0;
 			midi_rx_data_available <= 1'b0;
 			midi_rx_filter <= 4'b1111;
+			midi_rx_overrun <= 1'b0;
+			midi_rx_frame_error <= 1'b0;
 		end
 
 		// 1/16 system clock == 16 times midi clock
@@ -218,20 +222,24 @@ always @(negedge clk) begin
 			   // received a bit
 				if(midi_rx_cnt[3:0] == 4'd0) begin
 					// in the middle of the bit -> shift new bit into msb
-					midi_rx_shift_reg <= { midi_in_filtered, midi_rx_shift_reg[8:1] };
+					midi_rx_shift_reg <= { midi_in_filtered, midi_rx_shift_reg[7:1] };
 				end
 
 				// receiving last (stop) bit
 				if(midi_rx_cnt[7:0] == 8'd1) begin
 					if(midi_in_filtered == 1'b1) begin
 						// copy data into rx register 
-						midi_rx_data <= midi_rx_shift_reg[8:1];  // pure data w/o start and stop bits
+						midi_rx_data <= midi_rx_shift_reg;  // pure data w/o start and stop bits
 						midi_rx_data_available <= 1'b1;
 						midi_rx_frame_error <= 1'b0;
 					end else
 						// report frame error via status register
 						midi_rx_frame_error <= 1'b1;
-						
+
+					// data hasn't been read yet? -> overrun
+					if(midi_rx_data_available)
+						midi_rx_overrun <= 1'b1;
+					
 				end
 			end
 		end

@@ -23,7 +23,6 @@
 module video (
   // system interface
   input clk,                      // 31.875 MHz
-  input clk27,                    // 27.000 Mhz
   input [1:0] bus_cycle,          // bus-cycle for sync
 
   // SPI interface for OSD

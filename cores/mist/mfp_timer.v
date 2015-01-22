@@ -90,8 +90,10 @@ always @(negedge CLK) begin
       // then write the data to the appropriate register.
       if(DAT_WE) begin
          data <= DAT_I;
-         down_counter <= DAT_I;
-		end
+	 // the counter itself is only loaded here if it's stopped
+	 if(!started)
+           down_counter <= DAT_I;
+      end
 
 		if(CTRL_WE) begin
          control <= CTRL_I[3:0];

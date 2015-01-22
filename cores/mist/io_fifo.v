@@ -19,6 +19,9 @@
 // You should have received a copy of the GNU General Public License 
 // along with this program.  If not, see <http://www.gnu.org/licenses/>. 
 
+// TODO: Make this truly async
+// http://www.asic-world.com/examples/verilog/asyn_fifo.html
+
 module io_fifo #(
  parameter DATA_WIDTH = 8,
  parameter DEPTH = 4
