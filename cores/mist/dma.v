@@ -192,7 +192,7 @@ acsi acsi(.clk        ( clk                   ),
 	 .cpu_din     ( cpu_din[7:0]          ),
 	 .cpu_dout    ( acsi_dout             )
 );
-   
+
 // ============= CPU read interface ============
 always @(cpu_sel, cpu_rw, cpu_addr, dma_mode, dma_addr, dma_scnt) begin
    cpu_dout = 16'h0000;
@@ -204,9 +204,9 @@ always @(cpu_sel, cpu_rw, cpu_addr, dma_mode, dma_addr, dma_scnt) begin
          if(dma_mode[4] == 1'b0) begin
             // controller access register
             if(dma_mode[3] == 1'b0)
-	       cpu_dout = { 8'h00, fdc_dout };
-	    else
-	       cpu_dout = { 8'h00, acsi_dout };
+					cpu_dout = { 8'h00, fdc_dout };
+				else
+					cpu_dout = { 8'h00, acsi_dout };
          end else
            cpu_dout = { 8'h00, dma_scnt };  // sector count register
       end
@@ -623,16 +623,16 @@ wire [7:0] dma_io_status =
 	   (bcnt == 3)?dma_scnt:
 	   // 5 bytes FDC status
 	   ((bcnt >= 4)&&(bcnt <= 8))?fdc_status_byte:
-	   // 7 bytes ACSI status
-	   ((bcnt >= 9)&&(bcnt <= 15))?acsi_status_byte:
+	   // 11 bytes ACSI status
+	   ((bcnt >= 9)&&(bcnt <= 19))?acsi_status_byte:
 		// DMA debug signals
-	   (bcnt == 16)?8'ha5:
-	   (bcnt == 17)?{ fifo_rptr, fifo_wptr}:
-	   (bcnt == 18)?{ 4'd0, fdc_irq, acsi_irq, ioc_br_clk, dma_in_progress }:
-	   (bcnt == 19)?dma_status:
-	   (bcnt == 20)?dma_mode[8:1]:
-	   (bcnt == 21)?fdc_irq_count:
-	   (bcnt == 22)?acsi_irq_count:
+	   (bcnt == 20)?8'ha5:
+	   (bcnt == 21)?{ fifo_rptr, fifo_wptr}:
+	   (bcnt == 22)?{ 4'd0, fdc_irq, acsi_irq, ioc_br_clk, dma_in_progress }:
+	   (bcnt == 23)?dma_status:
+	   (bcnt == 24)?dma_mode[8:1]:
+	   (bcnt == 25)?fdc_irq_count:
+	   (bcnt == 26)?acsi_irq_count:
 	   8'h00;
    
 // ====================================================================
