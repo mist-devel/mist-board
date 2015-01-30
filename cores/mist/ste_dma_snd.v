@@ -52,7 +52,7 @@ module ste_dma_snd (
 // --------------------------- internal state counter ------------------------
 // ---------------------------------------------------------------------------
 
-reg [1:0] t /* synthesis noprune */ ;
+reg [1:0] t;
 always @(posedge clk32) begin
 	// 32Mhz counter synchronous to 8 Mhz clock
 	// force counter to pass state 0 exactly after the rising edge of clk (8Mhz)
@@ -254,7 +254,7 @@ reg [FIFO_ADDR_BITS-1:0] writeP, readP;
 wire fifo_empty = (readP == writeP);
 wire fifo_full = (readP == (writeP + 2'd1));
 
-reg [11:0] fifo_underflow /* synthesis noprune */;
+reg [11:0] fifo_underflow;
 
 // ---------------------------------------------------------------------------
 // -------------------------------- audio engine -----------------------------
@@ -294,7 +294,7 @@ always @(posedge aclk) begin
 			end else
 				// for debugging: monitor if fifo runs out of data
 				fifo_underflow <= fifo_underflow + 12'd1;
-		end
+		end 
 	end
 end
 
@@ -312,9 +312,8 @@ reg dma_enable;  // flag indicating dma engine is active
 // released for that event
 reg frame_done;
 assign xsint = dma_enable && (snd_adr != snd_end_latched);
-// assign xsint = dma_enable && !frame_done;
 
-reg [7:0] frame_cnt /* synthesis noprune */;
+reg [7:0] frame_cnt;
 
 always @(posedge clk32) begin
 	if(reset) begin

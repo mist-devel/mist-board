@@ -141,7 +141,7 @@ reg init;
 reg wait4bus;
 
 // counter for cooperative (non-hog) bus access
-reg [5:0] bus_coop_cnt /* synthesis noprune */;
+reg [5:0] bus_coop_cnt;
 
 reg bus_owned;
 

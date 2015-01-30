@@ -61,15 +61,15 @@ assign status = { statusCode, 5'h00, tbcr == tx_w_cnt, isr[1:0], tbcr };
 // ----- bus interface signals as wired up on the ethernec/netusbee ------
 // sel[0] = 0xfa0000 -> normal read
 // sel[1] = 0xfb0000 -> write through address bus
-wire ne_read = sel[0] /* synthesis keep */;
-wire ne_write = sel[1] /* synthesis keep */;
-wire [4:0] ne_addr = addr[12:8] /* synthesis keep */;
-wire [7:0] ne_wdata = addr[7:0] /* synthesis keep */;
+wire ne_read = sel[0];
+wire ne_write = sel[1];
+wire [4:0] ne_addr = addr[12:8];
+wire [7:0] ne_wdata = addr[7:0];
 reg [7:0] ne_rdata;
 assign dout = { ne_rdata, 8'h00 };
 
 // ---------- ne2000 internal registers -------------
-reg reset /* synthesis noprune */;
+reg reset;
 reg [7:0]  cr;             // ne command register
 reg [7:0]  isr;            // ne interrupt service register
 reg [7:0]  imr;            // interrupt mask register
@@ -84,7 +84,7 @@ reg [7:0]  pstop;          // rx buffer ring stop page
 reg [7:0]  par [5:0];      // 6 byte mac address register
 reg [7:0]  mar [7:0];      // 8 byte multicast hash register
 reg [15:0] rbcr;           // receiver byte count register
-reg [15:0] rsar /* synthesis noprune */;           // receiver address register
+reg [15:0] rsar;           // receiver address register
 reg [15:0] tbcr;           // transmitter byte count register
 
 
@@ -120,8 +120,8 @@ end
 // ------------- set local mac address ------------
 
 // mac address from io controller
-reg [7:0] mac [5:0] /* synthesis noprune */;
-reg [2:0] mac_cnt /* synthesis noprune */;
+reg [7:0] mac [5:0];
+reg [2:0] mac_cnt;
 
 always @(negedge mac_strobe or posedge mac_begin) begin
 	if(mac_begin)
@@ -180,8 +180,8 @@ reg [1:0] rx_w_state;
 // Several sources can write into the rx_buffer. The user_io SPI client receiving 
 // data from the io controller or the ethernec core itself setting the mac address
 // or adding the rx header 
-wire rx_write_clk = rx_strobe || int_strobe /* synthesis keep */;
-wire rx_write_begin = (rx_beginD && !rx_beginD2) || int_begin /* synthesis keep */;
+wire rx_write_clk = rx_strobe || int_strobe;
+wire rx_write_begin = (rx_beginD && !rx_beginD2) || int_begin;
 
 reg rx_lastByte;
 
@@ -194,7 +194,7 @@ always @(negedge clk)
 	rx_new_pageD <= rx_new_page;
 	
 // -------- dummy page counter ---------
-reg [7:0] rx_page_cnt /* synthesis noprune */;
+reg [7:0] rx_page_cnt;
 always @(negedge clk) begin
 	if(rx_new_page && !rx_new_pageD)
 		rx_page_cnt <= rx_page_cnt + 8'd1;
@@ -219,8 +219,6 @@ always @(posedge rx_write_clk or posedge rx_write_begin) begin
 			rx_w_cnt <= rx_w_cnt + 16'd1;
 			
 		end else if(rx_w_state == 2'd2) begin
-			// rx begin stays true over the entire transfer
-//			if(rx_begin)
 			rx_w_cnt <= rx_w_cnt + 16'd1;
 					
 		end else if(rx_w_state == 2'd3) begin
@@ -236,7 +234,7 @@ wire [7:0] header_byte =
 	(rx_w_cnt==1)?curr:
 	(rx_w_cnt==2)?rx_len[7:0]:
 	(rx_w_cnt==3)?rx_len[15:8]:
-	8'h55 /* synthesis keep*/ ;
+	8'h55;
 
 always @(posedge clk) begin
 	rx_lastByte <= 1'b0;

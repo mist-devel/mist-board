@@ -747,16 +747,6 @@ always @ (posedge clk_32, negedge pll_locked) begin
 end
 
 assign clk_8 = clk_cnt[1];
-
-// bus cycle counter for debugging
-reg [31:0] cycle_counter /* synthesis noprune */;
-always @ (posedge clk_8) begin
-	if(reset)
-		cycle_counter <= 32'd0;
-	else
-		cycle_counter <= cycle_counter + 32'd1;
-end
-
  
 // tg68 bus interface. These are the signals which are latched
 // for the 8MHz bus.
