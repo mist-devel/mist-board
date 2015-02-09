@@ -106,9 +106,9 @@ always @(posedge clk) begin
      index_pulse_cnt <= 32'd0;
    else begin
       if(index_pulse_cnt != 0)
-	index_pulse_cnt <= index_pulse_cnt - 32'd1;
+			index_pulse_cnt <= index_pulse_cnt - 32'd1;
       else
-	index_pulse_cnt <= 32'd1600000;  // 8000000/5
+			index_pulse_cnt <= 32'd1600000;  // 8000000/5
    end
 end
 
@@ -129,10 +129,10 @@ always @(cpu_sel, cpu_addr, cpu_rw) begin
 
    if(cpu_sel && cpu_rw) begin
       case(cpu_addr)
-	 0: cpu_dout = status;
-	 1: cpu_dout = track;
-	 2: cpu_dout = sector;
-	 3: cpu_dout = data;
+			0: cpu_dout = status;
+			1: cpu_dout = track;
+			2: cpu_dout = sector;
+			3: cpu_dout = data;
       endcase
    end
 end
@@ -157,110 +157,109 @@ always @(negedge clk or posedge reset) begin
 
       // DMA transfer has been ack'd by io controller
       if(dma_ack) begin
-	 // fdc waiting for io controller
-	 if(state == STATE_IO_WAIT)
-	   state <= STATE_IRQ;  // jump to end of busy phase
+			// fdc waiting for io controller
+			if(state == STATE_IO_WAIT)
+				state <= STATE_IRQ;  // jump to end of busy phase
       end
       
       // fdc may be waiting internally (e.g. for step completion)
       if(state == STATE_INT_WAIT) begin
-	 // count down and go into irq state if done
-	 if(delay != 0)
-	   delay <= delay - 32'd1;
-	 else
-	   state <= STATE_IRQ;
-      end
+			// count down and go into irq state if done
+			if(delay != 0)
+				delay <= delay - 32'd1;
+			else
+				state <= STATE_IRQ;
+		end
 			
-      // fdc is ending busy phase
-      if(state == STATE_IRQ) begin
-	 irq <= 1'b1;
-	 state <= STATE_IDLE;
-      end
+		// fdc is ending busy phase
+		if(state == STATE_IRQ) begin
+			irq <= 1'b1;
+			state <= STATE_IDLE;
+		end
 
-      // cpu is reading status register or writing command register -> clear fdc irq
-      if(cpu_sel && (cpu_addr == 0))
-	irq <= 1'b0;
+		// cpu is reading status register or writing command register -> clear fdc irq
+		if(cpu_sel && (cpu_addr == 0))
+			irq <= 1'b0;
 	 
-      if(cpu_sel && !cpu_rw) begin
-	 // fdc register write
-	 if(cpu_addr == 0) begin       // command register
-	    cmd <= cpu_din;
-	    state <= STATE_INT_WAIT;
-	    delay <= 31'd0;
+		if(cpu_sel && !cpu_rw) begin
+			// fdc register write
+			if(cpu_addr == 0) begin       // command register
+				cmd <= cpu_din;
+				state <= STATE_INT_WAIT;
+				delay <= 31'd0;
 
-	    // all TYPE I and TYPE II commands start the motor
-	    if((cpu_din[7] == 1'b0) || (cpu_din[7:6] == 2'b10))
-	      motor_start <= 1'b1;
+				// all TYPE I and TYPE II commands start the motor
+				if((cpu_din[7] == 1'b0) || (cpu_din[7:6] == 2'b10))
+					motor_start <= 1'b1;
 	    
-	    // ------------- TYPE I commands -------------
-	    if(cpu_din[7:4] == 4'b0000) begin  	        // RESTORE
-	       track <= 8'd0;
-	       delay <= 31'd2000000;		        // 250ms delay
-	    end
+				// ------------- TYPE I commands -------------
+				if(cpu_din[7:4] == 4'b0000) begin  	        // RESTORE
+					track <= 8'd0;
+					delay <= 31'd200000;		        // 25ms delay
+				end
 	    
-	    if(cpu_din[7:4] == 4'b0001) begin  	        // SEEK
-	       track <= data;
-	       delay <= 31'd200000;			// 25ms delay
-	    end
+				if(cpu_din[7:4] == 4'b0001) begin  	        // SEEK
+					track <= data;
+					delay <= 31'd200000;			// 25ms delay
+				end
 	    
-	    if(cpu_din[7:3] == 3'b001) begin		// STEP
-	       delay <= 31'd20000;			// 2.5ms delay
-	       if(cpu_din[4])                           // update flag
-		 track <= (step_dir == 1)?(track + 8'd1):(track - 8'd1);
-	    end
+				if(cpu_din[7:3] == 3'b001) begin		// STEP
+					delay <= 31'd20000;			// 2.5ms delay
+					if(cpu_din[4])                           // update flag
+						track <= (step_dir == 1)?(track + 8'd1):(track - 8'd1);
+				end
 	    
-	    if(cpu_din[7:5] == 3'b010) begin            // STEP-IN
-	       delay <= 31'd20000;			// 2.5ms delay
-	       step_dir <= 1'b1;
-	       if(cpu_din[4])                           // update flag
-		 track <= track + 8'd1;
-	    end
+				if(cpu_din[7:5] == 3'b010) begin            // STEP-IN
+					delay <= 31'd20000;			// 2.5ms delay
+					step_dir <= 1'b1;
+					if(cpu_din[4])                           // update flag
+						track <= track + 8'd1;
+				end
 
-	    if(cpu_din[7:5] == 3'b011) begin            // STEP-OUT
-	       delay <= 31'd20000;			// 2.5ms delay
-	       step_dir <= 1'b0;
-	       if(cpu_din[4])                           // update flag
-		 track <= track - 8'd1;
-	    end
+				if(cpu_din[7:5] == 3'b011) begin            // STEP-OUT
+					delay <= 31'd20000;			// 2.5ms delay
+					step_dir <= 1'b0;
+					if(cpu_din[4])                           // update flag
+						track <= track - 8'd1;
+				end
 	    
-	    // ------------- TYPE II commands -------------
-	    if(cpu_din[7:5] == 3'b100) begin            // read sector
-	       state <= STATE_IO_WAIT;
-	    end
+				// ------------- TYPE II commands -------------
+				if(cpu_din[7:5] == 3'b100) begin            // read sector
+					state <= STATE_IO_WAIT;
+				end
 							
-	    if(cpu_din[7:5] == 3'b101)                  // write sector
-	      if(!wr_prot)
-		state <= STATE_IO_WAIT;
+				if(cpu_din[7:5] == 3'b101)                  // write sector
+					if(!wr_prot)
+						state <= STATE_IO_WAIT;
 	    
-	    // ------------- TYPE III commands ------------
+				// ------------- TYPE III commands ------------
+	    		if(cpu_din[7:4] == 4'b1100)                 // read address
+					state <= STATE_IO_WAIT;
 	    
-	    if(cpu_din[7:4] == 4'b1100)                 // read address
-	      state <= STATE_IO_WAIT;
+				if(cpu_din[7:4] == 4'b1110)                 // read track
+					state <= STATE_IO_WAIT;
 	    
-	    if(cpu_din[7:4] == 4'b1110)                 // read track
-	      state <= STATE_IO_WAIT;
+				if(cpu_din[7:4] == 4'b1111)                 // write track
+					if(!wr_prot)
+						state <= STATE_IO_WAIT;
 	    
-	    if(cpu_din[7:4] == 4'b1111)                 // write track
-	      if(!wr_prot)
-		state <= STATE_IO_WAIT;
-	    
-	    // ------------- TYPE IV commands -------------
-	    if(cpu_din[7:4] == 4'b1101) begin           // force intrerupt
-	       if(cpu_din[3:0] == 4'b0000)
-		 state <= STATE_IDLE;                    // immediately
-	       else
-		 state <= STATE_IRQ;                     // with irq
-	    end
-	 end // if (cpu_addr == 0)
+				// ------------- TYPE IV commands -------------
+				if(cpu_din[7:4] == 4'b1101) begin           // force intrerupt
+					if(cpu_din[3:0] == 4'b0000)
+						state <= STATE_IDLE;                    // immediately
+					else
+						state <= STATE_IRQ;                     // with irq
+				end
+			end // if (cpu_addr == 0)
 	 
-	 if(cpu_addr == 1)             // track register
-	   track <= cpu_din;
+			if(cpu_addr == 1)             // track register
+				track <= cpu_din;
 	 
-	 if(cpu_addr == 2)             // sector register
-	   sector <= cpu_din;
+			if(cpu_addr == 2)             // sector register
+				sector <= cpu_din;
 	 
-	 if(cpu_addr == 3)             // data register
-	   data <= cpu_din;   
+			if(cpu_addr == 3)             // data register
+				data <= cpu_din;   
 
       end // if (cpu_sel && !cpu_rw)
    end // else: !if(reset)

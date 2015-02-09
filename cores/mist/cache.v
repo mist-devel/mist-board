@@ -22,7 +22,7 @@
   
 module cache (
       input 	    clk_128,
-      input 	    clk_8,
+      input 	    clk,
       input 	    reset, 
       input 	    flush, 
 	      
@@ -41,16 +41,6 @@ module cache (
 		input [15:0]  din16,
 		input         update
 );
-
-reg [3:0] t;
-always @(posedge clk_128) begin
-	// 128Mhz counter synchronous to 8 Mhz clock
-   // force counter to pass state 0 exactly after the rising edge of clk_8
-   if(((t == 4'd15) && ( clk_8 == 0)) ||
-      ((t ==  4'd0) && ( clk_8 == 1)) ||
-      ((t != 4'd15) && (t != 4'd0)))
-            t <= t + 4'd1;
-end
 
 // cache size configuration
 // the cache size in bytes is 8*(2^BITS), e.g. 2kBytes if BITS == 8
@@ -110,55 +100,52 @@ always @(posedge clk_128) begin
 	current_tag <= tag_latch[line];
 end
 
-always @(posedge clk_128) begin
-   if(reset || flush) begin
+wire clear = reset || flush;
+
+always @(posedge clk or posedge clear) begin
+   if(clear) begin
 		valid <= { ENTRIES {1'b0} };
    end else begin
-		// the store and update signals are valid in the last cycle only. The cpu runs
-		// at 32MHz and is valid if t=14,15,0,1
-		if(t==15) begin
-
-			// store indicates that a whole cache line is to be stored
-			if(store) begin
-				data_latch_7[line] <= din64[63:56];
-				data_latch_6[line] <= din64[55:48];
-				data_latch_5[line] <= din64[47:40];
-				data_latch_4[line] <= din64[39:32];
-				data_latch_3[line] <= din64[31:24];
-				data_latch_2[line] <= din64[23:16];
-				data_latch_1[line] <= din64[15: 8];
-				data_latch_0[line] <= din64[ 7: 0];
+		// store indicates that a whole cache line is to be stored
+		if(store) begin
+			data_latch_7[line] <= din64[63:56];
+			data_latch_6[line] <= din64[55:48];
+			data_latch_5[line] <= din64[47:40];
+			data_latch_4[line] <= din64[39:32];
+			data_latch_3[line] <= din64[31:24];
+			data_latch_2[line] <= din64[23:16];
+			data_latch_1[line] <= din64[15: 8];
+			data_latch_0[line] <= din64[ 7: 0];
 			
-				tag_latch[line] <= tag;
-				valid[line] <= 1'b1;
-			end
+			tag_latch[line] <= tag;
+			valid[line] <= 1'b1;
+		end
 		
-			// cpu (or other bus master!) writes to ram, so update cache contents if necessary
-			else if(update && hit) begin
-				// no need to care for "tag_latch" or "valid" as they simply stay the same
+		// cpu (or other bus master!) writes to ram, so update cache contents if necessary
+		else if(update && hit) begin
+			// no need to care for "tag_latch" or "valid" as they simply stay the same
 
-				case(addr[1:0]) 
-					0: begin
-							if(ds[1]) data_latch_0[line] <= din16[7:0];
-							if(ds[0]) data_latch_1[line] <= din16[15:8];
-						end
+			case(addr[1:0]) 
+				0: begin
+						if(ds[1]) data_latch_0[line] <= din16[7:0];
+						if(ds[0]) data_latch_1[line] <= din16[15:8];
+					end
 			
-					1: begin
-							if(ds[1]) data_latch_2[line] <= din16[7:0];
-							if(ds[0]) data_latch_3[line] <= din16[15:8];
-						end
+				1: begin
+						if(ds[1]) data_latch_2[line] <= din16[7:0];
+						if(ds[0]) data_latch_3[line] <= din16[15:8];
+					end
 
-					2: begin
-							if(ds[1]) data_latch_4[line] <= din16[7:0];
-							if(ds[0]) data_latch_5[line] <= din16[15:8];
-						end
-
-					3:  begin
-							if(ds[1]) data_latch_6[line] <= din16[7:0];
-							if(ds[0]) data_latch_7[line] <= din16[15:8];
-						end
-				endcase
-			end
+				2: begin
+						if(ds[1]) data_latch_4[line] <= din16[7:0];
+						if(ds[0]) data_latch_5[line] <= din16[15:8];
+					end
+					
+				3:  begin
+						if(ds[1]) data_latch_6[line] <= din16[7:0];
+						if(ds[0]) data_latch_7[line] <= din16[15:8];
+					end
+			endcase
 		end
    end
 end

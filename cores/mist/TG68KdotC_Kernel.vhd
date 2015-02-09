@@ -736,40 +736,41 @@ PROCESS (clk, setdisp, memaddr_a, briefdata, memaddr_delta, setdispbyte, datatyp
 		
 		IF rising_edge(clk) THEN
 			IF clkena_lw='1' THEN
-				trap_vector(31 downto 8) <= (others => '0');
+--				trap_vector(31 downto 8) <= (others => '0');
+				trap_vector(31 downto 10) <= (others => '0');
 --				IF trap_addr_fault='1' THEN
 				IF trap_berr='1' THEN
-					trap_vector(7 downto 0) <= X"08";
+					trap_vector(9 downto 0) <= "00" & X"08";
 				END IF;	
 				IF trap_addr_error='1' THEN
-					trap_vector(7 downto 0) <= X"0C";
+					trap_vector(9 downto 0) <= "00" & X"0C";
 				END IF;	
 				IF trap_illegal='1' THEN
-					trap_vector(7 downto 0) <= X"10";
+					trap_vector(9 downto 0) <= "00" & X"10";
 				END IF;	
 				IF z_error='1' THEN
-					trap_vector(7 downto 0) <= X"14";
+					trap_vector(9 downto 0) <= "00" & X"14";
 				END IF;	
 				IF exec(trap_chk)='1' THEN
-					trap_vector(7 downto 0) <= X"18";
+					trap_vector(9 downto 0) <= "00" & X"18";
 				END IF;	
 				IF trap_trapv='1' THEN
-					trap_vector(7 downto 0) <= X"1C";
+					trap_vector(9 downto 0) <= "00" & X"1C";
 				END IF;	
 				IF trap_priv='1' THEN
-					trap_vector(7 downto 0) <= X"20";
+					trap_vector(9 downto 0) <= "00" & X"20";
 				END IF;	
 				IF trap_trace='1' THEN
-					trap_vector(7 downto 0) <= X"24";
+					trap_vector(9 downto 0) <= "00" & X"24";
 				END IF;	
 				IF trap_1010='1' THEN
-					trap_vector(7 downto 0) <= X"28";
+					trap_vector(9 downto 0) <= "00" & X"28";
 				END IF;	
 				IF trap_1111='1' THEN
-					trap_vector(7 downto 0) <= X"2C";
+					trap_vector(9 downto 0) <= "00" & X"2C";
 				END IF;	
 				IF trap_trap='1' THEN
-					trap_vector(7 downto 0) <= "10" & opcode(3 downto 0) & "00";
+					trap_vector(9 downto 0) <= "0010" & opcode(3 downto 0) & "00";
 				END IF;	
 				IF trap_interrupt='1' or set_vectoraddr = '1' THEN
 					trap_vector(9 downto 0) <= IPL_vec & "00";      --TH

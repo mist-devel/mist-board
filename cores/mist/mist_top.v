@@ -720,6 +720,14 @@ clock clock (
   .locked       (pll_locked       )  // pll locked output
 );
 
+reg clk_64;
+always @(posedge clk_128)
+	clk_64 <= !clk_64;
+
+//reg clk_32;
+//always @(posedge clk_64)
+//	clk_32 <= !clk_32;
+
 //// 8MHz clock ////
 reg [1:0] clk_cnt;
 reg [1:0] bus_cycle;
@@ -854,19 +862,16 @@ always @(posedge clk_32)
 
 // the TG68 core works on the rising clock edge. We thus prepare everything
 // on the falling clock edge
-reg brD;
+reg cacheFail /* synthesis noprune */;
 always @(negedge clk_32) begin
-	brD <= br;  // delay bus request by one cycle. This only has an effect in
-	// STEroids mode as otherwise br changes in those cycles not used by 
-	// CPU
-
 	// default: cpu does not run
 	clkena <= 1'b0;
 	iCacheStore <= 1'b0;
 	dCacheStore <= 1'b0;
 	cacheUpdate <= 1'b0;
-	 
-	if(br || brD || reset)
+	cacheFail <= 1'b0;
+	
+	if(br || reset)
 		tg68_as <= 1'b0;
 	else begin
 		// run cpu if it owns the bus
@@ -903,7 +908,7 @@ always @(negedge clk_32) begin
 			clkena <= 1'b1; 
 			cpuDoes8MhzCycle <= 1'b0;
 		end 
-		
+
 		else begin
 			// this ends a normal 8MHz bus cycle. This requires that the 
 			// cpu/chipset had the entire cycle and not e.g. started just in
@@ -911,11 +916,19 @@ always @(negedge clk_32) begin
 			// which is invalidated whenever the cpu uses a internal cycle or 
 			// runs from cache
  
-			// clkcnt == 14 -> clkena in cycle 15 -> cpu runs in cycle 15
+			// clkcnt == 3 -> clkena in cycle 0 -> cpu runs in cycle 0
 			if((clkcnt == 3) && cpuDoes8MhzCycle && cpu_cycle && (tg68_dtack || tg68_berr)) begin
 				clkena <= 1'b1;
 				cpuDoes8MhzCycle <= 1'b0;
-											
+
+				// ---------- cache debugging --------------- 		
+				// if the cache reports a hit, it should be the same data that's also 		
+				// returned by ram. Otherwise the cache is broken 		
+				if(cache_hit && (tg68_busstate[0] == 1'b0)) begin 		
+					if(cache_data_out != system_data_out) 		
+						cacheFail <= 1'b1; 		
+				end 		
+
 				if(cacheable && tg68_dtack) begin
 					case(tg68_busstate)
 						0: iCacheStore <= 1'b1;  // store data in instruction cache on cpu instruction read
@@ -980,7 +993,7 @@ wire [15:0] data_cache_data_out;
 
 cache data_cache (
 	.clk_128  		( clk_128					),
-	.clk_8    		( clk_8						),
+	.clk  			( clk_32						),
 	.reset 			( reset						), 
 	.flush			( br							), 
 
@@ -1008,7 +1021,7 @@ wire [15:0] inst_cache_data_out;
 
 cache instruction_cache (
 	.clk_128  		( clk_128					),
-	.clk_8    		( clk_8						),
+	.clk  	  		( clk_32						),
 	.reset 			( reset						), 
 	.flush			( br							), 
 
@@ -1122,8 +1135,8 @@ wire [15:0] system_data_out = cpu2mem?ram_data_out:io_data_out;
 wire [15:0] ram_data_in = dma_has_bus?dma_dout:(blitter_has_bus?blitter_master_data_out:tg68_dat_out);
 
 // data strobe
-wire ram_uds = video_cycle?1'b1:((br && brD)?1'b1:~tg68_uds);
-wire ram_lds = video_cycle?1'b1:((br && brD)?1'b1:~tg68_lds);
+wire ram_uds = video_cycle?1'b1:(br?1'b1:~tg68_uds);
+wire ram_lds = video_cycle?1'b1:(br?1'b1:~tg68_lds);
  
 // sdram controller has 64 bit output
 wire [63:0] ram_data_out_64;
@@ -1138,7 +1151,7 @@ assign ram_data_out =
 	                               ram_data_out_64[63:48]));
 
 assign SDRAM_CKE         = 1'b1;
-
+   
 sdram sdram (
 	// interface to the MT48LC16M16 chip
 	.sd_data     	( SDRAM_DQ                 ),
