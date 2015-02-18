@@ -1,0 +1,52 @@
+[*]
+[*] GTKWave Analyzer v3.3.58 (w)1999-2014 BSI
+[*] Wed Feb 18 14:49:30 2015
+[*]
+[dumpfile] "/home/tharbaum/tmp/mist/tools/verilator_video/video.vcd"
+[dumpfile_mtime] "Wed Feb 18 14:46:53 2015"
+[dumpfile_size] 153829409
+[savefile] "/home/tharbaum/tmp/mist/tools/verilator_video/video.sav"
+[timestart] 14081095
+[size] 1134 700
+[pos] 19 117
+*-10.703690 14083937 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+[treeopen] TOP.
+[treeopen] TOP.v.
+[treeopen] TOP.v.shifter.
+[sst_width] 202
+[signals_width] 206
+[sst_expanded] 1
+[sst_vpaned_height] 250
+@28
+TOP.v.clk_32
+@22
+TOP.v.vaddr[22:0]
+@28
+TOP.v.shifter.h_state[1:0]
+TOP.v.read
+@22
+TOP.v.shifter.data_latch(0)[15:0]
+TOP.v.shifter.data_latch(1)[15:0]
+TOP.v.shifter.data_latch(2)[15:0]
+TOP.v.shifter.data_latch(3)[15:0]
+TOP.v.shifter.shift_0[15:0]
+TOP.v.shifter.shift_1[15:0]
+TOP.v.shifter.shift_2[15:0]
+TOP.v.shifter.shift_3[15:0]
+TOP.v.shifter_r[3:0]
+TOP.v.shifter_g[3:0]
+TOP.v.shifter_b[3:0]
+@28
+TOP.v.shifter.pclk
+@22
+TOP.v.shifter.bus_cycle_L[3:0]
+@28
+TOP.v.shifter.t[1:0]
+@24
+TOP.v.shifter.hcnt[9:0]
+@29
+TOP.v.shifter.bus_cycle[1:0]
+@28
+TOP.v.shifter.de
+[pattern_trace] 1
+[pattern_trace] 0
