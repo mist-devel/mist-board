@@ -4,7 +4,7 @@
 // On Screen Display implementation for the MiST board
 // http://code.google.com/p/mist-board/
 // 
-// Copyright (c) 2013 Till Harbaum <till@harbaum.org> 
+// Copyright (c) 2015 Till Harbaum <till@harbaum.org> 
 // 
 // This source file is free software: you can redistribute it and/or modify 
 // it under the terms of the GNU General Public License as published 
@@ -21,32 +21,74 @@
 //
 
 module osd (
-  input clk,     // 31.875 MHz
+  input        clk, // 31.875 MHz
 
   // SPI interface for OSD
-  input         sck,
-  input         ss,
-  input         sdi,
+  input        sck,
+  input        ss,
+  input        sdi,
 
-  output reg 	osd_enable,
-
-  // current video beam position
-  input [9:0]   hcnt,
-  input [9:0]   vcnt,
+  input        hs,
+  input        vs,
   
-  input [5:0]   in_r, // Red[5:0]
-  input [5:0]   in_g, // Green[5:0]
-  input [5:0]   in_b, // Blue[5:0]
+  input [5:0]  r_in,  // Red[5:0]
+  input [5:0]  g_in,  // Green[5:0]
+  input [5:0]  b_in,  // Blue[5:0]
 
-  output [5:0]  out_r, // Red[5:0]
-  output [5:0]  out_g, // Green[5:0]
-  output [5:0]  out_b  // Blue[5:0]
+  output [5:0] r_out, // Red[5:0]
+  output [5:0] g_out, // Green[5:0]
+  output [5:0] b_out  // Blue[5:0]
 );
 
-assign out_r = !oe?in_r:{osd_pixel, osd_pixel, osd_pixel, in_r[5:3]};
-assign out_g = !oe?in_g:{osd_pixel, osd_pixel,      1'b1, in_g[5:3]};
-assign out_b = !oe?in_b:{osd_pixel, osd_pixel, osd_pixel, in_b[5:3]};
+// combine input and OSD into a overlayed signal
+assign r_out = !oe?r_in:{pixel, pixel, pixel, r_in[5:3]};
+assign g_out = !oe?g_in:{pixel, pixel,  1'b1, g_in[5:3]};
+assign b_out = !oe?b_in:{pixel, pixel, pixel, b_in[5:3]};
 
+reg enabled;
+
+// ---------------------------------------------------------------------------
+// ------------------------- video timing analysis ---------------------------
+// ---------------------------------------------------------------------------
+
+// System clock is 32Mhz. Slowest hsync is 15Khz/64us. Hcounter must thus be
+// able to run to 2048
+reg [10:0] 	hcnt;
+reg [10:0] 	vcnt;
+
+reg [10:0] 	hs_high;
+reg [10:0] 	hs_low;
+wire 		hs_pol = hs_high < hs_low;
+wire [10:0] 	dsp_width = hs_pol?hs_low:hs_high;
+   
+reg [10:0] 	vs_high;
+reg [10:0] 	vs_low;
+wire 		vs_pol = vs_high < vs_low;
+wire [10:0] 	dsp_height = vs_pol?vs_low:vs_high;
+   
+reg hsD, vsD;
+always @(negedge clk) begin
+   // check if hsync has changed
+   hsD <= hs;
+   if(hsD != hs) begin
+      if(hs)  hs_low  <= hcnt;
+      else    hs_high <= hcnt;
+      hcnt <= 11'd0;
+
+      if(hs == hs_pol) begin
+	 // check if vsync has changed
+	 vsD <= vs;
+	 if(vsD != vs) begin
+	    if(vs)  vs_low  <= vcnt;
+	    else    vs_high <= vcnt;
+	    vcnt <= 11'd0;
+	 end else
+	   vcnt <= vcnt + 11'd1;
+      end
+   end else
+     hcnt <= hcnt + 11'd1;
+end
+   
 // ---------------------------------------------------------------------------
 // -------------------------------- spi client -------------------------------
 // ---------------------------------------------------------------------------
@@ -59,7 +101,7 @@ reg [7:0]       cmd;
 reg [4:0]       cnt;
 reg [10:0]      bcnt;
 
-reg [7:0] osd_buffer [2047:0];  // the OSD buffer itself
+reg [7:0] buffer [2047:0];  // the OSD buffer itself
 
 // the OSD has its own SPI interface to the io controller
 always@(posedge sck, posedge ss) begin
@@ -83,44 +125,51 @@ always@(posedge sck, posedge ss) begin
 
       // command 0x40: OSDCMDENABLE, OSDCMDDISABLE
       if(sbuf[6:3] == 4'b0100)
-        osd_enable <= sdi;
+        enabled <= sdi;
     end
 
     // command 0x20: OSDCMDWRITE
     if((cmd[7:3] == 5'b00100) && (cnt == 15)) begin
-      osd_buffer[bcnt] <= {sbuf[6:0], sdi};
+      buffer[bcnt] <= {sbuf[6:0], sdi};
       bcnt <= bcnt + 11'd1;
     end
   end
 end
 
-localparam OSD_WIDTH  = 10'd256;
-localparam OSD_HEIGHT = 10'd128;   // pixels are doubled vertically
+// ---------------------------------------------------------------------------
+// ------------------------------- OSD position ------------------------------
+// ---------------------------------------------------------------------------
 
-localparam OSD_POS_X  = (10'd640 - OSD_WIDTH)>>1;
-localparam OSD_POS_Y  = (10'd400 - OSD_HEIGHT)>>1;
+wire expand_x = ((dsp_width > 1000)&&(dsp_height < 1000))?1:0;
+wire expand_y = (dsp_height > 400)?1:0;
+   
+wire [10:0] width  = expand_x?10'd512:10'd256;
+wire [10:0] height = expand_y?10'd128:10'd64;
 
-localparam OSD_BORDER  = 10'd2;
+wire [10:0] border_x = expand_x?10'd4:10'd4;
+wire [10:0] border_y = expand_y?10'd4:10'd2;
 
-wire oe    = osd_enable && (
-  (hcnt >=  OSD_POS_X-OSD_BORDER) &&
-  (hcnt <  (OSD_POS_X + OSD_WIDTH + OSD_BORDER)) &&
-  (vcnt >=  OSD_POS_Y - OSD_BORDER) &&
-  (vcnt <  (OSD_POS_Y + OSD_HEIGHT + OSD_BORDER)));
+wire [10:0] pos_x = (dsp_width - width)>>1;
+wire [10:0] pos_y = (dsp_height - height)>>1;
 
-wire osd_content_area =
-  (hcnt >=  OSD_POS_X) &&
-  (hcnt <  (OSD_POS_X + OSD_WIDTH)) &&
-  (vcnt >=  OSD_POS_Y) &&
-  (vcnt <  (OSD_POS_Y + OSD_HEIGHT));
+wire oe = enabled && (
+  (hcnt >= pos_x - border_x) &&
+  (hcnt < (pos_x + width + border_x)) &&
+  (vcnt >= pos_y - border_y) &&
+  (vcnt < (pos_y + height + border_y)));
 
-wire [7:0] osd_hcnt = hcnt - OSD_POS_X + 7'd1;  // one pixel offset for osd_byte register
-wire [6:0] osd_vcnt = vcnt - OSD_POS_Y;
+wire content_area =
+  (hcnt >= pos_x) && (hcnt < (pos_x + width - 1)) &&
+  (vcnt >= pos_y) && (vcnt < (pos_y + height - 1));
 
-wire osd_pixel = osd_content_area?osd_byte[osd_vcnt[3:1]]:1'b0;
+// one pixel offset for delay by byte register
+wire [7:0] ihcnt = (expand_x?((hcnt-pos_x)>>1):(hcnt-pos_x))+8'd1;
+wire [6:0] ivcnt =  expand_y?((vcnt-pos_y)>>1):(vcnt-pos_y);
 
-reg [7:0] osd_byte; 
+wire pixel = content_area?buffer_byte[ivcnt[2:0]]:1'b0;
+
+reg [7:0] buffer_byte; 
 always @(posedge clk)
-  osd_byte <= osd_buffer[{osd_vcnt[6:4], osd_hcnt}];
+  buffer_byte <= buffer[{ivcnt[5:3], ihcnt}];
   
 endmodule

@@ -240,7 +240,7 @@ wire [15:0] io_data_out = vreg_data_out | dma_data_out | blitter_data_out |
 
 wire init = ~pll_locked;
 
-/* -------------------------- Viking video card -------------------- */
+/* -------------------------- Video subsystem -------------------- */
 
 // viking/sm194 is enabled and max 8MB memory may be enabled. In steroids mode
 // video memory is moved to $e80000 and all stram up to 14MB may be used
@@ -263,79 +263,47 @@ always @(posedge clk_32) begin
 			viking_in_use <= viking_in_use + 8'h01;
 end
 
-// video output multiplexer to switch between shifter and viking
-wire viking_active = (viking_in_use == 8'hff) && !osd_enable;
-assign VGA_HS = viking_active?viking_hs:shifter_hs;
-assign VGA_VS = viking_active?viking_vs:shifter_vs;
-assign VGA_R = viking_active?viking_r:shifter_r;
-assign VGA_G = viking_active?viking_g:shifter_g;
-assign VGA_B = viking_active?viking_b:shifter_b;
-
-wire viking_hs, viking_vs;
-wire [5:0] viking_r, viking_g, viking_b;
-
-wire [22:0] viking_address;
-wire viking_read;
-
-viking viking (
-	.pclk         	(clk_128    ),    // pixel 
-	.bus_cycle   	(bus_cycle  ),
-	
-	// memory interface
-	.himem		(steroids      ),
-	.bclk      	(clk_8      	),    // system bus clock = 8Mhz
-   .addr       (viking_address ),
-	.data       (ram_data_out_64),
-	.read       (viking_read    ),
-
-	// video output 
-	.hs		(viking_hs			),
-	.vs		(viking_vs			),
-	.r    	(viking_r        	),
-	.g    	(viking_g       	),
-	.b    	(viking_b        	)
-);
-
-wire osd_enable;
-wire shifter_hs, shifter_vs;
-wire [5:0] shifter_r, shifter_g, shifter_b;
+wire viking_active = (viking_in_use == 8'hff);
 
 video video (
-	.clk         	(clk_32     ),
+	.clk_128      	(clk_128    ),
+	.clk_32      	(clk_32     ),
 	.bus_cycle   	(bus_cycle  ),
 	
 	// spi for OSD
    .sdi           (SPI_DI    	),
    .sck           (SPI_SCK   	),
    .ss            (SPI_SS3   	),
-	.osd_enable    (osd_enable ),
 
 	// cpu register interface
-	.reg_clk      (clk_8       ),
-	.reg_reset    (reset       ),
-	.reg_din      (tg68_dat_out),
-	.reg_sel      (vreg_sel    ),
-	.reg_addr     (tg68_adr[6:1]),
-	.reg_uds      (tg68_uds    ),
-	.reg_lds      (tg68_lds    ),
-	.reg_rw       (tg68_rw     ),
-	.reg_dout     (vreg_data_out),
+	.cpu_clk      (clk_8       ),
+	.cpu_reset    (reset       ),
+	.cpu_din      (tg68_dat_out),
+	.cpu_sel      (vreg_sel    ),
+	.cpu_addr     (tg68_adr[6:1]),
+	.cpu_uds      (tg68_uds    ),
+	.cpu_lds      (tg68_lds    ),
+	.cpu_rw       (tg68_rw     ),
+	.cpu_dout     (vreg_data_out),
 	
    .vaddr      (video_address ),
 	.data       (ram_data_out_64),
 	.read       (video_read    ),
 	
-	.hs			(shifter_hs		),
-	.vs			(shifter_vs		),
-	.video_r    (shifter_r    	),
-	.video_g    (shifter_g    	),
-	.video_b    (shifter_b    	),
+	.hs			(VGA_HS	      ),
+	.vs			(VGA_VS		   ),
+	.video_r    (VGA_R  	      ),
+	.video_g    (VGA_G    	   ),
+	.video_b    (VGA_B    	   ),
 
 	// configuration signals
-	.adjust     (video_adj    	),
-	.pal56      (~system_ctrl[9]),
-   .scanlines  (system_ctrl[21:20]),
-	.ste			(ste				),
+   .viking_enable       ( viking_active       ), // enable and activate viking video card
+   .viking_himem        ( steroids            ), // let viking use memory from $e80000
+   .scandoubler_disable ( scandoubler_disable ), // don't use scandoubler in 15khz modes 
+	.adjust              ( video_adj    	    ),
+	.pal56               ( ~system_ctrl[9]     ),
+   .scanlines           ( system_ctrl[21:20]  ),
+	.ste			         ( ste				       ),
 	
 	// signals not affected by scan doubler required for
 	// irq generation
@@ -1110,25 +1078,25 @@ wire second_cpu_slot = (mste && enable_16mhz) || steroids;
 
 // Two of the four cycles are being used. One for video (+STE audio) and one for
 // cpu, DMA and Blitter. A third is optionally being used for faster CPU
-wire video_cycle = (bus_cycle == 0);
+wire video_cycle = (bus_cycle == 0)||(bus_cycle == 2);
 wire cpu_cycle = (bus_cycle == 1) || (second_cpu_slot && (bus_cycle == 3));
-wire viking_cycle = (bus_cycle == 2);
 
 // ----------------- RAM address --------------
-wire [22:0] video_cycle_addr = (st_hs && ste)?ste_dma_snd_addr:video_address;
+wire ste_dma_has_bus = (bus_cycle == 0) && st_hs && ste;
+wire [22:0] video_cycle_addr = ste_dma_has_bus?ste_dma_snd_addr:video_address;
 wire [22:0] cpu_cycle_addr = dma_has_bus?dma_addr:(blitter_has_bus?blitter_master_addr:tg68_adr[23:1]);
-wire [22:0] ram_address = viking_cycle?viking_address:(video_cycle?video_cycle_addr:cpu_cycle_addr);
+wire [22:0] ram_address = video_cycle?video_cycle_addr:cpu_cycle_addr;
 
 // ----------------- RAM read -----------------
 // memory access during the video cycle is shared between video and ste_dma_snd
-wire video_cycle_oe = (st_hs && ste)?ste_dma_snd_read:video_read;
+wire video_cycle_oe = ste_dma_has_bus?ste_dma_snd_read:video_read;
 // memory access during the cpu cycle is shared between blitter and cpu
 wire cpu_cycle_oe = dma_has_bus?dma_read:(blitter_has_bus?blitter_master_read:(cpu_cycle && tg68_as && tg68_rw && cpu2mem));
-wire ram_oe = viking_cycle?viking_read:(video_cycle?video_cycle_oe:(cpu_cycle?cpu_cycle_oe:1'b0));
+wire ram_oe = video_cycle?video_cycle_oe:(cpu_cycle?cpu_cycle_oe:1'b0);
 
 // ----------------- RAM write -----------------
 wire cpu_cycle_wr = dma_has_bus?dma_write:(blitter_has_bus?blitter_master_write:(cpu_cycle && tg68_as && ~tg68_rw && cpu2ram));
-wire ram_wr = (viking_cycle||video_cycle)?1'b0:(cpu_cycle?cpu_cycle_wr:1'b0);
+wire ram_wr = video_cycle?1'b0:(cpu_cycle?cpu_cycle_wr:1'b0);
 
 wire [15:0] ram_data_out;
 wire [15:0] system_data_out = cpu2mem?ram_data_out:io_data_out;
@@ -1227,6 +1195,8 @@ wire eth_tx_read_strobe, eth_tx_read_begin;
 wire [7:0] eth_rx_write_byte;
 wire eth_rx_write_strobe, eth_rx_write_begin;
 
+wire scandoubler_disable;
+
 //// user io has an extra spi channel outside minimig core ////
 user_io user_io(
 		// the spi interface
@@ -1274,6 +1244,9 @@ user_io user_io(
 		.eth_rx_write_begin			(eth_rx_write_begin),
 		.eth_rx_write_strobe			(eth_rx_write_strobe),
 		.eth_rx_write_byte			(eth_rx_write_byte),
+
+		// io controller requests to disable vga scandoubler
+		.scandoubler_disable       (scandoubler_disable),
 		
 		.CORE_TYPE						(8'ha3)    // mist core id
 );

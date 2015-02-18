@@ -4,7 +4,7 @@
 // Atari ST(E) Viking/SM194
 // http://code.google.com/p/mist-board/
 // 
-// Copyright (c) 2013 Till Harbaum <till@harbaum.org> 
+// Copyright (c) 2013-2015 Till Harbaum <till@harbaum.org> 
 // 
 // This source file is free software: you can redistribute it and/or modify 
 // it under the terms of the GNU General Public License as published 
@@ -37,9 +37,9 @@ module viking (
 		// VGA output (multiplexed with sm124 output in top level)
 	   output 				hs,
 	   output 				vs,
-	   output [5:0] 		r,
-	   output [5:0] 		g,
-	   output [5:0] 		b
+	   output [3:0] 		r,
+	   output [3:0] 		g,
+	   output [3:0] 		b
 );
 
 localparam BASE    = 23'h600000;   // c00000
@@ -98,8 +98,8 @@ reg[10:0] h_cnt;   // 0..2047
 assign hs = ((h_cnt >= HBP1+H+HFP) && (h_cnt < HBP1+H+HFP+HS))?0:1;
 always@(posedge pclk) begin
 	if(h_cnt==HBP1+H+HFP+HS+HBP2-1) begin
-		// make sure a line starts with the "viking" bus cyle (2)
-		// shifter has cycle 0, cpu has cycles 1 and 3
+		// make sure a line starts with the "video" bus cyle (0)
+		// cpu has cycles 1 and 3
 		if(bus_cycle_L == { 2'd1, 4'd15 })
 			h_cnt<=0;
 	end else
@@ -116,9 +116,6 @@ always@(posedge pclk) begin
 	end
 end
 
-// reorder words 1:2:3:4 -> 4:3:2:1
-wire [63:0] data_reorder = { data[15:0], data[31:16], data[47:32], data[63:48] };
-
 reg [63:0] input_latch;
 reg [63:0] shift_register;
 
@@ -131,10 +128,13 @@ always@(posedge pclk) begin
 		addr <= addr + 23'd4;              // advance 4 words (64 bits)
 		
 	if(me && (bus_cycle_L == 6'h2f))
-		input_latch <= data_reorder;
+		input_latch <= data;
 		
 	if(bus_cycle_L == 6'h3f)
-		shift_register <= input_latch;
+		// reorder words 1:2:3:4 -> 4:3:2:1
+		shift_register <= 
+			{  input_latch[15:0], input_latch[31:16], 
+			  input_latch[47:32], input_latch[63:48] };
 	else	
 		shift_register[63:1] <= shift_register[62:0];
 end
@@ -146,10 +146,10 @@ wire de	= (v_cnt < V)&&(h_cnt >= HBP1)&&(h_cnt < HBP1+H);
 
 wire pix = de?(!shift_register[63]):1'b0;
 
-// drive all 18 rgb bits from the data bit
-wire [5:0] pix6 = { pix, pix, pix, pix, pix, pix };
-assign r = pix6;
-assign g = pix6;
-assign b = pix6;
+// drive all 12 rgb bits from the data bit
+wire [3:0] pix4 = { pix, pix, pix, pix };
+assign r = pix4;
+assign g = pix4;
+assign b = pix4;
 
 endmodule

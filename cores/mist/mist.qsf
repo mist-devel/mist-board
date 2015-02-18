@@ -323,6 +323,9 @@ set_global_assignment -name VERILOG_FILE clock.v
 set_global_assignment -name VERILOG_FILE mist_top.v
 set_global_assignment -name VERILOG_FILE user_io.v
 set_global_assignment -name VERILOG_FILE video.v
+set_global_assignment -name VERILOG_FILE shifter.v
+set_global_assignment -name VERILOG_FILE scandoubler.v
+set_global_assignment -name VERILOG_FILE sync_adjust.v
 set_global_assignment -name VERILOG_FILE viking.v
 set_global_assignment -name VERILOG_FILE video_modes.v
 set_global_assignment -name VERILOG_FILE io_fifo.v

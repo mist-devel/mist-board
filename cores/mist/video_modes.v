@@ -19,10 +19,13 @@
 // You should have received a copy of the GNU General Public License 
 // along with this program.  If not, see <http://www.gnu.org/licenses/>. 
 
-// video docs: 
+// VGA video docs: 
 // http://martin.hinner.info/vga/timing.html
 // http://www.epanorama.net/faq/vga2rgb/calc.html
 
+// Atari video timings:
+// http://www.atari-forum.com/viewtopic.php?f=16&t=24855&start=350
+  
 // clocks on real sts:
 // PAL  32084988 Hz
 // NTSC 32042400 Hz
@@ -39,6 +42,9 @@
 
 // vbl at cycle counter 64 (64 cycles after hbl)
 
+// All video modes are based on a 32MHz pixel clock. This is two times the mid rez pixel clock and
+// four times the low rez pixel clock.
+
 module video_modes (
 	inout mono,   // select monochrome mode (and not color)
 	input pal,    // select pal mode (and not ntsc) if a color mode is selected
@@ -51,9 +57,6 @@ module video_modes (
 // ---------------------------- generic timing parameters --------------------
 // ---------------------------------------------------------------------------
 
-localparam H_ACT    = 10'd640;
-localparam V_ACT    = 10'd400;
- 
 // TIMING CONSTRAINTS:
 // The total width (act+both blank+2*border+sync) must be a multiple of 16, for
 // scan doubled modes a multiple of 8
@@ -63,15 +66,16 @@ localparam V_ACT    = 10'd400;
 // ---------------------------------------------------------------------------
 
 // 56Hz replacement for Atari 50Hz low and medium resolution video mode scan doubled:
+// displayed 640x200
 // total: 928x612, active incl border: 720x560, displayed: 640x400
 // horizontal scan rate: 17.27 kHz ST, 34.48 kHz VGA, vertical scan rate: 56.34 hz
 
 wire [121:0] pal56_config_str;
 conf pal56_conf(
-     // front porch      sync width      back porch       border width                    sync polarity
-	.h_fp ( 10'd44), .h_s (10'd120), .h_bp ( 10'd44), .h_bd (10'd40),                 .h_sp (1'b1),
-	.v_fp ( 10'd24), .v_s (  10'd4), .v_bp ( 10'd24), .v_tb (10'd80), .v_bb (10'd80), .v_sp (1'b1),
-	.str  (pal56_config_str)
+  // display      front porch     sync width     back porch      border width                  sync polarity
+  .h_ds(10'd640), .h_fp( 10'd44), .h_s(10'd120), .h_bp( 10'd44), .h_lb(10'd40), .h_rb(10'd40), .h_sp(1'b1),
+  .v_ds(10'd200), .v_fp( 10'd12), .v_s(  10'd2), .v_bp( 10'd12), .v_tb(10'd40), .v_bb(10'd40), .v_sp(1'b1),
+  .str  (pal56_config_str)
 );
 
 // ---------------------------------------------------------------------------
@@ -79,16 +83,20 @@ conf pal56_conf(
 // ---------------------------------------------------------------------------
 
 // Atari 50Hz low and medium resolution video mode scan doubled:
+// According to troed: 40/40/28/320/72/12
+// ->  sync-80 bl-80 brd-56 dsp-640 brd-144  bl-24
+// displayed 640x200
 // total: 1024x626, active incl border: 800x560, displayed: 640x400
-// horizontal scan rate: 15.625 kHz ST, 31.25 kHz VGA, vertical scan rate: 49.92 hz
+// horizontal scan rate: 15.625 kHz ST (, 31.25 kHz VGA), vertical scan rate: 49.92 hz
 
 wire [121:0] pal50_config_str;
 conf pal50_conf(
-     // front porch      sync width      back porch       border width                    sync polarity
-	.h_fp ( 10'd80), .h_s ( 10'd64), .h_bp ( 10'd80), .h_bd (10'd80),                 .h_sp (1'b1),
-//	.v_fp ( 10'd42), .v_s (  10'd8), .v_bp ( 10'd42), .v_tb (10'd58), .v_bb (10'd76), .v_sp (1'b1),
-   .v_fp ( 10'd30), .v_s (  10'd6), .v_bp ( 10'd30), .v_tb (10'd80), .v_bb (10'd80), .v_sp (1'b1),
-	.str  (pal50_config_str)
+  // display      front porch     sync width     back porch      border width                  sync polarity
+//.h_ds(10'd640), .h_fp( 10'd80), .h_s( 10'd64), .h_bp( 10'd80), .h_lb(10'd80), .h_rb(10'd80),  .h_sp(1'b1),
+  .h_ds(10'd640), .h_fp( 10'd80), .h_s( 10'd80), .h_bp( 10'd24), .h_lb(10'd72), .h_rb(10'd128), .h_sp(1'b1),
+//  .h_ds(10'd640), .h_fp( 10'd80), .h_s( 10'd80), .h_bp( 10'd24), .h_lb(10'd56), .h_rb(10'd144), .h_sp(1'b1),
+  .v_ds(10'd200), .v_fp( 10'd15), .v_s(  10'd3), .v_bp( 10'd15), .v_tb(10'd40), .v_bb(10'd40),  .v_sp(1'b1),
+  .str  (pal50_config_str)
 );
 
 // ---------------------------------------------------------------------------
@@ -101,10 +109,10 @@ conf pal50_conf(
 
 wire [121:0] ntsc_config_str;
 conf ntsc_conf(
-     // front porch      sync width      back porch       border width                    sync polarity
-	.h_fp ( 10'd76), .h_s ( 10'd64), .h_bp ( 10'd76), .h_bd (10'd80),                 .h_sp (1'b1),
-	.v_fp ( 10'd20), .v_s (  10'd6), .v_bp ( 10'd20), .v_tb (10'd40), .v_bb (10'd40), .v_sp (1'b0),
-	.str  (ntsc_config_str)
+  // display      front porch     sync width     back porch      border width                  sync polarity
+  .h_ds(10'd640), .h_fp( 10'd76), .h_s( 10'd64), .h_bp( 10'd76), .h_lb(10'd80), .h_rb(10'd80), .h_sp(1'b1),
+  .v_ds(10'd200), .v_fp( 10'd10), .v_s(  10'd3), .v_bp( 10'd10), .v_tb(10'd20), .v_bb(10'd20), .v_sp(1'b0),
+  .str  (ntsc_config_str)
 );
 
 // ---------------------------------------------------------------------------
@@ -117,10 +125,10 @@ conf ntsc_conf(
 
 wire [121:0] mono_config_str;
 conf mono_conf(
-     // front porch      sync width      back porch       border width                    sync polarity
-	.h_fp (10'd108), .h_s ( 10'd40), .h_bp (10'd108), .h_bd ( 10'd0),                 .h_sp (1'b0),
-	.v_fp ( 10'd48), .v_s (  10'd5), .v_bp ( 10'd48), .v_tb ( 10'd0), .v_bb ( 10'd0), .v_sp (1'b0),
-	.str  (mono_config_str)
+  // display       front porch     sync width     back porch      border width                  sync polarity
+  .h_ds( 10'd640), .h_fp(10'd108), .h_s( 10'd40), .h_bp(10'd108), .h_lb( 10'd0), .h_rb( 10'd0), .h_sp(1'b0),
+  .v_ds( 10'd400), .v_fp( 10'd48), .v_s(  10'd5), .v_bp( 10'd48), .v_tb( 10'd0), .v_bb( 10'd0), .v_sp(1'b0),
+  .str  (mono_config_str)
 );
 
 
@@ -132,43 +140,43 @@ endmodule
 // ---------------------------------------------------------------------------
 // ------------------ video timing config string generator -------------------
 // ---------------------------------------------------------------------------
-module conf (
-	input [9:0] h_fp, // horizontal front porch width
-	input [9:0] h_s,  // horizontal sync width
-	input [9:0] h_bp, // horizontal back porch width
-	input [9:0] h_bd, // horizontal border width
-	input       h_sp, // horizontal sync polarity
 
-	input [9:0] v_fp, // vertical front porch width
-	input [9:0] v_s,  // vertical sync width
-	input [9:0] v_bp, // vertical back porch width
-	input [9:0] v_tb, // vertical border width top
-	input [9:0] v_bb, // vertical border width bottom
-	input       v_sp, // vertical sync polarity
+module conf (
+	input [9:0]   h_ds, // horizontal display
+	input [9:0]   h_fp, // horizontal front porch width
+	input [9:0]   h_s,  // horizontal sync width
+	input [9:0]   h_bp, // horizontal back porch width
+	input [9:0]   h_lb, // horizontal left border width
+	input [9:0]   h_rb, // horizontal right border width
+	input 	      h_sp, // horizontal sync polarity
+
+	input [9:0]   v_ds, // vertical display
+	input [9:0]   v_fp, // vertical front porch width
+	input [9:0]   v_s,  // vertical sync width
+	input [9:0]   v_bp, // vertical back porch width
+	input [9:0]   v_tb, // vertical top border width
+	input [9:0]   v_bb, // vertical bottom border width
+	input 	      v_sp, // vertical sync polarity
 
 	output [121:0] str
 );
 
-// all Atari video mods are based on a 640x400 screen
-localparam H_ACT = 10'd640;
-localparam V_ACT = 10'd400;
-
 // all parameters are assembled into one config string 
 wire [60:0] h_str = { h_sp, 
-			H_ACT - 10'd1, 
-			H_ACT + h_bd - 10'd1, 
-			H_ACT + h_bd + h_fp - 10'd1, 
-			H_ACT + h_bd + h_fp + h_s - 10'd1, 
-			H_ACT + h_bd + h_fp + h_s + h_bp - 10'd1, 
-			H_ACT + h_bd + h_fp + h_s + h_bp + h_bd - 10'd1};
+		      h_ds - 10'd1, 
+		      h_ds + h_rb - 10'd1, 
+		      h_ds + h_rb + h_fp - 10'd1, 
+		      h_ds + h_rb + h_fp + h_s - 10'd1, 
+		      h_ds + h_rb + h_fp + h_s + h_bp - 10'd1, 
+		      h_ds + h_rb + h_fp + h_s + h_bp + h_lb - 10'd1};
 			
 wire [60:0] v_str = { v_sp, 
-			V_ACT - 10'd1, 
-			V_ACT + v_bb - 10'd1,
-			V_ACT + v_bb + v_fp - 10'd1, 
-			V_ACT + v_bb + v_fp + v_s - 10'd1, 
-			V_ACT + v_bb + v_fp + v_s + v_bp - 10'd1, 
-			V_ACT + v_bb + v_fp + v_s + v_bp + v_tb - 10'd1};
+		      v_ds - 10'd1, 
+		      v_ds + v_bb - 10'd1,
+		      v_ds + v_bb + v_fp - 10'd1, 
+		      v_ds + v_bb + v_fp + v_s - 10'd1, 
+		      v_ds + v_bb + v_fp + v_s + v_bp - 10'd1, 
+		      v_ds + v_bb + v_fp + v_s + v_bp + v_tb - 10'd1};
 			
 assign str = { h_str, v_str };
 
