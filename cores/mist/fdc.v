@@ -203,7 +203,7 @@ always @(negedge clk or posedge reset) begin
 					delay <= 31'd200000;			// 25ms delay
 				end
 	    
-				if(cpu_din[7:3] == 3'b001) begin		// STEP
+				if(cpu_din[7:5] == 3'b001) begin		// STEP
 					delay <= 31'd20000;			// 2.5ms delay
 					if(cpu_din[4])                           // update flag
 						track <= (step_dir == 1)?(track + 8'd1):(track - 8'd1);

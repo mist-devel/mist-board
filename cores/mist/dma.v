@@ -294,7 +294,7 @@ end
 // 32 byte dma fifo (actually a 16 word fifo)
 reg [15:0] fifo [15:0];
 reg [3:0] fifo_wptr;         // word pointers
-reg [3:0] fifo_rptr; 
+reg [3:0] fifo_rptr;
 wire [3:0] fifo_ptr_diff = fifo_wptr - fifo_rptr; 
 reg [2:0] fifo_read_cnt;     // fifo read transfer word counter
 reg [2:0] fifo_write_cnt;    // fifo write transfer word counter

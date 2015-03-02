@@ -29,7 +29,7 @@
 // clocks on real sts:
 // PAL  32084988 Hz
 // NTSC 32042400 Hz
-// MIST 31875000 Hz
+// MIST 32000000 Hz
 
 // real ST timing
 
@@ -95,7 +95,8 @@ conf pal50_conf(
   .h_ds(10'd640), .h_fp( 10'd80), .h_s( 10'd64), .h_bp( 10'd80), .h_lb(10'd80), .h_rb(10'd80),  .h_sp(1'b1),
 //  .h_ds(10'd640), .h_fp( 10'd80), .h_s( 10'd80), .h_bp( 10'd24), .h_lb(10'd72), .h_rb(10'd128), .h_sp(1'b1),
 //  .h_ds(10'd640), .h_fp( 10'd80), .h_s( 10'd80), .h_bp( 10'd24), .h_lb(10'd56), .h_rb(10'd144), .h_sp(1'b1),
-  .v_ds(10'd200), .v_fp( 10'd15), .v_s(  10'd3), .v_bp( 10'd15), .v_tb(10'd40), .v_bb(10'd40),  .v_sp(1'b1),
+//  .v_ds(10'd200), .v_fp( 10'd15), .v_s(  10'd3), .v_bp( 10'd15), .v_tb(10'd40), .v_bb(10'd40),  .v_sp(1'b1),
+  .v_ds(10'd200), .v_fp( 10'd15), .v_s(  10'd3), .v_bp( 10'd4), .v_tb(10'd40), .v_bb(10'd51),  .v_sp(1'b1),
   .str  (pal50_config_str)
 );
 

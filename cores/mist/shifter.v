@@ -102,26 +102,16 @@ assign st_de = ~de;
 always @(posedge clk) begin
    st_hs <= h_sync;
    
-	// hsync irq is generated after the rightmost border pixel column has been displayed
-
-	// hsync starts at begin of blanking phase
-//	if(hcnt == (t1_h_blank_right))
-//		st_hs <= 1'b1;
-
-	// hsync ends at begin of left border
-//	if(hcnt == (t4_h_border_left - 10'd16))
-//		st_hs <= 1'b0;
-
 	// vsync irq is generated right after the last border line has been displayed
  
 	// v_event is the begin of hsync. The hatari video.h says vbi happens 64 clock cycles
 	// ST hor counter runs at 16Mhz, thus the trigger is 128 events after h_sync
 	if(hcnt == v_event) begin		
 		// vsync starts at begin of blanking phase
-		if(vcnt == t7_v_blank_bot + 10'd4)   st_vs <= 1'b1;
+		if(vcnt == t7_v_blank_bot)   st_vs <= 1'b1;
 		
 		// vsync ends at begin of top border
-		if(vcnt == t10_v_border_top + 10'd0) st_vs <= 1'b0;
+		if(vcnt == t10_v_border_top) st_vs <= 1'b0;
 	end
 end
 		
@@ -442,8 +432,8 @@ always @(posedge clk) begin
 		end 
 	  
 		// trigger in line 284/285
-		if((vcnt[8:1] == 8'd133)||(vcnt[8:1] == 8'd134)||(vcnt[8:1] == 8'd135)||
-			(vcnt[8:1] == 8'd136)||(vcnt[8:1] == 8'd137)||(vcnt[8:1] == 8'd138)) begin
+		if((vcnt[8:1] == 8'd140)||(vcnt[8:1] == 8'd141)||(vcnt[8:1] == 8'd142)||
+			(vcnt[8:1] == 8'd143)||(vcnt[8:1] == 8'd144)||(vcnt[8:1] == 8'd145)) begin
 			// syncmode has changed from 1 to 0 (50 to 60 hz)
 			if((syncmode[1] == 1'b0) && (last_syncmode == 1'b1))
 				top_overscan_cnt <= 4'd15;

@@ -72,7 +72,8 @@ assign read  = viking_enable?viking_read:shifter_read;
 // if we use 15khz signals without scan doubler then we need
 // to create a composite sync on hsync
 wire enable_csync =  sd_15khz_detected && scandoubler_disable;
-wire csync = shifter_hs == shifter_vs;
+// wire csync = shifter_hs == shifter_vs;
+wire csync = shifter_sd_adjusted_hs == shifter_sd_adjusted_vs;
 assign hs = enable_csync?csync:stvid_hs;
 assign vs = enable_csync?1'b1:stvid_vs;
 
@@ -95,8 +96,8 @@ osd osd (
          .ss         ( ss         ),
 
          // feed ST video signal into OSD
-	 .hs         ( stvid_hs ),
-	 .vs         ( stvid_vs ),
+			.hs         ( stvid_hs ),
+			.vs         ( stvid_vs ),
 	 
          .r_in       ( {stvid_r, 2'b00}),
          .g_in       ( {stvid_g, 2'b00}),
@@ -156,7 +157,7 @@ wire sd_hs, sd_vs;
 wire [3:0] sd_r, sd_g, sd_b;
 
 scandoubler scandoubler (
-	 .clk       ( clk_32     ), // 31.875 MHz
+	 .clk       ( clk_32     ), // 33.000 MHz
 	 .clk_16    ( clk_16     ),
 
 	 .scanlines ( scanlines  ),

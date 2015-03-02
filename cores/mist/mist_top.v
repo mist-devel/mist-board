@@ -675,41 +675,21 @@ wire pll_locked;
 wire clk_8;
 wire clk_32;
 wire clk_128;
-wire clk_mfp;
      
 // use pll
 clock clock (
-  .areset       (1'b0             ), // async reset input
   .inclk0       (CLOCK_27[0]      ), // input clock (27MHz)
   .c0           (clk_128          ), // output clock c0 (128MHz)
   .c1           (clk_32           ), // output clock c1 (32MHz)
   .c2           (SDRAM_CLK        ), // output clock c2 (128MHz)
-//  .c3           (clk_mfp          ), // output clock c3 (2.4576MHz)
   .locked       (pll_locked       )  // pll locked output
 );
 
-reg clk_64;
-always @(posedge clk_128)
-	clk_64 <= !clk_64;
-
-//reg clk_32;
-//always @(posedge clk_64)
-//	clk_32 <= !clk_32;
 
 //// 8MHz clock ////
 reg [1:0] clk_cnt;
 reg [1:0] bus_cycle;
 
-// MFP clock
-// required: 2.4576 MHz
-// derived from 27MHZ: 27*74/824 = 2.457525 MHz => 0.003% error
-// derived from 31.875MHz: 31.875*33/428=2.457652 MHz => 0.002% error
-// derived from 127.5 MHz: 127.5*58/3009 = 2.457627 MHz => 0.001% error
-// use pll
-pll_mfp1 pll_mfp1 (
-  .inclk0       (clk_128     ), // input clock (127.5MHz)
-  .c0           (clk_mfp     )  // output clock c0 (2.457627MHz)
-);
 
 always @ (posedge clk_32, negedge pll_locked) begin
 	if (!pll_locked) begin
@@ -724,6 +704,20 @@ end
 
 assign clk_8 = clk_cnt[1];
  
+// MFP clock
+// required: 2.4576 MHz
+// mfp clock is clk_128*2457600/128000000 -> 12/625 -> toggle at 24/625
+reg clk_mfp;
+reg [9:0] clk_mfp_div;
+always @(posedge clk_128) begin
+	if(clk_mfp_div < 625)
+		clk_mfp_div <= clk_mfp_div + 10'd24;
+	else begin
+		clk_mfp_div <= clk_mfp_div - 10'd625 + 10'd24;
+		clk_mfp <= ~clk_mfp;
+	end
+end
+
 // tg68 bus interface. These are the signals which are latched
 // for the 8MHz bus.
 wire [15:0] tg68_dat_in;
