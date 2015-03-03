@@ -156,6 +156,19 @@ u08 spiTransferFF() {
   return spiTransferByte(0xff);
 }
 
+void spiTx1(int i) {
+  while(i--) {
+    top->sd_sdi = 1;
+
+    dump();
+    top->sd_sck = 1;
+    dump();
+    top->sd_sck = 0;
+    dump();
+  }
+  dump();
+}
+
 #define DIR_INIT_MEMSIZE 16*1024
 u08 mem[DIR_INIT_MEMSIZE];
 char ROM_DIR[]="/atari800/rom";

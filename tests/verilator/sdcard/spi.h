@@ -60,6 +60,7 @@ u08 spiTransferByte(u08 data);
 // operates on a whole word (16-bits of data).
 u08 spiTransferFF();
 void spiTransferTwoFF();
+void spiTx1(int i);
 
 void spiDisplay(int i);
 

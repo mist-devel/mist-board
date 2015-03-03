@@ -309,18 +309,25 @@ end
 
 // spi receiver  
 reg illegal_write_state /* synthesis noprune */;
-
+reg synced;
+   
 always @(posedge sd_sck or posedge sd_cs) begin
 	// cs is active low
 	if(sd_cs == 1) begin
 		bit_cnt <= 3'd0;
+	        synced <= 1'b0;
 	end else begin 
 		illegal_write_state <= 1'b0;
 		new_cmd_rcvd <= 1'b0;
 		buffer_write_strobe <= 1'b0;
 		req_io_wr <= 1'b0;
-		bit_cnt <= bit_cnt + 3'd1;
-		
+
+	        // wait for first 0 bit until start counting bits
+	        if(synced || !sd_sdi) begin
+		   synced <= 1'b1;		   
+		   bit_cnt <= bit_cnt + 3'd1;
+		end
+	   
 		// assemble byte
 		if(bit_cnt != 7)
 			sbuf[6:0] <= { sbuf[5:0], sd_sdi };
