@@ -110,12 +110,18 @@ osd osd (
 );
 
 // ------------- combine scandoubled shifter with viking -------------
-wire [3:0] stvid_r = viking_enable?viking_r:shifter_sd_r;
-wire [3:0] stvid_g = viking_enable?viking_g:shifter_sd_g;
-wire [3:0] stvid_b = viking_enable?viking_b:shifter_sd_b;
+wire [3:0] stvid_r = viking_enable?viking_r:shifter_sd_sblank_r;
+wire [3:0] stvid_g = viking_enable?viking_g:shifter_sd_sblank_g;
+wire [3:0] stvid_b = viking_enable?viking_b:shifter_sd_sblank_b;
 wire stvid_hs = viking_enable?viking_hs:vga_hs;
 wire stvid_vs = viking_enable?viking_vs:vga_vs;
 
+// -------- make sure adjusted video blanks during sync phase -------
+wire n_sync_adjusted = shifter_sd_adjusted_hs && shifter_sd_adjusted_vs;
+wire [3:0] shifter_sd_sblank_r = n_sync_adjusted?shifter_sd_r:3'b000;
+wire [3:0] shifter_sd_sblank_g = n_sync_adjusted?shifter_sd_g:3'b000;
+wire [3:0] shifter_sd_sblank_b = n_sync_adjusted?shifter_sd_b:3'b000;
+   
 // --------------- apply screen position adjustments -----------------
 
 // apply vga sync polarity adjustment to scan doubler output. It doesn't hurt

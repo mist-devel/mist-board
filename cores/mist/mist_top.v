@@ -3,7 +3,7 @@
 /********************************************/
 
 module mist_top ( 
-  // clock inputsxque	
+  // clock inputs	
   input wire [ 2-1:0] 	CLOCK_27, // 27 MHz
   // LED outputs
   output wire 		LED, // LED Yellow
@@ -220,7 +220,7 @@ wire [15:0] blitter_data_out;
 
 //  psg 8 bit interface at $ff8800 - $ff88ff
 wire psg_sel  = io_sel && ({tg68_adr[15:8], 8'd0} == 16'h8800);
-wire [7:0] psg_data_out;
+wire [15:0] audio_data_out;
 
 //  dma 16 bit interface at $ff8604 - $ff8607 (word only) and $ff8606 - $ff860d (STE - ff860f)
 wire word_access = (tg68_uds == 1'd0) && (tg68_lds == 1'd0);
@@ -232,10 +232,10 @@ wire dma_sel  = io_sel && (
 wire [15:0] dma_data_out;
 
 // de-multiplex the various io data output ports into one 
-wire [7:0] io_data_out_8u = acia_data_out | psg_data_out;
+wire [7:0] io_data_out_8u = acia_data_out;
 wire [7:0] io_data_out_8l = mmu_data_out | mfp_data_out | auto_vector | mste_ctrl_data_out;
 wire [15:0] io_data_out = vreg_data_out | dma_data_out | blitter_data_out | 
-				ste_joy_data_out | ste_dma_snd_data_out | rom_data_out |
+				ste_joy_data_out | audio_data_out | rom_data_out |
 				{8'h00, io_data_out_8l} | {io_data_out_8u, 8'h00};
 
 wire init = ~pll_locked;
@@ -350,6 +350,7 @@ wire mfp_io7 = system_ctrl[8] ^ (ste?ste_dma_snd_xsirq:1'b0);
 // input 0 is busy from printer which is pulled up when the printer cannot accept further data
 // if no printer redirection is being used this is wired to the extra joystick ports provided
 // by the "gauntlet2 adapter". If no extra joystick ports are present this will return 1
+wire parallel_fifo_full;
 wire mfp_io0 = (usb_redirection == 2'd2)?parallel_fifo_full:~joy0[4];
 
 // inputs 1,2 and 6 are inputs from serial which have pullups before an inverter
@@ -486,139 +487,56 @@ ethernec ethernec (
 	.rx_byte    (eth_rx_write_byte)
 );
 
+// ----------------- AUDIO subsystem ----------------
 wire [22:0] ste_dma_snd_addr;
 wire ste_dma_snd_read;
-wire [7:0] ste_audio_out_l, ste_audio_out_r;
 
-ste_dma_snd ste_dma_snd (
-	// cpu interface
-	.clk      	(clk_8             ),
-	.reset    	(reset             ),
-	.din      	(tg68_dat_out      ),
-	.sel      	(ste_dma_snd_sel   ),
-	.addr     	(tg68_adr[5:1]     ),
-	.uds      	(tg68_uds          ),
-	.lds      	(tg68_lds          ),
-	.rw       	(tg68_rw           ),
-	.dout     	(ste_dma_snd_data_out),
+audio audio (
+	// system interface
+	.reset 		( reset 			),
+	.clk_32 		( clk_32 		),
+	.clk_8 		( clk_8 			),
+	.bus_cycle 	( bus_cycle		),
 
-	// memory interface
-	.clk32	  	(clk_32            ),
-	.bus_cycle 	(bus_cycle         ),
-	.hsync		(st_hs             ),
-	.saddr      (ste_dma_snd_addr  ),
-	.read       (ste_dma_snd_read  ),
-	.data       (ram_data_out_64   ),
+	// cpu register interface(s)
+	.din ( tg68_dat_out ),
+	.dout ( audio_data_out ),
+	.addr ( tg68_adr[15:0] ),
+	.rw ( tg68_rw ),
+	.uds ( tg68_uds ),
+	.lds ( tg68_lds ),
+	.psg_sel ( psg_sel ),
+	.ste_dma_snd_sel ( ste_dma_snd_sel ),
 
-	.audio_l    (ste_audio_out_l   ),
-	.audio_r    (ste_audio_out_r	 ),
+	// ste dma interface
+	.hsync		( st_hs             ),
+	.dma_addr   ( ste_dma_snd_addr  ),
+	.dma_read   ( ste_dma_snd_read  ),
+	.dma_data   ( ram_data_out_64   ),
+
+	.psg_stereo ( system_ctrl[22] ),
+
+	// connections to psg gpio ports
+	.joy0 ( joy0 ),
+	.joy1 ( joy1 ),
+	.floppy_side ( floppy_side ),
+	.floppy_sel ( floppy_sel ),
+	
+	// psg gpio printer port fifo
+	.parallel_data_out ( parallel_data_out ),
+	.parallel_strobe_out ( parallel_strobe_out ),
+	.parallel_data_out_available (parallel_data_out_available),
 
 	.xsint     	(ste_dma_snd_xsirq ),
-	.xsint_d   	(ste_dma_snd_xsirq_delayed )   // 4 usec delayed
+	.xsint_d   	(ste_dma_snd_xsirq_delayed ),
+
+	.audio_r ( AUDIO_R ),
+	.audio_l ( AUDIO_L )
 );
 
-// audio output processing
-
-// simple mixer for ste and ym audio. result is 9 bits
-// this will later be handled by the lmc1992
-wire [8:0] audio_mix_l = { 1'b0, ym_audio_out_l} + { 1'b0, ste_audio_out_l };
-wire [8:0] audio_mix_r = { 1'b0, ym_audio_out_r} + { 1'b0, ste_audio_out_r };
-
-// limit audio to 8 bit range
-wire [7:0] audio_out_l = audio_mix_l[8]?8'd255:audio_mix_l[7:0];
-wire [7:0] audio_out_r = audio_mix_r[8]?8'd255:audio_mix_r[7:0];
-
-sigma_delta_dac sigma_delta_dac_l (
-	.DACout 		(AUDIO_L),
-	.DACin		(audio_out_l),
-	.CLK 			(clk_32),
-	.RESET 		(reset)
-);
-
-sigma_delta_dac sigma_delta_dac_r (
-	.DACout     (AUDIO_R),
-	.DACin    	(audio_out_r),
-	.CLK      	(clk_32),
-	.RESET    	(reset)
-);
-
-//// ym2149 sound chip ////
-
-wire parallel_fifo_full;
-
-// ------ fifo to store printer data coming from psg ---------
-io_fifo #(.DEPTH(4)) parallel_out_fifo (
-	.reset 				(reset),		
-
-	.in_clk  			(clk_8),
-	.in 					(port_b_out),
-	.in_strobe 			(port_a_out[5]),
-	.in_enable		 	(1'b0),
-
-	.out_clk  			(clk_8),
-	.out 					(parallel_data_out),
-	.out_strobe 		(parallel_strobe_out),
-	.out_enable		 	(1'b0),
-
-	.full					(parallel_fifo_full),
-	.data_available 	(parallel_data_out_available)
-);
-
-reg [1:0] sclk;
-always @ (posedge clk_8)
-	sclk <= sclk + 2'd1;
-
-wire [7:0] port_a_out;
-wire [7:0] port_b_out;
-assign floppy_side = port_a_out[0];
-assign floppy_sel = port_a_out[2:1];
-
-wire [7:0] ym_audio_out_l, ym_audio_out_r;
-
-// extra joysticks are wired to the printer port
-// using the "gauntlet2 interface", fire of 
-// joystick 0 is connected to the mfp I0 (busy)
-wire [7:0] port_b_in = { ~joy0[0], ~joy0[1], ~joy0[2], ~joy0[3], 
-								 ~joy1[0], ~joy1[1], ~joy1[2], ~joy1[3]}; 
-wire [7:0] port_a_in = { 2'b11, ~joy1[4], 5'b11111 }; 
-
-YM2149 ym2149 (
-	.I_DA						( tg68_dat_out[15:8]		),
-	.O_DA						( psg_data_out				),
-	.O_DA_OE_L           (								),
-
-	// control
-	.I_A9_L              ( 1'b0						),
-	.I_A8                ( 1'b1						),
-	.I_BDIR              ( psg_sel && !tg68_rw	),
-	.I_BC2               ( 1'b1						),
-	.I_BC1              	( psg_sel && !tg68_adr[1]),
-	.I_SEL_L             ( 1'b1						),
-
-	.O_AUDIO_L           (ym_audio_out_l			),
-	.O_AUDIO_R           (ym_audio_out_r			),
-
-	.stereo 					(system_ctrl[22]			),
-	
-	// port a
-	.I_IOA           		( port_a_in 				),
-	.O_IOA              	( port_a_out				),
-	.O_IOA_OE_L      		(								),
-
-	// port b
-	.I_IOB               ( port_b_in					),
-	.O_IOB              	( port_b_out				),
-	.O_IOB_OE_L         	(								),
-  
-	//
-	.ENA                	( 1'b1						), 
-	.RESET_L            	( !reset 					),
-	.CLK                	( sclk[1]  					),	// 2 MHz
-	.CLK8              	( clk_8  					)	// 8 MHz CPU bus clock
-);
-  
 // floppy_sel is active low
 wire wr_prot = (floppy_sel == 2'b01)?system_ctrl[7]:system_ctrl[6];
+
 wire [22:0] dma_addr;
 wire [15:0] dma_dout;
 wire dma_write, dma_read;

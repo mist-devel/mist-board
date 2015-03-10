@@ -93,9 +93,6 @@ wire [121:0] pal50_config_str;
 conf pal50_conf(
   // display      front porch     sync width     back porch      border width                  sync polarity
   .h_ds(10'd640), .h_fp( 10'd80), .h_s( 10'd64), .h_bp( 10'd80), .h_lb(10'd80), .h_rb(10'd80),  .h_sp(1'b1),
-//  .h_ds(10'd640), .h_fp( 10'd80), .h_s( 10'd80), .h_bp( 10'd24), .h_lb(10'd72), .h_rb(10'd128), .h_sp(1'b1),
-//  .h_ds(10'd640), .h_fp( 10'd80), .h_s( 10'd80), .h_bp( 10'd24), .h_lb(10'd56), .h_rb(10'd144), .h_sp(1'b1),
-//  .v_ds(10'd200), .v_fp( 10'd15), .v_s(  10'd3), .v_bp( 10'd15), .v_tb(10'd40), .v_bb(10'd40),  .v_sp(1'b1),
   .v_ds(10'd200), .v_fp( 10'd15), .v_s(  10'd3), .v_bp( 10'd4), .v_tb(10'd40), .v_bb(10'd51),  .v_sp(1'b1),
   .str  (pal50_config_str)
 );
@@ -112,7 +109,8 @@ wire [121:0] ntsc_config_str;
 conf ntsc_conf(
   // display      front porch     sync width     back porch      border width                  sync polarity
   .h_ds(10'd640), .h_fp( 10'd76), .h_s( 10'd64), .h_bp( 10'd76), .h_lb(10'd80), .h_rb(10'd80), .h_sp(1'b1),
-  .v_ds(10'd200), .v_fp( 10'd10), .v_s(  10'd3), .v_bp( 10'd10), .v_tb(10'd20), .v_bb(10'd20), .v_sp(1'b0),
+//  .v_ds(10'd200), .v_fp( 10'd10), .v_s(  10'd3), .v_bp( 10'd10), .v_tb(10'd20), .v_bb(10'd20), .v_sp(1'b0),
+  .v_ds(10'd200), .v_fp( 10'd1), .v_s(  10'd3), .v_bp( 10'd10), .v_tb(10'd20), .v_bb(10'd29), .v_sp(1'b0),
   .str  (ntsc_config_str)
 );
 

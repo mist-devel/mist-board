@@ -18,7 +18,7 @@
 // 
 // You should have received a copy of the GNU General Public License 
 // along with this program.  If not, see <http://www.gnu.org/licenses/>. 
- 
+
 module ste_dma_snd (
 	// system interface
 	input             clk,
@@ -34,7 +34,7 @@ module ste_dma_snd (
 	output reg [15:0] dout,
 
 	// memory interface
-	input 				clk32,     // 31.875 MHz
+	input 				clk32,     // 32 MHz
 	input [1:0] 		bus_cycle, // bus-cycle
 	input					hsync,     // to synchronize with video
 	output            read,
@@ -45,7 +45,7 @@ module ste_dma_snd (
 	output reg [7:0]  audio_l,
 	output reg [7:0]  audio_r,
 	
-	output            xsint,
+	output reg			xsint,
 	output 				xsint_d
 );
 // ---------------------------------------------------------------------------
@@ -82,24 +82,24 @@ always @(posedge clk)
 
 wire clk_2 = sclk[1];  // 2Mhz
 
-// generate audio sample rate base == 50kHz == 2Mhz/40
-reg abase;
-reg [4:0] acnt;
-
-always @(posedge clk_2) begin
-	if(acnt == 5'd19) begin	
-		acnt <= 5'd0;
-		abase <= ~abase;
-	end else
-		acnt <= acnt + 5'd1;
-end	
-
+// divide 8MHz down to sample rate base frequency of 55066hz
+reg a2base;
+reg [31:0] a2base_cnt;
+always @(posedge clk) begin
+   if(a2base_cnt < 32'd4000000)
+     a2base_cnt <= a2base_cnt + 32'd50066;
+   else begin
+      a2base_cnt <= a2base_cnt - 32'd4000000 + 32'd50066;
+      a2base <= !a2base;
+   end
+end
+   
 // generate current audio clock
 reg [2:0] aclk_cnt;
-always @(posedge abase)
+always @(posedge a2base)
 	aclk_cnt <= aclk_cnt + 3'd1;
 
-wire aclk =  (mode[1:0] == 2'b11)?abase:        // 50 kHz
+wire aclk =  (mode[1:0] == 2'b11)?a2base:        // 50 kHz
 				((mode[1:0] == 2'b10)?aclk_cnt[0]:  // 25 kHz
 				((mode[1:0] == 2'b01)?aclk_cnt[1]:  // 12.5 kHz
 					aclk_cnt[2]));                   // 6.25 kHz
@@ -118,10 +118,12 @@ end
 assign xsint_d = xsint_delay[7];
 
 // dma sound  
+// according to "STE_Dev_add_5-25-1989.pdf", snd_end points to the first byte
+// _after_ the sample to be played 
 reg [1:0] ctrl;
 reg [22:0] snd_bas, snd_adr, snd_end;
 reg [22:0] snd_end_latched;
-reg [7:0] mode;
+reg [2:0] mode;
 
 // micro wire
 reg [15:0] mw_data_reg, mw_mask_reg;
@@ -148,17 +150,16 @@ always @(sel, rw, addr, ctrl, snd_bas, snd_adr, snd_end, mode, mw_data_reg, mw_m
 		if(addr == 5'h06) dout[7:1] = snd_adr[6:0];
 
 		// frame end address
-		if(addr == 5'h07) dout[7:0] = snd_end_latched[22:15]; 
-		if(addr == 5'h08) dout[7:0] = snd_end_latched[14:7];
-		if(addr == 5'h09) dout[7:1] = snd_end_latched[6:0];
+		if(addr == 5'h07) dout[7:0] = snd_end[22:15]; 
+		if(addr == 5'h08) dout[7:0] = snd_end[14:7];
+		if(addr == 5'h09) dout[7:1] = snd_end[6:0];
 
 		// sound mode register
-		if(addr == 5'h10) dout[7:0] = mode; 
+		if(addr == 5'h10) dout[7:0] = { mode[2], 5'd0, mode[1:0] }; 
 		
 		// mircowire
 		if(addr == 5'h11) dout = mw_data_reg; 
 		if(addr == 5'h12) dout = mw_mask_reg; 
-		
 	end
 end
 
@@ -190,19 +191,19 @@ always @(negedge clk) begin
 				if(addr == 5'h00) ctrl <= din[1:0];
 
 				// frame start address
-				if(addr == 5'h01) snd_bas[22:15] <= din[7:0]; 
+				if(addr == 5'h01) snd_bas[22:15] <= din[7:0]; // snd_bas <= { din[7:0], 15'd0 }; 
 				if(addr == 5'h02) snd_bas[14:7] <= din[7:0];
 				if(addr == 5'h03) snd_bas[6:0] <= din[7:1];
 	
 				// frame address counter is read only
 
 				// frame end address
-				if(addr == 5'h07) snd_end[22:15] <= din[7:0]; 
+				if(addr == 5'h07) snd_end[22:15] <= din[7:0]; // snd_end <= { din[7:0], 15'd0 }; 
 				if(addr == 5'h08) snd_end[14:7] <= din[7:0];
 				if(addr == 5'h09) snd_end[6:0] <= din[7:1];
 
 				// sound mode register
-				if(addr == 5'h10) mode <= din[7:0];
+				if(addr == 5'h10) mode <= { din[7], din[1:0] };
 			end
 
 			// micro wire has a 16 bit interface
@@ -247,14 +248,19 @@ end
 // --------------------------------- audio fifo ------------------------------
 // ---------------------------------------------------------------------------
 
-localparam FIFO_ADDR_BITS = 2;    // four words
+// This type of fifo can actually never be 100% full. It contains at most
+// 2^n-1 words. A n=2 buffer can thus contain at most 3 words which at 50kHz
+// stereo means that the buffer needs to be reloaded at 16.6kHz. Reloading
+// happens in hsync at 15.6Khz. Thus a n=2 buffer is not sufficient. 
+
+localparam FIFO_ADDR_BITS = 3;    // four words
 localparam FIFO_DEPTH = (1 << FIFO_ADDR_BITS);
 reg [15:0] fifo [FIFO_DEPTH-1:0];
 reg [FIFO_ADDR_BITS-1:0] writeP, readP;
-wire fifo_empty = (readP == writeP);
-wire fifo_full = (readP == (writeP + 2'd1));
+wire fifo_empty = (readP == writeP) /* synthesis keep */;
+wire fifo_full = (readP == (writeP + 2'd1)) /* synthesis keep */;
 
-reg [11:0] fifo_underflow;
+reg [11:0] fifo_underflow /* synthesis noprune */;
 
 // ---------------------------------------------------------------------------
 // -------------------------------- audio engine -----------------------------
@@ -262,7 +268,7 @@ reg [11:0] fifo_underflow;
 
 reg byte;   // byte-in-word toggle flag
 wire [15:0] fifo_out = fifo[readP];
-wire [7:0] mono_byte = (!byte)?fifo_out[7:0]:fifo_out[15:8];  // TODO: check byte order!!
+wire [7:0] mono_byte = (!byte)?fifo_out[15:8]:fifo_out[7:0];
 
 // empty the fifo at the correct rate
 always @(posedge aclk) begin
@@ -270,30 +276,33 @@ always @(posedge aclk) begin
 		readP <= 2'd0;
 		fifo_underflow <= 12'd0;
 	end else begin
-		// no audio playing: silence
-		if(!ctrl[0]) begin
-			audio_l <= 8'd0;
-			audio_r <= 8'd0;
-			byte <= 1'b0;
-		end else begin
-			// audio enabled and data in fifo? play it!
-			if(!fifo_empty) begin
-				if(!mode[7]) begin
-					audio_l <= fifo_out[15:8] + 8'd128;   // high byte == left channel
-					audio_r <= fifo_out[ 7:0] + 8'd128;   // low byte == right channel
-				end else begin
-					audio_l <= mono_byte + 8'd128;
-					audio_r <= mono_byte + 8'd128;
-					byte <= !byte;
-				end
+		// audio data in fifo? play it!
+		if(!fifo_empty) begin
+			if(!mode[2]) begin
+				audio_l <= fifo_out[15:8] + 8'd128;   // high byte == left channel
+				audio_r <= fifo_out[ 7:0] + 8'd128;   // low byte == right channel
+			end else begin
+				audio_l <= mono_byte + 8'd128;
+				audio_r <= mono_byte + 8'd128;
+				byte <= !byte;
+			end
 	
-				// increase fifo read pointer everytime in stereo mode and every
-				// second byte in mono mode
-				if(!mode[7] || byte)
-					readP <= readP + 2'd1;	
-			end else
-				// for debugging: monitor if fifo runs out of data
-				fifo_underflow <= fifo_underflow + 12'd1;
+			// increase fifo read pointer every sample in stereo mode and every
+			// second sample in mono mode
+			if(!mode[2] || byte)
+				readP <= readP + 2'd1;	
+		end else begin
+
+		   // ------ FIFO is empty -------
+		   
+		   if(!ctrl[0]) begin
+		      // no audio supposed to be playing: silence
+//		      audio_l <= 8'd0;
+//		      audio_r <= 8'd0;
+		      byte <= 1'b0;
+		   end else
+		     // for debugging: monitor if fifo runs out of data
+			fifo_underflow <= fifo_underflow + 12'd1;
 		end 
 	end
 end
@@ -310,8 +319,10 @@ reg dma_enable;  // flag indicating dma engine is active
 // the "dma_enable" signal is permanently active while playing. The adress counter will
 // reach snd_end, but this will not generate a bus transfer and thus xsint is
 // released for that event
-reg frame_done;
-assign xsint = dma_enable && (snd_adr != snd_end_latched);
+always @(posedge clk)
+	xsint <= dma_enable && (snd_adr != snd_end_latched);
+
+// assign xsint = dma_enable && (snd_adr != snd_end_latched);
 
 reg [7:0] frame_cnt;
 
@@ -321,7 +332,7 @@ always @(posedge clk32) begin
 		writeP <= 2'd0;
 		frame_cnt <= 8'h00;
 	end else begin
-
+	        // ctrl[0] stops dma
 		if(!ctrl[0]) begin
 			dma_enable <= 1'b0;  // stop dma_enable
 			frame_cnt <= 8'h00;
@@ -329,20 +340,19 @@ always @(posedge clk32) begin
 			// dma not enabled enabled, but should be playing? -> start dma
 			if(!dma_enable) begin
 				if(dma_start) begin
-					// start
-					dma_enable <= 1'b1;   // start dma
-					snd_adr <= snd_bas;   // load audio start address
-					snd_end_latched <= snd_end;
-					frame_cnt <= frame_cnt + 8'h01;
+//					if(snd_end > snd_bas) begin
+						// start
+						dma_enable <= 1'b1;   // start dma
+						snd_adr <= snd_bas;   // load audio start address
+						snd_end_latched <= snd_end;
+						frame_cnt <= frame_cnt + 8'h01;
+//					end
 				end
 			end else begin
 
-				// address will reach end address in next step. indicate end of frame
-				frame_done <= (snd_adr == snd_end_latched-23'd1);
- 
 				// fifo not full? read something during hsync using the video cycle
 				// bus_cycle_L = 3 is the end of the video cycle
-				if((!fifo_full) && hsync && (bus_cycle_L == 3)) begin
+				if(!fifo_full && hsync && (bus_cycle_L == 3)) begin
 						
  					if(snd_adr != snd_end_latched) begin
 						// read right word from ram using the 64 bit memory interface
@@ -356,12 +366,14 @@ always @(posedge clk32) begin
 						writeP <= writeP + 2'd1;     // advance fifo ptr
 						snd_adr <= snd_adr + 23'd1;  // advance address counter
 					end else begin
+//						snd_end_latched <= snd_end;
+							
 						// check if we just loaded the last sample
 						if(ctrl == 2'b11) begin	
 							snd_adr <= snd_bas;   // load audio start address
 							snd_end_latched <= snd_end;
 							frame_cnt <= frame_cnt + 8'h01;
-						end else 
+						end else
 							dma_enable <= 1'b0;          // else just stop dma
 					end
 				end
