@@ -74,7 +74,9 @@ port (
 	
 	-- DIP switches (reset values for corresponding bits above)
 	INIT_RD_EN	:	in	std_logic;
-	INIT_ROM_nRAM	:	in	std_logic
+	INIT_ROM_nRAM	:	in	std_logic;
+	
+	JOYSTICK	:	in	std_logic_vector(7 downto 0)
 	);
 end entity;
 
@@ -88,6 +90,7 @@ signal paging_reg	:	std_logic_vector(7 downto 0);
 begin
 	-- Input register read when RS=1
 	DO <= 
+		JOYSTICK when RS="00" else 
 		in_reg when RS="01" else 
 		paging_reg when RS="11" else
 		(others => '1');

@@ -51,7 +51,7 @@ generic (
 	-- 0 = 48 K
 	-- 1 = 128 K
 	-- 2 = +2A/+3
-	MODEL				:	integer := 1
+	MODEL				:	integer := 2
 );
 	
 port (
@@ -192,7 +192,7 @@ end component;
 ---------
 
 -- config string used by the io controller to fill the OSD
-constant CONF_STR : string := "SPECTRUM;CSW;T1,Reset;";
+constant CONF_STR : string := "SPECTRUM;CSW;T1,Reset;T2,Trigger NMI;O3,ZXMMC+ overlay,Off,On;O4,ZXMMC+ memory,RAM,ROM";
 
 -- convert string to std_logic_vector to be given to user_io
 function to_slv(s: string) return std_logic_vector is 
@@ -210,38 +210,79 @@ begin
 end function; 
 
 component user_io
-  generic ( STRLEN : integer := 0 );
-  port ( SPI_CLK, SPI_SS_IO, SPI_MOSI :in std_logic;
-         SPI_MISO : out std_logic;
-         conf_str : in std_logic_vector(8*STRLEN-1 downto 0);
-         JOY0 :     out std_logic_vector(5 downto 0);
-         JOY1 :     out std_logic_vector(5 downto 0);
-         status:    out std_logic_vector(7 downto 0);
-         SWITCHES : out std_logic_vector(1 downto 0);
-         BUTTONS : out std_logic_vector(1 downto 0);
-			clk		: in std_logic;
-			ps2_clk	: out std_logic;
-			ps2_data : out std_logic
-       );
+generic ( STRLEN : integer := 0 );
+port (
+      SPI_CLK, SPI_SS_IO, SPI_MOSI :in std_logic;
+      SPI_MISO : out std_logic;
+      conf_str : in std_logic_vector(8*STRLEN-1 downto 0);
+
+      switches : out std_logic_vector(1 downto 0);
+      buttons : out std_logic_vector(1 downto 0);
+      scandoubler_disable : out std_logic;
+
+      joystick_0 : out std_logic_vector(7 downto 0);
+      joystick_1 : out std_logic_vector(7 downto 0);
+      joystick_analog_0 : out std_logic_vector(15 downto 0);
+      joystick_analog_1 : out std_logic_vector(15 downto 0);
+      status : out std_logic_vector(7 downto 0);
+
+		sd_lba : in std_logic_vector(31 downto 0);
+		sd_rd : in std_logic;
+		sd_wr : in std_logic;
+		sd_ack : out std_logic;
+		sd_conf : in std_logic;
+		sd_sdhc : in std_logic;
+		sd_dout : out std_logic_vector(7 downto 0);
+		sd_dout_strobe : out std_logic;
+		sd_din : in std_logic_vector(7 downto 0);
+		sd_din_strobe : out std_logic;
+
+      ps2_clk : in std_logic;
+      ps2_kbd_clk : out std_logic;
+      ps2_kbd_data : out std_logic
+);
 end component user_io;
+
+---------
+-- sd card
+---------
+
+component sd_card
+   port (  io_lba       : out std_logic_vector(31 downto 0);
+           io_rd         : out std_logic;
+           io_wr         : out std_logic;
+           io_ack        : in std_logic;
+           io_sdhc       : out std_logic;
+           io_conf       : out std_logic;
+           io_din        : in std_logic_vector(7 downto 0);
+           io_din_strobe : in std_logic;
+           io_dout       : out std_logic_vector(7 downto 0);
+           io_dout_strobe : in std_logic;
+           allow_sdhc    : in std_logic;
+                          
+           sd_cs                :       in std_logic;
+           sd_sck       :       in std_logic;
+           sd_sdi       :       in std_logic;
+           sd_sdo       :       out std_logic
+  );
+  end component sd_card;
 
 ---------
 -- Data IO
 ---------
 
 component data_io
-  generic ( ADDR_WIDTH : integer := 16;
-				START_ADDR : integer := 0);
   port ( sck, ss, sdi 	:	in std_logic;
 
 			-- download info
 			downloading  	:  out std_logic;
-			size				:  out std_logic_vector(ADDR_WIDTH-1 downto 0);
+			size				:  out std_logic_vector(24 downto 0);
+			index				:  out std_logic_vector(4 downto 0);
   
 			-- external ram interface
 			clk				:	in std_logic;
 			wr					:  out std_logic;
-			a					:  out std_logic_vector(ADDR_WIDTH-1 downto 0);
+			a					:  out std_logic_vector(24 downto 0);
 			d					:  out std_logic_vector(7 downto 0)
 );
 end component data_io;
@@ -492,7 +533,10 @@ port (
 	
 	-- DIP switches (reset values for corresponding bits above)
 	INIT_RD_EN	:	in	std_logic;
-	INIT_ROM_nRAM	:	in	std_logic
+	INIT_ROM_nRAM	:	in	std_logic;
+	
+	-- Kempston joystick input
+	JOYSTICK			:	in	std_logic_vector(7 downto 0)
 	);
 end component;
 
@@ -523,9 +567,9 @@ signal joystickB: std_logic_vector(5 downto 0);
 signal status: std_logic_vector(7 downto 0);
 
 -- TH extra
-signal rom_addr		:	std_logic_vector(18 downto 0);
-signal ram_addr		:	std_logic_vector(18 downto 0);
-signal cpu_addr		:	std_logic_vector(19 downto 0);
+signal rom_addr		:	std_logic_vector(19 downto 0);
+signal ram_addr		:	std_logic_vector(19 downto 0);
+signal cpu_addr		:	std_logic_vector(20 downto 0);
 signal vid_addr		:	std_logic_vector(18 downto 0);
 signal cpu_cycle     :  std_logic;
 signal rom_do        :  std_logic_vector(7 downto 0);
@@ -540,12 +584,26 @@ signal ioctl_cycle   :  std_logic;
 signal ioctl_used    :  std_logic;
 signal ioctl_ram_addr : std_logic_vector(24 downto 0);
 signal ioctl_ram_data :  std_logic_vector(7 downto 0);
-signal ioctl_size    : std_logic_vector(24 downto 0);
+signal ioctl_size     : std_logic_vector(24 downto 0);
+signal ioctl_index    : std_logic_vector(4 downto 0);
 signal ioctl_download : std_logic;
 signal tape_rd			:  std_logic;
 signal tape_addr		:  std_logic_vector(24 downto 0);
+signal tape_download : std_logic;
 signal io_addr			:  std_logic_vector(24 downto 0);
 signal audio			:  std_logic;
+signal scandoubler_disable	: std_logic;
+signal rom_dl	      : std_logic := '0';
+signal sd_lba 			: std_logic_vector(31 downto 0);
+signal sd_rd 			: std_logic;
+signal sd_wr 			: std_logic;
+signal sd_ack 			: std_logic;
+signal sd_conf 		: std_logic;
+signal sd_sdhc 		: std_logic;
+signal sd_dout 		: std_logic_vector(7 downto 0);
+signal sd_dout_strobe : std_logic;
+signal sd_din 			: std_logic_vector(7 downto 0);
+signal sd_din_strobe : std_logic;
 
 -- Master clock - 28 MHz
 signal clk112      	:	std_logic;
@@ -688,7 +746,7 @@ begin
 	-- Clock enable logic
 	clken: clocks port map (
 		clock,
-		reset_n,
+		pll_locked,
 		not cpu_mreq_n,
 		psg_clken,
 		cpu_clken,
@@ -726,7 +784,6 @@ begin
 	-- in the zx01 because it does not come with its own embedded dual port ram.
 	-- Instead it provides signals to connect to an external ram
 	data_io_I: data_io 	
-	generic map (ADDR_WIDTH => 25, START_ADDR => 16#20000#)
 	port map (
 		sck 	=> 	SPI_SCK,
 		ss    =>  	SPI_SS2,
@@ -734,6 +791,7 @@ begin
 
 		downloading => ioctl_download,
 		size        => ioctl_size,
+		index       => ioctl_index,
 
 		-- ram interface
 		clk 	=> 	clock,
@@ -742,6 +800,18 @@ begin
 		d     =>		ioctl_data
 	);
 
+	process(ioctl_download)
+	begin
+		if rising_edge(ioctl_download) then
+			if(ioctl_index = "00000") then
+				rom_dl <= '1';
+			end if;
+		end if;
+	end process;	
+	
+
+	-- tape download comes from OSD entry 1
+	tape_download <= '1' when (ioctl_index = "00001") AND (ioctl_download = '1') else '0';
 	tape_I: tape 	
 	generic map (ADDR_WIDTH => 25)
 	port map (
@@ -806,19 +876,52 @@ begin
 		conf_str => to_slv(CONF_STR),
 			
 		status => status,
-		JOY0 => joystickA,
-		JOY1 => joystickB,
-		SWITCHES => switches,
-		BUTTONS => buttons,
+		joystick_0(5 downto 0) => joystickA,
+		joystick_1(5 downto 0) => joystickB,
+		switches => switches,
+		buttons => buttons,
+		scandoubler_disable => scandoubler_disable,
+
+		sd_lba => sd_lba,
+		sd_rd => sd_rd,
+		sd_wr => sd_wr,
+		sd_ack => sd_ack,
+		sd_conf => sd_conf,
+		sd_sdhc => sd_sdhc,
+		sd_dout => sd_dout,
+		sd_dout_strobe => sd_dout_strobe,
+		sd_din => sd_din,
+		sd_din_strobe => sd_din_strobe,
 		
-		clk => clk14k,
-		ps2_clk => ps2_clk,
-		ps2_data => ps2_data
+		ps2_clk => clk14k,
+		ps2_kbd_clk => ps2_clk,
+		ps2_kbd_data => ps2_data
 	);
 
-	-- map both joysticks onto the one supported by kempston
-	zxmmc_do <= "00" & (joystickA or joystickB);
-		
+	sd_card_d: sd_card
+   port map
+   (
+         -- connection to io controller
+         io_lba => sd_lba,
+         io_rd  => sd_rd,
+         io_wr  => sd_wr,
+         io_ack => sd_ack,
+         io_conf => sd_conf,
+         io_sdhc => sd_sdhc,
+         io_din => sd_dout,
+         io_din_strobe => sd_dout_strobe,
+         io_dout => sd_din,
+         io_dout_strobe => sd_din_strobe,
+ 
+         allow_sdhc  => '0',   -- SPECTRUM does not support SDHC
+
+         -- connection to host
+         sd_cs  => zxmmc_cs0,
+         sd_sck => zxmmc_sclk,
+         sd_sdi => zxmmc_mosi,
+         sd_sdo => zxmmc_miso
+    );
+
 	-- CPU
 	cpu: T80se port map (
 		reset_n, clock, cpu_clken, --debug_cpu_clken,
@@ -833,7 +936,7 @@ begin
 	cpu_irq_n <= vid_irq_n;
 	-- Unused CPU input signals
 	cpu_wait_n <= '1';
-	cpu_nmi_n <= '1';
+	cpu_nmi_n <= '0' when status(2) = '1' else '1';
 	cpu_busreq_n <= '1';
 		
 	-- Keyboard
@@ -857,7 +960,7 @@ begin
 	-- ULA video
 	vid: video port map (
 		clock, vid_clken, reset_n,
-		'1',  -- VGA SW(7)
+		not scandoubler_disable,
 		vid_a, sdram_do, vid_rd_n, vid_wait_n,
 		ula_border,
 		vid_r_out, vid_g_out, vid_b_out,
@@ -908,26 +1011,18 @@ begin
 	end generate;
 	
 	-- ZXMMC interface
---	mmc: zxmmc port map (
---		clock, reset_n, cpu_clken,
---		zxmmc_enable, cpu_a(6 downto 5), -- A6/A5 selects register
---		cpu_wr_n, cpu_do, zxmmc_do,
---		zxmmc_cs0, open,
---		zxmmc_sclk, zxmmc_mosi, zxmmc_miso,
---		zxmmc_wr_en, zxmmc_rd_en, zxmmc_rom_nram,
---		zxmmc_bank,
---		SW(1), SW(0)
---		);
-
-	-- TH		
---	SD_nCS <= zxmmc_cs0;
---	SD_SCLK <= zxmmc_sclk;
---	SD_MOSI <= zxmmc_mosi;
---	zxmmc_miso <= SD_MISO;
---	GPIO_0(0) <= zxmmc_cs0;
---	GPIO_0(1) <= zxmmc_sclk;
---	GPIO_0(2) <= zxmmc_mosi;
---	GPIO_0(3) <= zxmmc_miso;
+	mmc: zxmmc port map (
+		clock, reset_n, cpu_clken,
+		zxmmc_enable, cpu_a(6 downto 5), -- A6/A5 selects register
+		cpu_wr_n, cpu_do, zxmmc_do,
+		zxmmc_cs0, open,
+		zxmmc_sclk, zxmmc_mosi, zxmmc_miso,
+		zxmmc_wr_en, zxmmc_rd_en, zxmmc_rom_nram,
+		zxmmc_bank,
+		status(3),status(4),
+		-- map both joysticks onto the one supported by kempston
+		"00" & (joystickA or joystickB)
+		);
 		
 	-- Asynchronous reset
 	-- System is reset by external reset switch or PLL being out of lock
@@ -944,10 +1039,13 @@ begin
 			end if;
 		end if;
 
-		if reset_cnt = 0 then
-			reset_n <= '1';
-		else 
-			reset_n <= '0';
+		-- make sure cpu runs synchronous to bus state machine
+		if rising_edge(psg_clken) then
+			if reset_cnt = 0 then
+				reset_n <= '1';
+			else 
+				reset_n <= '0';
+			end if;
 		end if;
 	end process;
 	
@@ -1009,7 +1107,13 @@ begin
 		-- latch data at the end of cpus memory cycle
 		if falling_edge(cpu_cycle) then
 			if rom_enable = '1' then
-				mem_do <= rom_do;
+				-- fetch rom from internal memory unless something has
+				-- been uploaded. Then use uploaded code in ram
+				if(rom_dl = '0') then
+					mem_do <= rom_do;
+				else
+					mem_do <= sdram_do;
+				end if;
 			else	
 				mem_do <= sdram_do;
 			end if;
@@ -1032,44 +1136,39 @@ begin
 		-- Idle bus
 		(others => '1');
 	
-	-- ROMs are in external flash starting at 0x20000
-	-- (lower addresses contain the BBC ROMs)
---	FL_RST_N <= reset_n;
---	FL_CE_N <= '0';
---	FL_OE_N <= '0';
---	FL_WE_N <= '1';
 	rom_48k: if model = 0 generate
 		-- 48K
 		rom_addr <= 
 			-- Overlay external ROMs when enabled
-			"1" & zxmmc_bank(3 downto 0) & cpu_a(13 downto 0)
+			"1" & zxmmc_bank & cpu_a(13 downto 0)
 			when zxmmc_rd_en = '1' else
 			-- Otherwise access the internal ROM
-			"00000" & cpu_a(13 downto 0);
+			"000000" & cpu_a(13 downto 0);
 	end generate;
 	rom_128k: if model = 1 generate
 		-- 128K
 		rom_addr <= 
 			-- Overlay external ROMs when enabled
-			"1" & zxmmc_bank(3 downto 0) & cpu_a(13 downto 0)
+			"1" & zxmmc_bank & cpu_a(13 downto 0)
 			when zxmmc_rd_en = '1' else
 			-- Otherwise access the internal ROMs
-			"0000" & page_rom_sel & cpu_a(13 downto 0);
+			"00000" & page_rom_sel & cpu_a(13 downto 0);
 	end generate;
 	rom_plus3: if model = 2 generate
 		-- +3
 		rom_addr <= 
 			-- Overlay external ROMs when enabled
-			"1" & zxmmc_bank(3 downto 0) & cpu_a(13 downto 0)
+			"1" & zxmmc_bank & cpu_a(13 downto 0)
 			when zxmmc_rd_en = '1' else
 			-- Otherwise access the internal ROMs		
-			"000" & plus3_page(1) & page_rom_sel & cpu_a(13 downto 0);
+			"0000" & plus3_page(1) & page_rom_sel & cpu_a(13 downto 0);
 	end generate;
 
 	-- SRAM bus
 	vid_di <= sdram_do;
 	
-	-- first 512k of sdram are used as ram, second 512k sdram are used as rom
+	-- first 1MB of sdram are used as ram, second 1MB sdram are used as rom
+	-- and after that starts tape buffer
 	cpu_addr <= "0" & ram_addr when ram_enable = '1' or 
 				(rom_enable = '1' and zxmmc_rd_en = '1' and zxmmc_rom_nram = '0') else
 					"1" & rom_addr;
@@ -1086,7 +1185,7 @@ begin
 	-- map video controller address to sdram when video is active, else cpu
 -- 	sdram_addr(24 downto 20) <= io_addr(24 downto 20) when ioctl_cycle ='1' else "00000";  -- only 1 of 32 MB used
 	sdram_addr <= io_addr when ioctl_cycle = '1' else
-		("000000" & vid_addr) when vid_rd_n = '0' else ("00000" & cpu_addr);
+		("000000" & vid_addr) when vid_rd_n = '0' else ("0000" & cpu_addr);
 
 	-- Synchronous outputs to SRAM
 	process(clock,reset_n)
@@ -1098,8 +1197,9 @@ begin
 		int_ram_write := ram_enable and not cpu_wr_n;
 		sram_write := int_ram_write or ext_ram_write;
 	
-		if reset_n = '0' then
-		elsif rising_edge(clock) then
+--		if reset_n = '0' then
+--		els
+		if rising_edge(clock) then
 			-- synchonize cpu memory access to video memory access
 			if vid_clken = '1' then
 				cpu_cycle <= mem_clken;
@@ -1112,12 +1212,12 @@ begin
 				if rom_enable = '0' then
 					-- Normal RAM access at 0x4000-0xffff
 					-- 16-bit address
-					ram_addr <= "00" & ram_page & cpu_a(13 downto 0);
+					ram_addr <= "000" & ram_page & cpu_a(13 downto 0);
 				else
 					-- ZXMMC+ external RAM access (16 banks of 16KB)
 					-- at 0x0000-0x3fff
 					-- 16-bit address
-					ram_addr <= "1" & zxmmc_bank(3 downto 0) & cpu_a(13 downto 0);
+					ram_addr <= "1" & zxmmc_bank & cpu_a(13 downto 0);
 				end if;
 			end if;
 		end if;
@@ -1202,8 +1302,8 @@ begin
       red_in => zx_red,
       green_in => zx_green,
       blue_in => zx_blue,
-      hs_in => zx_hs,
-      vs_in => zx_vs,
+      hs_in => vid_hsync_n,
+      vs_in => vid_vsync_n,
 
       red_out => VGA_R,
       green_out => VGA_G,

@@ -55,8 +55,8 @@ reg [31:0] bit_cnt;
 reg [2:0] reload32;
 
 assign rd = iocycle && ((header_cnt != 0) || (payload_cnt != 0));
-assign a = (header_cnt != 0)?(25'h20000 + 25'd32 - header_cnt):
-	(payload_cnt != 0)?(25'h20000 + size - payload_cnt):
+assign a = (header_cnt != 0)?(25'h200000 + 25'd32 - header_cnt):
+	(payload_cnt != 0)?(25'h200000 + size - payload_cnt):
 	25'h12345;
 
 reg [7:0] din;

@@ -123,7 +123,8 @@ begin
 	PIXCLK <= CLK and CLKEN and nRESET;
 	
 	-- Output syncs
-	nVSYNC <= not vsync;
+	-- drive VSYNC to 1 in PAL mode for Minimig VGA cable
+	nVSYNC <= '1' when VGA = '0' else not vsync;
 	nHSYNC <= not hsync;
 	nCSYNC <= not (vsync xor hsync);
 	-- Combined HSYNC/CSYNC.  Feeds HSYNC to VGA HSYNC in VGA mode,

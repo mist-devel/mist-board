@@ -119,11 +119,12 @@ assign sd_we  = sd_cmd[0];
 // at a time when writing
 assign sd_data = we?{din, din}:16'bZZZZZZZZZZZZZZZZ;
 
-reg addr0;
-always @(posedge clk)
-	if((q == 1) && oe) addr0 <= addr[0];
+//reg addr0;
+//always @(posedge clk)
+//	if((q == 1) && oe) addr0 <= addr[0];
 
-assign dout = addr0?sd_data[7:0]:sd_data[15:8];
+//assign dout = addr0?sd_data[7:0]:sd_data[15:8];
+assign dout = sd_data[7:0];
 
 wire [3:0] reset_cmd = 
 	((q == STATE_CMD_START) && (reset == 13))?CMD_PRECHARGE:
@@ -142,12 +143,13 @@ assign sd_cmd = (reset != 0)?reset_cmd:run_cmd;
 wire [12:0] reset_addr = (reset == 13)?13'b0010000000000:MODE;
 	
 wire [12:0] run_addr = 
-	(q == STATE_CMD_START)?addr[21:9]:{ 4'b0010, addr[24], addr[8:1]};
+	(q == STATE_CMD_START)?addr[20:8]:{ 4'b0010, addr[23], addr[7:0]};
 
 assign sd_addr = (reset != 0)?reset_addr:run_addr;
 
-assign sd_ba = addr[23:22];
+assign sd_ba = addr[22:21];
 
-assign sd_dqm = we?{ addr[0], ~addr[0] }:2'b00;
+//assign sd_dqm = we?{ addr[0], ~addr[0] }:2'b00;
+assign sd_dqm = 2'b00;
 
 endmodule
