@@ -89,7 +89,7 @@ always@(posedge sck, posedge ss) begin
 		if((cmd == UIO_FILE_TX) && (cnt == 15)) begin
 			// prepare 
 			if(sdi) begin
-				if(index == 0) addr <= 25'h100000;  // OS ROM at 1MB
+				if(index == 0) addr <= 25'h180000;  // esxdos at 1MB
 				else				addr <= 25'h200000;  // tape buffer at 2MB
 				
 				downloading_reg <= 1'b1; 
