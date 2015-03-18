@@ -53,47 +53,40 @@ always @(posedge clk) begin
 		paged_in <= 1'b0;
 		ctrl <= 8'h00;
 	end else begin
-//		if(clken) begin
-			if (a[3:0]==4'h3 && enable && !wr_n)
-				ctrl <= din;
+		spi_rx_strobe = 1'b0;
+		spi_tx_strobe = 1'b0;
 			
-			if(a[3:0]==4'h7 && enable && !wr_n)
-				sd_cs <= din[0];
-
-			// SPI read
-			if (enable && a[3:0]==4'hb &&  wr_n)
-				spi_rx_strobe = 1'b1;
-			else
-				spi_rx_strobe = 1'b0;
+		if (a[3:0]==4'h3 && enable && !wr_n)
+			ctrl <= din;
 			
-			// SPI write
-			if (enable && a[3:0]==4'hb && !wr_n)
-				spi_tx_strobe = 1'b1;
-			else
-				spi_tx_strobe = 1'b0;
+		if(a[3:0]==4'h7 && enable && !wr_n)
+			sd_cs <= din[0];
 
-			if (!mreq_n && !rd_n && !m1_n && 
-				((a==16'h0000) || (a==16'h0008) || (a==16'h0038) ||
-				 (a==16'h0066) || (a==16'h04C6) || (a==16'h0562))) begin
-				// automapper diferido (siguiente ciclo)
-				m1_trigger <= 1'b1;
-			end else if (!mreq_n && !rd_n && !m1_n && a[15:8]==8'h3D) begin
-				// automapper no diferido (ciclo actual)
-				paged_in <= 1'b1;
-				m1_trigger <= 1'b1;
-			end else if (!mreq_n && !rd_n && !m1_n && a[15:3]==13'b0001111111111) begin
-				// desconexin de automapper diferido
-				m1_trigger <= 1'b0;
-			end
+		// SPI read/write
+		if(enable && a[3:0]==4'hb) begin
+			if(wr_n) spi_rx_strobe = 1'b1;
+			else     spi_tx_strobe = 1'b1;
+		end
+
+		if (!mreq_n && !rd_n && !m1_n && 
+			((a==16'h0000) || (a==16'h0008) || (a==16'h0038) ||
+			 (a==16'h0066) || (a==16'h04C6) || (a==16'h0562))) begin
+			// activate automapper after this cycle
+			m1_trigger <= 1'b1;
+		end else if (!mreq_n && !rd_n && !m1_n && a[15:8]==8'h3D) begin
+			// activate automapper immediately
+			paged_in <= 1'b1;
+			m1_trigger <= 1'b1;
+		end else if (!mreq_n && !rd_n && !m1_n && {a[15:3],3'd0} == 16'h1ff8) begin
+			// deactivate automapper after this cycle
+			m1_trigger <= 1'b0;
+		end
 	
-			if (m1_n==1'b1) begin  // tras el ciclo M1, aqu es cuando realmente se hace el mapping
-				paged_in <= m1_trigger;
-			end
-//		end
+		if (m1_n==1'b1)
+			paged_in <= m1_trigger;
 	end
 end
 
-// Instanciacion del modulo SPI   
 spi mi_spi (
    .clk(clk),
    .tx_strobe(spi_tx_strobe),
@@ -102,8 +95,8 @@ spi mi_spi (
    .dout(dout),
    
    .spi_clk(sd_sck),
-   .spi_di(sd_mosi),
-   .spi_do(sd_miso)
+   .spi_di(sd_miso),
+   .spi_do(sd_mosi)
 );
 
 endmodule

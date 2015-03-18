@@ -8,7 +8,7 @@
 -- modification, are permitted provided that the following conditions are met:
 --
 -- * Redistributions of source code must retain the above copyright notice,
---   this list of conditions and the following disclaimer.
+--   this list of conditionand the following disclaimer.
 --
 -- * Redistributions in synthesized form must reproduce the above copyright
 --   notice, this list of conditions and the following disclaimer in the
@@ -51,9 +51,9 @@ generic (
 	-- 0 = 48 K
 	-- 1 = 128 K
 	-- 2 = +2A/+3
-	MODEL				:	integer := 2
-);
-	
+	MODEL				:	integer := 1
+); 
+
 port (
 	-- Clocks
 	CLOCK_27	:	in	std_logic_vector(1 downto 0);
@@ -192,7 +192,7 @@ end component;
 ---------
 
 -- config string used by the io controller to fill the OSD
-constant CONF_STR : string := "SPECTRUM;CSW;T1,Reset;T2,Trigger NMI;O3,ZXMMC+ overlay,Off,On;O4,ZXMMC+ memory,RAM,ROM";
+constant CONF_STR : string := "SPECTRUM;CSW;T1,Reset;T2,Trigger NMI";
 
 -- convert string to std_logic_vector to be given to user_io
 function to_slv(s: string) return std_logic_vector is 
@@ -497,49 +497,41 @@ component sigma_delta_dac is
   );
 end component;
 
+
 -------------------
--- MMC interface
+-- DIVMMC interface
 -------------------
 
-component zxmmc is
+component divmmc is
 port (
-	CLOCK		:	in	std_logic;
-	nRESET		:	in	std_logic;
-	CLKEN		:	in	std_logic;
-	
+	clk		: in std_logic;
+	reset_n	: in std_logic;
+	clken		: in std_logic;
+
 	-- Bus interface
-	ENABLE		:	in	std_logic;
-	-- 0 - W  - Card chip selects (active low)
-	-- 1 - RW - SPI tx/rx data register
-	-- 2 - Not used
-	-- 3 - RW - Paging control register
-	RS			:	in	std_logic_vector(1 downto 0);
-	nWR			:	in	std_logic;
-	DI			:	in	std_logic_vector(7 downto 0);
-	DO			:	out	std_logic_vector(7 downto 0);
+	enable   : in std_logic;
+	a			: in std_logic_vector(15 downto 0); 
+	wr_n     : in std_logic;
+	rd_n     : in std_logic;
+	mreq_n   : in std_logic;
+	m1_n     : in std_logic;
+	din		: in std_logic_vector(7 downto 0);
+	dout		: out std_logic_vector(7 downto 0);
+
+	-- memory paging info
+	paged_in : out std_logic;
+	sram_page: out std_logic_vector(3 downto 0);
+	mapram   : out std_logic;
+	conmem   : out std_logic;
 	
 	-- SD card interface
-	SD_CS0		:	out	std_logic;
-	SD_CS1		:	out	std_logic;
-	SD_CLK		:	out	std_logic;
-	SD_MOSI		:	out	std_logic;
-	SD_MISO		:	in	std_logic;
-	
-	-- Paging control for external RAM/ROM banks
-	EXT_WR_EN	:	out	std_logic; -- Enable writes to external RAM/ROM
-	EXT_RD_EN	:	out	std_logic; -- Enable reads from external RAM/ROM (overlay internal ROM)
-	EXT_ROM_nRAM	:	out	std_logic; -- Select external ROM or RAM banks
-	EXT_BANK	:	out	std_logic_vector(4 downto 0); -- Selected bank number
-	
-	-- DIP switches (reset values for corresponding bits above)
-	INIT_RD_EN	:	in	std_logic;
-	INIT_ROM_nRAM	:	in	std_logic;
-	
-	-- Kempston joystick input
-	JOYSTICK			:	in	std_logic_vector(7 downto 0)
+	sd_cs		:	out	std_logic;
+	sd_sck	:	out	std_logic;
+	sd_mosi	:	out	std_logic;
+	sd_miso	:	in		std_logic
 	);
 end component;
-
+			
 -------------
 -- Signals
 -------------
@@ -556,17 +548,18 @@ signal sdram_oe      :  std_logic;
 signal zx_red : std_logic_vector(5 downto 0);
 signal zx_green : std_logic_vector(5 downto 0);
 signal zx_blue : std_logic_vector(5 downto 0);
-signal zx_hs : std_logic;
-signal zx_vs : std_logic;
 
 -- signals from user_io
 signal switches: std_logic_vector(1 downto 0);
 signal buttons: std_logic_vector(1 downto 0);
-signal joystickA: std_logic_vector(5 downto 0);
-signal joystickB: std_logic_vector(5 downto 0);
+signal joystickA: std_logic_vector(7 downto 0);
+signal joystickB: std_logic_vector(7 downto 0);
 signal status: std_logic_vector(7 downto 0);
 
 -- TH extra
+signal divmmc_lo_addr	:	std_logic_vector(18 downto 0);
+signal divmmc_hi_addr	:	std_logic_vector(18 downto 0);
+signal divmmc_addr	:	std_logic_vector(18 downto 0);
 signal rom_addr		:	std_logic_vector(19 downto 0);
 signal ram_addr		:	std_logic_vector(19 downto 0);
 signal cpu_addr		:	std_logic_vector(20 downto 0);
@@ -593,7 +586,7 @@ signal tape_download : std_logic;
 signal io_addr			:  std_logic_vector(24 downto 0);
 signal audio			:  std_logic;
 signal scandoubler_disable	: std_logic;
-signal rom_dl	      : std_logic := '0';
+signal esxdos_downloaded : std_logic := '0';
 signal sd_lba 			: std_logic_vector(31 downto 0);
 signal sd_rd 			: std_logic;
 signal sd_wr 			: std_logic;
@@ -604,6 +597,10 @@ signal sd_dout 		: std_logic_vector(7 downto 0);
 signal sd_dout_strobe : std_logic;
 signal sd_din 			: std_logic_vector(7 downto 0);
 signal sd_din_strobe : std_logic;
+signal divmmc_paged_in : std_logic;
+signal divmmc_sram_page: std_logic_vector(3 downto 0);
+signal divmmc_mapram   : std_logic;
+signal divmmc_conmem   : std_logic;
 
 -- Master clock - 28 MHz
 signal clk112      	:	std_logic;
@@ -631,8 +628,9 @@ signal page_enable		:	std_logic; -- all odd IO addresses with A15 and A1 clear (
 signal psg_enable		:	std_logic; -- all odd IO addresses with A15 set and A1 clear
 -- +3 extensions
 signal plus3_enable		:	std_logic; -- A15, A14, A13, A1 clear, A12 set.
--- ZXMMC
-signal zxmmc_enable		:	std_logic; -- A4-A0 set
+-- MMC
+signal divmmc_enable		:	std_logic; -- A7-A4 = "1110"
+signal kempston_enable	:	std_logic; -- A7-A0 = "00011111"
 
 -- 128K paging register (with default values for systems that don't have it)
 signal page_reg_disable	:	std_logic := '1'; -- bit 5
@@ -709,19 +707,13 @@ signal psg_bdir		:	std_logic;
 signal psg_bc1		:	std_logic;
 signal psg_aout		:	std_logic_vector(7 downto 0) := "00000000";
 
--- ZXMMC interface
-signal zxmmc_do		:	std_logic_vector(7 downto 0);
+-- DIVMMC interface
+signal divmmc_do		:	std_logic_vector(7 downto 0);
 
-signal zxmmc_sclk	:	std_logic;
-signal zxmmc_mosi	:	std_logic;
-signal zxmmc_miso	:	std_logic;
-signal zxmmc_cs0	:	std_logic;
-
--- ZXMMC+ external ROM/RAM interface (for ResiDOS)
-signal zxmmc_wr_en	:	std_logic;
-signal zxmmc_rd_en	:	std_logic;
-signal zxmmc_rom_nram	:	std_logic;
-signal zxmmc_bank	:	std_logic_vector(4 downto 0);
+signal divmmc_sclk	:	std_logic;
+signal divmmc_mosi	:	std_logic;
+signal divmmc_miso	:	std_logic;
+signal divmmc_cs		:	std_logic;
 
 begin
 	-- 28 MHz master clock
@@ -804,7 +796,7 @@ begin
 	begin
 		if rising_edge(ioctl_download) then
 			if(ioctl_index = "00000") then
-				rom_dl <= '1';
+				esxdos_downloaded <= '1';
 			end if;
 		end if;
 	end process;	
@@ -821,7 +813,7 @@ begin
 		
 		audio_out => 	ula_ear_in,
 
-		downloading => ioctl_download,
+		downloading => tape_download,
 		size        => ioctl_size,
 
 		-- ram interface
@@ -876,8 +868,8 @@ begin
 		conf_str => to_slv(CONF_STR),
 			
 		status => status,
-		joystick_0(5 downto 0) => joystickA,
-		joystick_1(5 downto 0) => joystickB,
+		joystick_0 => joystickA,
+		joystick_1 => joystickB,
 		switches => switches,
 		buttons => buttons,
 		scandoubler_disable => scandoubler_disable,
@@ -913,13 +905,13 @@ begin
          io_dout => sd_din,
          io_dout_strobe => sd_din_strobe,
  
-         allow_sdhc  => '0',   -- SPECTRUM does not support SDHC
+         allow_sdhc  => '1',   -- esxdos supports SDHC
 
          -- connection to host
-         sd_cs  => zxmmc_cs0,
-         sd_sck => zxmmc_sclk,
-         sd_sdi => zxmmc_mosi,
-         sd_sdo => zxmmc_miso
+         sd_cs  => divmmc_cs,
+         sd_sck => divmmc_sclk,
+         sd_sdi => divmmc_mosi,
+         sd_sdo => divmmc_miso
     );
 
 	-- CPU
@@ -936,7 +928,8 @@ begin
 	cpu_irq_n <= vid_irq_n;
 	-- Unused CPU input signals
 	cpu_wait_n <= '1';
-	cpu_nmi_n <= '0' when status(2) = '1' else '1';
+	-- trigger nmi either with the OSD or with the joystick
+	cpu_nmi_n <= '0' when status(2) = '1' or joystickA(7) = '1' or joystickB(7) = '1' else '1';
 	cpu_busreq_n <= '1';
 		
 	-- Keyboard
@@ -1010,29 +1003,28 @@ begin
 
 	end generate;
 	
-	-- ZXMMC interface
-	mmc: zxmmc port map (
+		
+	-- DIVMMC interface
+	dmmc: divmmc port map (
 		clock, reset_n, cpu_clken,
-		zxmmc_enable, cpu_a(6 downto 5), -- A6/A5 selects register
-		cpu_wr_n, cpu_do, zxmmc_do,
-		zxmmc_cs0, open,
-		zxmmc_sclk, zxmmc_mosi, zxmmc_miso,
-		zxmmc_wr_en, zxmmc_rd_en, zxmmc_rom_nram,
-		zxmmc_bank,
-		status(3),status(4),
-		-- map both joysticks onto the one supported by kempston
-		"00" & (joystickA or joystickB)
+		divmmc_enable, cpu_a,
+		cpu_wr_n, cpu_rd_n, cpu_mreq_n, cpu_m1_n, 
+		cpu_do, divmmc_do,
+		divmmc_paged_in, divmmc_sram_page, divmmc_mapram, divmmc_conmem,
+		divmmc_cs, divmmc_sclk, divmmc_mosi, divmmc_miso
 		);
 		
 	-- Asynchronous reset
 	-- System is reset by external reset switch or PLL being out of lock
 
-	-- delay reset so sdram can be initialized etc
+	-- delay reset so sdram can be initialized etc. especially clearing the
+	-- divmmc ram after esxdos upload needs some time (9.3ms)
+	-- counting to 280000 at 28Mhz is 10ms
 	process(clock, pll_locked, status, buttons)
-		variable reset_cnt : integer range 0 to 10000;
+		variable reset_cnt : integer range 0 to 280000;
 	begin
 		if pll_locked = '0' or status(0) = '1' or status(1) = '1' or buttons(1) = '1' then
-			reset_cnt := 10000;
+			reset_cnt := 280000;
 		elsif rising_edge(clock) then
 			if reset_cnt /= 0 then
 				reset_cnt := reset_cnt - 1;
@@ -1059,13 +1051,14 @@ begin
 	-- 0x1FFD W   = +3 paging and control register
 	-- 0x2FFD R   = +3 FDC status register
 	-- 0x3FFD R/W = +3 FDC data register
-	-- 0xXXXF R/W = ZXMMC interface
+	-- 0xXXEX R/W = DIVMMC interface
 	-- FIXME: Revisit this - could be neater
-	ula_enable <= (not cpu_ioreq_n) and not cpu_a(0); -- all even IO addresses
-	psg_enable <= (not cpu_ioreq_n) and cpu_a(0) and cpu_a(15) and not cpu_a(1);
-	zxmmc_enable <= (not cpu_ioreq_n) and cpu_a(4) and cpu_a(3) and cpu_a(2) and cpu_a(1) and cpu_a(0);
+	ula_enable <= (not cpu_ioreq_n) and cpu_m1_n and not cpu_a(0); -- all even IO addresses
+	psg_enable <= (not cpu_ioreq_n) and cpu_m1_n and cpu_a(0) and cpu_a(15) and not cpu_a(1);
+	kempston_enable <= (not cpu_ioreq_n) and cpu_m1_n and not cpu_a(7) and not cpu_a(6) and not cpu_a(5) and cpu_a(4) and cpu_a(3) and cpu_a(2) and cpu_a(1) and cpu_a(0);
+	divmmc_enable <= esxdos_downloaded and (not cpu_ioreq_n) and cpu_m1_n and cpu_a(7) and cpu_a(6) and cpu_a(5) and not cpu_a(4) and cpu_a(0);
 	addr_decode_128k: if model /= 2 generate
-		page_enable <= (not cpu_ioreq_n) and cpu_a(0) and not (cpu_a(15) or cpu_a(1));
+		page_enable <= (not cpu_ioreq_n) and cpu_m1_n and cpu_a(0) and not (cpu_a(15) or cpu_a(1));
 	end generate;
 	addr_decode_plus3: if model = 2 generate
 		-- Paging register address decoding is slightly stricter on the +3
@@ -1104,62 +1097,72 @@ begin
 		
 	process(cpu_cycle)
 	begin
-		-- latch data at the end of cpus memory cycle
+		-- latch sdram data at the end of cpus memory cycle
 		if falling_edge(cpu_cycle) then
-			if rom_enable = '1' then
-				-- fetch rom from internal memory unless something has
-				-- been uploaded. Then use uploaded code in ram
-				if(rom_dl = '0') then
-					mem_do <= rom_do;
-				else
-					mem_do <= sdram_do;
-				end if;
-			else	
-				mem_do <= sdram_do;
-			end if;
+			mem_do <= sdram_do;
 		end if;
 	end process;
 	
 	-- CPU data bus mux
 	cpu_di <=
 		-- System RAM
-		mem_do when ram_enable = '1' else
-		-- External (ZXMMC+) RAM at 0x0000-0x3fff when enabled
-		-- This overlays the internal ROM
-		mem_do when rom_enable = '1' and zxmmc_rd_en = '1' and zxmmc_rom_nram = '0' else
-		-- Internal ROM or external (ZXMMC+) ROM at 0x0000-0x3fff
-		mem_do when rom_enable = '1' else
+		mem_do when ram_enable = '1'  else
+		-- DIVMMC memory mapped into ROM area
+		mem_do when rom_enable = '1' and divmmc_paged_in = '1' and esxdos_downloaded = '1' else
+		-- Internal ROM
+		rom_do when rom_enable = '1' else
 		-- IO ports
 		ula_do when ula_enable = '1' else
 		psg_do when psg_enable = '1' else
-		zxmmc_do when zxmmc_enable = '1' else
+		divmmc_do when divmmc_enable = '1' else
+		-- map both joysticks onto the one supported by kempston
+		"00" & (joystickA(5 downto 0) or joystickB(5 downto 0)) 
+					when kempston_enable = '1' else
 		-- Idle bus
 		(others => '1');
 	
 	rom_48k: if model = 0 generate
 		-- 48K
 		rom_addr <= 
-			-- Overlay external ROMs when enabled
-			"1" & zxmmc_bank & cpu_a(13 downto 0)
-			when zxmmc_rd_en = '1' else
 			-- Otherwise access the internal ROM
 			"000000" & cpu_a(13 downto 0);
 	end generate;
 	rom_128k: if model = 1 generate
+		-- DIVMMC low mapping (0x0000 - 0x1fff)
+		divmmc_lo_addr <= "000000" & cpu_a(12 downto 0) when
+			divmmc_conmem = '1' or divmmc_mapram = '0' else "010011" & cpu_a(12 downto 0);
+		
+		-- DIVMMC hi mapping (0x2000 - 0x3fff)
+		divmmc_hi_addr <= "01" & divmmc_sram_page & cpu_a(12 downto 0);
+	
+		-- DIVMMC mapping
+		divmmc_addr <= divmmc_lo_addr when cpu_a(13) = '0' else divmmc_hi_addr;
+			
 		-- 128K
 		rom_addr <= 
-			-- Overlay external ROMs when enabled
-			"1" & zxmmc_bank & cpu_a(13 downto 0)
-			when zxmmc_rd_en = '1' else
+			-- all DIVMMC mapping (even ram) happens in the ROM
+			-- address space (0x0000-0x3fff)
+			"1" & divmmc_addr when esxdos_downloaded = '1' and divmmc_paged_in = '1' else
 			-- Otherwise access the internal ROMs
 			"00000" & page_rom_sel & cpu_a(13 downto 0);
 	end generate;
 	rom_plus3: if model = 2 generate
+		-- DIVMMC low mapping (0x0000 - 0x1fff)
+		divmmc_lo_addr <= "000000" & cpu_a(12 downto 0) when
+			divmmc_conmem = '1' or divmmc_mapram = '0' else "010011" & cpu_a(12 downto 0);
+		
+		-- DIVMMC hi mapping (0x2000 - 0x3fff)
+		divmmc_hi_addr <= "01" & divmmc_sram_page & cpu_a(12 downto 0);
+	
+		-- DIVMMC mapping
+		divmmc_addr <= divmmc_lo_addr when cpu_a(13) = '0' else divmmc_hi_addr;
+			
 		-- +3
 		rom_addr <= 
-			-- Overlay external ROMs when enabled
-			"1" & zxmmc_bank & cpu_a(13 downto 0)
-			when zxmmc_rd_en = '1' else
+			-- all DIVMMC mapping (even ram) happens in the ROM
+			-- address space (0x0000-0x3fff)
+			"1" & divmmc_addr when esxdos_downloaded = '1' and divmmc_paged_in = '1' else
+		
 			-- Otherwise access the internal ROMs		
 			"0000" & plus3_page(1) & page_rom_sel & cpu_a(13 downto 0);
 	end generate;
@@ -1169,9 +1172,7 @@ begin
 	
 	-- first 1MB of sdram are used as ram, second 1MB sdram are used as rom
 	-- and after that starts tape buffer
-	cpu_addr <= "0" & ram_addr when ram_enable = '1' or 
-				(rom_enable = '1' and zxmmc_rd_en = '1' and zxmmc_rom_nram = '0') else
-					"1" & rom_addr;
+	cpu_addr <= "0" & ram_addr when ram_enable = '1' else "1" & rom_addr;
 	 
 	-- Video from bank 7 (128K/+3)
 	-- Video from bank 5
@@ -1189,16 +1190,29 @@ begin
 
 	-- Synchronous outputs to SRAM
 	process(clock,reset_n)
-	variable ext_ram_write : std_logic; -- External RAM (ZXMMC+)
+	variable divmmc_lo_write : std_logic;
+	variable divmmc_hi_write : std_logic;
+	variable divmmc_write : std_logic;
+	variable ext_ram_write : std_logic; -- External RAM
 	variable int_ram_write : std_logic; -- Internal RAM
 	variable sram_write : std_logic;
 	begin
-		ext_ram_write := (rom_enable and zxmmc_wr_en and not zxmmc_rom_nram) and not cpu_wr_n;
+		-- never write to lower 8k
+		divmmc_lo_write := '0';
+
+		-- write to upper 8k unless comem = 0, mapram = 1 and bank = 3
+		divmmc_hi_write := not (divmmc_conmem and divmmc_mapram and 
+										 not divmmc_sram_page(3) and not divmmc_sram_page(2) and
+										 divmmc_sram_page(1) and divmmc_sram_page(0));
+
+	   -- access to first or second 8k in OS ROM area	
+		divmmc_write := (not cpu_a(13) and divmmc_lo_write) or 
+							 (    cpu_a(13) and divmmc_hi_write);
+		
+		ext_ram_write := (rom_enable and esxdos_downloaded and divmmc_paged_in and divmmc_write) and not cpu_wr_n;
 		int_ram_write := ram_enable and not cpu_wr_n;
 		sram_write := int_ram_write or ext_ram_write;
 	
---		if reset_n = '0' then
---		els
 		if rising_edge(clock) then
 			-- synchonize cpu memory access to video memory access
 			if vid_clken = '1' then
@@ -1209,16 +1223,9 @@ begin
 			-- Register SRAM signals to outputs (clock must be at least 2x CPU clock)
 			if vid_clken = '1' then
 				-- Fetch data from previous CPU cycle
-				if rom_enable = '0' then
-					-- Normal RAM access at 0x4000-0xffff
-					-- 16-bit address
-					ram_addr <= "000" & ram_page & cpu_a(13 downto 0);
-				else
-					-- ZXMMC+ external RAM access (16 banks of 16KB)
-					-- at 0x0000-0x3fff
-					-- 16-bit address
-					ram_addr <= "1" & zxmmc_bank & cpu_a(13 downto 0);
-				end if;
+				-- Normal RAM access at 0x4000-0xffff
+				-- 16-bit address
+				ram_addr <= "000" & ram_page & cpu_a(13 downto 0);
 			end if;
 		end if;
 		
@@ -1279,16 +1286,12 @@ begin
 		end process;
 	end generate;
 	
-	-- Connect audio to PCM interface
---	pcm_outl <= ula_ear_out & psg_aout & ula_mic_out & "000000";
---	pcm_outr <= ula_ear_out & psg_aout & ula_mic_out & "000000";
-	
 	-- Connect ULA to video output
 	zx_red <= vid_r_out & "00";
 	zx_green <= vid_g_out & "00";
 	zx_blue <= vid_b_out & "00";
-	zx_hs <= vid_hcsync_n;
-	zx_vs <= vid_vsync_n;
+	VGA_HS <= vid_hcsync_n;
+	VGA_VS <= vid_vsync_n;
 
 	-- route video through osd
 	osd_d : osd
@@ -1307,8 +1310,6 @@ begin
 
       red_out => VGA_R,
       green_out => VGA_G,
-      blue_out => VGA_B,
-      hs_out => VGA_HS,
-      vs_out => VGA_VS
+      blue_out => VGA_B
 	);
 end architecture;

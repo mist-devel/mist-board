@@ -4,7 +4,9 @@
 // io controller writable ram for the MiST board
 // http://code.google.com/p/mist-board/
 //
-// Copyright (c) 2014 Till Harbaum <till@harbaum.org>
+// ZX Spectrum adapted version
+//
+// Copyright (c) 2015 Till Harbaum <till@harbaum.org>
 //
 // This source file is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published
@@ -33,12 +35,13 @@ module data_io (
 	// external ram interface
 	input 			clk,
 	output reg     wr,
-	output reg [24:0] a,
+	output [24:0]  a,
 	output [7:0]   d
 );
 
-assign d = data;
-assign size = addr - 25'h100000;
+assign d = erasing?8'h00:data;
+assign size = addr - 25'h100000;   // only valid for tape
+assign a = erasing?erase_addr:write_a;
 
 // *********************************************************************************
 // spi client
@@ -47,12 +50,15 @@ assign size = addr - 25'h100000;
 // this core supports only the display related OSD commands
 // of the minimig
 reg [6:0]      sbuf;
-reg [7:0]      cmd /* synthesis noprune */;
-reg [7:0]      data /* synthesis noprune */;
-reg [4:0]      cnt /* synthesis noprune */;
+reg [7:0]      cmd;
+reg [7:0]      data;
+reg [4:0]      cnt;
 
-reg [24:0]     addr /* synthesis noprune */;
-reg rclk /* synthesis noprune */;
+reg [24:0]     addr;
+reg [24:0]     write_a;
+reg rclk;
+reg erase_trigger;
+reg [24:0] erase_addr;
 
 localparam UIO_FILE_TX      = 8'h53;
 localparam UIO_FILE_TX_DAT  = 8'h54;
@@ -60,6 +66,7 @@ localparam UIO_FILE_INDEX   = 8'h55;
 
 assign downloading = downloading_reg;
 reg downloading_reg = 1'b0;
+reg erasing = 1'b0;
 
 // data_io has its own SPI interface to the io controller
 always@(posedge sck, posedge ss) begin
@@ -67,6 +74,7 @@ always@(posedge sck, posedge ss) begin
 		cnt <= 5'd0;
 	else begin
 		rclk <= 1'b0;
+		erase_trigger <= 1'b0;
 
 		// don't shift in last bit. It is evaluated directly
 		// when writing to ram
@@ -93,15 +101,21 @@ always@(posedge sck, posedge ss) begin
 				else				addr <= 25'h200000;  // tape buffer at 2MB
 				
 				downloading_reg <= 1'b1; 
-			end else
+			end else begin
 				downloading_reg <= 1'b0; 
+					
+				// in case of a esxdos 8k download we also erase the memory
+				// area at 1a0000 to make sure divmmc ram is empty
+				if(addr == 25'h182000)
+					erase_trigger <= 1'b1;
+			end
 		end
 		
 		// command 0x54: UIO_FILE_TX
 		if((cmd == UIO_FILE_TX_DAT) && (cnt == 15)) begin
 			data <= {sbuf, sdi};
 			rclk <= 1'b1;
-			a <= addr;
+			write_a <= addr;
 		end
 		
       // expose file (menu) index
@@ -111,14 +125,36 @@ always@(posedge sck, posedge ss) begin
 end
 
 reg rclkD, rclkD2;
+reg eraseD, eraseD2;
+reg [4:0] erase_clk_div;
 always@(posedge clk) begin
 	// bring rclk from spi clock domain into c64 clock domain
 	rclkD <= rclk;
 	rclkD2 <= rclkD;
 	wr <= 1'b0;
 	
-	if(rclkD && !rclkD2) 
+	if(rclkD && !rclkD2)
 		wr <= 1'b1;
+
+	// download may trigger an erase afterwards
+	eraseD <= erase_trigger;
+	eraseD2 <= eraseD;
+	
+	// start erasing
+	if(eraseD && !eraseD2) begin
+		erase_clk_div <= 5'd0;
+		erase_addr <= 25'h1a0000;
+		erasing <= 1'b1;
+	end else begin
+		erase_clk_div <= erase_clk_div + 5'd1;
+		if(erase_clk_div == 0) begin
+			if(erase_addr != 25'h1a2000) begin
+				erase_addr <= erase_addr + 25'd1;
+				wr <= 1'b1;
+			end else
+				erasing <= 1'b0;
+		end
+	end
 end
 
 endmodule
