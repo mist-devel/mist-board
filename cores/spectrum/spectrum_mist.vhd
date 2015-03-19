@@ -450,7 +450,9 @@ port (
 	-- CPU address bus (row)
 	A			:	in	std_logic_vector(15 downto 0);
 	-- Column outputs to ULA
-	KEYB		:	out	std_logic_vector(4 downto 0)
+	KEYB		:	out	std_logic_vector(4 downto 0);
+	
+	F11 : out std_logic
 	);
 end component;
 
@@ -601,6 +603,7 @@ signal divmmc_paged_in : std_logic;
 signal divmmc_sram_page: std_logic_vector(3 downto 0);
 signal divmmc_mapram   : std_logic;
 signal divmmc_conmem   : std_logic;
+signal key_f11         : std_logic;
 
 -- Master clock - 28 MHz
 signal clk112      	:	std_logic;
@@ -822,7 +825,8 @@ begin
 		d     =>		sdram_do
 	);
 
-	LED <= '0';
+	-- use led as the sd card access led
+	LED <= divmmc_cs;
 	
 	process(clock)
 	begin
@@ -928,15 +932,15 @@ begin
 	cpu_irq_n <= vid_irq_n;
 	-- Unused CPU input signals
 	cpu_wait_n <= '1';
-	-- trigger nmi either with the OSD or with the joystick
-	cpu_nmi_n <= '0' when status(2) = '1' or joystickA(7) = '1' or joystickB(7) = '1' else '1';
+	-- trigger nmi either with F11, the OSD or with the joystick
+	cpu_nmi_n <= '0' when key_f11 = '1' or status(2) = '1' or joystickA(7) = '1' or joystickB(7) = '1' else '1';
 	cpu_busreq_n <= '1';
 		
 	-- Keyboard
 	kb:	keyboard port map (
 		clock, reset_n,
 		ps2_clk, ps2_data,
-		cpu_a, keyb
+		cpu_a, keyb, key_f11
 		);
 		
 	-- ULA port
@@ -952,7 +956,7 @@ begin
 		
 	-- ULA video
 	vid: video port map (
-		clock, vid_clken, reset_n,
+		clock, vid_clken, pll_locked, -- reset_n,
 		not scandoubler_disable,
 		vid_a, sdram_do, vid_rd_n, vid_wait_n,
 		ula_border,

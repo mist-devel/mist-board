@@ -356,7 +356,7 @@ begin
 				vblanking <= '1';
 				vsync <= '1';
 				-- Assert vsync interrupt
-				nIRQ <= '0';
+				nIRQ <= '0'; 
 			when "0111111" =>
 				-- End of vsync after 4 lines (line 252)
 				vsync <= '0';					
@@ -364,7 +364,7 @@ begin
 				-- End of blanking and start of top border (line 256)
 				-- Should be line 264 but this is simpler and doesn't really make
 				-- any difference
-				vblanking <= '0';
+				vblanking <= '0'; 
 			when others =>
 				null;
 			end case;
@@ -372,7 +372,8 @@ begin
 			-- Wrap vertical counter at line 312-1,
 			-- Top counter value is 623 for VGA, 622 for PAL
 			if vcounter(9 downto 1) = "100110111" then
-				if (VGA = '1' and vcounter(0) = '1') or VGA = '0' then
+				if ((VGA = '1' and vcounter(0) = '1' and hcounter = "1101111110") or
+					 (VGA = '0' and                       hcounter = "1101111111")) then
 					-- Start of picture area
 					vcounter <= (others => '0');
 					-- Increment the flash counter once per frame

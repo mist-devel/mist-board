@@ -52,6 +52,7 @@ always @(posedge clk) begin
 		m1_trigger <= 1'b0;
 		paged_in <= 1'b0;
 		ctrl <= 8'h00;
+		sd_cs <= 1'b1;
 	end else begin
 		spi_rx_strobe = 1'b0;
 		spi_tx_strobe = 1'b0;

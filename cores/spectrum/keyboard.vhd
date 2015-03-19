@@ -52,7 +52,9 @@ port (
 	-- CPU address bus (row)
 	A			:	in	std_logic_vector(15 downto 0);
 	-- Column outputs to ULA
-	KEYB		:	out	std_logic_vector(4 downto 0)
+	KEYB		:	out	std_logic_vector(4 downto 0);
+
+	F11		:	out	std_logic
 	);
 end keyboard;
 
@@ -204,6 +206,8 @@ begin
 					when X"76" =>	keys(0)(0) <= release; -- Escape (CAPS SPACE)
 									keys(7)(0) <= release;
 					
+					when X"78" =>	F11 <= release;        -- F11 key
+
 					when others =>
 						null;
 					end case;
