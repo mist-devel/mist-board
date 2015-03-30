@@ -310,7 +310,7 @@ begin
                      else
                        O_DA <= reg(14); -- read output reg
                      end if;
-        when x"F" => if (Reg(7)(7) = '0') then
+        when x"F" => if (reg(7)(7) = '0') then
                        O_DA <= iob_inreg;
                      else
                        O_DA <= reg(15);

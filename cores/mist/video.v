@@ -43,6 +43,12 @@ module video (
   input 	cpu_rw,
   output [15:0] cpu_dout,
   
+  // debug overlay
+  input dbg_enable,
+  input [31:0] dbg_val_a,
+  input [31:0] dbg_val_d,
+  input [31:0] dbg_val_s,
+  
   // screen interface
   output 	hs,                  // H_SYNC
   output 	vs,                  // V_SYNC
@@ -99,14 +105,36 @@ osd osd (
 			.hs         ( stvid_hs ),
 			.vs         ( stvid_vs ),
 	 
-         .r_in       ( {stvid_r, 2'b00}),
-         .g_in       ( {stvid_g, 2'b00}),
-         .b_in       ( {stvid_b, 2'b00}),
+         .r_in       ( ovl_r ),
+         .g_in       ( ovl_g ),
+         .b_in       ( ovl_b ),
 	 
          // receive signal with OSD overlayed
          .r_out      ( video_r  ),
          .g_out      ( video_g  ),
          .b_out      ( video_b  )
+);
+
+// include debug overlay
+wire [5:0] ovl_r, ovl_g, ovl_b;
+overlay overlay (
+         .pclk       ( clk_32       ),
+			.enable     ( dbg_enable   ),
+
+			.val_a      ( dbg_val_a    ),
+			.val_d      ( dbg_val_d    ),
+			.val_s      ( dbg_val_s    ),
+
+         .red_in     ( {stvid_r, 2'b00}),
+         .green_in   ( {stvid_g, 2'b00}),
+         .blue_in    ( {stvid_b, 2'b00}),
+			.hs_in      ( stvid_hs        ),
+			.vs_in      ( stvid_vs        ),
+
+         // receive signal with OSD overlayed
+         .red_out    ( ovl_r  ),
+         .green_out  ( ovl_g  ),
+         .blue_out   ( ovl_b  )
 );
 
 // ------------- combine scandoubled shifter with viking -------------

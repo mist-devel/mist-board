@@ -38,7 +38,7 @@ module fdc (
         input 		 cpu_sel,
         input 		 cpu_rw,
         input [7:0] 	 cpu_din,
-        output reg [7:0] cpu_dout,
+        output [7:0] cpu_dout,
 
 	output reg 	 irq		 
 );
@@ -63,7 +63,7 @@ assign status_byte =
     (status_sel == 0)?cmd:
     (status_sel == 1)?track:
     (status_sel == 2)?sector:
-    (status_sel == 3)?data:
+    (status_sel == 3)?8'h00: // data:
     (status_sel == 4)?{ 4'b0000, drv_sel, drv_side, state == STATE_IO_WAIT }:
     8'h00;
 
@@ -124,18 +124,12 @@ wire [7:0] status = {
 };
 
 // CPU register read
-always @(cpu_sel, cpu_addr, cpu_rw) begin
-   cpu_dout = 8'h00;
-
-   if(cpu_sel && cpu_rw) begin
-      case(cpu_addr)
-			0: cpu_dout = status;
-			1: cpu_dout = track;
-			2: cpu_dout = sector;
-			3: cpu_dout = data;
-      endcase
-   end
-end
+assign cpu_dout = 
+	(cpu_sel && cpu_rw)?(
+		(cpu_addr == 0)?status:
+		(cpu_addr == 1)?track:
+		(cpu_addr == 2)?sector:
+		data):8'h00;
 
 // CPU register write
 always @(negedge clk or posedge reset) begin

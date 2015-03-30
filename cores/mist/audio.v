@@ -90,7 +90,7 @@ wire [7:0] psg_dout;
 
 YM2149 ym2149 (
 	.I_DA						( din[15:8]					),
-	.O_DA						( psg_data_out				),
+	.O_DA						( psg_dout				   ),
 	.O_DA_OE_L           (								),
 
 	// control

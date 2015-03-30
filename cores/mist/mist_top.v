@@ -74,19 +74,19 @@ wire tg68_berr = (dtack_timeout == 4'd15);
 	
 // count bus errors for debugging purposes. we can thus trigger for a
 // certain bus error
-reg [3:0] berr_cnt_out /* synthesis noprune */;
-reg [3:0] berr_cnt;
+reg [7:0] berr_cnt_out /* synthesis noprune */;
+reg [7:0] berr_cnt;
 reg berrD;
 always @(negedge clk_8) begin
 	berrD <= tg68_berr;
 
 	if(reset) begin
-		berr_cnt <= 4'd0;
+		berr_cnt <= 8'd0;
 	end else begin
-		berr_cnt_out <= 4'd0;
+		berr_cnt_out <= 8'd0;
 		if(tg68_berr && !berrD) begin
-			berr_cnt_out <= berr_cnt + 4'd1;
-			berr_cnt <= berr_cnt + 4'd1;
+			berr_cnt_out <= berr_cnt + 8'd1;
+			berr_cnt <= berr_cnt + 8'd1;
 		end
 	end
 end
@@ -265,6 +265,8 @@ end
 
 wire viking_active = (viking_in_use == 8'hff);
 
+// xyz
+
 video video (
 	.clk_128      	(clk_128    ),
 	.clk_32      	(clk_32     ),
@@ -296,6 +298,12 @@ video video (
 	.video_g    (VGA_G    	   ),
 	.video_b    (VGA_B    	   ),
 
+	// debug overlay
+	.dbg_enable (switches[0]   ),
+	.dbg_val_a  (tg68_adr       ),
+	.dbg_val_d  ({tg68_dat_out, cpu_data_in }),
+	.dbg_val_s  ({16'h0000, berr_cnt, 6'b000000, tg68_busstate } ),
+	
 	// configuration signals
    .viking_enable       ( viking_active       ), // enable and activate viking video card
    .viking_himem        ( steroids            ), // let viking use memory from $e80000
@@ -638,7 +646,6 @@ end
 
 // tg68 bus interface. These are the signals which are latched
 // for the 8MHz bus.
-wire [15:0] tg68_dat_in;
 reg [15:0] tg68_dat_out;
 reg [31:0] tg68_adr;
 wire [2:0] tg68_IPL;
@@ -784,11 +791,12 @@ always @(negedge clk_32) begin
 
 		// cpu does internal processing -> let it do this immediately
 		// or cpu wants to read and the requested data is available from the cache -> run immediately
+//		if((clkcnt == 3) && (tg68_busstate == 2'b01)) begin
 		if((tg68_busstate == 2'b01) || ((tg68_busstate[0] == 1'b0) && cacheReady)) begin
 			clkena <= 1'b1; 
 			cpuDoes8MhzCycle <= 1'b0;
 		end 
-
+		
 		else begin
 			// this ends a normal 8MHz bus cycle. This requires that the 
 			// cpu/chipset had the entire cycle and not e.g. started just in
@@ -1107,6 +1115,7 @@ wire eth_tx_read_strobe, eth_tx_read_begin;
 wire [7:0] eth_rx_write_byte;
 wire eth_rx_write_strobe, eth_rx_write_begin;
 
+wire [2:0] switches;
 wire scandoubler_disable;
 
 //// user io has an extra spi channel outside minimig core ////
@@ -1159,7 +1168,7 @@ user_io user_io(
 
 		// io controller requests to disable vga scandoubler
 		.scandoubler_disable       (scandoubler_disable),
-		
+		.SWITCHES                  (switches ),
 		.CORE_TYPE						(8'ha3)    // mist core id
 );
 
