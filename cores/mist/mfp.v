@@ -186,7 +186,7 @@ reg [15:0] imr, ier;   // interrupt registers
 reg [7:0] vr;
 
 // generate irq signal if an irq is pending and no other irq of same or higher prio is in service
-assign irq = ((ipr & imr) != 16'h0000) && (highest_irq_pending >= irq_in_service);
+assign irq = ((ipr & imr) != 16'h0000) && (highest_irq_pending > irq_in_service);
    
 // check number of current interrupt in service
 wire [3:0] irq_in_service;
@@ -278,14 +278,13 @@ mfp_srff16 ipr_latch (
 	.reset	( ipr_reset			),
 	.out		( ipr					)
 );
- 
+
 // ------------------------ ISR register --------------------------
 wire [15:0] isr;
 reg [15:0] isr_reset;
+reg [15:0] isr_set;
 
 // move highest pending irq into isr when s bit set and iack raises
-wire [15:0] isr_set = (vr[3] && iack)?highest_irq_pending_mask:16'h0000;
-
 mfp_srff16 isr_latch (
 	.set    	( isr_set			),
 	.reset	( isr_reset			),
@@ -307,12 +306,15 @@ always @(negedge clk) begin
 		isr_reset <= 16'hffff;
 		ier <= 16'h0000; 
 		imr <= 16'h0000;
+		isr_set <= 16'h0000;
 	end else begin 
  
-		// remove active bit from ipr
-		if(iack)
+		// remove active bit from ipr and set it in isr
+		if(iack) begin
 			ipr_reset[highest_irq_pending] <= 1'b1;
-	
+			isr_set <= (vr[3] && iack)?highest_irq_pending_mask:16'h0000;
+		end
+			
 		if(sel && ~ds && ~rw) begin
 			// -------- GPIO ---------
 			if(addr == 5'h00) gpip <= din;
