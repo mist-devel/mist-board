@@ -270,7 +270,7 @@ reg [15:0] ipr_reset;
 wire [15:0]	ipr_set = {  
 	gpio_irq[7:6], timera_done, serial_data_in_available, 
 	1'b0 /* rcv err */, !serial_data_out_fifo_full, 1'b0 /* tx err */, timerb_done,
-	gpio_irq[5:4], timerc_done, timerb_done, gpio_irq[3:0]
+	gpio_irq[5:4], timerc_done, timerd_done, gpio_irq[3:0]
 };
 
 mfp_srff16 ipr_latch (
