@@ -76,23 +76,30 @@ wire cmd_type_2 = (cmd[7:6] == 2'b10);
 
 // ---------------- floppy motor simulation -------------
 
+// - all type 1 and 2 commands switch the motor on
+// - if it was already running it just keeps running
+// - if it was off it "spins up"
+// - force interrupt basically enforces a spin-up even if motor is spinning
+
 // timer to simulate motor-on. This runs for x/8000000 seconds after each command
 reg motor_start;
+reg motor_force_spinup;
 reg [31:0] motor_on_counter;
 wire motor_on = (motor_on_counter != 0);
 
 // motor_on_counter > 16000000 means the motor is spinning up
 wire motor_spin_up_done = motor_on && (motor_on_counter <= 16000000);
+wire motor_start_or_force = motor_start || motor_force_spinup;
 
-always @(posedge clk or posedge motor_start) begin
-   if(motor_start)
+always @(posedge clk or posedge motor_start_or_force) begin
+   if(motor_start_or_force)
      // motor runs for 2 seconds if it was already on. it rus for one
      // more second if if wasn't on yet (spin up)
-     motor_on_counter <= motor_on?32'd16000000:32'd24000000;
+     motor_on_counter <= (motor_on && !motor_force_spinup)?32'd16000000:32'd24000000;
    else begin
       // let "motor" run
       if(motor_on_counter != 0)
-	motor_on_counter <= motor_on_counter - 32'd1;
+			motor_on_counter <= motor_on_counter - 32'd1;
    end
 end
 		
@@ -116,11 +123,11 @@ end
 wire [7:0] status = { 
   motor_on,
   wr_prot,
-  cmd_type_1?motor_spin_up_done:1'b0,
+  cmd_type_1?motor_spin_up_done:1'b0,         // spin up done? RType Deluxe needs this
   2'b00 /* track not found/crc err */, 
   cmd_type_1?(track == 0):1'b0,
-  cmd_type_1?index_pulse:(state!=STATE_IDLE),
-  state != STATE_IDLE 
+  cmd_type_1?index_pulse:(state == STATE_IO_WAIT),   // drq
+  (state == STATE_INT_WAIT) || (state == STATE_IO_WAIT)
 };
 
 // CPU register read
@@ -144,10 +151,12 @@ always @(negedge clk or posedge reset) begin
       state <= STATE_IDLE;
       irq <= 1'b0;
       motor_start <= 1'b0;
+      motor_force_spinup <= 1'b0;
       delay <= 32'd0;
 
    end else begin
       motor_start <= 1'b0;
+      motor_force_spinup <= 1'b0;
 
       // DMA transfer has been ack'd by io controller
       if(dma_ack) begin
@@ -193,8 +202,11 @@ always @(negedge clk or posedge reset) begin
 				end
 	    
 				if(cpu_din[7:4] == 4'b0001) begin  	        // SEEK
-					track <= data;
-					delay <= 31'd200000;			// 25ms delay
+					if(track != data) begin
+						track <= data;
+						delay <= 31'd200000;			// 25ms delay
+					end else
+						state <= STATE_IRQ;						
 				end
 	    
 				if(cpu_din[7:5] == 3'b001) begin		// STEP
@@ -239,6 +251,7 @@ always @(negedge clk or posedge reset) begin
 	    
 				// ------------- TYPE IV commands -------------
 				if(cpu_din[7:4] == 4'b1101) begin           // force intrerupt
+					motor_force_spinup <= 1'b1;
 					if(cpu_din[3:0] == 4'b0000)
 						state <= STATE_IDLE;                    // immediately
 					else

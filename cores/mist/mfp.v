@@ -274,7 +274,8 @@ wire [15:0]	ipr_set = {
 };
 
 mfp_srff16 ipr_latch (
-	.set    	( ipr_set & ier	),
+	.set    	( ipr_set       	),
+	.mask   	( ier	            ),
 	.reset	( ipr_reset			),
 	.out		( ipr					)
 );
@@ -287,6 +288,7 @@ reg [15:0] isr_set;
 // move highest pending irq into isr when s bit set and iack raises
 mfp_srff16 isr_latch (
 	.set    	( isr_set			),
+	.mask   	( 16'hffff			),
 	.reset	( isr_reset			),
 	.out		( isr					)
 );
