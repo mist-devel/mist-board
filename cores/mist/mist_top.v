@@ -363,7 +363,7 @@ wire mfp_io0 = (usb_redirection == 2'd2)?parallel_fifo_full:~joy0[4];
 
 // inputs 1,2 and 6 are inputs from serial which have pullups before an inverter
 wire [7:0] mfp_gpio_in = {mfp_io7, 1'b0, !dma_irq, !acia_irq, !blitter_irq, 2'b00, mfp_io0};
-wire [1:0] mfp_timer_in = {st_de, ste?ste_dma_snd_xsirq_delayed:parallel_fifo_full};
+wire [1:0] mfp_timer_in = {!st_de, ste?ste_dma_snd_xsirq_delayed:!parallel_fifo_full};
 
 mfp mfp (
 	// cpu register interface

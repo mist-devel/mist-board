@@ -122,7 +122,7 @@ mfp_timer timer_a (
    .DAT_O		(timera_dat_o),
    .DAT_WE		((addr == 5'h0f) && write),
 	.PULSE_MODE (pulse_mode[1]),
-   .T_I			(t_i[0] ^ aer[4]),
+   .T_I			(t_i[0] ^ ~aer[4]),
    .T_O_PULSE	(timera_done)
 );
 
@@ -141,7 +141,7 @@ mfp_timer timer_b (
    .DAT_O		(timerb_dat_o),
    .DAT_WE		((addr == 5'h10) && write),
 	.PULSE_MODE (pulse_mode[0]),
-   .T_I			(t_i[1] ^ aer[3]),
+   .T_I			(t_i[1] ^ ~aer[3]),
    .T_O_PULSE	(timerb_done)
 );
 
