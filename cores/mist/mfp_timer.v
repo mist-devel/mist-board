@@ -1,3 +1,26 @@
+//
+// mfp_timer.v
+// 
+// Single MFP68901 timer implementation
+// http://code.google.com/p/mist-board/
+// 
+// Copyright (c) 2013 Stephen Leary
+// Copyright (c) 2013-15 Till Harbaum <till@harbaum.org> 
+// 
+// This source file is free software: you can redistribute it and/or modify 
+// it under the terms of the GNU General Public License as published 
+// by the Free Software Foundation, either version 3 of the License, or 
+// (at your option) any later version. 
+// 
+// This source file is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of 
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the 
+// GNU General Public License for more details.
+// 
+// You should have received a copy of the GNU General Public License 
+// along with this program.  If not, see <http://www.gnu.org/licenses/>. 
+
+
 module mfp_timer(
 		 input 	      CLK,
 		 input 	      RST, 
@@ -8,14 +31,14 @@ module mfp_timer(
 
        input 	     CTRL_WE,                      
        input [4:0]  CTRL_I,
-       output [4:0] CTRL_O,
+       output [3:0] CTRL_O,
 
 		 inout 	     XCLK_I, 
        input 	     T_I, // ext. trigger in
 
 		 output       PULSE_MODE,  // pulse mode disables input port irq
 		 
-       output reg   T_O,                          
+       output reg   T_O,
        output reg   T_O_PULSE
 );
 
@@ -69,7 +92,6 @@ end
 always @(negedge CLK) begin
       
 	if (RST === 1'b1) begin
-//      T_O_PULSE <= 1'b0;
       T_O     <= 1'b0;
       control <= 4'd0;
       data    <= 8'd0;
@@ -84,14 +106,12 @@ always @(negedge CLK) begin
 		xclk_r <= (prescaler_counter === 8'd0);
 		xclk_r2 <= xclk_r;
 
-//      T_O_PULSE <= 1'b0;
-	 
       // if a write request comes from the main unit
       // then write the data to the appropriate register.
       if(DAT_WE) begin
          data <= DAT_I;
-	 // the counter itself is only loaded here if it's stopped
-	 if(!started)
+			// the counter itself is only loaded here if it's stopped
+			if(!started)
            down_counter <= DAT_I;
       end
 
@@ -128,10 +148,9 @@ always @(negedge CLK) begin
 					// pulse the timer out
 					T_O <= ~T_O;
 					down_counter <= data;
-//					T_O_PULSE <= 1'b1;
 		  
 				end else begin
-		  
+	  
 					down_counter <= down_counter - 8'd1;		  
 				end
          end
@@ -153,6 +172,6 @@ assign event_mode = control[3:0] === 4'b1000;
    
 assign started = control[3:0] != 4'd0;
 assign DAT_O = cur_counter;    
-assign CTRL_O = {T_O, control};    
-   
+assign CTRL_O = control;
+ 
 endmodule // mfp_timer

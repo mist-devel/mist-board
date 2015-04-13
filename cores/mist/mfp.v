@@ -109,7 +109,7 @@ wire [1:0] pulse_mode;
    
 wire timera_done;
 wire [7:0] timera_dat_o;
-wire [4:0] timera_ctrl_o;
+wire [3:0] timera_ctrl_o;
 
 mfp_timer timer_a (
 	.CLK 			(clk),
@@ -128,7 +128,7 @@ mfp_timer timer_a (
 
 wire timerb_done;
 wire [7:0] timerb_dat_o;
-wire [4:0] timerb_ctrl_o;
+wire [3:0] timerb_ctrl_o;
 
 mfp_timer timer_b (
 	.CLK 			(clk),
@@ -147,7 +147,7 @@ mfp_timer timer_b (
 
 wire timerc_done;
 wire [7:0] timerc_dat_o;
-wire [4:0] timerc_ctrl_o;
+wire [3:0] timerc_ctrl_o;
 
 mfp_timer timer_c (
 	.CLK 			(clk),
@@ -164,7 +164,7 @@ mfp_timer timer_c (
 
 wire timerd_done;
 wire [7:0] timerd_dat_o;
-wire [4:0] timerd_ctrl_o;
+wire [3:0] timerd_ctrl_o;
 
 mfp_timer timer_d (
 	.CLK 			(clk),
@@ -210,6 +210,8 @@ wire [7:0] gpip_cpu_out = (i & ~ddr) | (gpip & ddr);
 // cpu controllable uart control bits
 reg [1:0] uart_rx_ctrl;
 reg [3:0] uart_tx_ctrl;
+reg [6:0] uart_ctrl;
+reg [7:0] uart_sync_chr;
 
 // cpu read interface
 always @(iack, sel, ds, rw, addr, gpip_cpu_out, aer, ddr, ier, ipr, isr, imr, 
@@ -234,15 +236,17 @@ always @(iack, sel, ds, rw, addr, gpip_cpu_out, aer, ddr, ier, ipr, isr, imr,
 		if(addr == 5'h0b) dout = vr;
 	 
 		// timers
-		if(addr == 5'h0c) dout = { 3'b000, timera_ctrl_o};
-		if(addr == 5'h0d) dout = { 3'b000, timerb_ctrl_o};
-		if(addr == 5'h0e) dout = { timerc_ctrl_o[3:0], timerd_ctrl_o[3:0]};
+		if(addr == 5'h0c) dout = { 4'h0, timera_ctrl_o};
+		if(addr == 5'h0d) dout = { 4'h0, timerb_ctrl_o};
+		if(addr == 5'h0e) dout = { timerc_ctrl_o, timerd_ctrl_o};
 		if(addr == 5'h0f) dout = timera_dat_o;
 		if(addr == 5'h10) dout = timerb_dat_o;
 		if(addr == 5'h11) dout = timerc_dat_o;
 		if(addr == 5'h12) dout = timerd_dat_o;
 		
 		// uart: report "tx buffer empty" if fifo is not full
+		if(addr == 5'h13) dout = uart_sync_chr; 
+		if(addr == 5'h14) dout = { uart_ctrl, 1'b0 }; 
 		if(addr == 5'h15) dout = {  serial_data_in_available, 5'b00000 , uart_rx_ctrl}; 
 		if(addr == 5'h16) dout = { !serial_data_out_fifo_full, 3'b000 , uart_tx_ctrl}; 
 		if(addr == 5'h17) dout = serial_data_in_cpu;
@@ -343,8 +347,10 @@ always @(negedge clk) begin
 			if(addr == 5'h0b) vr <= din;
 
 			// ------- uart ------------
-			if(addr == 5'h15) uart_rx_ctrl <= din[1:0];
-			if(addr == 5'h16) uart_tx_ctrl <= din[3:0];
+			if(addr == 5'h13) uart_sync_chr <= din[1:0];
+			if(addr == 5'h14) uart_ctrl     <= din[7:1];
+			if(addr == 5'h15) uart_rx_ctrl  <= din[1:0];
+			if(addr == 5'h16) uart_tx_ctrl  <= din[3:0];
 			
 			// write to addr == 5'h17 is handled by the output fifo
 		end

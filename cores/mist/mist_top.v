@@ -791,10 +791,11 @@ always @(negedge clk_32) begin
 
 		// cpu does internal processing -> let it do this immediately
 		// or cpu wants to read and the requested data is available from the cache -> run immediately
-//		if((clkcnt == 3) && (tg68_busstate == 2'b01)) begin
 		if((tg68_busstate == 2'b01) || ((tg68_busstate[0] == 1'b0) && cacheReady)) begin
-			clkena <= 1'b1; 
-			cpuDoes8MhzCycle <= 1'b0;
+			if(steroids || ((clkcnt == 3) && (cpu_cycle || cpu_cycle_int))) begin
+				clkena <= 1'b1; 
+				cpuDoes8MhzCycle <= 1'b0;
+			end
 		end 
 		
 		else begin
@@ -1000,6 +1001,7 @@ wire second_cpu_slot = (mste && enable_16mhz) || steroids;
 // cpu, DMA and Blitter. A third is optionally being used for faster CPU
 wire video_cycle = (bus_cycle == 0)||(bus_cycle == 2);
 wire cpu_cycle = (bus_cycle == 1) || (second_cpu_slot && (bus_cycle == 3));
+wire cpu_cycle_int = (bus_cycle == 3);
 
 // ----------------- RAM address --------------
 wire ste_dma_has_bus = (bus_cycle == 0) && st_hs && ste;
