@@ -231,12 +231,17 @@ wire dma_sel  = io_sel && (
 	(({tg68_adr[15:1], 1'd0} == 16'h860e) && ste));           // ff860e-ff860f (hdmode, STE)
 wire [15:0] dma_data_out;
 
-// de-multiplex the various io data output ports into one 
-wire [7:0] io_data_out_8u = acia_data_out;
-wire [7:0] io_data_out_8l = mmu_data_out | mfp_data_out | auto_vector | mste_ctrl_data_out;
+// --------- de-multiplex the various io data output ports into one -----------
+// acia returns 0xff on odd addresses (needed e.g. by intro of automation 496)
+wire [15:0] acia_data_out_16 = { acia_data_out, acia_sel?8'hff:8'h00 };
+wire io_data_out_8l_sel = mmu_sel | mfp_sel | auto_iack | mste_ctrl_sel;
+wire [15:0] mfp_data_out_16 = { mfp_sel?8'hff:8'h00, mfp_data_out };
+wire [15:0] mmu_data_out_16 = { mmu_sel?8'hff:8'h00, mmu_data_out };
+wire [15:0] mste_ctrl_data_out_16 = { mste_ctrl_sel?8'hff:8'h00, mste_ctrl_data_out };
+// wire [7:0] io_data_out_8l = mste_ctrl_data_out;
 wire [15:0] io_data_out = vreg_data_out | dma_data_out | blitter_data_out | 
-				ste_joy_data_out | audio_data_out | rom_data_out |
-				{8'h00, io_data_out_8l} | {io_data_out_8u, 8'h00};
+				ste_joy_data_out | audio_data_out | rom_data_out | { 8'h00, auto_vector } |
+				mfp_data_out_16 | mmu_data_out_16 | mste_ctrl_data_out_16 | acia_data_out_16;
 
 wire init = ~pll_locked;
 
