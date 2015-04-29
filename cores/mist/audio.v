@@ -84,7 +84,7 @@ wire [7:0] port_b_in = { ~joy0[0], ~joy0[1], ~joy0[2], ~joy0[3],
 								 ~joy1[0], ~joy1[1], ~joy1[2], ~joy1[3]}; 
 wire [7:0] port_a_in = { 2'b11, ~joy1[4], 5'b11111 }; 
 
-assign dout = psg_sel?{psg_dout,8'h00}:ste_dma_snd_sel?ste_dma_snd_data_out:16'h0000;
+assign dout = psg_sel?{psg_dout,8'hff}:ste_dma_snd_sel?ste_dma_snd_data_out:16'h0000;
 wire [15:0] ste_dma_snd_data_out;
 wire [7:0] psg_dout;
 

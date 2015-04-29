@@ -25,20 +25,20 @@ module fdc (
 	input 		 reset,
 
 	    // write protection of currently selected floppy
-	input [1:0] 	 drv_sel,
+	input [1:0]  drv_sel,
 	input 		 drv_side,
 	input 		 wr_prot,
 	    
 	input 		 dma_ack,
-	input [2:0] 	 status_sel,
-	output [7:0]     status_byte,
+	input [2:0]  status_sel,
+	output [7:0] status_byte,
 
-	    // cpu interface
-        input [1:0] 	 cpu_addr,
-        input 		 cpu_sel,
-        input 		 cpu_rw,
-        input [7:0] 	 cpu_din,
-        output [7:0] cpu_dout,
+	// cpu interface
+   input [1:0]  cpu_addr,
+   input 		 cpu_sel,
+   input 		 cpu_rw,
+   input [7:0]  cpu_din,
+   output [7:0] cpu_dout,
 
 	output reg 	 irq		 
 );
@@ -58,13 +58,18 @@ reg [7:0] track;
 reg [7:0] sector;
 reg [7:0] data;
 
+// Some broken software selects both drives at the same time. On real hardware this
+// only works if no second drive is present. In our setup the second drive is present
+// but we can simply map all such broken accesses to drive A only
+wire [1:0] drv_sel_exclusive = (drv_sel == 2'b00)?2'b10:drv_sel;
+
 // fdc status as reported to the io controller
 assign status_byte =
     (status_sel == 0)?cmd:
     (status_sel == 1)?track:
     (status_sel == 2)?sector:
     (status_sel == 3)?8'h00: // data:
-    (status_sel == 4)?{ 4'b0000, drv_sel, drv_side, state == STATE_IO_WAIT }:
+    (status_sel == 4)?{ 4'b0000, drv_sel_exclusive, drv_side, state == STATE_IO_WAIT }:
     8'h00;
 
 reg step_dir;
