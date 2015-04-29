@@ -288,7 +288,7 @@ begin
   begin
     -- putting zeros on the outputs whenever the chip is not selected is necessary for the mist
 	 -- as all the chips outputs are simply or'ed tegether
-    O_DA <= (others => '0'); -- 'X'
+    O_DA <= (others => '1'); -- reading with BC1=0 returns ff on ST as the bus floats
     if (busctrl_re = '1') then -- not necessary, but useful for putting 'X's in the simulator
       case addr(3 downto 0) is
         when x"0" => O_DA <= reg(0) ;
