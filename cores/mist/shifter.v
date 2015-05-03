@@ -21,44 +21,44 @@
 
 module shifter (
   // system interface
-  input 	    clk, // 31.875 MHz
-  input [1:0] 	    bus_cycle, // bus-cycle for sync
+  input 	    			clk, // 32.000 MHz
+  input [1:0] 	    	bus_cycle, // bus-cycle for sync
 
   // memory interface
-  output reg [22:0] vaddr, // video word address counter
-  output 	    read, // video read cycle
-  input [63:0] 	    data, // video data read
+  output reg [22:0] 	vaddr, // video word address counter
+  output 	    		read, // video read cycle
+  input [63:0] 	   data, // video data read
   
   // cpu register interface
-  input 	    cpu_clk,
-  input 	    cpu_reset,
-  input [15:0] 	    cpu_din,
-  input 	    cpu_sel,
-  input [5:0] 	    cpu_addr,
-  input 	    cpu_uds,
-  input 	    cpu_lds,
-  input 	    cpu_rw,
-  output reg [15:0] cpu_dout,
+  input 	    			cpu_clk,
+  input 	    			cpu_reset,
+  input [15:0] 	   cpu_din,
+  input 	    			cpu_sel,
+  input [5:0] 	    	cpu_addr,
+  input 	    			cpu_uds,
+  input 	    			cpu_lds,
+  input 	    			cpu_rw,
+  output reg [15:0] 	cpu_dout,
   
   // screen interface
-  output reg 	    hs, // H_SYNC
-  output reg 	    vs, // V_SYNC
-  output reg [3:0]  video_r, // Red
-  output reg [3:0]  video_g, // Green
-  output reg [3:0]  video_b, // Blue
+  output reg 	    	hs, // H_SYNC
+  output reg 	    	vs, // V_SYNC
+  output reg [3:0] 	video_r, // Red
+  output reg [3:0] 	video_g, // Green
+  output reg [3:0] 	video_b, // Blue
 
   // system config
-  input 	    pal56, // use VGA compatible 56hz for PAL
-  input 	    ste, // enable STE featurss
+  input 	    			pal56, // use VGA compatible 56hz for PAL
+  input 	    			ste, // enable STE featurss
 
-  output 	    vga_hs_pol, // sync polarity to be used on vga
-  output 	    vga_vs_pol,
-  output            clk_16,     // 16Mhz clock for scan doubler
+  output 	    		vga_hs_pol, // sync polarity to be used on vga
+  output 	    		vga_vs_pol,
+  output          	clk_16,     // 16Mhz clock for scan doubler
  
   // signals not affected by scan doubler for internal use like irqs
-  output 	    st_de,
-  output reg 	    st_vs,
-  output reg 	    st_hs
+  output 	    		st_de,
+  output reg 	   	st_vs,
+  output reg 	   	st_hs
 );
 
 localparam STATE_SYNC   = 2'd0;
@@ -97,16 +97,24 @@ always @(negedge clk)
 // by software to generate a line interrupt and to e.g. do 512 color effects.
 // st_de is active low. Using display enable (de) for this makes sure the cpu has
 // plenty of time before data for the next line is starting to be fetched
-assign st_de = ~de;
+// assign st_de = ~de;
 
+// according to hatari video.h/video.c the timer_b irq comes 28 8MHz cycles after
+// the last pixel has been displayed. Our de is 4 cycles earlier then the end
+// of the line, so we delay by 28+4=32
+reg [31:0] st_de_delay;
+assign st_de = st_de_delay[31];
+always @(posedge t[1])
+   st_de_delay <= { st_de_delay[30:0], ~de };
+ 
 always @(posedge clk) begin
    st_hs <= h_sync;
    
 	// vsync irq is generated right after the last border line has been displayed
- 
-	// v_event is the begin of hsync. The hatari video.h says vbi happens 64 clock cycles
-	// ST hor counter runs at 16Mhz, thus the trigger is 128 events after h_sync
-	if(hcnt == v_event) begin		
+
+	// According to hatari vbl happens in cycle 64. Display starts at cycle 56,
+	// so vbl happens at cycle 8 of the display phase
+	if(hcnt == 8) begin		
 		// vsync starts at begin of blanking phase
 		if(vcnt == t7_v_blank_bot)   st_vs <= 1'b1;
 		
@@ -403,6 +411,8 @@ reg [3:0] top_overscan_cnt;
 wire bottom_overscan = (bottom_overscan_cnt != 0);
 wire top_overscan = (top_overscan_cnt != 0);
 
+reg syncmode_at_line_start;
+
 always @(posedge clk) begin
 	if(cpu_reset) begin
 		top_overscan_cnt <= 4'd0;
@@ -410,7 +420,7 @@ always @(posedge clk) begin
 	end else begin
 		last_syncmode <= syncmode[1];  // delay syncmode to detect changes
 
-	        // reset counters
+      // reset counters
 		if((vcnt == 0) && (hcnt == 10'd0)) begin
 		   if(bottom_overscan_cnt != 0)
 		     bottom_overscan_cnt  <= bottom_overscan_cnt - 4'd1;
@@ -420,24 +430,29 @@ always @(posedge clk) begin
 		end
 	   
 		// this is the magic used to do "overscan".
-		// the magic actually involves more than writing zero (60hz)
+		// the magic actually involves more than toggling syncmode (50/60hz)
 		// within line 200. But this is sufficient for our detection
 
-		// trigger in line 198/199
-		if((vcnt[8:1] == 8'd97)||(vcnt[8:1] == 8'd98)||(vcnt[8:1] == 8'd99)||
-			(vcnt[8:1] == 8'd100)||(vcnt[8:1] == 8'd101)) begin
-			// syncmode has changed from 1 to 0 (50 to 60 hz)
-			if((syncmode[1] == 1'b0) && (last_syncmode == 1'b1))
+		// trigger in line 199
+		if( (vcnt >= 9'd194) && (vcnt <= 9'd202) ) begin
+			// syncmode has changed between 1 and 0 (50/60 hz)
+			if(syncmode[1] != last_syncmode)
 				bottom_overscan_cnt <= 4'd15;
 		end 
 	  
-		// trigger in line 284/285
-		if((vcnt[8:1] == 8'd140)||(vcnt[8:1] == 8'd141)||(vcnt[8:1] == 8'd142)||
-			(vcnt[8:1] == 8'd143)||(vcnt[8:1] == 8'd144)||(vcnt[8:1] == 8'd145)) begin
-			// syncmode has changed from 1 to 0 (50 to 60 hz)
-			if((syncmode[1] == 1'b0) && (last_syncmode == 1'b1))
+		// trigger in line 284/285 and 1/2
+		if( ( (vcnt >= 9'd280) && (vcnt <= 9'd290) ) ||
+			 ( (vcnt >=   9'd0) && (vcnt <=   9'd3) ) ) begin
+			// syncmode has changed between 1 and 0 (50/60 hz)
+			if(syncmode[1] != last_syncmode)
 				top_overscan_cnt <= 4'd15;
 		end
+		
+		// latch syncmode at begin of line and check if it changed at the end
+		// this special case causes 2 less (50->60) or more (60->50) bytes to be read
+		// during a line
+		if(hcnt == de_h_start)
+			syncmode_at_line_start <= syncmode[1];
 	end
 end
 
@@ -534,15 +549,16 @@ always @(posedge clk) begin
 		if(hcnt == de_h_end)    de <= 1'b0;
 	end
  
-	// make sure each line starts with plane 0
-	if(hcnt == de_h_start)
-		plane <= 2'd0;
-
 	// according to hatari the video counter is reloaded 3 lines before 
 	// the vbi occurs. This is right after the display has been painted.
 	// The video address counter is reloaded right after display ends 
-	if((hcnt == t3_h_blank_left) && (vcnt == (t7_v_blank_bot+10'd1))) begin
+   // also according to hatari this happens 8 cycles before display starts
+	// in mono mode it doesn't work that way as there's no border and 
+	// three lines before blank is inside the display area
+	if((hcnt == t5_h_end-8 ) && 
+		(vcnt == (mono?(t7_v_blank_bot+10'd1):(t7_v_blank_bot-10'd3)))) begin
 		vaddr <= _v_bas_ad;
+		plane <= 2'd0;
 
 		// copy syncmode
 		syncmode_latch <= syncmode;
@@ -563,16 +579,28 @@ always @(posedge clk) begin
 						2'd3: data_latch[plane] <= data[63:48];
 				endcase
 				
+				// advance video address
 				vaddr <= vaddr + 23'd1;
-			end
 
-			// advance plane counter
-			if(planes != 1) begin
-				plane <= plane + 2'd1;
-				if(plane == planes - 2'd1)
-					plane <= 2'd0;
+				// advance plane counter
+				if(planes != 1) begin
+					plane <= plane + 2'd1;
+					if(plane == planes - 2'd1)
+						plane <= 2'd0;
+				end
 			end
 		end
+	end
+
+	// at the end of each line check whether someone messed with the 
+	// syncmode register in a way that the line ends at  adifferent mode than
+	// it started
+	if(de_v && (hcnt == de_h_end + 1 ) && (t == 0)) begin
+		if(syncmode_at_line_start && !syncmode[1])    // 50->60 Hz => two bytes less
+			vaddr <= vaddr - 23'd1;                    // two bytes less
+
+		if(!syncmode_at_line_start && syncmode[1])    // 60->50 Hz => two bytes less
+			vaddr <= vaddr + 23'd1;                    // two bytes more
 	end
 
 	// STE has additional ways to influence video address
@@ -627,13 +655,13 @@ always @(posedge pclk) begin
 	end else 
 	  hcnt <= hcnt + 10'd1;
 
-        if( hcnt == t2_h_sync)       h_sync <= 1'b1;
-        if( hcnt == t3_h_blank_left) h_sync <= 1'b0;
+   if( hcnt == t2_h_sync)       h_sync <= 1'b1;
+   if( hcnt == t3_h_blank_left) h_sync <= 1'b0;
  
 	// generate horizontal video signal states
 	if( hcnt == t2_h_sync )                                     h_state <= STATE_SYNC;
 	if((hcnt == t0_h_border_right + ste_overscan) || 
-	   (hcnt == t4_h_border_left))                              h_state <= STATE_BORDER;
+		(hcnt == t4_h_border_left))                              h_state <= STATE_BORDER;
 	if((hcnt == t1_h_blank_right) || (hcnt == t3_h_blank_left)) h_state <= STATE_BLANK;
 	if( hcnt == t5_h_end)                                       h_state <= STATE_DISP;
 
