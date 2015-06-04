@@ -1,0 +1,19 @@
+PACK Dx,Dy,#
+
+15 14 13 12 11 10  9  8  7  6  5  4  3  2  1  0
+1  0  0  0   <Dy/Ay>  1  0  1  0  0  RM <Dx/Ax>
+
+RM=0->Dx/y   RM=1->-(Ax/y)
+
+UNPK Dx,Dy,#
+
+15 14 13 12 11 10  9  8  7  6  5  4  3  2  1  0
+1  0  0  0   <Dy/Ay>  1  1  0  0  0  RM <Dx/Ax>
+
+trace
+
+t0 (bit14): trace on change of flow.
+
+all trace happens after the instruction!
+
+nop is also a change of flow
