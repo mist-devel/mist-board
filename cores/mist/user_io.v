@@ -21,11 +21,15 @@ module user_io(
 		output reg       serial_strobe_out,
 		input            serial_data_out_available,
 		input [7:0]      serial_data_out,
+		// serial status from mfp to io controller
+		input [63:0]     serial_status_out,
 		
 		// serial data from io controller to mfp
 		output reg       serial_strobe_in,
 		output reg [7:0] serial_data_in,
-
+		// serial status from io controller to mfp
+		output reg [7:0] serial_status_in,
+		
 		// parallel data from psg/ym to io controller
 		output reg       parallel_strobe_out,
 		input            parallel_data_out_available,
@@ -62,7 +66,7 @@ module user_io(
 wire [7:0] spi_sck_D = { spi_sck_D[6:0], SPI_CLK } /* synthesis keep */;
 wire spi_sck = (spi_sck && spi_sck_D != 8'h00) || (!spi_sck && spi_sck_D == 8'hff);
 
-reg [1:0] 			byte_cnt;
+reg [3:0] 			byte_cnt;
 reg [6:0]         sbuf;
 reg [7:0]         cmd;
 reg [3:0] 	      bit_cnt;       // 0..15
@@ -74,7 +78,11 @@ wire [2:0] tx_bit = ~(bit_cnt[2:0]);
 assign BUTTONS = but_sw[1:0];
 assign SWITCHES = but_sw[3:2];
 assign scandoubler_disable = but_sw[4];
-   
+
+// prepent "a5" to status to make sure io controller can detect that a core
+// doesn't support the command
+wire [63+8:0] serial_status_out_x = { 8'ha5, serial_status_out };
+	
 always@(negedge spi_sck) begin
       if(bit_cnt <= 7)
 		  SPI_MISO <= CORE_TYPE[7-bit_cnt];
@@ -113,18 +121,22 @@ always@(negedge spi_sck) begin
 			
 			// ethernet status
 			if(cmd == 8'h0a)
-				SPI_MISO <= eth_status[{~byte_cnt, tx_bit}];
+				SPI_MISO <= eth_status[{~byte_cnt[1:0], tx_bit}];
 
 			// read ethernet tx buffer
 			if(cmd == 8'h0b)
 				SPI_MISO <= eth_tx_read_byte[tx_bit];
+				
+			// serial status
+			if(cmd == 8'h0d)
+				SPI_MISO <= serial_status_out_x[{4'h8-byte_cnt, tx_bit}];
 		end
 	end
 		
    always@(posedge spi_sck, posedge SPI_SS_IO) begin
 		if(SPI_SS_IO == 1) begin
         bit_cnt <= 4'd0;
-		  byte_cnt <= 2'd0;
+		  byte_cnt <= 4'd0;
 		  
 		  // ikbd (kbd, joysticks, mouse)
 		  ikbd_strobe_in <= 1'b0;
@@ -152,7 +164,7 @@ always@(negedge spi_sck) begin
 				bit_cnt <= bit_cnt + 4'd1;
 			else begin
 				bit_cnt <= 4'd8;
-				byte_cnt <= byte_cnt + 2'd1;
+				byte_cnt <= byte_cnt + 4'd1;
 			end
 
 			// command byte finished
@@ -236,8 +248,11 @@ always@(negedge spi_sck) begin
 			   if(cmd == 8'h0c) begin
 					 eth_rx_write_byte <= { sbuf, SPI_MOSI }; 
 					 eth_rx_write_strobe <= 1'b1;
-//					 eth_rx_write_begin <= 1'b1;
 				end
+
+				// serial_status from io controller
+			   if((cmd == 8'h0d) && (byte_cnt == 1))
+					 serial_status_in <= { sbuf, SPI_MOSI }; 
 
 				// four extra joysticks ...
 				if(cmd == 8'h10)

@@ -36,11 +36,13 @@ module mfp (
 	output 		 serial_data_out_available,
 	input  		 serial_strobe_out,
 	output [7:0] serial_data_out,
+	output [63:0] serial_status_out,
 
 	// serial rs223 connection from io controller
    input 		serial_strobe_in,
    input [7:0] serial_data_in,
 	output      serial_data_in_full,
+	input [7:0] serial_status_in,
 
 	// inputs
 	input 		 clk_ext,   // external 2.457MHz
@@ -86,16 +88,20 @@ io_fifo mfp_in_fifo (
 	.out_strobe 		(1'b0),
 	.out_enable 		(serial_cpu_data_read && serial_data_in_available),
 
+	.empty				(serial_data_in_empty),
 	.full					(serial_data_in_full),
 	.data_available 	(serial_data_in_available)
 );
 
 // ---------------- mfp uart data to/from io controller ------------
-reg serial_cpu_data_read;
+reg serial_cpu_data_read, serial_cpu_data_readD;
 wire serial_data_in_available;
 wire [7:0] serial_data_in_cpu;
+wire serial_data_in_empty;
 
 always @(negedge clk) begin
+	serial_cpu_data_readD <= serial_cpu_data_read;
+
 	// read on uart data register
 	serial_cpu_data_read <= 1'b0;
 	if(sel && ~ds && rw && (addr == 5'h17))
@@ -165,6 +171,7 @@ mfp_timer timer_c (
 wire timerd_done;
 wire [7:0] timerd_dat_o;
 wire [3:0] timerd_ctrl_o;
+wire [7:0] timerd_set_data;
 
 mfp_timer timer_d (
 	.CLK 			(clk),
@@ -176,7 +183,8 @@ mfp_timer timer_d (
    .DAT_I		(din),
    .DAT_O		(timerd_dat_o),
    .DAT_WE		((addr == 5'h12) && write),
-   .T_O_PULSE	(timerd_done)
+   .T_O_PULSE	(timerd_done),
+   .SET_DATA_OUT (timerd_set_data)
 );
 
 reg [7:0] aer, ddr, gpip;
@@ -206,6 +214,60 @@ mfp_hbit16 irq_pending_index (
 	
 // gpip as output to the cpu (ddr bit == 1 -> gpip pin is output)
 wire [7:0] gpip_cpu_out = (i & ~ddr) | (gpip & ddr);
+
+// assemble output status structure. Adjust bitrate endianess
+assign serial_status_out = { 
+	bitrate[7:0], bitrate[15:8], bitrate[23:16], bitrate[31:24], 
+	databits, parity, stopbits, input_fifo_status };
+
+wire [11:0] timerd_state = { timerd_ctrl_o, timerd_set_data };
+	
+// Atari RTS: YM-A-4 ->
+// Atari CTS: mfp gpio-2 <-
+	
+// --- export bit rate ---
+// try to calculate bitrate from timer d config
+// bps is 2.457MHz/2/16/prescaler/datavalue
+wire [31:0] bitrate = 
+	(uart_ctrl[6] !=    1'b1)?32'h80000000:    // uart prescaler not 1
+	(timerd_state == 12'h101)?32'd19200:       // 19200 bit/s
+	(timerd_state == 12'h102)?32'd9600:        // 9600 bit/s
+	(timerd_state == 12'h104)?32'd4800:        // 4800 bit/s
+	(timerd_state == 12'h105)?32'd3600:        // 3600 bit/s (?? isn't that 3840?)
+	(timerd_state == 12'h108)?32'd2400:        // 2400 bit/s
+	(timerd_state == 12'h10a)?32'd2000:        // 2000 bit/s (exact 1920)
+	(timerd_state == 12'h10b)?32'd1800:        // 1800 bit/s (exact 1745)
+	(timerd_state == 12'h110)?32'd1200:        // 1200 bit/s
+	(timerd_state == 12'h120)?32'd600:         // 600 bit/s
+	(timerd_state == 12'h140)?32'd300:         // 300 bit/s
+	(timerd_state == 12'h160)?32'd200:         // 200 bit/s
+	(timerd_state == 12'h180)?32'd150:         // 150 bit/s
+	(timerd_state == 12'h18f)?32'd134:         // 134 bit/s
+	(timerd_state == 12'h18f)?32'd134:         // 134 bit/s (134.27)
+	(timerd_state == 12'h1af)?32'd110:         // 110 bit/s (109.71)
+	(timerd_state == 12'h240)?32'd75:          // 75 bit/s (120)
+	(timerd_state == 12'h260)?32'd50:          // 50 bit/s (80)
+	32'h80000001;                              // unsupported bit rate	
+
+wire [7:0] input_fifo_status = { 5'd0,
+	serial_data_in_empty, serial_data_in_full, serial_data_in_available };
+	
+wire [7:0] parity = 
+	(uart_ctrl[1] == 1'b0)?8'h00:    // no parity
+	(uart_ctrl[0] == 1'b0)?8'h01:    // odd parity
+	8'h02;                           // even parity
+
+wire [7:0] stopbits = 
+	(uart_ctrl[3:2] == 2'b00)?8'hff: // sync mode not supported
+	(uart_ctrl[3:2] == 2'b01)?8'h00: // async 1 stop bit
+	(uart_ctrl[3:2] == 2'b10)?8'h01: // async 1.5 stop bits
+	8'h11;                           // async 2 stop bits
+
+wire [7:0] databits = 
+	(uart_ctrl[5:4] == 2'b00)?8'd8:  // 8 data bits
+	(uart_ctrl[5:4] == 2'b01)?8'd7:  // 7 data bits
+	(uart_ctrl[5:4] == 2'b10)?8'd6:  // 6 data bits
+	8'd5;                            // 5 data bits
 
 // cpu controllable uart control bits
 reg [1:0] uart_rx_ctrl;
@@ -270,10 +332,19 @@ wire [7:0] gpio_irq = ~aer ^ ((i & ~ti_irq_mask) | (ti_irq & ti_irq_mask));
 wire [15:0] ipr;
 reg [15:0] ipr_reset;
 
+// the cpu reading data clears rx irq. It may raise again immediately if there's more
+// data in the input fifo. Use a delayed cpu read signal to make sure the fifo finishes
+// removing the byte before
+wire uart_rx_irq = serial_data_in_available && !serial_cpu_data_readD;
+
+// the io controller reading data clears tx irq. It may raus again immediately if 
+// there's more data in the output fifo
+wire uart_tx_irq = !serial_data_out_fifo_full && !serial_strobe_out;
+
 // map the 16 interrupt sources onto the 16 interrupt register bits
 wire [15:0]	ipr_set = {  
-	gpio_irq[7:6], timera_done, serial_data_in_available, 
-	1'b0 /* rcv err */, !serial_data_out_fifo_full, 1'b0 /* tx err */, timerb_done,
+	gpio_irq[7:6], timera_done, uart_rx_irq, 
+	1'b0 /* rcv err */, uart_tx_irq, 1'b0 /* tx err */, timerb_done,
 	gpio_irq[5:4], timerc_done, timerd_done, gpio_irq[3:0]
 };
 

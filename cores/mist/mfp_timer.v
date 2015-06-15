@@ -39,8 +39,14 @@ module mfp_timer(
 		 output       PULSE_MODE,  // pulse mode disables input port irq
 		 
        output reg   T_O,
-       output reg   T_O_PULSE
+       output reg   T_O_PULSE,
+		 
+		 // current data bits are exported to allow mfp some rs232 bitrate
+		 // calculations
+		 output [7:0] SET_DATA_OUT
 );
+
+assign SET_DATA_OUT = data;
 
 reg [7:0] data, down_counter, cur_counter;
 reg [3:0] control;

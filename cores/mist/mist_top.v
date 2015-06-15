@@ -1,7 +1,7 @@
 /********************************************/
 /*                                          */
 /********************************************/
-
+ 
 module mist_top ( 
   // clock inputs	
   input wire [ 2-1:0] 	CLOCK_27, // 27 MHz
@@ -365,7 +365,7 @@ wire mfp_io7 = system_ctrl[8] ^ (ste?ste_dma_snd_xsirq:1'b0);
 wire parallel_fifo_full;
 wire mfp_io0 = (usb_redirection == 2'd2)?parallel_fifo_full:~joy0[4];
 
-// inputs 1,2 and 6 are inputs from serial which have pullups before an inverter
+// inputs 1,2 and 6 are inputs from serial which have pullups before and inverter
 wire [7:0] mfp_gpio_in = {mfp_io7, 1'b0, !dma_irq, !acia_irq, !blitter_irq, 2'b00, mfp_io0};
 wire [1:0] mfp_timer_in = {!st_de, ste?ste_dma_snd_xsirq_delayed:!parallel_fifo_full};
 
@@ -386,8 +386,10 @@ mfp mfp (
 	.serial_data_out_available 	(serial_data_from_mfp_available),
 	.serial_strobe_out 				(serial_strobe_from_mfp),
 	.serial_data_out 	   			(serial_data_from_mfp),
+	.serial_status_out 	   		(serial_status_from_mfp),
 	.serial_strobe_in 				(serial_strobe_to_mfp),
 	.serial_data_in 	   			(serial_data_to_mfp),
+	.serial_status_in 	   		(serial_status_to_mfp),
 
 	// input signals
 	.clk_ext   (clk_mfp       ),  // 2.457MHz clock
@@ -1102,6 +1104,8 @@ wire serial_strobe_from_mfp;
 wire serial_data_from_mfp_available;
 wire [7:0] serial_data_to_mfp;
 wire serial_strobe_to_mfp;
+wire [7:0] serial_status_to_mfp;
+wire [63:0] serial_status_from_mfp;
 
 // connection to transfer parallel data from psg to io controller
 wire [7:0] parallel_data_out;
@@ -1147,8 +1151,10 @@ user_io user_io(
       .serial_strobe_out			(serial_strobe_from_mfp),
       .serial_data_out				(serial_data_from_mfp),
       .serial_data_out_available	(serial_data_from_mfp_available),
+      .serial_status_out			(serial_status_from_mfp),
       .serial_strobe_in				(serial_strobe_to_mfp),
       .serial_data_in				(serial_data_to_mfp),
+      .serial_status_in				(serial_status_to_mfp),
 		
 		// parallel interface
       .parallel_strobe_out			(parallel_strobe_out),
