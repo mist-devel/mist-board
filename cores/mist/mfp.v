@@ -88,6 +88,7 @@ io_fifo mfp_in_fifo (
 	.out_strobe 		(1'b0),
 	.out_enable 		(serial_cpu_data_read && serial_data_in_available),
 
+	.space				(serial_data_in_space),
 	.empty				(serial_data_in_empty),
 	.full					(serial_data_in_full),
 	.data_available 	(serial_data_in_available)
@@ -98,6 +99,7 @@ reg serial_cpu_data_read, serial_cpu_data_readD;
 wire serial_data_in_available;
 wire [7:0] serial_data_in_cpu;
 wire serial_data_in_empty;
+wire [3:0] serial_data_in_space;
 
 always @(negedge clk) begin
 	serial_cpu_data_readD <= serial_cpu_data_read;
@@ -249,7 +251,7 @@ wire [31:0] bitrate =
 	(timerd_state == 12'h260)?32'd50:          // 50 bit/s (80)
 	32'h80000001;                              // unsupported bit rate	
 
-wire [7:0] input_fifo_status = { 5'd0,
+wire [7:0] input_fifo_status = { serial_data_in_space, 1'b0,
 	serial_data_in_empty, serial_data_in_full, serial_data_in_available };
 	
 wire [7:0] parity = 

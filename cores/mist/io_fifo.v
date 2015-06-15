@@ -38,6 +38,7 @@ module io_fifo #(
 	input out_strobe,
 	input out_enable,
 
+	output [DEPTH-1:0] space,
 	output empty,
 	output data_available,
 	output full
@@ -52,6 +53,8 @@ reg [FIFO_ADDR_BITS-1:0] writeP, readP;
 assign full = (readP == (writeP + 1));
 assign empty = (readP == writeP);
 assign data_available = (readP != writeP);
+
+assign space = readP - writeP - 1;
 
 // the strobes may not be in the right clock domain, so bring them into the 
 // local clock domain
