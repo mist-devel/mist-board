@@ -61,7 +61,7 @@ library ieee;
   use ieee.std_logic_unsigned.all;
 
 entity YM2149 is
-  port (
+  port ( 
   -- data bus
   I_DA                : in  std_logic_vector(7 downto 0);
   O_DA                : out std_logic_vector(7 downto 0);
@@ -75,8 +75,8 @@ entity YM2149 is
   I_SEL_L             : in  std_logic;
   stereo : in std_logic;
 
-  O_AUDIO_L : out std_logic_vector(7 downto 0);
-  O_AUDIO_R : out std_logic_vector(7 downto 0);
+  O_AUDIO_L : out std_logic_vector(9 downto 0);
+  O_AUDIO_R : out std_logic_vector(9 downto 0);
   -- port a
   I_IOA               : in  std_logic_vector(7 downto 0);
   O_IOA               : out std_logic_vector(7 downto 0);
@@ -184,54 +184,6 @@ begin
     O_DA_OE_L <= not (busctrl_re);
   end process;
 
-  -- CLOCKED
-  --p_waddr                : process
-  --begin
-    ---- looks like registers are latches in real chip, but the address is caught at the end of the address state.
-    --wait until rising_edge(CLK);
-
-    --if (RESET_L = '0') then
-      --addr <= (others => '0');
-    --else
-      --if (busctrl_addr = '1') then
-        --addr <= I_DA;
-      --end if;
-    --end if;
-  --end process;
-  --p_wdata                : process
-  --begin
-    ---- looks like registers are latches in real chip, but the address is caught at the end of the address state.
-    --wait until rising_edge(CLK);
-    --env_reset <= '0';
-
-    --if (RESET_L = '0') then
-      --reg <= (others => (others => '0'));
-      --env_reset <= '1';
-    --else
-      --env_reset <= '0';
-      --if (busctrl_we = '1') then
-        --case addr(3 downto 0) is
-          --when x"0" => reg(0)  <= I_DA;
-          --when x"1" => reg(1)  <= I_DA;
-          --when x"2" => reg(2)  <= I_DA;
-          --when x"3" => reg(3)  <= I_DA;
-          --when x"4" => reg(4)  <= I_DA;
-          --when x"5" => reg(5)  <= I_DA;
-          --when x"6" => reg(6)  <= I_DA;
-          --when x"7" => reg(7)  <= I_DA;
-          --when x"8" => reg(8)  <= I_DA;
-          --when x"9" => reg(9)  <= I_DA;
-          --when x"A" => reg(10) <= I_DA;
-          --when x"B" => reg(11) <= I_DA;
-          --when x"C" => reg(12) <= I_DA;
-          --when x"D" => reg(13) <= I_DA; env_reset <= '1';
-          --when x"E" => reg(14) <= I_DA;
-          --when x"F" => reg(15) <= I_DA;
-          --when others => null;
-        --end case;
-      --end if;
-    --end if;
-  --end process;
 
   -- LATCHED, useful when emulating a real chip in circuit. Nasty as gated clock.
   p_waddr                : process(reset_l, busctrl_addr)
@@ -605,11 +557,11 @@ begin
     wait until rising_edge(CLK);
 
     if (RESET_L = '0') then
-      O_AUDIO_L(7 downto 0) <= "00000000";
-      O_AUDIO_R(7 downto 0) <= "00000000";
+      O_AUDIO_L <= "0000000000";
+      O_AUDIO_R <= "0000000000";
     else
-      O_AUDIO_L(7 downto 0) <= vol_table_out_l(9 downto 2);
-      O_AUDIO_R(7 downto 0) <= vol_table_out_r(9 downto 2);
+      O_AUDIO_L <= vol_table_out_l;
+      O_AUDIO_R <= vol_table_out_r;
     end if;
   end process;
 

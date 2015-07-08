@@ -75,7 +75,7 @@ wire [7:0] port_b_out;
 assign floppy_side = port_a_out[0];
 assign floppy_sel = port_a_out[2:1];
 
-wire [7:0] ym_audio_out_l, ym_audio_out_r;
+wire [9:0] ym_audio_out_l, ym_audio_out_r;
 
 // extra joysticks are wired to the printer port
 // using the "gauntlet2 interface", fire of 
@@ -175,27 +175,24 @@ ste_dma_snd ste_dma_snd (
 
 // audio output processing
 
-// simple mixer for ste and ym audio. result is 9 bits
-// this will later be handled by the lmc1992
-wire [8:0] audio_mix_l = { 1'b0, ym_audio_out_l} + { 1'b0, ste_audio_out_l };
-wire [8:0] audio_mix_r = { 1'b0, ym_audio_out_r} + { 1'b0, ste_audio_out_r };
+// YM and STE audio channels are expanded to 14 bits and added resulting in 15 bits 
+// for the sigmadelta dac take from the minimig
 
-// limit audio to 8 bit range
-wire [7:0] audio_out_l = audio_mix_l[8]?8'd255:audio_mix_l[7:0];
-wire [7:0] audio_out_r = audio_mix_r[8]?8'd255:audio_mix_r[7:0];
+// This should later be handled by the lmc1992
 
-sigma_delta_dac sigma_delta_dac_l (
-	.DACout 		(audio_l),
-	.DACin		(audio_out_l),
-	.CLK 			(clk_32),
-	.RESET 		(reset)
-);
+wire [14:0] audio_mix_l = 
+	{ 1'b0, ym_audio_out_l, ym_audio_out_l[9:6]} + 
+	{ 1'b0, ste_audio_out_l, ste_audio_out_l[7:2] };
+wire [14:0] audio_mix_r = 
+	{ 1'b0, ym_audio_out_r, ym_audio_out_r[9:6]} + 
+	{ 1'b0, ste_audio_out_r, ste_audio_out_r[7:2] };
 
-sigma_delta_dac sigma_delta_dac_r (
-	.DACout     (audio_r),
-	.DACin    	(audio_out_r),
-	.CLK      	(clk_32),
-	.RESET    	(reset)
+sigma_delta_dac sigma_delta_dac (
+	.clk 		 ( clk_32      ),	// bus clock
+	.ldatasum ( audio_mix_l ),	// left channel data
+	.rdatasum ( audio_mix_r ),	// right channel data
+	.left   	 ( audio_l     ),	// left bitstream output
+	.right	 ( audio_r     )	// right bitsteam output
 );
 
 endmodule

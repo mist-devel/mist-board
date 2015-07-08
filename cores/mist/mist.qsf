@@ -1,4 +1,3 @@
-
 # Copyright (C) 1991-2007 Altera Corporation
 # Your use of Altera Corporation's design tools, logic functions 
 # and other software and tools, and its AMPP partner logic 
@@ -32,8 +31,8 @@ set_global_assignment -name USE_GENERATED_PHYSICAL_CONSTRAINTS OFF -section_id e
 set_global_assignment -name DEVICE_FILTER_PIN_COUNT 144
 set_global_assignment -name POWER_PRESET_COOLING_SOLUTION "NO HEAT SINK WITH STILL AIR"
 set_global_assignment -name POWER_BOARD_THERMAL_MODEL "NONE (CONSERVATIVE)"
-set_global_assignment -name OPTIMIZE_HOLD_TIMING "ALL PATHS"
-set_global_assignment -name FITTER_EFFORT "AUTO FIT"
+set_global_assignment -name OPTIMIZE_HOLD_TIMING OFF
+set_global_assignment -name FITTER_EFFORT "FAST FIT"
 set_global_assignment -name STRATIX_CONFIGURATION_DEVICE EPCS4
 set_global_assignment -name CYCLONEII_RESERVE_NCEO_AFTER_CONFIGURATION "USE AS REGULAR IO"
 set_global_assignment -name RESERVE_ASDO_AFTER_CONFIGURATION "AS INPUT TRI-STATED"
@@ -124,12 +123,12 @@ set_location_assignment PIN_43 -to SDRAM_CLK
 set_global_assignment -name CYCLONEII_OPTIMIZATION_TECHNIQUE BALANCED
 set_global_assignment -name SMART_RECOMPILE ON
 set_global_assignment -name ENABLE_SIGNALTAP OFF
-set_global_assignment -name USE_SIGNALTAP_FILE stp1.stp
+set_global_assignment -name USE_SIGNALTAP_FILE tg68k.stp
 set_global_assignment -name PHYSICAL_SYNTHESIS_COMBO_LOGIC ON
 set_global_assignment -name PHYSICAL_SYNTHESIS_REGISTER_DUPLICATION ON
 set_global_assignment -name PHYSICAL_SYNTHESIS_EFFORT NORMAL
 set_global_assignment -name FMAX_REQUIREMENT "114 MHz"
-set_global_assignment -name OPTIMIZE_MULTI_CORNER_TIMING ON
+set_global_assignment -name OPTIMIZE_MULTI_CORNER_TIMING OFF
 set_global_assignment -name MIN_CORE_JUNCTION_TEMP 0
 set_global_assignment -name MAX_CORE_JUNCTION_TEMP 85
 set_global_assignment -name USE_CONFIGURATION_DEVICE ON
@@ -282,65 +281,104 @@ set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to SDRAM_nCS
 set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to SDRAM_CKE
 set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to SDRAM_CLK
 
-set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to VGA_R[5]
-set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to VGA_R[4]
-set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to VGA_R[3]
-set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to VGA_R[2]
-set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to VGA_R[1]
-set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to VGA_R[0]
-
-set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to VGA_G[5]
-set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to VGA_G[4]
-set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to VGA_G[3]
-set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to VGA_G[2]
-set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to VGA_G[1]
-set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to VGA_G[0]
-
-set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to VGA_B[5]
-set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to VGA_B[4]
-set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to VGA_B[3]
-set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to VGA_B[2]
-set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to VGA_B[1]
-set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to VGA_B[0]
-
 set_instance_assignment -name GLOBAL_SIGNAL "GLOBAL CLOCK" -to clk_32
 
+set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to VGA_R[5]
+set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to VGA_R[4]
+set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to VGA_R[3]
+set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to VGA_R[2]
+set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to VGA_R[1]
+set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to VGA_R[0]
+set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to VGA_B[5]
+set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to VGA_B[4]
+set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to VGA_B[3]
+set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to VGA_B[2]
+set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to VGA_B[1]
+set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to VGA_B[0]
+set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to VGA_G[5]
+set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to VGA_G[4]
+set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to VGA_G[3]
+set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to VGA_G[2]
+set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to VGA_G[1]
+set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to VGA_G[0]
+set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to VGA_VS
+set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to VGA_HS
 
-set_global_assignment -name ENABLE_BENEFICIAL_SKEW_OPTIMIZATION ON
+set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to AUDIO_L
+set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to AUDIO_R
+
+set_instance_assignment -name CURRENT_STRENGTH_NEW 8MA -to VGA_R[5]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 8MA -to VGA_R[4]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 8MA -to VGA_R[3]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 8MA -to VGA_R[2]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 8MA -to VGA_R[1]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 8MA -to VGA_R[0]
+
+set_instance_assignment -name CURRENT_STRENGTH_NEW 8MA -to VGA_G[5]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 8MA -to VGA_G[4]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 8MA -to VGA_G[3]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 8MA -to VGA_G[2]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 8MA -to VGA_G[1]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 8MA -to VGA_G[0]
+
+set_instance_assignment -name CURRENT_STRENGTH_NEW 8MA -to VGA_B[5]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 8MA -to VGA_B[4]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 8MA -to VGA_B[3]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 8MA -to VGA_B[2]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 8MA -to VGA_B[1]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 8MA -to VGA_B[0]
+
+set_instance_assignment -name CURRENT_STRENGTH_NEW 8MA -to VGA_HS
+set_instance_assignment -name CURRENT_STRENGTH_NEW 8MA -to VGA_VS
+
+set_instance_assignment -name CURRENT_STRENGTH_NEW 8MA -to AUDIO_L
+set_instance_assignment -name CURRENT_STRENGTH_NEW 8MA -to AUDIO_R
+
+set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to UART_RX
+set_global_assignment -name VERILOG_FILE sigma_delta_dac.v
+set_global_assignment -name SOURCE_FILE font8x8.memh
+set_global_assignment -name VERILOG_FILE overlay.v
+set_global_assignment -name VERILOG_FILE font.v
+set_global_assignment -name VERILOG_FILE scandoubler.v
+set_global_assignment -name VERILOG_FILE shifter.v
+set_global_assignment -name VERILOG_FILE sync_adjust.v
+set_global_assignment -name QIP_FILE pll_mfp1.qip
+set_global_assignment -name VERILOG_FILE acsi.v
+set_global_assignment -name VERILOG_FILE fdc.v
+set_global_assignment -name VERILOG_FILE mfp_srff16.v
+set_global_assignment -name VERILOG_FILE viking.v
 set_global_assignment -name VERILOG_FILE cache.v
+set_global_assignment -name VERILOG_FILE mste_ctrl.v
 set_global_assignment -name VERILOG_FILE ethernec.v
+set_global_assignment -name VERILOG_FILE osd.v
+set_global_assignment -name VERILOG_FILE video_modes.v
+set_global_assignment -name VERILOG_FILE blitter.v
 set_global_assignment -name VERILOG_FILE mfp_timer.v
 set_global_assignment -name VHDL_FILE vol_table_array.vhd
 set_global_assignment -name VHDL_FILE YM2149_volmix.vhd
 set_global_assignment -name VERILOG_FILE acia.v
-set_global_assignment -name VERILOG_FILE blitter.v
 set_global_assignment -name VHDL_FILE TG68K_ALU.vhd
 set_global_assignment -name VHDL_FILE TG68K_Pack.vhd
 set_global_assignment -name VHDL_FILE TG68KdotC_Kernel.vhd
 set_global_assignment -name SDC_FILE mist.sdc
-set_global_assignment -name VERILOG_FILE sdram.v
 set_global_assignment -name VERILOG_FILE clock.v
 set_global_assignment -name VERILOG_FILE mist_top.v
 set_global_assignment -name VERILOG_FILE user_io.v
 set_global_assignment -name VERILOG_FILE video.v
-set_global_assignment -name VERILOG_FILE shifter.v
-set_global_assignment -name VERILOG_FILE scandoubler.v
-set_global_assignment -name VERILOG_FILE overlay.v
-set_global_assignment -name VERILOG_FILE font.v
-set_global_assignment -name VERILOG_FILE sync_adjust.v
-set_global_assignment -name VERILOG_FILE viking.v
-set_global_assignment -name VERILOG_FILE video_modes.v
-set_global_assignment -name VERILOG_FILE io_fifo.v
-set_global_assignment -name VERILOG_FILE osd.v
-set_global_assignment -name VERILOG_FILE fdc.v
-set_global_assignment -name VERILOG_FILE acsi.v
 set_global_assignment -name VERILOG_FILE mfp.v
 set_global_assignment -name VERILOG_FILE dma.v
-set_global_assignment -name VERILOG_FILE sigma_delta_dac.v
 set_global_assignment -name VERILOG_FILE mmu.v
-set_global_assignment -name VERILOG_FILE ste_dma_snd.v
-set_global_assignment -name VERILOG_FILE audio.v
 set_global_assignment -name VERILOG_FILE ste_joystick.v
-set_global_assignment -name VERILOG_FILE mste_ctrl.v
-set_global_assignment -name QIP_FILE pll_mfp1.qip
+set_global_assignment -name VERILOG_FILE ste_dma_snd.v
+set_global_assignment -name SIGNALTAP_FILE data_io.stp
+set_global_assignment -name SIGNALTAP_FILE cpu.stp
+set_global_assignment -name SIGNALTAP_FILE sdram.stp
+set_global_assignment -name VERILOG_FILE sdram.v
+set_global_assignment -name SIGNALTAP_FILE tg68k.stp
+set_global_assignment -name SIGNALTAP_FILE tg68_bare.stp
+set_global_assignment -name SIGNALTAP_FILE irq.stp
+set_global_assignment -name SIGNALTAP_FILE cache.stp
+set_global_assignment -name VERILOG_FILE io_fifo.v
+set_global_assignment -name VERILOG_FILE mfp_hbit16.v
+set_global_assignment -name VERILOG_FILE audio.v
 set_instance_assignment -name PARTITION_HIERARCHY root_partition -to | -section_id Top

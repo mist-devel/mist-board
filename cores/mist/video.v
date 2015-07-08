@@ -125,17 +125,24 @@ overlay overlay (
 			.val_d      ( dbg_val_d    ),
 			.val_s      ( dbg_val_s    ),
 
-         .red_in     ( {stvid_r, 2'b00}),
-         .green_in   ( {stvid_g, 2'b00}),
-         .blue_in    ( {stvid_b, 2'b00}),
-			.hs_in      ( stvid_hs        ),
-			.vs_in      ( stvid_vs        ),
+         .red_in     ( stvid6_r     ),
+         .green_in   ( stvid6_g     ),
+         .blue_in    ( stvid6_b     ),
+			.hs_in      ( stvid_hs     ),
+			.vs_in      ( stvid_vs     ),
 
          // receive signal with OSD overlayed
-         .red_out    ( ovl_r  ),
-         .green_out  ( ovl_g  ),
-         .blue_out   ( ovl_b  )
+         .red_out    ( ovl_r        ),
+         .green_out  ( ovl_g        ),
+         .blue_out   ( ovl_b        )
 );
+
+// expand ST(E) 3/4 bit colors to MISTs 6 bit range
+// in 3 bit ST mode we can simply double each bit to achieve 6 bits
+// in 4 bit STE mode the mapping isn't linear
+wire [5:0] stvid6_r = ste?{stvid_r, stvid_r[3:2]}:{stvid_r[3:1],stvid_r[3:1]};
+wire [5:0] stvid6_g = ste?{stvid_g, stvid_g[3:2]}:{stvid_g[3:1],stvid_g[3:1]};
+wire [5:0] stvid6_b = ste?{stvid_b, stvid_b[3:2]}:{stvid_b[3:1],stvid_b[3:1]};
 
 // ------------- combine scandoubled shifter with viking -------------
 wire [3:0] stvid_r = viking_enable?viking_r:shifter_sd_sblank_r;
@@ -146,9 +153,9 @@ wire stvid_vs = viking_enable?viking_vs:vga_vs;
 
 // -------- make sure adjusted video blanks during sync phase -------
 wire n_sync_adjusted = shifter_sd_adjusted_hs && shifter_sd_adjusted_vs;
-wire [3:0] shifter_sd_sblank_r = n_sync_adjusted?shifter_sd_r:3'b000;
-wire [3:0] shifter_sd_sblank_g = n_sync_adjusted?shifter_sd_g:3'b000;
-wire [3:0] shifter_sd_sblank_b = n_sync_adjusted?shifter_sd_b:3'b000;
+wire [3:0] shifter_sd_sblank_r = n_sync_adjusted?shifter_sd_r:4'b0000;
+wire [3:0] shifter_sd_sblank_g = n_sync_adjusted?shifter_sd_g:4'b0000;
+wire [3:0] shifter_sd_sblank_b = n_sync_adjusted?shifter_sd_b:4'b0000;
    
 // --------------- apply screen position adjustments -----------------
 
