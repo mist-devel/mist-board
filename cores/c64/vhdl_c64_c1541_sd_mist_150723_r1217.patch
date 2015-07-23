@@ -1,0 +1,4443 @@
+diff -Naur vhdl_c64_c1541_sd.orig/mist/C64_mist.qpf vhdl_c64_c1541_sd.mist/mist/C64_mist.qpf
+--- vhdl_c64_c1541_sd.orig/mist/C64_mist.qpf	1970-01-01 01:00:00.000000000 +0100
++++ vhdl_c64_c1541_sd.mist/mist/C64_mist.qpf	2015-07-09 09:30:37.681578871 +0200
+@@ -0,0 +1,32 @@
++# -------------------------------------------------------------------------- #
++#
++# Copyright (C) 1991-2014 Altera Corporation
++# Your use of Altera Corporation's design tools, logic functions 
++# and other software and tools, and its AMPP partner logic 
++# functions, and any output files from any of the foregoing 
++# (including device programming or simulation files), and any 
++# associated documentation or information are expressly subject 
++# to the terms and conditions of the Altera Program License 
++# Subscription Agreement, Altera MegaCore Function License 
++# Agreement, or other applicable license agreement, including, 
++# without limitation, that your use is for the sole purpose of 
++# programming logic devices manufactured by Altera and sold by 
++# Altera or its authorized distributors.  Please refer to the 
++# applicable agreement for further details.
++#
++# -------------------------------------------------------------------------- #
++#
++# Quartus II 64-Bit
++# Version 13.1.4 Build 182 03/12/2014 SJ Web Edition
++# Date created = 09:30:37  July 09, 2015
++#
++# -------------------------------------------------------------------------- #
++
++QUARTUS_VERSION = "13.1"
++DATE = "09:30:37  July 09, 2015"
++
++# Revisions
++
++PROJECT_REVISION = "C64_mist"
++PROJECT_REVISION = "C64_de2"
++PROJECT_REVISION = "C64_de1"
+diff -Naur vhdl_c64_c1541_sd.orig/mist/C64_mist.qsf vhdl_c64_c1541_sd.mist/mist/C64_mist.qsf
+--- vhdl_c64_c1541_sd.orig/mist/C64_mist.qsf	1970-01-01 01:00:00.000000000 +0100
++++ vhdl_c64_c1541_sd.mist/mist/C64_mist.qsf	2015-07-23 10:39:26.983312078 +0200
+@@ -0,0 +1,208 @@
++# -------------------------------------------------------------------------- #
++#
++# Copyright (C) 1991-2011 Altera Corporation
++# Your use of Altera Corporation's design tools, logic functions 
++# and other software and tools, and its AMPP partner logic 
++# functions, and any output files from any of the foregoing 
++# (including device programming or simulation files), and any 
++# associated documentation or information are expressly subject 
++# to the terms and conditions of the Altera Program License 
++# Subscription Agreement, Altera MegaCore Function License 
++# Agreement, or other applicable license agreement, including, 
++# without limitation, that your use is for the sole purpose of 
++# programming logic devices manufactured by Altera and sold by 
++# Altera or its authorized distributors.  Please refer to the 
++# applicable agreement for further details.
++#
++# -------------------------------------------------------------------------- #
++#
++# Quartus II
++# Version 11.0 Build 157 04/27/2011 SJ Full Version
++# Date created = 17:14:01  April 10, 2012
++#
++# -------------------------------------------------------------------------- #
++#
++# Notes:
++#
++# 1) The default values for assignments are stored in the file:
++#		led_assignment_defaults.qdf
++#    If this file doesn't exist, see file:
++#		assignment_defaults.qdf
++#
++# 2) Altera recommends that you do not modify this file. This
++#    file is updated automatically by the Quartus II software
++#    and any changes you make may be lost or overwritten.
++#
++# -------------------------------------------------------------------------- #
++
++
++set_global_assignment -name FAMILY "Cyclone III"
++set_global_assignment -name DEVICE EP3C25E144C8
++set_global_assignment -name TOP_LEVEL_ENTITY C64_mist
++set_global_assignment -name ORIGINAL_QUARTUS_VERSION 11.0
++set_global_assignment -name PROJECT_CREATION_TIME_DATE "17:14:01  APRIL 10, 2012"
++set_global_assignment -name LAST_QUARTUS_VERSION 13.1
++set_global_assignment -name MIN_CORE_JUNCTION_TEMP 0
++set_global_assignment -name MAX_CORE_JUNCTION_TEMP 85
++set_global_assignment -name DEVICE_FILTER_PACKAGE "ANY QFP"
++set_global_assignment -name DEVICE_FILTER_SPEED_GRADE 8
++set_global_assignment -name ERROR_CHECK_FREQUENCY_DIVISOR 1
++set_global_assignment -name PARTITION_NETLIST_TYPE SOURCE -section_id Top
++set_global_assignment -name PARTITION_FITTER_PRESERVATION_LEVEL PLACEMENT_AND_ROUTING -section_id Top
++set_global_assignment -name PARTITION_COLOR 16764057 -section_id Top
++set_global_assignment -name USE_CONFIGURATION_DEVICE OFF
++set_global_assignment -name CRC_ERROR_OPEN_DRAIN OFF
++set_global_assignment -name RESERVE_ALL_UNUSED_PINS_WEAK_PULLUP "AS INPUT TRI-STATED"
++set_global_assignment -name OUTPUT_IO_TIMING_NEAR_END_VMEAS "HALF VCCIO" -rise
++set_global_assignment -name OUTPUT_IO_TIMING_NEAR_END_VMEAS "HALF VCCIO" -fall
++set_global_assignment -name OUTPUT_IO_TIMING_FAR_END_VMEAS "HALF SIGNAL SWING" -rise
++set_global_assignment -name OUTPUT_IO_TIMING_FAR_END_VMEAS "HALF SIGNAL SWING" -fall
++set_global_assignment -name CYCLONEIII_CONFIGURATION_SCHEME "PASSIVE SERIAL"
++set_global_assignment -name GENERATE_RBF_FILE ON
++set_global_assignment -name FORCE_CONFIGURATION_VCCIO ON
++set_global_assignment -name STRATIX_DEVICE_IO_STANDARD "3.3-V LVTTL"
++
++set_location_assignment PIN_7 -to LED
++set_location_assignment PIN_22 -to CLOCK_50[0]
++set_location_assignment PIN_23 -to CLOCK_50[1]
++set_location_assignment PIN_128 -to CLOCK_32[0]
++set_location_assignment PIN_129 -to CLOCK_32[1]
++set_location_assignment PIN_54 -to CLOCK_27[0]
++set_location_assignment PIN_55 -to CLOCK_27[1]
++set_location_assignment PIN_144 -to VGA_R[5]
++set_location_assignment PIN_143 -to VGA_R[4]
++set_location_assignment PIN_142 -to VGA_R[3]
++set_location_assignment PIN_141 -to VGA_R[2]
++set_location_assignment PIN_137 -to VGA_R[1]
++set_location_assignment PIN_135 -to VGA_R[0]
++set_location_assignment PIN_133 -to VGA_B[5]
++set_location_assignment PIN_132 -to VGA_B[4]
++set_location_assignment PIN_125 -to VGA_B[3]
++set_location_assignment PIN_121 -to VGA_B[2]
++set_location_assignment PIN_120 -to VGA_B[1]
++set_location_assignment PIN_115 -to VGA_B[0]
++set_location_assignment PIN_114 -to VGA_G[5]
++set_location_assignment PIN_113 -to VGA_G[4]
++set_location_assignment PIN_112 -to VGA_G[3]
++set_location_assignment PIN_111 -to VGA_G[2]
++set_location_assignment PIN_110 -to VGA_G[1]
++set_location_assignment PIN_106 -to VGA_G[0]
++set_location_assignment PIN_136 -to VGA_VS
++set_location_assignment PIN_119 -to VGA_HS
++set_location_assignment PIN_65 -to AUDIO_L
++set_location_assignment PIN_80 -to AUDIO_R
++set_location_assignment PIN_46 -to UART_TX
++set_location_assignment PIN_31 -to UART_RX
++set_location_assignment PIN_105 -to SPI_DO
++set_location_assignment PIN_88 -to SPI_DI
++set_location_assignment PIN_126 -to SPI_SCK
++set_location_assignment PIN_127 -to SPI_SS2
++set_location_assignment PIN_91 -to SPI_SS3
++set_location_assignment PIN_90 -to SPI_SS4
++set_location_assignment PIN_13 -to CONF_DATA0
++
++set_location_assignment PIN_49 -to SDRAM_A[0]
++set_location_assignment PIN_44 -to SDRAM_A[1]
++set_location_assignment PIN_42 -to SDRAM_A[2]
++set_location_assignment PIN_39 -to SDRAM_A[3]
++set_location_assignment PIN_4 -to SDRAM_A[4]
++set_location_assignment PIN_6 -to SDRAM_A[5]
++set_location_assignment PIN_8 -to SDRAM_A[6]
++set_location_assignment PIN_10 -to SDRAM_A[7]
++set_location_assignment PIN_11 -to SDRAM_A[8]
++set_location_assignment PIN_28 -to SDRAM_A[9]
++set_location_assignment PIN_50 -to SDRAM_A[10]
++set_location_assignment PIN_30 -to SDRAM_A[11]
++set_location_assignment PIN_32 -to SDRAM_A[12]
++set_location_assignment PIN_83 -to SDRAM_DQ[0]
++set_location_assignment PIN_79 -to SDRAM_DQ[1]
++set_location_assignment PIN_77 -to SDRAM_DQ[2]
++set_location_assignment PIN_76 -to SDRAM_DQ[3]
++set_location_assignment PIN_72 -to SDRAM_DQ[4]
++set_location_assignment PIN_71 -to SDRAM_DQ[5]
++set_location_assignment PIN_69 -to SDRAM_DQ[6]
++set_location_assignment PIN_68 -to SDRAM_DQ[7]
++set_location_assignment PIN_86 -to SDRAM_DQ[8]
++set_location_assignment PIN_87 -to SDRAM_DQ[9]
++set_location_assignment PIN_98 -to SDRAM_DQ[10]
++set_location_assignment PIN_99 -to SDRAM_DQ[11]
++set_location_assignment PIN_100 -to SDRAM_DQ[12]
++set_location_assignment PIN_101 -to SDRAM_DQ[13]
++set_location_assignment PIN_103 -to SDRAM_DQ[14]
++set_location_assignment PIN_104 -to SDRAM_DQ[15]
++set_location_assignment PIN_58 -to SDRAM_BA[0]
++set_location_assignment PIN_51 -to SDRAM_BA[1]
++set_location_assignment PIN_85 -to SDRAM_DQMH
++set_location_assignment PIN_67 -to SDRAM_DQML
++set_location_assignment PIN_60 -to SDRAM_nRAS
++set_location_assignment PIN_64 -to SDRAM_nCAS
++set_location_assignment PIN_66 -to SDRAM_nWE
++set_location_assignment PIN_59 -to SDRAM_nCS
++set_location_assignment PIN_33 -to SDRAM_CKE
++set_location_assignment PIN_43 -to SDRAM_CLK
++
++
++set_global_assignment -name ENABLE_SIGNALTAP OFF
++set_global_assignment -name USE_SIGNALTAP_FILE stp1.stp
++set_global_assignment -name CYCLONEII_RESERVE_NCEO_AFTER_CONFIGURATION "USE AS REGULAR IO"
++set_global_assignment -name RESERVE_DATA0_AFTER_CONFIGURATION "USE AS REGULAR IO"
++set_global_assignment -name RESERVE_DATA1_AFTER_CONFIGURATION "USE AS REGULAR IO"
++set_global_assignment -name RESERVE_FLASH_NCE_AFTER_CONFIGURATION "USE AS REGULAR IO"
++set_global_assignment -name RESERVE_DCLK_AFTER_CONFIGURATION "USE AS REGULAR IO"
++set_global_assignment -name OPTIMIZE_HOLD_TIMING "ALL PATHS"
++set_global_assignment -name OPTIMIZE_MULTI_CORNER_TIMING ON
++set_global_assignment -name FITTER_EFFORT "FAST FIT"
++set_global_assignment -name POWER_PRESET_COOLING_SOLUTION "23 MM HEAT SINK WITH 200 LFPM AIRFLOW"
++set_global_assignment -name POWER_BOARD_THERMAL_MODEL "NONE (CONSERVATIVE)"
++set_instance_assignment -name CURRENT_STRENGTH_NEW "MAXIMUM CURRENT" -to VGA_*
++set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to SDRAM_*
++set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to SDRAM_*
++set_instance_assignment -name FAST_INPUT_REGISTER ON -to SDRAM_DQ*
++set_instance_assignment -name FAST_OUTPUT_ENABLE_REGISTER ON -to SDRAM_DQ*
++set_instance_assignment -name GLOBAL_SIGNAL "GLOBAL CLOCK" -to ram_clock
++set_instance_assignment -name GLOBAL_SIGNAL "GLOBAL CLOCK" -to cpu_clock
++
++
++set_instance_assignment -name GLOBAL_SIGNAL "GLOBAL CLOCK" -to clk_base
++set_global_assignment -name QIP_FILE pll_27_to_64.qip
++set_global_assignment -name QIP_FILE pll_pal_ntsc.qip
++set_global_assignment -name VERILOG_FILE sd_card.v
++set_global_assignment -name VERILOG_FILE user_io.v
++set_global_assignment -name VERILOG_FILE osd.v
++set_global_assignment -name VERILOG_FILE sdram.v
++set_global_assignment -name VHDL_FILE ../rtl_dar/c64_mist.vhd
++set_global_assignment -name VHDL_FILE ../rtl_dar/fpga64_keyboard_matrix_mark_mcdougall.vhd
++set_global_assignment -name VHDL_FILE ../rtl_fpga64_027/roms/rom_c64_kernal.vhd
++set_global_assignment -name VHDL_FILE ../t65/T65_Pack.vhd
++set_global_assignment -name VHDL_FILE ../t65/T65_MCode.vhd
++set_global_assignment -name VHDL_FILE ../t65/T65_ALU.vhd
++set_global_assignment -name VHDL_FILE ../t65/T65.vhd
++set_global_assignment -name VHDL_FILE ../rtl_pace/sprom.vhd
++set_global_assignment -name VHDL_FILE ../rtl_pace/spram.vhd
++set_global_assignment -name VHDL_FILE ../rtl_pace/m6522.vhd
++set_global_assignment -name VHDL_FILE ../rtl_dar/c1541_logic.vhd
++set_global_assignment -name VHDL_FILE ../rtl_dar/spi_controller.vhd
++set_global_assignment -name VHDL_FILE ../rtl_dar/gcr_floppy.vhd
++set_global_assignment -name VHDL_FILE ../rtl_dar/c1541_sd.vhd
++set_global_assignment -name VHDL_FILE ../rtl_dar/video_vicII_656x_a.vhd
++set_global_assignment -name VHDL_FILE ../rtl_dar/sid6581.vhd
++set_global_assignment -name VHDL_FILE ../rtl_dar/fpga64_sid_iec.vhd
++set_global_assignment -name VHDL_FILE ../rtl_dar/fpga64_buslogic_roms_mmu.vhd
++set_global_assignment -name VHDL_FILE ../rtl_dar/composite_sync.vhd
++set_global_assignment -name VHDL_FILE ../rtl_pace/sid_voice.vhd
++set_global_assignment -name VHDL_FILE ../rtl_fpga64_027/roms/rom_c64_chargen.vhd
++set_global_assignment -name VHDL_FILE ../rtl_fpga64_027/roms/rom_c64_basic.vhd
++set_global_assignment -name VHDL_FILE ../rtl_fpga64_027/video_vicII_656x_e.vhd
++set_global_assignment -name VHDL_FILE ../rtl_fpga64_027/io_ps2_keyboard.vhd
++set_global_assignment -name VHDL_FILE ../rtl_fpga64_027/gen_rwram.vhd
++set_global_assignment -name VHDL_FILE ../rtl_fpga64_027/gen_ram.vhd
++set_global_assignment -name VHDL_FILE ../rtl_fpga64_027/fpga64_rgbcolor.vhd
++set_global_assignment -name VHDL_FILE ../rtl_fpga64_027/fpga64_bustiming.vhd
++set_global_assignment -name VHDL_FILE ../rtl_fpga64_027/cpu65xx_fast.vhd
++set_global_assignment -name VHDL_FILE ../rtl_fpga64_027/cpu65xx_e.vhd
++set_global_assignment -name VHDL_FILE ../rtl_fpga64_027/cpu_6510.vhd
++set_global_assignment -name VHDL_FILE ../rtl_fpga64_027/cia6526.vhd
++set_global_assignment -name SIGNALTAP_FILE stp1.stp
++set_global_assignment -name VERILOG_FILE scandoubler.v
++set_global_assignment -name QIP_FILE pll_32.qip
++set_instance_assignment -name PARTITION_HIERARCHY root_partition -to | -section_id Top
+\ Kein Zeilenumbruch am Dateiende.
+diff -Naur vhdl_c64_c1541_sd.orig/mist/data_io.v vhdl_c64_c1541_sd.mist/mist/data_io.v
+--- vhdl_c64_c1541_sd.orig/mist/data_io.v	1970-01-01 01:00:00.000000000 +0100
++++ vhdl_c64_c1541_sd.mist/mist/data_io.v	2015-07-15 09:51:08.713527908 +0200
+@@ -0,0 +1,127 @@
++//
++// data_io.v
++//
++// io controller writable ram for the MiST board
++// http://code.google.com/p/mist-board/
++//
++// Copyright (c) 2014 Till Harbaum <till@harbaum.org>
++//
++// This source file is free software: you can redistribute it and/or modify
++// it under the terms of the GNU General Public License as published
++// by the Free Software Foundation, either version 3 of the License, or
++// (at your option) any later version.
++//
++// This source file is distributed in the hope that it will be useful,
++// but WITHOUT ANY WARRANTY; without even the implied warranty of
++// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++// GNU General Public License for more details.
++//
++// You should have received a copy of the GNU General Public License
++// along with this program.  If not, see <http://www.gnu.org/licenses/>.
++//
++
++module data_io (
++	// io controller spi interface
++	input         sck,
++	input         ss,
++	input         sdi,
++
++	output        downloading,   // signal indicating an active download
++	output [15:0] size,          // number of bytes in input buffer
++   output reg [4:0] index,      // menu index used to upload the file
++	 
++	// external ram interface
++	input 			clk,
++	output reg     wr,
++	output reg [15:0] a,
++	output [7:0]   d
++);
++
++assign d = data;
++
++parameter START_ADDR = 16'h0000;
++
++assign size = addr;
++
++// *********************************************************************************
++// spi client
++// *********************************************************************************
++
++// this core supports only the display related OSD commands
++// of the minimig
++reg [6:0]      sbuf;
++reg [7:0]      cmd /* synthesis noprune */;
++reg [7:0]      data /* synthesis noprune */;
++reg [4:0]      cnt /* synthesis noprune */;
++
++reg [15:0]     addr /* synthesis noprune */;
++reg rclk /* synthesis noprune */;
++
++localparam UIO_FILE_TX      = 8'h53;
++localparam UIO_FILE_TX_DAT  = 8'h54;
++localparam UIO_FILE_INDEX   = 8'h55;
++localparam UIO_FILE_INFO    = 8'h56;
++
++assign downloading = downloading_reg;
++reg downloading_reg = 1'b0;
++
++// data_io has its own SPI interface to the io controller
++always@(posedge sck, posedge ss) begin
++	if(ss == 1'b1)
++		cnt <= 5'd0;
++	else begin
++		rclk <= 1'b0;
++
++		// don't shift in last bit. It is evaluated directly
++		// when writing to ram
++		if(cnt != 15)
++			sbuf <= { sbuf[5:0], sdi};
++
++		// increase target address after write
++		if(rclk)
++			addr <= addr + 16'd1;
++	 
++		// count 0-7 8-15 8-15 ... 
++		if(cnt < 15) 	cnt <= cnt + 4'd1;
++		else				cnt <= 4'd8;
++
++		// finished command byte
++      if(cnt == 7)
++			cmd <= {sbuf, sdi};
++
++		// prepare/end transmission
++		if((cmd == UIO_FILE_TX) && (cnt == 15)) begin
++			// prepare
++			if(sdi) begin
++				addr <= START_ADDR;
++				downloading_reg <= 1'b1; 
++			end else
++				downloading_reg <= 1'b0; 
++		end
++		
++		// command 0x54: UIO_FILE_TX
++		if((cmd == UIO_FILE_TX_DAT) && (cnt == 15)) begin
++			data <= {sbuf, sdi};
++			rclk <= 1'b1;
++			a <= addr;
++		end
++		
++      // expose file (menu) index
++      if((cmd == UIO_FILE_INDEX) && (cnt == 15))
++			index <= {sbuf[3:0], sdi};
++							
++	end
++end
++
++reg rclkD, rclkD2;
++always@(posedge clk) begin
++	// bring rclk from spi clock domain into c64 clock domain
++	rclkD <= rclk;
++	rclkD2 <= rclkD;
++	wr <= 1'b0;
++	
++	if(rclkD && !rclkD2) 
++		wr <= 1'b1;
++end
++
++endmodule
+\ Kein Zeilenumbruch am Dateiende.
+diff -Naur vhdl_c64_c1541_sd.orig/mist/osd.v vhdl_c64_c1541_sd.mist/mist/osd.v
+--- vhdl_c64_c1541_sd.orig/mist/osd.v	1970-01-01 01:00:00.000000000 +0100
++++ vhdl_c64_c1541_sd.mist/mist/osd.v	2015-07-09 14:54:20.549530430 +0200
+@@ -0,0 +1,182 @@
++// A simple OSD implementation. Can be hooked up between a cores
++// VGA output and the physical VGA pins
++
++module osd (
++	// OSDs pixel clock, should be synchronous to cores pixel clock to
++	// avoid jitter.
++	input 			pclk,
++
++	// SPI interface
++	input         sck,
++	input         ss,
++	input         sdi,
++
++	// VGA signals coming from core
++	input [5:0]  	red_in,
++	input [5:0]  	green_in,
++	input [5:0]  	blue_in,
++	input				hs_in,
++	input				vs_in,
++	
++	// VGA signals going to video connector
++	output [5:0]  	red_out,
++	output [5:0]  	green_out,
++	output [5:0]  	blue_out,
++	output			hs_out,
++	output			vs_out
++);
++
++parameter OSD_X_OFFSET = 10'd0;
++parameter OSD_Y_OFFSET = 10'd0;
++parameter OSD_COLOR    = 3'd0;
++
++localparam OSD_WIDTH  = 10'd256;
++localparam OSD_HEIGHT = 10'd128;
++
++// *********************************************************************************
++// spi client
++// *********************************************************************************
++
++// this core supports only the display related OSD commands
++// of the minimig
++reg [7:0]      sbuf;
++reg [7:0]      cmd;
++reg [4:0]      cnt;
++reg [10:0]     bcnt;
++reg    			osd_enable;
++
++reg [7:0] osd_buffer [2047:0];  // the OSD buffer itself
++
++// the OSD has its own SPI interface to the io controller
++always@(posedge sck, posedge ss) begin
++  if(ss == 1'b1) begin
++      cnt <= 5'd0;
++      bcnt <= 11'd0;
++  end else begin
++    sbuf <= { sbuf[6:0], sdi};
++
++    // 0:7 is command, rest payload
++    if(cnt < 15)
++      cnt <= cnt + 4'd1;
++    else
++      cnt <= 4'd8;
++
++      if(cnt == 7) begin
++       cmd <= {sbuf[6:0], sdi};
++      
++      // lower three command bits are line address
++      bcnt <= { sbuf[1:0], sdi, 8'h00};
++
++      // command 0x40: OSDCMDENABLE, OSDCMDDISABLE
++      if(sbuf[6:3] == 4'b0100)
++        osd_enable <= sdi;
++    end
++
++    // command 0x20: OSDCMDWRITE
++    if((cmd[7:3] == 5'b00100) && (cnt == 15)) begin
++      osd_buffer[bcnt] <= {sbuf[6:0], sdi};
++      bcnt <= bcnt + 11'd1;
++    end
++  end
++end
++
++// *********************************************************************************
++// video timing and sync polarity anaylsis
++// *********************************************************************************
++
++// horizontal counter
++reg [9:0] h_cnt;
++reg hsD, hsD2;
++reg [9:0] hs_low, hs_high;
++wire hs_pol = hs_high < hs_low;
++wire [9:0] h_dsp_width = hs_pol?hs_low:hs_high;
++wire [9:0] h_dsp_ctr = { 1'b0, h_dsp_width[9:1] };
++
++always @(posedge pclk) begin
++	// bring hsync into local clock domain
++	hsD <= hs_in;
++	hsD2 <= hsD;
++
++	// falling edge of hs_in
++	if(!hsD && hsD2) begin	
++		h_cnt <= 10'd0;
++		hs_high <= h_cnt;
++	end
++
++	// rising edge of hs_in
++	else if(hsD && !hsD2) begin	
++		h_cnt <= 10'd0;
++		hs_low <= h_cnt;
++	end 
++	
++	else
++		h_cnt <= h_cnt + 10'd1;
++end
++
++// vertical counter
++reg [9:0] v_cnt;
++reg vsD, vsD2;
++reg [9:0] vs_low, vs_high;
++wire vs_pol = vs_high < vs_low;
++wire [9:0] v_dsp_width = vs_pol?vs_low:vs_high;
++wire [9:0] v_dsp_ctr = { 1'b0, v_dsp_width[9:1] };
++
++always @(posedge hs_in) begin
++	// bring vsync into local clock domain
++	vsD <= vs_in;
++	vsD2 <= vsD;
++
++	// falling edge of vs_in
++	if(!vsD && vsD2) begin	
++		v_cnt <= 10'd0;
++		vs_high <= v_cnt;
++	end
++
++	// rising edge of vs_in
++	else if(vsD && !vsD2) begin	
++		v_cnt <= 10'd0;
++		vs_low <= v_cnt;
++	end 
++	
++	else
++		v_cnt <= v_cnt + 10'd1;
++end
++
++// area in which OSD is being displayed
++wire [9:0] h_osd_start = h_dsp_ctr + OSD_X_OFFSET - (OSD_WIDTH >> 1);
++wire [9:0] h_osd_end   = h_dsp_ctr + OSD_X_OFFSET + (OSD_WIDTH >> 1) - 1;
++wire [9:0] v_osd_start = v_dsp_ctr + OSD_Y_OFFSET - (OSD_HEIGHT >> 1);
++wire [9:0] v_osd_end   = v_dsp_ctr + OSD_Y_OFFSET + (OSD_HEIGHT >> 1) - 1;
++
++reg h_osd_active, v_osd_active;
++always @(posedge pclk) begin
++	if(hs_in != hs_pol) begin
++		if(h_cnt == h_osd_start) h_osd_active <= 1'b1;
++		if(h_cnt == h_osd_end)   h_osd_active <= 1'b0;
++	end
++	if(vs_in != vs_pol) begin
++		if(v_cnt == v_osd_start) v_osd_active <= 1'b1;
++		if(v_cnt == v_osd_end)   v_osd_active <= 1'b0;
++	end
++end
++
++wire osd_de = osd_enable && h_osd_active && v_osd_active;
++
++wire [7:0] osd_hcnt = h_cnt - h_osd_start + 7'd1;  // one pixel offset for osd_byte register
++wire [6:0] osd_vcnt = v_cnt - v_osd_start;
++
++wire osd_pixel = osd_byte[osd_vcnt[3:1]];
++
++reg [7:0] osd_byte; 
++always @(posedge pclk)
++  osd_byte <= osd_buffer[{osd_vcnt[6:4], osd_hcnt}];
++
++wire [2:0] osd_color = OSD_COLOR;
++assign red_out   = !osd_de?red_in:  {osd_pixel, osd_pixel, osd_color[2], red_in[5:3]  };
++assign green_out = !osd_de?green_in:{osd_pixel, osd_pixel, osd_color[1], green_in[5:3]};
++assign blue_out  = !osd_de?blue_in: {osd_pixel, osd_pixel, osd_color[0], blue_in[5:3] };
++
++assign hs_out = hs_in;
++assign vs_out = vs_in;
++
++endmodule
+\ Kein Zeilenumbruch am Dateiende.
+diff -Naur vhdl_c64_c1541_sd.orig/mist/pll_27_to_64.qip vhdl_c64_c1541_sd.mist/mist/pll_27_to_64.qip
+--- vhdl_c64_c1541_sd.orig/mist/pll_27_to_64.qip	1970-01-01 01:00:00.000000000 +0100
++++ vhdl_c64_c1541_sd.mist/mist/pll_27_to_64.qip	2015-07-22 11:00:56.416523234 +0200
+@@ -0,0 +1,4 @@
++set_global_assignment -name IP_TOOL_NAME "ALTPLL"
++set_global_assignment -name IP_TOOL_VERSION "13.1"
++set_global_assignment -name VHDL_FILE [file join $::quartus(qip_path) "pll_27_to_64.vhd"]
++set_global_assignment -name MISC_FILE [file join $::quartus(qip_path) "pll_27_to_64.ppf"]
+diff -Naur vhdl_c64_c1541_sd.orig/mist/pll_27_to_64.vhd vhdl_c64_c1541_sd.mist/mist/pll_27_to_64.vhd
+--- vhdl_c64_c1541_sd.orig/mist/pll_27_to_64.vhd	1970-01-01 01:00:00.000000000 +0100
++++ vhdl_c64_c1541_sd.mist/mist/pll_27_to_64.vhd	2015-07-22 11:00:56.416523234 +0200
+@@ -0,0 +1,406 @@
++-- megafunction wizard: %ALTPLL%
++-- GENERATION: STANDARD
++-- VERSION: WM1.0
++-- MODULE: altpll 
++
++-- ============================================================
++-- File Name: pll_27_to_64.vhd
++-- Megafunction Name(s):
++-- 			altpll
++--
++-- Simulation Library Files(s):
++-- 			altera_mf
++-- ============================================================
++-- ************************************************************
++-- THIS IS A WIZARD-GENERATED FILE. DO NOT EDIT THIS FILE!
++--
++-- 13.1.4 Build 182 03/12/2014 SJ Web Edition
++-- ************************************************************
++
++
++--Copyright (C) 1991-2014 Altera Corporation
++--Your use of Altera Corporation's design tools, logic functions 
++--and other software and tools, and its AMPP partner logic 
++--functions, and any output files from any of the foregoing 
++--(including device programming or simulation files), and any 
++--associated documentation or information are expressly subject 
++--to the terms and conditions of the Altera Program License 
++--Subscription Agreement, Altera MegaCore Function License 
++--Agreement, or other applicable license agreement, including, 
++--without limitation, that your use is for the sole purpose of 
++--programming logic devices manufactured by Altera and sold by 
++--Altera or its authorized distributors.  Please refer to the 
++--applicable agreement for further details.
++
++
++LIBRARY ieee;
++USE ieee.std_logic_1164.all;
++
++LIBRARY altera_mf;
++USE altera_mf.all;
++
++ENTITY pll_27_to_64 IS
++	PORT
++	(
++		clkswitch		: IN STD_LOGIC  := '0';
++		inclk0		: IN STD_LOGIC  := '0';
++		inclk1		: IN STD_LOGIC  := '0';
++		c0		: OUT STD_LOGIC ;
++		c1		: OUT STD_LOGIC ;
++		locked		: OUT STD_LOGIC 
++	);
++END pll_27_to_64;
++
++
++ARCHITECTURE SYN OF pll_27_to_64 IS
++
++	SIGNAL sub_wire0	: STD_LOGIC_VECTOR (4 DOWNTO 0);
++	SIGNAL sub_wire1	: STD_LOGIC ;
++	SIGNAL sub_wire2	: STD_LOGIC ;
++	SIGNAL sub_wire3	: STD_LOGIC ;
++	SIGNAL sub_wire4	: STD_LOGIC ;
++	SIGNAL sub_wire5	: STD_LOGIC_VECTOR (1 DOWNTO 0);
++	SIGNAL sub_wire6	: STD_LOGIC ;
++
++
++
++	COMPONENT altpll
++	GENERIC (
++		bandwidth_type		: STRING;
++		clk0_divide_by		: NATURAL;
++		clk0_duty_cycle		: NATURAL;
++		clk0_multiply_by		: NATURAL;
++		clk0_phase_shift		: STRING;
++		clk1_divide_by		: NATURAL;
++		clk1_duty_cycle		: NATURAL;
++		clk1_multiply_by		: NATURAL;
++		clk1_phase_shift		: STRING;
++		compensate_clock		: STRING;
++		inclk0_input_frequency		: NATURAL;
++		inclk1_input_frequency		: NATURAL;
++		intended_device_family		: STRING;
++		lpm_hint		: STRING;
++		lpm_type		: STRING;
++		operation_mode		: STRING;
++		pll_type		: STRING;
++		port_activeclock		: STRING;
++		port_areset		: STRING;
++		port_clkbad0		: STRING;
++		port_clkbad1		: STRING;
++		port_clkloss		: STRING;
++		port_clkswitch		: STRING;
++		port_configupdate		: STRING;
++		port_fbin		: STRING;
++		port_inclk0		: STRING;
++		port_inclk1		: STRING;
++		port_locked		: STRING;
++		port_pfdena		: STRING;
++		port_phasecounterselect		: STRING;
++		port_phasedone		: STRING;
++		port_phasestep		: STRING;
++		port_phaseupdown		: STRING;
++		port_pllena		: STRING;
++		port_scanaclr		: STRING;
++		port_scanclk		: STRING;
++		port_scanclkena		: STRING;
++		port_scandata		: STRING;
++		port_scandataout		: STRING;
++		port_scandone		: STRING;
++		port_scanread		: STRING;
++		port_scanwrite		: STRING;
++		port_clk0		: STRING;
++		port_clk1		: STRING;
++		port_clk2		: STRING;
++		port_clk3		: STRING;
++		port_clk4		: STRING;
++		port_clk5		: STRING;
++		port_clkena0		: STRING;
++		port_clkena1		: STRING;
++		port_clkena2		: STRING;
++		port_clkena3		: STRING;
++		port_clkena4		: STRING;
++		port_clkena5		: STRING;
++		port_extclk0		: STRING;
++		port_extclk1		: STRING;
++		port_extclk2		: STRING;
++		port_extclk3		: STRING;
++		primary_clock		: STRING;
++		self_reset_on_loss_lock		: STRING;
++		switch_over_type		: STRING;
++		width_clock		: NATURAL
++	);
++	PORT (
++			clk	: OUT STD_LOGIC_VECTOR (4 DOWNTO 0);
++			clkswitch	: IN STD_LOGIC ;
++			inclk	: IN STD_LOGIC_VECTOR (1 DOWNTO 0);
++			locked	: OUT STD_LOGIC 
++	);
++	END COMPONENT;
++
++BEGIN
++	sub_wire6    <= inclk1;
++	sub_wire3    <= sub_wire0(0);
++	sub_wire1    <= sub_wire0(1);
++	c1    <= sub_wire1;
++	locked    <= sub_wire2;
++	c0    <= sub_wire3;
++	sub_wire4    <= inclk0;
++	sub_wire5    <= sub_wire6 & sub_wire4;
++
++	altpll_component : altpll
++	GENERIC MAP (
++		bandwidth_type => "HIGH",
++		clk0_divide_by => 3,
++		clk0_duty_cycle => 50,
++		clk0_multiply_by => 7,
++		clk0_phase_shift => "0",
++		clk1_divide_by => 3,
++		clk1_duty_cycle => 50,
++		clk1_multiply_by => 7,
++		clk1_phase_shift => "-2500",
++		compensate_clock => "CLK0",
++		inclk0_input_frequency => 37037,
++		inclk1_input_frequency => 38461,
++		intended_device_family => "Cyclone III",
++		lpm_hint => "CBX_MODULE_PREFIX=pll_27_to_64",
++		lpm_type => "altpll",
++		operation_mode => "NORMAL",
++		pll_type => "AUTO",
++		port_activeclock => "PORT_UNUSED",
++		port_areset => "PORT_UNUSED",
++		port_clkbad0 => "PORT_UNUSED",
++		port_clkbad1 => "PORT_UNUSED",
++		port_clkloss => "PORT_UNUSED",
++		port_clkswitch => "PORT_USED",
++		port_configupdate => "PORT_UNUSED",
++		port_fbin => "PORT_UNUSED",
++		port_inclk0 => "PORT_USED",
++		port_inclk1 => "PORT_USED",
++		port_locked => "PORT_USED",
++		port_pfdena => "PORT_UNUSED",
++		port_phasecounterselect => "PORT_UNUSED",
++		port_phasedone => "PORT_UNUSED",
++		port_phasestep => "PORT_UNUSED",
++		port_phaseupdown => "PORT_UNUSED",
++		port_pllena => "PORT_UNUSED",
++		port_scanaclr => "PORT_UNUSED",
++		port_scanclk => "PORT_UNUSED",
++		port_scanclkena => "PORT_UNUSED",
++		port_scandata => "PORT_UNUSED",
++		port_scandataout => "PORT_UNUSED",
++		port_scandone => "PORT_UNUSED",
++		port_scanread => "PORT_UNUSED",
++		port_scanwrite => "PORT_UNUSED",
++		port_clk0 => "PORT_USED",
++		port_clk1 => "PORT_USED",
++		port_clk2 => "PORT_UNUSED",
++		port_clk3 => "PORT_UNUSED",
++		port_clk4 => "PORT_UNUSED",
++		port_clk5 => "PORT_UNUSED",
++		port_clkena0 => "PORT_UNUSED",
++		port_clkena1 => "PORT_UNUSED",
++		port_clkena2 => "PORT_UNUSED",
++		port_clkena3 => "PORT_UNUSED",
++		port_clkena4 => "PORT_UNUSED",
++		port_clkena5 => "PORT_UNUSED",
++		port_extclk0 => "PORT_UNUSED",
++		port_extclk1 => "PORT_UNUSED",
++		port_extclk2 => "PORT_UNUSED",
++		port_extclk3 => "PORT_UNUSED",
++		primary_clock => "inclk0",
++		self_reset_on_loss_lock => "OFF",
++		switch_over_type => "MANUAL",
++		width_clock => 5
++	)
++	PORT MAP (
++		clkswitch => clkswitch,
++		inclk => sub_wire5,
++		clk => sub_wire0,
++		locked => sub_wire2
++	);
++
++
++
++END SYN;
++
++-- ============================================================
++-- CNX file retrieval info
++-- ============================================================
++-- Retrieval info: PRIVATE: ACTIVECLK_CHECK STRING "0"
++-- Retrieval info: PRIVATE: BANDWIDTH STRING "1.000"
++-- Retrieval info: PRIVATE: BANDWIDTH_FEATURE_ENABLED STRING "1"
++-- Retrieval info: PRIVATE: BANDWIDTH_FREQ_UNIT STRING "MHz"
++-- Retrieval info: PRIVATE: BANDWIDTH_PRESET STRING "High"
++-- Retrieval info: PRIVATE: BANDWIDTH_USE_AUTO STRING "0"
++-- Retrieval info: PRIVATE: BANDWIDTH_USE_PRESET STRING "1"
++-- Retrieval info: PRIVATE: CLKBAD_SWITCHOVER_CHECK STRING "0"
++-- Retrieval info: PRIVATE: CLKLOSS_CHECK STRING "0"
++-- Retrieval info: PRIVATE: CLKSWITCH_CHECK STRING "0"
++-- Retrieval info: PRIVATE: CNX_NO_COMPENSATE_RADIO STRING "0"
++-- Retrieval info: PRIVATE: CREATE_CLKBAD_CHECK STRING "0"
++-- Retrieval info: PRIVATE: CREATE_INCLK1_CHECK STRING "1"
++-- Retrieval info: PRIVATE: CUR_DEDICATED_CLK STRING "c0"
++-- Retrieval info: PRIVATE: CUR_FBIN_CLK STRING "c0"
++-- Retrieval info: PRIVATE: DEVICE_SPEED_GRADE STRING "8"
++-- Retrieval info: PRIVATE: DIV_FACTOR0 NUMERIC "3"
++-- Retrieval info: PRIVATE: DIV_FACTOR1 NUMERIC "3"
++-- Retrieval info: PRIVATE: DUTY_CYCLE0 STRING "50.00000000"
++-- Retrieval info: PRIVATE: DUTY_CYCLE1 STRING "50.00000000"
++-- Retrieval info: PRIVATE: EFF_OUTPUT_FREQ_VALUE0 STRING "63.000000"
++-- Retrieval info: PRIVATE: EFF_OUTPUT_FREQ_VALUE1 STRING "63.000000"
++-- Retrieval info: PRIVATE: EXPLICIT_SWITCHOVER_COUNTER STRING "0"
++-- Retrieval info: PRIVATE: EXT_FEEDBACK_RADIO STRING "0"
++-- Retrieval info: PRIVATE: GLOCKED_COUNTER_EDIT_CHANGED STRING "1"
++-- Retrieval info: PRIVATE: GLOCKED_FEATURE_ENABLED STRING "0"
++-- Retrieval info: PRIVATE: GLOCKED_MODE_CHECK STRING "0"
++-- Retrieval info: PRIVATE: GLOCK_COUNTER_EDIT NUMERIC "1048575"
++-- Retrieval info: PRIVATE: HAS_MANUAL_SWITCHOVER STRING "1"
++-- Retrieval info: PRIVATE: INCLK0_FREQ_EDIT STRING "27.000"
++-- Retrieval info: PRIVATE: INCLK0_FREQ_UNIT_COMBO STRING "MHz"
++-- Retrieval info: PRIVATE: INCLK1_FREQ_EDIT STRING "26.000"
++-- Retrieval info: PRIVATE: INCLK1_FREQ_EDIT_CHANGED STRING "1"
++-- Retrieval info: PRIVATE: INCLK1_FREQ_UNIT_CHANGED STRING "1"
++-- Retrieval info: PRIVATE: INCLK1_FREQ_UNIT_COMBO STRING "MHz"
++-- Retrieval info: PRIVATE: INTENDED_DEVICE_FAMILY STRING "Cyclone III"
++-- Retrieval info: PRIVATE: INT_FEEDBACK__MODE_RADIO STRING "1"
++-- Retrieval info: PRIVATE: LOCKED_OUTPUT_CHECK STRING "1"
++-- Retrieval info: PRIVATE: LONG_SCAN_RADIO STRING "1"
++-- Retrieval info: PRIVATE: LVDS_MODE_DATA_RATE STRING "Not Available"
++-- Retrieval info: PRIVATE: LVDS_MODE_DATA_RATE_DIRTY NUMERIC "0"
++-- Retrieval info: PRIVATE: LVDS_PHASE_SHIFT_UNIT0 STRING "deg"
++-- Retrieval info: PRIVATE: LVDS_PHASE_SHIFT_UNIT1 STRING "deg"
++-- Retrieval info: PRIVATE: MIG_DEVICE_SPEED_GRADE STRING "Any"
++-- Retrieval info: PRIVATE: MIRROR_CLK0 STRING "0"
++-- Retrieval info: PRIVATE: MIRROR_CLK1 STRING "0"
++-- Retrieval info: PRIVATE: MULT_FACTOR0 NUMERIC "7"
++-- Retrieval info: PRIVATE: MULT_FACTOR1 NUMERIC "7"
++-- Retrieval info: PRIVATE: NORMAL_MODE_RADIO STRING "1"
++-- Retrieval info: PRIVATE: OUTPUT_FREQ0 STRING "63.05600000"
++-- Retrieval info: PRIVATE: OUTPUT_FREQ1 STRING "63.05600000"
++-- Retrieval info: PRIVATE: OUTPUT_FREQ_MODE0 STRING "0"
++-- Retrieval info: PRIVATE: OUTPUT_FREQ_MODE1 STRING "0"
++-- Retrieval info: PRIVATE: OUTPUT_FREQ_UNIT0 STRING "MHz"
++-- Retrieval info: PRIVATE: OUTPUT_FREQ_UNIT1 STRING "MHz"
++-- Retrieval info: PRIVATE: PHASE_RECONFIG_FEATURE_ENABLED STRING "1"
++-- Retrieval info: PRIVATE: PHASE_RECONFIG_INPUTS_CHECK STRING "0"
++-- Retrieval info: PRIVATE: PHASE_SHIFT0 STRING "0.00000000"
++-- Retrieval info: PRIVATE: PHASE_SHIFT1 STRING "-2500.00000000"
++-- Retrieval info: PRIVATE: PHASE_SHIFT_STEP_ENABLED_CHECK STRING "0"
++-- Retrieval info: PRIVATE: PHASE_SHIFT_UNIT0 STRING "deg"
++-- Retrieval info: PRIVATE: PHASE_SHIFT_UNIT1 STRING "ps"
++-- Retrieval info: PRIVATE: PLL_ADVANCED_PARAM_CHECK STRING "0"
++-- Retrieval info: PRIVATE: PLL_ARESET_CHECK STRING "0"
++-- Retrieval info: PRIVATE: PLL_AUTOPLL_CHECK NUMERIC "1"
++-- Retrieval info: PRIVATE: PLL_ENHPLL_CHECK NUMERIC "0"
++-- Retrieval info: PRIVATE: PLL_FASTPLL_CHECK NUMERIC "0"
++-- Retrieval info: PRIVATE: PLL_FBMIMIC_CHECK STRING "0"
++-- Retrieval info: PRIVATE: PLL_LVDS_PLL_CHECK NUMERIC "0"
++-- Retrieval info: PRIVATE: PLL_PFDENA_CHECK STRING "0"
++-- Retrieval info: PRIVATE: PLL_TARGET_HARCOPY_CHECK NUMERIC "0"
++-- Retrieval info: PRIVATE: PRIMARY_CLK_COMBO STRING "inclk0"
++-- Retrieval info: PRIVATE: RECONFIG_FILE STRING "pll_27_to_64.mif"
++-- Retrieval info: PRIVATE: SACN_INPUTS_CHECK STRING "0"
++-- Retrieval info: PRIVATE: SCAN_FEATURE_ENABLED STRING "1"
++-- Retrieval info: PRIVATE: SELF_RESET_LOCK_LOSS STRING "0"
++-- Retrieval info: PRIVATE: SHORT_SCAN_RADIO STRING "0"
++-- Retrieval info: PRIVATE: SPREAD_FEATURE_ENABLED STRING "0"
++-- Retrieval info: PRIVATE: SPREAD_FREQ STRING "50.000"
++-- Retrieval info: PRIVATE: SPREAD_FREQ_UNIT STRING "KHz"
++-- Retrieval info: PRIVATE: SPREAD_PERCENT STRING "0.500"
++-- Retrieval info: PRIVATE: SPREAD_USE STRING "0"
++-- Retrieval info: PRIVATE: SRC_SYNCH_COMP_RADIO STRING "0"
++-- Retrieval info: PRIVATE: STICKY_CLK0 STRING "1"
++-- Retrieval info: PRIVATE: STICKY_CLK1 STRING "1"
++-- Retrieval info: PRIVATE: SWITCHOVER_COUNT_EDIT NUMERIC "1"
++-- Retrieval info: PRIVATE: SWITCHOVER_FEATURE_ENABLED STRING "1"
++-- Retrieval info: PRIVATE: SYNTH_WRAPPER_GEN_POSTFIX STRING "0"
++-- Retrieval info: PRIVATE: USE_CLK0 STRING "1"
++-- Retrieval info: PRIVATE: USE_CLK1 STRING "1"
++-- Retrieval info: PRIVATE: USE_CLKENA0 STRING "0"
++-- Retrieval info: PRIVATE: USE_CLKENA1 STRING "0"
++-- Retrieval info: PRIVATE: USE_MIL_SPEED_GRADE NUMERIC "0"
++-- Retrieval info: PRIVATE: ZERO_DELAY_RADIO STRING "0"
++-- Retrieval info: LIBRARY: altera_mf altera_mf.altera_mf_components.all
++-- Retrieval info: CONSTANT: BANDWIDTH_TYPE STRING "HIGH"
++-- Retrieval info: CONSTANT: CLK0_DIVIDE_BY NUMERIC "3"
++-- Retrieval info: CONSTANT: CLK0_DUTY_CYCLE NUMERIC "50"
++-- Retrieval info: CONSTANT: CLK0_MULTIPLY_BY NUMERIC "7"
++-- Retrieval info: CONSTANT: CLK0_PHASE_SHIFT STRING "0"
++-- Retrieval info: CONSTANT: CLK1_DIVIDE_BY NUMERIC "3"
++-- Retrieval info: CONSTANT: CLK1_DUTY_CYCLE NUMERIC "50"
++-- Retrieval info: CONSTANT: CLK1_MULTIPLY_BY NUMERIC "7"
++-- Retrieval info: CONSTANT: CLK1_PHASE_SHIFT STRING "-2500"
++-- Retrieval info: CONSTANT: COMPENSATE_CLOCK STRING "CLK0"
++-- Retrieval info: CONSTANT: INCLK0_INPUT_FREQUENCY NUMERIC "37037"
++-- Retrieval info: CONSTANT: INCLK1_INPUT_FREQUENCY NUMERIC "38461"
++-- Retrieval info: CONSTANT: INTENDED_DEVICE_FAMILY STRING "Cyclone III"
++-- Retrieval info: CONSTANT: LPM_TYPE STRING "altpll"
++-- Retrieval info: CONSTANT: OPERATION_MODE STRING "NORMAL"
++-- Retrieval info: CONSTANT: PLL_TYPE STRING "AUTO"
++-- Retrieval info: CONSTANT: PORT_ACTIVECLOCK STRING "PORT_UNUSED"
++-- Retrieval info: CONSTANT: PORT_ARESET STRING "PORT_UNUSED"
++-- Retrieval info: CONSTANT: PORT_CLKBAD0 STRING "PORT_UNUSED"
++-- Retrieval info: CONSTANT: PORT_CLKBAD1 STRING "PORT_UNUSED"
++-- Retrieval info: CONSTANT: PORT_CLKLOSS STRING "PORT_UNUSED"
++-- Retrieval info: CONSTANT: PORT_CLKSWITCH STRING "PORT_USED"
++-- Retrieval info: CONSTANT: PORT_CONFIGUPDATE STRING "PORT_UNUSED"
++-- Retrieval info: CONSTANT: PORT_FBIN STRING "PORT_UNUSED"
++-- Retrieval info: CONSTANT: PORT_INCLK0 STRING "PORT_USED"
++-- Retrieval info: CONSTANT: PORT_INCLK1 STRING "PORT_USED"
++-- Retrieval info: CONSTANT: PORT_LOCKED STRING "PORT_USED"
++-- Retrieval info: CONSTANT: PORT_PFDENA STRING "PORT_UNUSED"
++-- Retrieval info: CONSTANT: PORT_PHASECOUNTERSELECT STRING "PORT_UNUSED"
++-- Retrieval info: CONSTANT: PORT_PHASEDONE STRING "PORT_UNUSED"
++-- Retrieval info: CONSTANT: PORT_PHASESTEP STRING "PORT_UNUSED"
++-- Retrieval info: CONSTANT: PORT_PHASEUPDOWN STRING "PORT_UNUSED"
++-- Retrieval info: CONSTANT: PORT_PLLENA STRING "PORT_UNUSED"
++-- Retrieval info: CONSTANT: PORT_SCANACLR STRING "PORT_UNUSED"
++-- Retrieval info: CONSTANT: PORT_SCANCLK STRING "PORT_UNUSED"
++-- Retrieval info: CONSTANT: PORT_SCANCLKENA STRING "PORT_UNUSED"
++-- Retrieval info: CONSTANT: PORT_SCANDATA STRING "PORT_UNUSED"
++-- Retrieval info: CONSTANT: PORT_SCANDATAOUT STRING "PORT_UNUSED"
++-- Retrieval info: CONSTANT: PORT_SCANDONE STRING "PORT_UNUSED"
++-- Retrieval info: CONSTANT: PORT_SCANREAD STRING "PORT_UNUSED"
++-- Retrieval info: CONSTANT: PORT_SCANWRITE STRING "PORT_UNUSED"
++-- Retrieval info: CONSTANT: PORT_clk0 STRING "PORT_USED"
++-- Retrieval info: CONSTANT: PORT_clk1 STRING "PORT_USED"
++-- Retrieval info: CONSTANT: PORT_clk2 STRING "PORT_UNUSED"
++-- Retrieval info: CONSTANT: PORT_clk3 STRING "PORT_UNUSED"
++-- Retrieval info: CONSTANT: PORT_clk4 STRING "PORT_UNUSED"
++-- Retrieval info: CONSTANT: PORT_clk5 STRING "PORT_UNUSED"
++-- Retrieval info: CONSTANT: PORT_clkena0 STRING "PORT_UNUSED"
++-- Retrieval info: CONSTANT: PORT_clkena1 STRING "PORT_UNUSED"
++-- Retrieval info: CONSTANT: PORT_clkena2 STRING "PORT_UNUSED"
++-- Retrieval info: CONSTANT: PORT_clkena3 STRING "PORT_UNUSED"
++-- Retrieval info: CONSTANT: PORT_clkena4 STRING "PORT_UNUSED"
++-- Retrieval info: CONSTANT: PORT_clkena5 STRING "PORT_UNUSED"
++-- Retrieval info: CONSTANT: PORT_extclk0 STRING "PORT_UNUSED"
++-- Retrieval info: CONSTANT: PORT_extclk1 STRING "PORT_UNUSED"
++-- Retrieval info: CONSTANT: PORT_extclk2 STRING "PORT_UNUSED"
++-- Retrieval info: CONSTANT: PORT_extclk3 STRING "PORT_UNUSED"
++-- Retrieval info: CONSTANT: PRIMARY_CLOCK STRING "inclk0"
++-- Retrieval info: CONSTANT: SELF_RESET_ON_LOSS_LOCK STRING "OFF"
++-- Retrieval info: CONSTANT: SWITCH_OVER_TYPE STRING "MANUAL"
++-- Retrieval info: CONSTANT: WIDTH_CLOCK NUMERIC "5"
++-- Retrieval info: USED_PORT: @clk 0 0 5 0 OUTPUT_CLK_EXT VCC "@clk[4..0]"
++-- Retrieval info: USED_PORT: @inclk 0 0 2 0 INPUT_CLK_EXT VCC "@inclk[1..0]"
++-- Retrieval info: USED_PORT: c0 0 0 0 0 OUTPUT_CLK_EXT VCC "c0"
++-- Retrieval info: USED_PORT: c1 0 0 0 0 OUTPUT_CLK_EXT VCC "c1"
++-- Retrieval info: USED_PORT: clkswitch 0 0 0 0 INPUT GND "clkswitch"
++-- Retrieval info: USED_PORT: inclk0 0 0 0 0 INPUT_CLK_EXT GND "inclk0"
++-- Retrieval info: USED_PORT: inclk1 0 0 0 0 INPUT_CLK_EXT GND "inclk1"
++-- Retrieval info: USED_PORT: locked 0 0 0 0 OUTPUT GND "locked"
++-- Retrieval info: CONNECT: @clkswitch 0 0 0 0 clkswitch 0 0 0 0
++-- Retrieval info: CONNECT: @inclk 0 0 1 0 inclk0 0 0 0 0
++-- Retrieval info: CONNECT: @inclk 0 0 1 1 inclk1 0 0 0 0
++-- Retrieval info: CONNECT: c0 0 0 0 0 @clk 0 0 1 0
++-- Retrieval info: CONNECT: c1 0 0 0 0 @clk 0 0 1 1
++-- Retrieval info: CONNECT: locked 0 0 0 0 @locked 0 0 0 0
++-- Retrieval info: GEN_FILE: TYPE_NORMAL pll_27_to_64.vhd TRUE
++-- Retrieval info: GEN_FILE: TYPE_NORMAL pll_27_to_64.ppf TRUE
++-- Retrieval info: GEN_FILE: TYPE_NORMAL pll_27_to_64.inc FALSE
++-- Retrieval info: GEN_FILE: TYPE_NORMAL pll_27_to_64.cmp FALSE
++-- Retrieval info: GEN_FILE: TYPE_NORMAL pll_27_to_64.bsf FALSE
++-- Retrieval info: GEN_FILE: TYPE_NORMAL pll_27_to_64_inst.vhd FALSE
++-- Retrieval info: LIB_FILE: altera_mf
++-- Retrieval info: CBX_MODULE_PREFIX: ON
+diff -Naur vhdl_c64_c1541_sd.orig/mist/pll_32.qip vhdl_c64_c1541_sd.mist/mist/pll_32.qip
+--- vhdl_c64_c1541_sd.orig/mist/pll_32.qip	1970-01-01 01:00:00.000000000 +0100
++++ vhdl_c64_c1541_sd.mist/mist/pll_32.qip	2015-07-21 14:44:03.252822681 +0200
+@@ -0,0 +1,4 @@
++set_global_assignment -name IP_TOOL_NAME "ALTPLL"
++set_global_assignment -name IP_TOOL_VERSION "13.1"
++set_global_assignment -name VHDL_FILE [file join $::quartus(qip_path) "pll_32.vhd"]
++set_global_assignment -name MISC_FILE [file join $::quartus(qip_path) "pll_32.ppf"]
+diff -Naur vhdl_c64_c1541_sd.orig/mist/pll_32.vhd vhdl_c64_c1541_sd.mist/mist/pll_32.vhd
+--- vhdl_c64_c1541_sd.orig/mist/pll_32.vhd	1970-01-01 01:00:00.000000000 +0100
++++ vhdl_c64_c1541_sd.mist/mist/pll_32.vhd	2015-07-21 14:44:03.248822681 +0200
+@@ -0,0 +1,392 @@
++-- megafunction wizard: %ALTPLL%
++-- GENERATION: STANDARD
++-- VERSION: WM1.0
++-- MODULE: altpll 
++
++-- ============================================================
++-- File Name: pll_32.vhd
++-- Megafunction Name(s):
++-- 			altpll
++--
++-- Simulation Library Files(s):
++-- 			altera_mf
++-- ============================================================
++-- ************************************************************
++-- THIS IS A WIZARD-GENERATED FILE. DO NOT EDIT THIS FILE!
++--
++-- 13.1.4 Build 182 03/12/2014 SJ Web Edition
++-- ************************************************************
++
++
++--Copyright (C) 1991-2014 Altera Corporation
++--Your use of Altera Corporation's design tools, logic functions 
++--and other software and tools, and its AMPP partner logic 
++--functions, and any output files from any of the foregoing 
++--(including device programming or simulation files), and any 
++--associated documentation or information are expressly subject 
++--to the terms and conditions of the Altera Program License 
++--Subscription Agreement, Altera MegaCore Function License 
++--Agreement, or other applicable license agreement, including, 
++--without limitation, that your use is for the sole purpose of 
++--programming logic devices manufactured by Altera and sold by 
++--Altera or its authorized distributors.  Please refer to the 
++--applicable agreement for further details.
++
++
++LIBRARY ieee;
++USE ieee.std_logic_1164.all;
++
++LIBRARY altera_mf;
++USE altera_mf.all;
++
++ENTITY pll_32 IS
++	PORT
++	(
++		inclk0		: IN STD_LOGIC  := '0';
++		c0		: OUT STD_LOGIC ;
++		c1		: OUT STD_LOGIC ;
++		locked		: OUT STD_LOGIC 
++	);
++END pll_32;
++
++
++ARCHITECTURE SYN OF pll_32 IS
++
++	SIGNAL sub_wire0	: STD_LOGIC_VECTOR (4 DOWNTO 0);
++	SIGNAL sub_wire1	: STD_LOGIC ;
++	SIGNAL sub_wire2	: STD_LOGIC ;
++	SIGNAL sub_wire3	: STD_LOGIC ;
++	SIGNAL sub_wire4	: STD_LOGIC ;
++	SIGNAL sub_wire5	: STD_LOGIC_VECTOR (1 DOWNTO 0);
++	SIGNAL sub_wire6_bv	: BIT_VECTOR (0 DOWNTO 0);
++	SIGNAL sub_wire6	: STD_LOGIC_VECTOR (0 DOWNTO 0);
++
++
++
++	COMPONENT altpll
++	GENERIC (
++		bandwidth_type		: STRING;
++		clk0_divide_by		: NATURAL;
++		clk0_duty_cycle		: NATURAL;
++		clk0_multiply_by		: NATURAL;
++		clk0_phase_shift		: STRING;
++		clk1_divide_by		: NATURAL;
++		clk1_duty_cycle		: NATURAL;
++		clk1_multiply_by		: NATURAL;
++		clk1_phase_shift		: STRING;
++		compensate_clock		: STRING;
++		inclk0_input_frequency		: NATURAL;
++		intended_device_family		: STRING;
++		lpm_hint		: STRING;
++		lpm_type		: STRING;
++		operation_mode		: STRING;
++		pll_type		: STRING;
++		port_activeclock		: STRING;
++		port_areset		: STRING;
++		port_clkbad0		: STRING;
++		port_clkbad1		: STRING;
++		port_clkloss		: STRING;
++		port_clkswitch		: STRING;
++		port_configupdate		: STRING;
++		port_fbin		: STRING;
++		port_inclk0		: STRING;
++		port_inclk1		: STRING;
++		port_locked		: STRING;
++		port_pfdena		: STRING;
++		port_phasecounterselect		: STRING;
++		port_phasedone		: STRING;
++		port_phasestep		: STRING;
++		port_phaseupdown		: STRING;
++		port_pllena		: STRING;
++		port_scanaclr		: STRING;
++		port_scanclk		: STRING;
++		port_scanclkena		: STRING;
++		port_scandata		: STRING;
++		port_scandataout		: STRING;
++		port_scandone		: STRING;
++		port_scanread		: STRING;
++		port_scanwrite		: STRING;
++		port_clk0		: STRING;
++		port_clk1		: STRING;
++		port_clk2		: STRING;
++		port_clk3		: STRING;
++		port_clk4		: STRING;
++		port_clk5		: STRING;
++		port_clkena0		: STRING;
++		port_clkena1		: STRING;
++		port_clkena2		: STRING;
++		port_clkena3		: STRING;
++		port_clkena4		: STRING;
++		port_clkena5		: STRING;
++		port_extclk0		: STRING;
++		port_extclk1		: STRING;
++		port_extclk2		: STRING;
++		port_extclk3		: STRING;
++		self_reset_on_loss_lock		: STRING;
++		width_clock		: NATURAL
++	);
++	PORT (
++			clk	: OUT STD_LOGIC_VECTOR (4 DOWNTO 0);
++			inclk	: IN STD_LOGIC_VECTOR (1 DOWNTO 0);
++			locked	: OUT STD_LOGIC 
++	);
++	END COMPONENT;
++
++BEGIN
++	sub_wire6_bv(0 DOWNTO 0) <= "0";
++	sub_wire6    <= To_stdlogicvector(sub_wire6_bv);
++	sub_wire3    <= sub_wire0(0);
++	sub_wire1    <= sub_wire0(1);
++	c1    <= sub_wire1;
++	locked    <= sub_wire2;
++	c0    <= sub_wire3;
++	sub_wire4    <= inclk0;
++	sub_wire5    <= sub_wire6(0 DOWNTO 0) & sub_wire4;
++
++	altpll_component : altpll
++	GENERIC MAP (
++		bandwidth_type => "AUTO",
++		clk0_divide_by => 27,
++		clk0_duty_cycle => 50,
++		clk0_multiply_by => 32,
++		clk0_phase_shift => "0",
++		clk1_divide_by => 22,
++		clk1_duty_cycle => 50,
++		clk1_multiply_by => 15,
++		clk1_phase_shift => "0",
++		compensate_clock => "CLK0",
++		inclk0_input_frequency => 37037,
++		intended_device_family => "Cyclone III",
++		lpm_hint => "CBX_MODULE_PREFIX=pll_32",
++		lpm_type => "altpll",
++		operation_mode => "NORMAL",
++		pll_type => "AUTO",
++		port_activeclock => "PORT_UNUSED",
++		port_areset => "PORT_UNUSED",
++		port_clkbad0 => "PORT_UNUSED",
++		port_clkbad1 => "PORT_UNUSED",
++		port_clkloss => "PORT_UNUSED",
++		port_clkswitch => "PORT_UNUSED",
++		port_configupdate => "PORT_UNUSED",
++		port_fbin => "PORT_UNUSED",
++		port_inclk0 => "PORT_USED",
++		port_inclk1 => "PORT_UNUSED",
++		port_locked => "PORT_USED",
++		port_pfdena => "PORT_UNUSED",
++		port_phasecounterselect => "PORT_UNUSED",
++		port_phasedone => "PORT_UNUSED",
++		port_phasestep => "PORT_UNUSED",
++		port_phaseupdown => "PORT_UNUSED",
++		port_pllena => "PORT_UNUSED",
++		port_scanaclr => "PORT_UNUSED",
++		port_scanclk => "PORT_UNUSED",
++		port_scanclkena => "PORT_UNUSED",
++		port_scandata => "PORT_UNUSED",
++		port_scandataout => "PORT_UNUSED",
++		port_scandone => "PORT_UNUSED",
++		port_scanread => "PORT_UNUSED",
++		port_scanwrite => "PORT_UNUSED",
++		port_clk0 => "PORT_USED",
++		port_clk1 => "PORT_USED",
++		port_clk2 => "PORT_UNUSED",
++		port_clk3 => "PORT_UNUSED",
++		port_clk4 => "PORT_UNUSED",
++		port_clk5 => "PORT_UNUSED",
++		port_clkena0 => "PORT_UNUSED",
++		port_clkena1 => "PORT_UNUSED",
++		port_clkena2 => "PORT_UNUSED",
++		port_clkena3 => "PORT_UNUSED",
++		port_clkena4 => "PORT_UNUSED",
++		port_clkena5 => "PORT_UNUSED",
++		port_extclk0 => "PORT_UNUSED",
++		port_extclk1 => "PORT_UNUSED",
++		port_extclk2 => "PORT_UNUSED",
++		port_extclk3 => "PORT_UNUSED",
++		self_reset_on_loss_lock => "OFF",
++		width_clock => 5
++	)
++	PORT MAP (
++		inclk => sub_wire5,
++		clk => sub_wire0,
++		locked => sub_wire2
++	);
++
++
++
++END SYN;
++
++-- ============================================================
++-- CNX file retrieval info
++-- ============================================================
++-- Retrieval info: PRIVATE: ACTIVECLK_CHECK STRING "0"
++-- Retrieval info: PRIVATE: BANDWIDTH STRING "1.000"
++-- Retrieval info: PRIVATE: BANDWIDTH_FEATURE_ENABLED STRING "1"
++-- Retrieval info: PRIVATE: BANDWIDTH_FREQ_UNIT STRING "MHz"
++-- Retrieval info: PRIVATE: BANDWIDTH_PRESET STRING "Low"
++-- Retrieval info: PRIVATE: BANDWIDTH_USE_AUTO STRING "1"
++-- Retrieval info: PRIVATE: BANDWIDTH_USE_PRESET STRING "0"
++-- Retrieval info: PRIVATE: CLKBAD_SWITCHOVER_CHECK STRING "0"
++-- Retrieval info: PRIVATE: CLKLOSS_CHECK STRING "0"
++-- Retrieval info: PRIVATE: CLKSWITCH_CHECK STRING "0"
++-- Retrieval info: PRIVATE: CNX_NO_COMPENSATE_RADIO STRING "0"
++-- Retrieval info: PRIVATE: CREATE_CLKBAD_CHECK STRING "0"
++-- Retrieval info: PRIVATE: CREATE_INCLK1_CHECK STRING "0"
++-- Retrieval info: PRIVATE: CUR_DEDICATED_CLK STRING "c0"
++-- Retrieval info: PRIVATE: CUR_FBIN_CLK STRING "c0"
++-- Retrieval info: PRIVATE: DEVICE_SPEED_GRADE STRING "8"
++-- Retrieval info: PRIVATE: DIV_FACTOR0 NUMERIC "1"
++-- Retrieval info: PRIVATE: DIV_FACTOR1 NUMERIC "22"
++-- Retrieval info: PRIVATE: DUTY_CYCLE0 STRING "50.00000000"
++-- Retrieval info: PRIVATE: DUTY_CYCLE1 STRING "50.00000000"
++-- Retrieval info: PRIVATE: EFF_OUTPUT_FREQ_VALUE0 STRING "32.000000"
++-- Retrieval info: PRIVATE: EFF_OUTPUT_FREQ_VALUE1 STRING "18.409090"
++-- Retrieval info: PRIVATE: EXPLICIT_SWITCHOVER_COUNTER STRING "0"
++-- Retrieval info: PRIVATE: EXT_FEEDBACK_RADIO STRING "0"
++-- Retrieval info: PRIVATE: GLOCKED_COUNTER_EDIT_CHANGED STRING "1"
++-- Retrieval info: PRIVATE: GLOCKED_FEATURE_ENABLED STRING "0"
++-- Retrieval info: PRIVATE: GLOCKED_MODE_CHECK STRING "0"
++-- Retrieval info: PRIVATE: GLOCK_COUNTER_EDIT NUMERIC "1048575"
++-- Retrieval info: PRIVATE: HAS_MANUAL_SWITCHOVER STRING "1"
++-- Retrieval info: PRIVATE: INCLK0_FREQ_EDIT STRING "27.000"
++-- Retrieval info: PRIVATE: INCLK0_FREQ_UNIT_COMBO STRING "MHz"
++-- Retrieval info: PRIVATE: INCLK1_FREQ_EDIT STRING "100.000"
++-- Retrieval info: PRIVATE: INCLK1_FREQ_EDIT_CHANGED STRING "1"
++-- Retrieval info: PRIVATE: INCLK1_FREQ_UNIT_CHANGED STRING "1"
++-- Retrieval info: PRIVATE: INCLK1_FREQ_UNIT_COMBO STRING "MHz"
++-- Retrieval info: PRIVATE: INTENDED_DEVICE_FAMILY STRING "Cyclone III"
++-- Retrieval info: PRIVATE: INT_FEEDBACK__MODE_RADIO STRING "1"
++-- Retrieval info: PRIVATE: LOCKED_OUTPUT_CHECK STRING "1"
++-- Retrieval info: PRIVATE: LONG_SCAN_RADIO STRING "1"
++-- Retrieval info: PRIVATE: LVDS_MODE_DATA_RATE STRING "Not Available"
++-- Retrieval info: PRIVATE: LVDS_MODE_DATA_RATE_DIRTY NUMERIC "0"
++-- Retrieval info: PRIVATE: LVDS_PHASE_SHIFT_UNIT0 STRING "deg"
++-- Retrieval info: PRIVATE: LVDS_PHASE_SHIFT_UNIT1 STRING "ps"
++-- Retrieval info: PRIVATE: MIG_DEVICE_SPEED_GRADE STRING "Any"
++-- Retrieval info: PRIVATE: MIRROR_CLK0 STRING "0"
++-- Retrieval info: PRIVATE: MIRROR_CLK1 STRING "0"
++-- Retrieval info: PRIVATE: MULT_FACTOR0 NUMERIC "1"
++-- Retrieval info: PRIVATE: MULT_FACTOR1 NUMERIC "15"
++-- Retrieval info: PRIVATE: NORMAL_MODE_RADIO STRING "1"
++-- Retrieval info: PRIVATE: OUTPUT_FREQ0 STRING "32.00000000"
++-- Retrieval info: PRIVATE: OUTPUT_FREQ1 STRING "18.43000000"
++-- Retrieval info: PRIVATE: OUTPUT_FREQ_MODE0 STRING "1"
++-- Retrieval info: PRIVATE: OUTPUT_FREQ_MODE1 STRING "0"
++-- Retrieval info: PRIVATE: OUTPUT_FREQ_UNIT0 STRING "MHz"
++-- Retrieval info: PRIVATE: OUTPUT_FREQ_UNIT1 STRING "MHz"
++-- Retrieval info: PRIVATE: PHASE_RECONFIG_FEATURE_ENABLED STRING "1"
++-- Retrieval info: PRIVATE: PHASE_RECONFIG_INPUTS_CHECK STRING "0"
++-- Retrieval info: PRIVATE: PHASE_SHIFT0 STRING "0.00000000"
++-- Retrieval info: PRIVATE: PHASE_SHIFT1 STRING "0.00000000"
++-- Retrieval info: PRIVATE: PHASE_SHIFT_STEP_ENABLED_CHECK STRING "0"
++-- Retrieval info: PRIVATE: PHASE_SHIFT_UNIT0 STRING "deg"
++-- Retrieval info: PRIVATE: PHASE_SHIFT_UNIT1 STRING "ps"
++-- Retrieval info: PRIVATE: PLL_ADVANCED_PARAM_CHECK STRING "0"
++-- Retrieval info: PRIVATE: PLL_ARESET_CHECK STRING "0"
++-- Retrieval info: PRIVATE: PLL_AUTOPLL_CHECK NUMERIC "1"
++-- Retrieval info: PRIVATE: PLL_ENHPLL_CHECK NUMERIC "0"
++-- Retrieval info: PRIVATE: PLL_FASTPLL_CHECK NUMERIC "0"
++-- Retrieval info: PRIVATE: PLL_FBMIMIC_CHECK STRING "0"
++-- Retrieval info: PRIVATE: PLL_LVDS_PLL_CHECK NUMERIC "0"
++-- Retrieval info: PRIVATE: PLL_PFDENA_CHECK STRING "0"
++-- Retrieval info: PRIVATE: PLL_TARGET_HARCOPY_CHECK NUMERIC "0"
++-- Retrieval info: PRIVATE: PRIMARY_CLK_COMBO STRING "inclk0"
++-- Retrieval info: PRIVATE: RECONFIG_FILE STRING "pll_32.mif"
++-- Retrieval info: PRIVATE: SACN_INPUTS_CHECK STRING "0"
++-- Retrieval info: PRIVATE: SCAN_FEATURE_ENABLED STRING "1"
++-- Retrieval info: PRIVATE: SELF_RESET_LOCK_LOSS STRING "0"
++-- Retrieval info: PRIVATE: SHORT_SCAN_RADIO STRING "0"
++-- Retrieval info: PRIVATE: SPREAD_FEATURE_ENABLED STRING "0"
++-- Retrieval info: PRIVATE: SPREAD_FREQ STRING "50.000"
++-- Retrieval info: PRIVATE: SPREAD_FREQ_UNIT STRING "KHz"
++-- Retrieval info: PRIVATE: SPREAD_PERCENT STRING "0.500"
++-- Retrieval info: PRIVATE: SPREAD_USE STRING "0"
++-- Retrieval info: PRIVATE: SRC_SYNCH_COMP_RADIO STRING "0"
++-- Retrieval info: PRIVATE: STICKY_CLK0 STRING "1"
++-- Retrieval info: PRIVATE: STICKY_CLK1 STRING "1"
++-- Retrieval info: PRIVATE: SWITCHOVER_COUNT_EDIT NUMERIC "1"
++-- Retrieval info: PRIVATE: SWITCHOVER_FEATURE_ENABLED STRING "1"
++-- Retrieval info: PRIVATE: SYNTH_WRAPPER_GEN_POSTFIX STRING "0"
++-- Retrieval info: PRIVATE: USE_CLK0 STRING "1"
++-- Retrieval info: PRIVATE: USE_CLK1 STRING "1"
++-- Retrieval info: PRIVATE: USE_CLKENA0 STRING "0"
++-- Retrieval info: PRIVATE: USE_CLKENA1 STRING "0"
++-- Retrieval info: PRIVATE: USE_MIL_SPEED_GRADE NUMERIC "0"
++-- Retrieval info: PRIVATE: ZERO_DELAY_RADIO STRING "0"
++-- Retrieval info: LIBRARY: altera_mf altera_mf.altera_mf_components.all
++-- Retrieval info: CONSTANT: BANDWIDTH_TYPE STRING "AUTO"
++-- Retrieval info: CONSTANT: CLK0_DIVIDE_BY NUMERIC "27"
++-- Retrieval info: CONSTANT: CLK0_DUTY_CYCLE NUMERIC "50"
++-- Retrieval info: CONSTANT: CLK0_MULTIPLY_BY NUMERIC "32"
++-- Retrieval info: CONSTANT: CLK0_PHASE_SHIFT STRING "0"
++-- Retrieval info: CONSTANT: CLK1_DIVIDE_BY NUMERIC "22"
++-- Retrieval info: CONSTANT: CLK1_DUTY_CYCLE NUMERIC "50"
++-- Retrieval info: CONSTANT: CLK1_MULTIPLY_BY NUMERIC "15"
++-- Retrieval info: CONSTANT: CLK1_PHASE_SHIFT STRING "0"
++-- Retrieval info: CONSTANT: COMPENSATE_CLOCK STRING "CLK0"
++-- Retrieval info: CONSTANT: INCLK0_INPUT_FREQUENCY NUMERIC "37037"
++-- Retrieval info: CONSTANT: INTENDED_DEVICE_FAMILY STRING "Cyclone III"
++-- Retrieval info: CONSTANT: LPM_TYPE STRING "altpll"
++-- Retrieval info: CONSTANT: OPERATION_MODE STRING "NORMAL"
++-- Retrieval info: CONSTANT: PLL_TYPE STRING "AUTO"
++-- Retrieval info: CONSTANT: PORT_ACTIVECLOCK STRING "PORT_UNUSED"
++-- Retrieval info: CONSTANT: PORT_ARESET STRING "PORT_UNUSED"
++-- Retrieval info: CONSTANT: PORT_CLKBAD0 STRING "PORT_UNUSED"
++-- Retrieval info: CONSTANT: PORT_CLKBAD1 STRING "PORT_UNUSED"
++-- Retrieval info: CONSTANT: PORT_CLKLOSS STRING "PORT_UNUSED"
++-- Retrieval info: CONSTANT: PORT_CLKSWITCH STRING "PORT_UNUSED"
++-- Retrieval info: CONSTANT: PORT_CONFIGUPDATE STRING "PORT_UNUSED"
++-- Retrieval info: CONSTANT: PORT_FBIN STRING "PORT_UNUSED"
++-- Retrieval info: CONSTANT: PORT_INCLK0 STRING "PORT_USED"
++-- Retrieval info: CONSTANT: PORT_INCLK1 STRING "PORT_UNUSED"
++-- Retrieval info: CONSTANT: PORT_LOCKED STRING "PORT_USED"
++-- Retrieval info: CONSTANT: PORT_PFDENA STRING "PORT_UNUSED"
++-- Retrieval info: CONSTANT: PORT_PHASECOUNTERSELECT STRING "PORT_UNUSED"
++-- Retrieval info: CONSTANT: PORT_PHASEDONE STRING "PORT_UNUSED"
++-- Retrieval info: CONSTANT: PORT_PHASESTEP STRING "PORT_UNUSED"
++-- Retrieval info: CONSTANT: PORT_PHASEUPDOWN STRING "PORT_UNUSED"
++-- Retrieval info: CONSTANT: PORT_PLLENA STRING "PORT_UNUSED"
++-- Retrieval info: CONSTANT: PORT_SCANACLR STRING "PORT_UNUSED"
++-- Retrieval info: CONSTANT: PORT_SCANCLK STRING "PORT_UNUSED"
++-- Retrieval info: CONSTANT: PORT_SCANCLKENA STRING "PORT_UNUSED"
++-- Retrieval info: CONSTANT: PORT_SCANDATA STRING "PORT_UNUSED"
++-- Retrieval info: CONSTANT: PORT_SCANDATAOUT STRING "PORT_UNUSED"
++-- Retrieval info: CONSTANT: PORT_SCANDONE STRING "PORT_UNUSED"
++-- Retrieval info: CONSTANT: PORT_SCANREAD STRING "PORT_UNUSED"
++-- Retrieval info: CONSTANT: PORT_SCANWRITE STRING "PORT_UNUSED"
++-- Retrieval info: CONSTANT: PORT_clk0 STRING "PORT_USED"
++-- Retrieval info: CONSTANT: PORT_clk1 STRING "PORT_USED"
++-- Retrieval info: CONSTANT: PORT_clk2 STRING "PORT_UNUSED"
++-- Retrieval info: CONSTANT: PORT_clk3 STRING "PORT_UNUSED"
++-- Retrieval info: CONSTANT: PORT_clk4 STRING "PORT_UNUSED"
++-- Retrieval info: CONSTANT: PORT_clk5 STRING "PORT_UNUSED"
++-- Retrieval info: CONSTANT: PORT_clkena0 STRING "PORT_UNUSED"
++-- Retrieval info: CONSTANT: PORT_clkena1 STRING "PORT_UNUSED"
++-- Retrieval info: CONSTANT: PORT_clkena2 STRING "PORT_UNUSED"
++-- Retrieval info: CONSTANT: PORT_clkena3 STRING "PORT_UNUSED"
++-- Retrieval info: CONSTANT: PORT_clkena4 STRING "PORT_UNUSED"
++-- Retrieval info: CONSTANT: PORT_clkena5 STRING "PORT_UNUSED"
++-- Retrieval info: CONSTANT: PORT_extclk0 STRING "PORT_UNUSED"
++-- Retrieval info: CONSTANT: PORT_extclk1 STRING "PORT_UNUSED"
++-- Retrieval info: CONSTANT: PORT_extclk2 STRING "PORT_UNUSED"
++-- Retrieval info: CONSTANT: PORT_extclk3 STRING "PORT_UNUSED"
++-- Retrieval info: CONSTANT: SELF_RESET_ON_LOSS_LOCK STRING "OFF"
++-- Retrieval info: CONSTANT: WIDTH_CLOCK NUMERIC "5"
++-- Retrieval info: USED_PORT: @clk 0 0 5 0 OUTPUT_CLK_EXT VCC "@clk[4..0]"
++-- Retrieval info: USED_PORT: @inclk 0 0 2 0 INPUT_CLK_EXT VCC "@inclk[1..0]"
++-- Retrieval info: USED_PORT: c0 0 0 0 0 OUTPUT_CLK_EXT VCC "c0"
++-- Retrieval info: USED_PORT: c1 0 0 0 0 OUTPUT_CLK_EXT VCC "c1"
++-- Retrieval info: USED_PORT: inclk0 0 0 0 0 INPUT_CLK_EXT GND "inclk0"
++-- Retrieval info: USED_PORT: locked 0 0 0 0 OUTPUT GND "locked"
++-- Retrieval info: CONNECT: @inclk 0 0 1 1 GND 0 0 0 0
++-- Retrieval info: CONNECT: @inclk 0 0 1 0 inclk0 0 0 0 0
++-- Retrieval info: CONNECT: c0 0 0 0 0 @clk 0 0 1 0
++-- Retrieval info: CONNECT: c1 0 0 0 0 @clk 0 0 1 1
++-- Retrieval info: CONNECT: locked 0 0 0 0 @locked 0 0 0 0
++-- Retrieval info: GEN_FILE: TYPE_NORMAL pll_32.vhd TRUE
++-- Retrieval info: GEN_FILE: TYPE_NORMAL pll_32.ppf TRUE
++-- Retrieval info: GEN_FILE: TYPE_NORMAL pll_32.inc FALSE
++-- Retrieval info: GEN_FILE: TYPE_NORMAL pll_32.cmp FALSE
++-- Retrieval info: GEN_FILE: TYPE_NORMAL pll_32.bsf FALSE
++-- Retrieval info: GEN_FILE: TYPE_NORMAL pll_32_inst.vhd FALSE
++-- Retrieval info: LIB_FILE: altera_mf
++-- Retrieval info: CBX_MODULE_PREFIX: ON
+diff -Naur vhdl_c64_c1541_sd.orig/mist/pll_pal_ntsc.qip vhdl_c64_c1541_sd.mist/mist/pll_pal_ntsc.qip
+--- vhdl_c64_c1541_sd.orig/mist/pll_pal_ntsc.qip	1970-01-01 01:00:00.000000000 +0100
++++ vhdl_c64_c1541_sd.mist/mist/pll_pal_ntsc.qip	2015-07-22 11:03:25.292522863 +0200
+@@ -0,0 +1,4 @@
++set_global_assignment -name IP_TOOL_NAME "ALTPLL"
++set_global_assignment -name IP_TOOL_VERSION "13.1"
++set_global_assignment -name VHDL_FILE [file join $::quartus(qip_path) "pll_pal_ntsc.vhd"]
++set_global_assignment -name MISC_FILE [file join $::quartus(qip_path) "pll_pal_ntsc.ppf"]
+diff -Naur vhdl_c64_c1541_sd.orig/mist/pll_pal_ntsc.vhd vhdl_c64_c1541_sd.mist/mist/pll_pal_ntsc.vhd
+--- vhdl_c64_c1541_sd.orig/mist/pll_pal_ntsc.vhd	1970-01-01 01:00:00.000000000 +0100
++++ vhdl_c64_c1541_sd.mist/mist/pll_pal_ntsc.vhd	2015-07-22 11:03:25.292522863 +0200
+@@ -0,0 +1,350 @@
++-- megafunction wizard: %ALTPLL%
++-- GENERATION: STANDARD
++-- VERSION: WM1.0
++-- MODULE: altpll 
++
++-- ============================================================
++-- File Name: pll_pal_ntsc.vhd
++-- Megafunction Name(s):
++-- 			altpll
++--
++-- Simulation Library Files(s):
++-- 			altera_mf
++-- ============================================================
++-- ************************************************************
++-- THIS IS A WIZARD-GENERATED FILE. DO NOT EDIT THIS FILE!
++--
++-- 13.1.4 Build 182 03/12/2014 SJ Web Edition
++-- ************************************************************
++
++
++--Copyright (C) 1991-2014 Altera Corporation
++--Your use of Altera Corporation's design tools, logic functions 
++--and other software and tools, and its AMPP partner logic 
++--functions, and any output files from any of the foregoing 
++--(including device programming or simulation files), and any 
++--associated documentation or information are expressly subject 
++--to the terms and conditions of the Altera Program License 
++--Subscription Agreement, Altera MegaCore Function License 
++--Agreement, or other applicable license agreement, including, 
++--without limitation, that your use is for the sole purpose of 
++--programming logic devices manufactured by Altera and sold by 
++--Altera or its authorized distributors.  Please refer to the 
++--applicable agreement for further details.
++
++
++LIBRARY ieee;
++USE ieee.std_logic_1164.all;
++
++LIBRARY altera_mf;
++USE altera_mf.all;
++
++ENTITY pll_pal_ntsc IS
++	PORT
++	(
++		inclk0		: IN STD_LOGIC  := '0';
++		c0		: OUT STD_LOGIC 
++	);
++END pll_pal_ntsc;
++
++
++ARCHITECTURE SYN OF pll_pal_ntsc IS
++
++	SIGNAL sub_wire0	: STD_LOGIC_VECTOR (4 DOWNTO 0);
++	SIGNAL sub_wire1	: STD_LOGIC ;
++	SIGNAL sub_wire2	: STD_LOGIC ;
++	SIGNAL sub_wire3	: STD_LOGIC_VECTOR (1 DOWNTO 0);
++	SIGNAL sub_wire4_bv	: BIT_VECTOR (0 DOWNTO 0);
++	SIGNAL sub_wire4	: STD_LOGIC_VECTOR (0 DOWNTO 0);
++
++
++
++	COMPONENT altpll
++	GENERIC (
++		bandwidth_type		: STRING;
++		clk0_divide_by		: NATURAL;
++		clk0_duty_cycle		: NATURAL;
++		clk0_multiply_by		: NATURAL;
++		clk0_phase_shift		: STRING;
++		compensate_clock		: STRING;
++		inclk0_input_frequency		: NATURAL;
++		intended_device_family		: STRING;
++		lpm_hint		: STRING;
++		lpm_type		: STRING;
++		operation_mode		: STRING;
++		pll_type		: STRING;
++		port_activeclock		: STRING;
++		port_areset		: STRING;
++		port_clkbad0		: STRING;
++		port_clkbad1		: STRING;
++		port_clkloss		: STRING;
++		port_clkswitch		: STRING;
++		port_configupdate		: STRING;
++		port_fbin		: STRING;
++		port_inclk0		: STRING;
++		port_inclk1		: STRING;
++		port_locked		: STRING;
++		port_pfdena		: STRING;
++		port_phasecounterselect		: STRING;
++		port_phasedone		: STRING;
++		port_phasestep		: STRING;
++		port_phaseupdown		: STRING;
++		port_pllena		: STRING;
++		port_scanaclr		: STRING;
++		port_scanclk		: STRING;
++		port_scanclkena		: STRING;
++		port_scandata		: STRING;
++		port_scandataout		: STRING;
++		port_scandone		: STRING;
++		port_scanread		: STRING;
++		port_scanwrite		: STRING;
++		port_clk0		: STRING;
++		port_clk1		: STRING;
++		port_clk2		: STRING;
++		port_clk3		: STRING;
++		port_clk4		: STRING;
++		port_clk5		: STRING;
++		port_clkena0		: STRING;
++		port_clkena1		: STRING;
++		port_clkena2		: STRING;
++		port_clkena3		: STRING;
++		port_clkena4		: STRING;
++		port_clkena5		: STRING;
++		port_extclk0		: STRING;
++		port_extclk1		: STRING;
++		port_extclk2		: STRING;
++		port_extclk3		: STRING;
++		width_clock		: NATURAL
++	);
++	PORT (
++			clk	: OUT STD_LOGIC_VECTOR (4 DOWNTO 0);
++			inclk	: IN STD_LOGIC_VECTOR (1 DOWNTO 0)
++	);
++	END COMPONENT;
++
++BEGIN
++	sub_wire4_bv(0 DOWNTO 0) <= "0";
++	sub_wire4    <= To_stdlogicvector(sub_wire4_bv);
++	sub_wire1    <= sub_wire0(0);
++	c0    <= sub_wire1;
++	sub_wire2    <= inclk0;
++	sub_wire3    <= sub_wire4(0 DOWNTO 0) & sub_wire2;
++
++	altpll_component : altpll
++	GENERIC MAP (
++		bandwidth_type => "LOW",
++		clk0_divide_by => 1350,
++		clk0_duty_cycle => 50,
++		clk0_multiply_by => 1403,
++		clk0_phase_shift => "0",
++		compensate_clock => "CLK0",
++		inclk0_input_frequency => 37037,
++		intended_device_family => "Cyclone III",
++		lpm_hint => "CBX_MODULE_PREFIX=pll_pal_ntsc",
++		lpm_type => "altpll",
++		operation_mode => "NORMAL",
++		pll_type => "AUTO",
++		port_activeclock => "PORT_UNUSED",
++		port_areset => "PORT_UNUSED",
++		port_clkbad0 => "PORT_UNUSED",
++		port_clkbad1 => "PORT_UNUSED",
++		port_clkloss => "PORT_UNUSED",
++		port_clkswitch => "PORT_UNUSED",
++		port_configupdate => "PORT_UNUSED",
++		port_fbin => "PORT_UNUSED",
++		port_inclk0 => "PORT_USED",
++		port_inclk1 => "PORT_UNUSED",
++		port_locked => "PORT_UNUSED",
++		port_pfdena => "PORT_UNUSED",
++		port_phasecounterselect => "PORT_UNUSED",
++		port_phasedone => "PORT_UNUSED",
++		port_phasestep => "PORT_UNUSED",
++		port_phaseupdown => "PORT_UNUSED",
++		port_pllena => "PORT_UNUSED",
++		port_scanaclr => "PORT_UNUSED",
++		port_scanclk => "PORT_UNUSED",
++		port_scanclkena => "PORT_UNUSED",
++		port_scandata => "PORT_UNUSED",
++		port_scandataout => "PORT_UNUSED",
++		port_scandone => "PORT_UNUSED",
++		port_scanread => "PORT_UNUSED",
++		port_scanwrite => "PORT_UNUSED",
++		port_clk0 => "PORT_USED",
++		port_clk1 => "PORT_UNUSED",
++		port_clk2 => "PORT_UNUSED",
++		port_clk3 => "PORT_UNUSED",
++		port_clk4 => "PORT_UNUSED",
++		port_clk5 => "PORT_UNUSED",
++		port_clkena0 => "PORT_UNUSED",
++		port_clkena1 => "PORT_UNUSED",
++		port_clkena2 => "PORT_UNUSED",
++		port_clkena3 => "PORT_UNUSED",
++		port_clkena4 => "PORT_UNUSED",
++		port_clkena5 => "PORT_UNUSED",
++		port_extclk0 => "PORT_UNUSED",
++		port_extclk1 => "PORT_UNUSED",
++		port_extclk2 => "PORT_UNUSED",
++		port_extclk3 => "PORT_UNUSED",
++		width_clock => 5
++	)
++	PORT MAP (
++		inclk => sub_wire3,
++		clk => sub_wire0
++	);
++
++
++
++END SYN;
++
++-- ============================================================
++-- CNX file retrieval info
++-- ============================================================
++-- Retrieval info: PRIVATE: ACTIVECLK_CHECK STRING "0"
++-- Retrieval info: PRIVATE: BANDWIDTH STRING "1.000"
++-- Retrieval info: PRIVATE: BANDWIDTH_FEATURE_ENABLED STRING "1"
++-- Retrieval info: PRIVATE: BANDWIDTH_FREQ_UNIT STRING "MHz"
++-- Retrieval info: PRIVATE: BANDWIDTH_PRESET STRING "Low"
++-- Retrieval info: PRIVATE: BANDWIDTH_USE_AUTO STRING "0"
++-- Retrieval info: PRIVATE: BANDWIDTH_USE_PRESET STRING "1"
++-- Retrieval info: PRIVATE: CLKBAD_SWITCHOVER_CHECK STRING "0"
++-- Retrieval info: PRIVATE: CLKLOSS_CHECK STRING "0"
++-- Retrieval info: PRIVATE: CLKSWITCH_CHECK STRING "0"
++-- Retrieval info: PRIVATE: CNX_NO_COMPENSATE_RADIO STRING "0"
++-- Retrieval info: PRIVATE: CREATE_CLKBAD_CHECK STRING "0"
++-- Retrieval info: PRIVATE: CREATE_INCLK1_CHECK STRING "0"
++-- Retrieval info: PRIVATE: CUR_DEDICATED_CLK STRING "c0"
++-- Retrieval info: PRIVATE: CUR_FBIN_CLK STRING "c0"
++-- Retrieval info: PRIVATE: DEVICE_SPEED_GRADE STRING "8"
++-- Retrieval info: PRIVATE: DIV_FACTOR0 NUMERIC "1"
++-- Retrieval info: PRIVATE: DUTY_CYCLE0 STRING "50.00000000"
++-- Retrieval info: PRIVATE: EFF_OUTPUT_FREQ_VALUE0 STRING "28.059999"
++-- Retrieval info: PRIVATE: EXPLICIT_SWITCHOVER_COUNTER STRING "0"
++-- Retrieval info: PRIVATE: EXT_FEEDBACK_RADIO STRING "0"
++-- Retrieval info: PRIVATE: GLOCKED_COUNTER_EDIT_CHANGED STRING "1"
++-- Retrieval info: PRIVATE: GLOCKED_FEATURE_ENABLED STRING "0"
++-- Retrieval info: PRIVATE: GLOCKED_MODE_CHECK STRING "0"
++-- Retrieval info: PRIVATE: GLOCK_COUNTER_EDIT NUMERIC "1048575"
++-- Retrieval info: PRIVATE: HAS_MANUAL_SWITCHOVER STRING "1"
++-- Retrieval info: PRIVATE: INCLK0_FREQ_EDIT STRING "27.000"
++-- Retrieval info: PRIVATE: INCLK0_FREQ_UNIT_COMBO STRING "MHz"
++-- Retrieval info: PRIVATE: INCLK1_FREQ_EDIT STRING "100.000"
++-- Retrieval info: PRIVATE: INCLK1_FREQ_EDIT_CHANGED STRING "1"
++-- Retrieval info: PRIVATE: INCLK1_FREQ_UNIT_CHANGED STRING "1"
++-- Retrieval info: PRIVATE: INCLK1_FREQ_UNIT_COMBO STRING "MHz"
++-- Retrieval info: PRIVATE: INTENDED_DEVICE_FAMILY STRING "Cyclone III"
++-- Retrieval info: PRIVATE: INT_FEEDBACK__MODE_RADIO STRING "1"
++-- Retrieval info: PRIVATE: LOCKED_OUTPUT_CHECK STRING "0"
++-- Retrieval info: PRIVATE: LONG_SCAN_RADIO STRING "1"
++-- Retrieval info: PRIVATE: LVDS_MODE_DATA_RATE STRING "Not Available"
++-- Retrieval info: PRIVATE: LVDS_MODE_DATA_RATE_DIRTY NUMERIC "0"
++-- Retrieval info: PRIVATE: LVDS_PHASE_SHIFT_UNIT0 STRING "deg"
++-- Retrieval info: PRIVATE: MIG_DEVICE_SPEED_GRADE STRING "Any"
++-- Retrieval info: PRIVATE: MIRROR_CLK0 STRING "0"
++-- Retrieval info: PRIVATE: MULT_FACTOR0 NUMERIC "1"
++-- Retrieval info: PRIVATE: NORMAL_MODE_RADIO STRING "1"
++-- Retrieval info: PRIVATE: OUTPUT_FREQ0 STRING "28.06000000"
++-- Retrieval info: PRIVATE: OUTPUT_FREQ_MODE0 STRING "1"
++-- Retrieval info: PRIVATE: OUTPUT_FREQ_UNIT0 STRING "MHz"
++-- Retrieval info: PRIVATE: PHASE_RECONFIG_FEATURE_ENABLED STRING "1"
++-- Retrieval info: PRIVATE: PHASE_RECONFIG_INPUTS_CHECK STRING "0"
++-- Retrieval info: PRIVATE: PHASE_SHIFT0 STRING "0.00000000"
++-- Retrieval info: PRIVATE: PHASE_SHIFT_STEP_ENABLED_CHECK STRING "0"
++-- Retrieval info: PRIVATE: PHASE_SHIFT_UNIT0 STRING "deg"
++-- Retrieval info: PRIVATE: PLL_ADVANCED_PARAM_CHECK STRING "0"
++-- Retrieval info: PRIVATE: PLL_ARESET_CHECK STRING "0"
++-- Retrieval info: PRIVATE: PLL_AUTOPLL_CHECK NUMERIC "1"
++-- Retrieval info: PRIVATE: PLL_ENHPLL_CHECK NUMERIC "0"
++-- Retrieval info: PRIVATE: PLL_FASTPLL_CHECK NUMERIC "0"
++-- Retrieval info: PRIVATE: PLL_FBMIMIC_CHECK STRING "0"
++-- Retrieval info: PRIVATE: PLL_LVDS_PLL_CHECK NUMERIC "0"
++-- Retrieval info: PRIVATE: PLL_PFDENA_CHECK STRING "0"
++-- Retrieval info: PRIVATE: PLL_TARGET_HARCOPY_CHECK NUMERIC "0"
++-- Retrieval info: PRIVATE: PRIMARY_CLK_COMBO STRING "inclk0"
++-- Retrieval info: PRIVATE: RECONFIG_FILE STRING "pll_pal_ntsc.mif"
++-- Retrieval info: PRIVATE: SACN_INPUTS_CHECK STRING "0"
++-- Retrieval info: PRIVATE: SCAN_FEATURE_ENABLED STRING "1"
++-- Retrieval info: PRIVATE: SELF_RESET_LOCK_LOSS STRING "0"
++-- Retrieval info: PRIVATE: SHORT_SCAN_RADIO STRING "0"
++-- Retrieval info: PRIVATE: SPREAD_FEATURE_ENABLED STRING "0"
++-- Retrieval info: PRIVATE: SPREAD_FREQ STRING "50.000"
++-- Retrieval info: PRIVATE: SPREAD_FREQ_UNIT STRING "KHz"
++-- Retrieval info: PRIVATE: SPREAD_PERCENT STRING "0.500"
++-- Retrieval info: PRIVATE: SPREAD_USE STRING "0"
++-- Retrieval info: PRIVATE: SRC_SYNCH_COMP_RADIO STRING "0"
++-- Retrieval info: PRIVATE: STICKY_CLK0 STRING "1"
++-- Retrieval info: PRIVATE: SWITCHOVER_COUNT_EDIT NUMERIC "1"
++-- Retrieval info: PRIVATE: SWITCHOVER_FEATURE_ENABLED STRING "1"
++-- Retrieval info: PRIVATE: SYNTH_WRAPPER_GEN_POSTFIX STRING "0"
++-- Retrieval info: PRIVATE: USE_CLK0 STRING "1"
++-- Retrieval info: PRIVATE: USE_CLKENA0 STRING "0"
++-- Retrieval info: PRIVATE: USE_MIL_SPEED_GRADE NUMERIC "0"
++-- Retrieval info: PRIVATE: ZERO_DELAY_RADIO STRING "0"
++-- Retrieval info: LIBRARY: altera_mf altera_mf.altera_mf_components.all
++-- Retrieval info: CONSTANT: BANDWIDTH_TYPE STRING "LOW"
++-- Retrieval info: CONSTANT: CLK0_DIVIDE_BY NUMERIC "1350"
++-- Retrieval info: CONSTANT: CLK0_DUTY_CYCLE NUMERIC "50"
++-- Retrieval info: CONSTANT: CLK0_MULTIPLY_BY NUMERIC "1403"
++-- Retrieval info: CONSTANT: CLK0_PHASE_SHIFT STRING "0"
++-- Retrieval info: CONSTANT: COMPENSATE_CLOCK STRING "CLK0"
++-- Retrieval info: CONSTANT: INCLK0_INPUT_FREQUENCY NUMERIC "37037"
++-- Retrieval info: CONSTANT: INTENDED_DEVICE_FAMILY STRING "Cyclone III"
++-- Retrieval info: CONSTANT: LPM_TYPE STRING "altpll"
++-- Retrieval info: CONSTANT: OPERATION_MODE STRING "NORMAL"
++-- Retrieval info: CONSTANT: PLL_TYPE STRING "AUTO"
++-- Retrieval info: CONSTANT: PORT_ACTIVECLOCK STRING "PORT_UNUSED"
++-- Retrieval info: CONSTANT: PORT_ARESET STRING "PORT_UNUSED"
++-- Retrieval info: CONSTANT: PORT_CLKBAD0 STRING "PORT_UNUSED"
++-- Retrieval info: CONSTANT: PORT_CLKBAD1 STRING "PORT_UNUSED"
++-- Retrieval info: CONSTANT: PORT_CLKLOSS STRING "PORT_UNUSED"
++-- Retrieval info: CONSTANT: PORT_CLKSWITCH STRING "PORT_UNUSED"
++-- Retrieval info: CONSTANT: PORT_CONFIGUPDATE STRING "PORT_UNUSED"
++-- Retrieval info: CONSTANT: PORT_FBIN STRING "PORT_UNUSED"
++-- Retrieval info: CONSTANT: PORT_INCLK0 STRING "PORT_USED"
++-- Retrieval info: CONSTANT: PORT_INCLK1 STRING "PORT_UNUSED"
++-- Retrieval info: CONSTANT: PORT_LOCKED STRING "PORT_UNUSED"
++-- Retrieval info: CONSTANT: PORT_PFDENA STRING "PORT_UNUSED"
++-- Retrieval info: CONSTANT: PORT_PHASECOUNTERSELECT STRING "PORT_UNUSED"
++-- Retrieval info: CONSTANT: PORT_PHASEDONE STRING "PORT_UNUSED"
++-- Retrieval info: CONSTANT: PORT_PHASESTEP STRING "PORT_UNUSED"
++-- Retrieval info: CONSTANT: PORT_PHASEUPDOWN STRING "PORT_UNUSED"
++-- Retrieval info: CONSTANT: PORT_PLLENA STRING "PORT_UNUSED"
++-- Retrieval info: CONSTANT: PORT_SCANACLR STRING "PORT_UNUSED"
++-- Retrieval info: CONSTANT: PORT_SCANCLK STRING "PORT_UNUSED"
++-- Retrieval info: CONSTANT: PORT_SCANCLKENA STRING "PORT_UNUSED"
++-- Retrieval info: CONSTANT: PORT_SCANDATA STRING "PORT_UNUSED"
++-- Retrieval info: CONSTANT: PORT_SCANDATAOUT STRING "PORT_UNUSED"
++-- Retrieval info: CONSTANT: PORT_SCANDONE STRING "PORT_UNUSED"
++-- Retrieval info: CONSTANT: PORT_SCANREAD STRING "PORT_UNUSED"
++-- Retrieval info: CONSTANT: PORT_SCANWRITE STRING "PORT_UNUSED"
++-- Retrieval info: CONSTANT: PORT_clk0 STRING "PORT_USED"
++-- Retrieval info: CONSTANT: PORT_clk1 STRING "PORT_UNUSED"
++-- Retrieval info: CONSTANT: PORT_clk2 STRING "PORT_UNUSED"
++-- Retrieval info: CONSTANT: PORT_clk3 STRING "PORT_UNUSED"
++-- Retrieval info: CONSTANT: PORT_clk4 STRING "PORT_UNUSED"
++-- Retrieval info: CONSTANT: PORT_clk5 STRING "PORT_UNUSED"
++-- Retrieval info: CONSTANT: PORT_clkena0 STRING "PORT_UNUSED"
++-- Retrieval info: CONSTANT: PORT_clkena1 STRING "PORT_UNUSED"
++-- Retrieval info: CONSTANT: PORT_clkena2 STRING "PORT_UNUSED"
++-- Retrieval info: CONSTANT: PORT_clkena3 STRING "PORT_UNUSED"
++-- Retrieval info: CONSTANT: PORT_clkena4 STRING "PORT_UNUSED"
++-- Retrieval info: CONSTANT: PORT_clkena5 STRING "PORT_UNUSED"
++-- Retrieval info: CONSTANT: PORT_extclk0 STRING "PORT_UNUSED"
++-- Retrieval info: CONSTANT: PORT_extclk1 STRING "PORT_UNUSED"
++-- Retrieval info: CONSTANT: PORT_extclk2 STRING "PORT_UNUSED"
++-- Retrieval info: CONSTANT: PORT_extclk3 STRING "PORT_UNUSED"
++-- Retrieval info: CONSTANT: WIDTH_CLOCK NUMERIC "5"
++-- Retrieval info: USED_PORT: @clk 0 0 5 0 OUTPUT_CLK_EXT VCC "@clk[4..0]"
++-- Retrieval info: USED_PORT: @inclk 0 0 2 0 INPUT_CLK_EXT VCC "@inclk[1..0]"
++-- Retrieval info: USED_PORT: c0 0 0 0 0 OUTPUT_CLK_EXT VCC "c0"
++-- Retrieval info: USED_PORT: inclk0 0 0 0 0 INPUT_CLK_EXT GND "inclk0"
++-- Retrieval info: CONNECT: @inclk 0 0 1 1 GND 0 0 0 0
++-- Retrieval info: CONNECT: @inclk 0 0 1 0 inclk0 0 0 0 0
++-- Retrieval info: CONNECT: c0 0 0 0 0 @clk 0 0 1 0
++-- Retrieval info: GEN_FILE: TYPE_NORMAL pll_pal_ntsc.vhd TRUE
++-- Retrieval info: GEN_FILE: TYPE_NORMAL pll_pal_ntsc.ppf TRUE
++-- Retrieval info: GEN_FILE: TYPE_NORMAL pll_pal_ntsc.inc FALSE
++-- Retrieval info: GEN_FILE: TYPE_NORMAL pll_pal_ntsc.cmp FALSE
++-- Retrieval info: GEN_FILE: TYPE_NORMAL pll_pal_ntsc.bsf FALSE
++-- Retrieval info: GEN_FILE: TYPE_NORMAL pll_pal_ntsc_inst.vhd FALSE
++-- Retrieval info: LIB_FILE: altera_mf
++-- Retrieval info: CBX_MODULE_PREFIX: ON
+diff -Naur vhdl_c64_c1541_sd.orig/mist/scandoubler.v vhdl_c64_c1541_sd.mist/mist/scandoubler.v
+--- vhdl_c64_c1541_sd.orig/mist/scandoubler.v	1970-01-01 01:00:00.000000000 +0100
++++ vhdl_c64_c1541_sd.mist/mist/scandoubler.v	2015-07-21 14:58:54.596820458 +0200
+@@ -0,0 +1,86 @@
++// simple scan doubler
++
++// c64 pixelclock = ~8Mhz
++// vga pixelclock = ~16Mhz
++
++module scandoubler (
++	// system interface
++	input            	clk,        // 32 MHz
++
++	// c64 input
++	input            	enable_in,  // true on rising clock edge
++	input [3:0]		 	video_in,
++	input            	vsync_in,
++	input					hsync_in,
++	
++	// vga output
++	output [3:0]		video_out,
++	output 				vsync_out,
++	output reg			hsync_out
++);
++
++localparam SYNC_WIDTH = 10'd16;
++
++assign vsync_out = !vsync_in;
++
++// sync is 64 pixel clocks wide and the whole screen is max 65*8=520. Thus a 10 bit
++// counter is sufficient
++reg [9:0] hcnt;
++wire [9:0] pixel_addr = hcnt - SYNC_WIDTH;
++reg [9:0] hcnt_max;
++reg last_hsync_in;
++
++// The sync pulse width is 16 Pixels leaving a total of 520-16=504 max Pixels
++reg [3:0] buffer [1023:0];
++
++// run output counter at twice the speed
++reg [9:0] vga_hcnt;
++wire [9:0] vga_pixel_addr = vga_hcnt - SYNC_WIDTH;
++reg vga_clk;
++
++reg line_toggle;
++
++assign video_out = (!hsync_out)?4'b0000:video_out_reg;
++
++reg [3:0] video_out_reg;
++
++// analyze hsync signal
++always @(posedge clk) begin
++
++	// vga counter runs at twice the hcnt speed
++	if(vga_clk) begin
++		// read from line buffer
++		video_out_reg <= buffer[{line_toggle, vga_pixel_addr[8:0]}];
++	
++		if(vga_hcnt == hcnt_max) begin
++			vga_hcnt <= 10'd0;
++			hsync_out <= 1'b0;
++		end else	
++			vga_hcnt <= vga_hcnt + 10'd1;
++
++		if(vga_hcnt == SYNC_WIDTH)
++			hsync_out <= 1'b1;
++	end
++
++	if(enable_in) begin
++		last_hsync_in <= hsync_in;
++		vga_clk <= 1'b0;
++	
++		// write to line buffer
++		if(hcnt >= SYNC_WIDTH)
++			buffer[{!line_toggle, pixel_addr[8:0]}] <= video_in;
++
++		// rising edge of hsync
++		if(!last_hsync_in && hsync_in) begin
++			line_toggle <= !line_toggle;
++			vga_hcnt <= 10'd0;
++			hcnt_max <= hcnt;
++			hcnt <= 10'd0;
++		end else
++			hcnt <= hcnt + 10'd1;
++	end else
++		vga_clk <= !vga_clk;
++	
++end
++
++endmodule
+diff -Naur vhdl_c64_c1541_sd.orig/mist/sd_card.v vhdl_c64_c1541_sd.mist/mist/sd_card.v
+--- vhdl_c64_c1541_sd.orig/mist/sd_card.v	1970-01-01 01:00:00.000000000 +0100
++++ vhdl_c64_c1541_sd.mist/mist/sd_card.v	2015-07-10 13:51:25.217258713 +0200
+@@ -0,0 +1,476 @@
++// 
++// sd_card.v
++//
++// This file implelents a sd card for the MIST board since on the board
++// the SD card is connected to the ARM IO controller and the FPGA has no
++// direct connection to the SD card. This file provides a SD card like
++// interface to the IO controller easing porting of cores that expect
++// a direct interface to the SD card.
++//
++// Copyright (c) 2014 Till Harbaum <till@harbaum.org>
++//
++// This source file is free software: you can redistribute it and/or modify
++// it under the terms of the Lesser GNU General Public License as published
++// by the Free Software Foundation, either version 3 of the License, or
++// (at your option) any later version.
++//
++// This source file is distributed in the hope that it will be useful,
++// but WITHOUT ANY WARRANTY; without even the implied warranty of
++// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++// GNU General Public License for more details.
++//
++// You should have received a copy of the GNU General Public License
++// along with this program.  If not, see <http://www.gnu.org/licenses/>.
++//
++// http://elm-chan.org/docs/mmc/mmc_e.html
++
++module sd_card (
++	// link to user_io for io controller
++	output [31:0] io_lba,
++	output reg    io_rd,
++	output reg    io_wr,
++	input			  io_ack,
++	output		  io_conf,
++	output		  io_sdhc,
++	
++	// data coming in from io controller
++	input	[7:0]	  io_din,
++	input 		  io_din_strobe,
++
++	// data going out to io controller
++	output [7:0]  io_dout,
++	input 		  io_dout_strobe,
++
++	// configuration input
++	input         allow_sdhc,
++	
++   input         sd_cs,
++   input         sd_sck,
++   input         sd_sdi,
++   output reg    sd_sdo
++); 
++
++// set io_rd once read_state machine starts waiting (rising edge of req_io_rd)
++// and clear it once io controller uploads something (io_ack==1) 
++reg req_io_rd = 1'b0; // set when write_state is changed to RD_STATE_WAIT_IO
++always @(posedge req_io_rd or posedge io_ack) begin
++	if(io_ack) io_rd <= 1'b0;
++	else 		  io_rd <= 1'b1;
++end
++
++reg req_io_wr = 1'b0; // set when write_state is changed to WR_STATE_BUSY
++always @(posedge req_io_wr or posedge io_ack) begin
++	if(io_ack) io_wr <= 1'b0;
++	else 		  io_wr <= 1'b1;
++end
++
++wire [31:0] OCR = { 1'b0, io_sdhc, 30'h0 };  // bit30 = 1 -> high capaciry card (sdhc)
++wire [7:0] READ_DATA_TOKEN = 8'hfe;
++
++// number of bytes to wait after a command before sending the reply
++localparam NCR=4;
++
++localparam RD_STATE_IDLE       = 2'd0;
++localparam RD_STATE_WAIT_IO    = 2'd1;
++localparam RD_STATE_SEND_TOKEN = 2'd2;
++localparam RD_STATE_SEND_DATA  = 2'd3;
++reg [1:0] read_state = RD_STATE_IDLE;  
++
++localparam WR_STATE_IDLE       = 3'd0;
++localparam WR_STATE_EXP_DTOKEN = 3'd1;
++localparam WR_STATE_RECV_DATA  = 3'd2;
++localparam WR_STATE_RECV_CRC0  = 3'd3;
++localparam WR_STATE_RECV_CRC1  = 3'd4;
++localparam WR_STATE_SEND_DRESP = 3'd5;
++localparam WR_STATE_BUSY       = 3'd6;
++reg [2:0] write_state = WR_STATE_IDLE;  
++
++reg card_is_reset = 1'b0;    // flag that card has received a reset command
++reg [6:0] sbuf; 
++reg cmd55;
++reg new_cmd_rcvd;
++reg [7:0] cmd = 8'h00;
++reg [2:0] bit_cnt;           // counts bits 0-7 0-7 ...
++reg [3:0] byte_cnt= 4'd15;   // counts bytes
++
++reg [31:0] lba;
++assign io_lba = io_sdhc?lba:{9'd0, lba[31:9]};
++
++reg [7:0] reply;
++reg [7:0] reply0, reply1, reply2, reply3;
++reg [3:0] reply_len;
++
++// falling edge of io_ack signals that a sector to be read has been written into
++// the sector buffer by the io controller. This signal is kept set as long
++// as the read state machine is in the "wait for io controller" state (state 1)
++wire rd_wait_io = (read_state != RD_STATE_IDLE);
++reg rd_io_ack_i = 1'b0;
++always @(negedge io_ack or negedge rd_wait_io) begin
++	if(!rd_wait_io) rd_io_ack_i <= 1'b0;
++	else            rd_io_ack_i <= 1'b1;
++end
++ 
++wire wr_wait_io = (write_state == WR_STATE_BUSY);
++reg wr_io_ack_i = 1'b0;
++always @(negedge io_ack or negedge wr_wait_io) begin
++	if(!wr_wait_io) wr_io_ack_i <= 1'b0;
++	else            wr_io_ack_i <= 1'b1;
++end
++
++// bring xx_io_ack into sd cards clock domain
++reg wr_io_ack;
++reg rd_io_ack;
++always @(posedge sd_sck) begin	
++	rd_io_ack <= rd_io_ack_i;
++	wr_io_ack <= wr_io_ack_i;
++end
++
++// ------------------------- SECTOR BUFFER -----------------------
++
++// the buffer itself. Can hold one sector
++reg [7:0] buffer [511:0];
++
++// ---------------- buffer read engine -----------------------
++reg [8:0] buffer_rptr;
++reg buffer_read_strobe;
++wire buffer_dout_strobe = buffer_read_strobe || io_dout_strobe;
++reg [7:0] buffer_dout;
++assign io_dout = buffer_dout;
++
++// buffer_rptr is increased in a diferent clock domain than it's
++// evaluated. These single bit registers bring certain states from
++// one domain into the other one in a safe (atomic) way
++reg buffer_read_sector_done;
++reg buffer_read_ciscid_done;
++
++always @(posedge buffer_dout_strobe or posedge new_cmd_rcvd) begin
++	if(new_cmd_rcvd == 1) begin
++		buffer_rptr <= 9'd0;
++		buffer_read_sector_done <= 1'b0;
++		buffer_read_ciscid_done <= 1'b0;
++	end else begin
++		buffer_dout <= buffer[buffer_rptr];
++		buffer_rptr <= buffer_rptr + 9'd1;
++		if(buffer_rptr == 511) buffer_read_sector_done <= 1'b1;
++		if(buffer_rptr == 15)  buffer_read_ciscid_done <= 1'b1;
++	end
++end
++
++// ---------------- buffer write engine -----------------------
++reg [8:0] buffer_wptr;
++reg buffer_write_strobe;
++wire buffer_din_strobe = io_din_strobe || buffer_write_strobe;
++wire [7:0] buffer_din = (cmd == 8'h51)?io_din:{sbuf, sd_sdi};
++
++always @(posedge buffer_din_strobe or posedge new_cmd_rcvd) begin
++	if(new_cmd_rcvd == 1)
++		buffer_wptr <= 9'd0;
++	else begin
++		buffer[buffer_wptr] <= buffer_din;	
++		buffer_wptr <= buffer_wptr + 9'd1;
++	end
++end
++
++wire [7:0] WRITE_DATA_RESPONSE = 8'h05;
++
++// ------------------------- CSD/CID BUFFER ----------------------
++assign io_conf = (csd_wptr == 0);  // csd_wptr still 0 -> configuration required
++
++// the 32 bytes as sent from the io controller
++reg [7:0] cid [15:0];
++reg [7:0] csd [15:0];
++reg [7:0] conf;
++
++reg [7:0] cid_byte;
++reg [7:0] csd_byte;
++reg [5:0] csd_wptr = 6'd0;
++
++// conf[0]==1 -> io controller is using an sdhc card
++wire io_has_sdhc = conf[0];
++assign io_sdhc = allow_sdhc && io_has_sdhc;
++
++always @(posedge io_din_strobe) begin
++	// if io controller sends data without asserting io_ack, then it's
++	// updating the config
++	if(!io_ack && (csd_wptr <= 32)) begin
++	
++		if(csd_wptr < 16)                       // first 16 bytes are cid
++			cid[csd_wptr[3:0]] <= io_din;	
++		if((csd_wptr >= 16) && (csd_wptr < 32)) // then comes csd
++			csd[csd_wptr[3:0]] <= io_din;	
++		if(csd_wptr == 32)                      // finally a config byte
++			conf <= io_din;	
++			
++		csd_wptr	<= csd_wptr + 6'd1;
++	end
++end
++ 
++always @(posedge buffer_dout_strobe) begin
++	cid_byte <= cid[buffer_rptr[3:0]];
++	csd_byte <= csd[buffer_rptr[3:0]];
++end
++ 	
++// ----------------- spi transmitter --------------------
++// advance transmitter state machine on falling sck edge, so data is valid on the 
++// rising edge
++always@(negedge sd_sck) begin
++	if(sd_cs == 0) begin
++		buffer_read_strobe <= 1'b0;
++		sd_sdo <= 1'b1;				// default: send 1's (busy/wait)
++		req_io_rd <= 1'b0;
++		
++		if(byte_cnt == 5+NCR) begin
++			sd_sdo <= reply[~bit_cnt];
++
++			if(bit_cnt == 7) begin
++				// these three commands all have a reply_len of 0 and will thus
++				// not send more than a single reply byte
++				
++				// CMD9: SEND_CSD
++				// CMD10: SEND_CID
++				if((cmd == 8'h49)||(cmd == 8'h4a))
++					read_state <= RD_STATE_SEND_TOKEN;      // jump directly to data transmission
++						
++				// CMD17: READ_SINGLE_BLOCK
++				if(cmd == 8'h51) begin
++					read_state <= RD_STATE_WAIT_IO;         // start waiting for data from io controller
++					req_io_rd <= 1'b1;                      // trigger request to io controller
++				end
++			end
++		end
++		else if((reply_len > 0) && (byte_cnt == 5+NCR+1))
++			sd_sdo <= reply0[~bit_cnt];
++		else if((reply_len > 1) && (byte_cnt == 5+NCR+2))
++			sd_sdo <= reply1[~bit_cnt];
++		else if((reply_len > 2) && (byte_cnt == 5+NCR+3))
++			sd_sdo <= reply2[~bit_cnt];
++		else if((reply_len > 3) && (byte_cnt == 5+NCR+4))
++			sd_sdo <= reply3[~bit_cnt];
++		else
++			sd_sdo <= 1'b1;
++
++		// ---------- read state machine processing -------------
++
++		case(read_state)
++			RD_STATE_IDLE: ;
++				// don't do anything
++
++			// waiting for io controller to return data
++			RD_STATE_WAIT_IO: begin
++				if(rd_io_ack && (bit_cnt == 7)) 
++					read_state <= RD_STATE_SEND_TOKEN;
++			end
++
++			// send data token
++			RD_STATE_SEND_TOKEN: begin
++				sd_sdo <= READ_DATA_TOKEN[~bit_cnt];
++	
++				if(bit_cnt == 7) begin
++					read_state <= RD_STATE_SEND_DATA;   // next: send data
++					buffer_read_strobe <= 1'b1;         // trigger read of first data byte
++				end
++			end
++					
++			// send data
++			RD_STATE_SEND_DATA: begin
++				if(cmd == 8'h51) 							// CMD17: READ_SINGLE_BLOCK
++					sd_sdo <= buffer_dout[~bit_cnt];
++				else if(cmd == 8'h49) 					// CMD9: SEND_CSD
++					sd_sdo <= csd_byte[~bit_cnt];
++				else if(cmd == 8'h4a) 					// CMD10: SEND_CID
++					sd_sdo <= cid_byte[~bit_cnt];
++				else
++					sd_sdo <= 1'b1;
++
++				if(bit_cnt == 7) begin
++					// sent 512 sector data bytes?
++					if((cmd == 8'h51) && buffer_read_sector_done) // (buffer_rptr == 0))
++						read_state <= RD_STATE_IDLE;   // next: send crc. It's ignored so return to idle state
++						
++					// sent 16 cid/csd data bytes?
++					else if(((cmd == 8'h49)||(cmd == 8'h4a)) && buffer_read_ciscid_done) // && (buffer_rptr == 16))
++						read_state <= RD_STATE_IDLE;   // return to idle state
++						
++					else
++						buffer_read_strobe <= 1'b1;    // not done yet -> trigger read of next data byte
++				end
++			end
++		endcase
++					
++		// ------------------ write support ----------------------
++		// send write data response
++		if(write_state == WR_STATE_SEND_DRESP) 
++			sd_sdo <= WRITE_DATA_RESPONSE[~bit_cnt];
++			
++		// busy after write until the io controller sends ack
++		if(write_state == WR_STATE_BUSY) 
++			sd_sdo <= 1'b0;
++   end
++end
++
++// spi receiver  
++reg illegal_write_state /* synthesis noprune */;
++
++always @(posedge sd_sck or posedge sd_cs) begin
++	// cs is active low
++	if(sd_cs == 1) begin
++		bit_cnt <= 3'd0;
++	end else begin 
++		illegal_write_state <= 1'b0;
++		new_cmd_rcvd <= 1'b0;
++		buffer_write_strobe <= 1'b0;
++		req_io_wr <= 1'b0;
++		bit_cnt <= bit_cnt + 3'd1;
++		
++		// assemble byte
++		if(bit_cnt != 7)
++			sbuf[6:0] <= { sbuf[5:0], sd_sdi };
++		else begin
++			// finished reading one byte
++			// byte counter runs against 15 byte boundary
++			if(byte_cnt != 15)
++				byte_cnt <= byte_cnt + 4'd1;			
++
++			// byte_cnt > 6 -> complete command received
++			// first byte of valid command is 01xxxxxx
++			// don't accept new commands once a write or read command has been accepted
++ 			if((byte_cnt > 5) && (write_state == WR_STATE_IDLE) && 
++				(read_state == RD_STATE_IDLE)  && sbuf[6:5] == 2'b01) begin
++				byte_cnt <= 4'd0;			
++				cmd <= { sbuf, sd_sdi};
++				new_cmd_rcvd <= 1'b1;
++
++			   // set cmd55 flag if previous command was 55
++			   cmd55 <= (cmd == 8'h77);
++			end
++
++			// parse additional command bytes
++			if(byte_cnt == 0) lba[31:24] <= { sbuf, sd_sdi};
++			if(byte_cnt == 1) lba[23:16] <= { sbuf, sd_sdi};
++			if(byte_cnt == 2) lba[15:8]  <= { sbuf, sd_sdi};
++			if(byte_cnt == 3) lba[7:0]   <= { sbuf, sd_sdi};			
++
++			// last byte received, evaluate
++			if(byte_cnt == 4) begin		
++		
++				// default:
++				reply <= 8'h04;     // illegal command
++				reply_len <= 4'd0;  // no extra reply bytes
++				
++				// CMD0: GO_IDLE_STATE
++				if(cmd == 8'h40) begin
++					card_is_reset <= 1'b1;
++					reply <= 8'h01;    // ok, busy
++				end
++
++				// every other command is only accepted after a reset
++				else if(card_is_reset) begin
++					// CMD1: SEND_OP_COND
++					if(cmd == 8'h41)
++						reply <= 8'h00;    // ok, not busy
++					
++					// CMD8: SEND_IF_COND (V2 only)
++					else if(cmd == 8'h48) begin
++						reply <= 8'h01;    // ok, busy
++						reply0 <= 8'h00;
++						reply1 <= 8'h00;
++						reply2 <= 8'h01;
++						reply3 <= 8'hAA;
++						reply_len <= 4'd4;
++					end
++				
++					// CMD9: SEND_CSD
++					else if(cmd == 8'h49)
++						reply <= 8'h00;    // ok
++				
++					// CMD10: SEND_CID
++					else if(cmd == 8'h4a)
++						reply <= 8'h00;    // ok
++				
++					// CMD16: SET_BLOCKLEN
++					else if(cmd == 8'h50) begin
++						// we only support a block size of 512
++						if(lba == 32'd512)
++							reply <= 8'h00;    // ok
++						else
++							reply <= 8'h40;    // parmeter error
++					end
++
++					// CMD17: READ_SINGLE_BLOCK
++					else if(cmd == 8'h51)
++						reply <= 8'h00;    // ok
++
++					// CMD24: WRITE_BLOCK
++					else if(cmd == 8'h58) begin
++						reply <= 8'h00;    // ok
++						write_state <= WR_STATE_EXP_DTOKEN;  // expect data token
++					end
++
++					// ACMD41: APP_SEND_OP_COND
++					else if(cmd55 && (cmd == 8'h69))
++						reply <= 8'h00;    // ok, not busy
++	
++					// CMD55: APP_COND
++					else if(cmd == 8'h77)
++						reply <= 8'h01;    // ok, busy
++
++					// CMD58: READ_OCR
++					else if(cmd == 8'h7a) begin
++						reply <= 8'h00;    // ok
++					
++						reply0 <= OCR[31:24];   // bit 30 = 1 -> high capacity card 
++						reply1 <= OCR[23:16];
++						reply2 <= OCR[15:8];
++						reply3 <= OCR[7:0];
++						reply_len <= 4'd4;
++					end
++				end
++			end
++			
++			// ---------- handle write -----------
++			case(write_state) 
++				// don't do anything in idle state
++				WR_STATE_IDLE: ;
++				
++				// waiting for data token
++				WR_STATE_EXP_DTOKEN:
++					if({ sbuf, sd_sdi} == 8'hfe )
++						write_state <= WR_STATE_RECV_DATA;
++
++				// transfer 512 bytes
++				WR_STATE_RECV_DATA: begin
++					// push one byte into local buffer
++					buffer_write_strobe <= 1'b1;
++
++					// all bytes written?
++					if(buffer_wptr == 511)
++						write_state <= WR_STATE_RECV_CRC0;
++				end
++	
++				// transfer 1st crc byte
++				WR_STATE_RECV_CRC0:
++					write_state <= WR_STATE_RECV_CRC1;
++
++				// transfer 2nd crc byte
++				WR_STATE_RECV_CRC1:
++					write_state <= WR_STATE_SEND_DRESP;
++	
++				// send data response
++				WR_STATE_SEND_DRESP: begin
++					write_state <= WR_STATE_BUSY;
++					req_io_wr <= 1'b1;               // trigger write request to io ontroller
++				end
++				
++				// wait for io controller to accept data
++				WR_STATE_BUSY:
++					if(wr_io_ack)
++						write_state <= WR_STATE_IDLE;
++						
++				default:
++					illegal_write_state <= 1'b1;
++			endcase
++		end
++	end
++end
++
++endmodule
+diff -Naur vhdl_c64_c1541_sd.orig/mist/sdram.v vhdl_c64_c1541_sd.mist/mist/sdram.v
+--- vhdl_c64_c1541_sd.orig/mist/sdram.v	1970-01-01 01:00:00.000000000 +0100
++++ vhdl_c64_c1541_sd.mist/mist/sdram.v	2015-07-13 14:27:07.250787173 +0200
+@@ -0,0 +1,143 @@
++//
++// sdram.v
++//
++// sdram controller implementation for the MiST board
++// http://code.google.com/p/mist-board/
++// 
++// Copyright (c) 2013 Till Harbaum <till@harbaum.org> 
++// 
++// This source file is free software: you can redistribute it and/or modify 
++// it under the terms of the GNU General Public License as published 
++// by the Free Software Foundation, either version 3 of the License, or 
++// (at your option) any later version. 
++// 
++// This source file is distributed in the hope that it will be useful,
++// but WITHOUT ANY WARRANTY; without even the implied warranty of 
++// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the 
++// GNU General Public License for more details.
++// 
++// You should have received a copy of the GNU General Public License 
++// along with this program.  If not, see <http://www.gnu.org/licenses/>. 
++//
++
++module sdram (
++
++	// interface to the MT48LC16M16 chip
++	output [12:0]		sd_addr,    // 13 bit multiplexed address bus
++	output [1:0] 		sd_ba,      // two banks
++	output 				sd_cs,      // a single chip select
++	output 				sd_we,      // write enable
++	output 				sd_ras,     // row address select
++	output 				sd_cas,     // columns address select
++
++	// cpu/chipset interface
++	input 		 		init,			// init signal after FPGA config to initialize RAM
++	input 		 		clk,			// sdram is accessed at up to 128MHz
++	
++	input [15:0]   	addr,       // 25 bit byte address
++	input 		 		refresh,    // refresh cycle
++	input 		 		ce,         // cpu/chipset access
++	input 		 		we          // cpu/chipset requests write
++);
++
++// no burst configured
++localparam RASCAS_DELAY   = 3'd2;   // tRCD>=20ns -> 2 cycles@64MHz
++localparam BURST_LENGTH   = 3'b000; // 000=none, 001=2, 010=4, 011=8
++localparam ACCESS_TYPE    = 1'b0;   // 0=sequential, 1=interleaved
++localparam CAS_LATENCY    = 3'd2;   // 2/3 allowed
++localparam OP_MODE        = 2'b00;  // only 00 (standard operation) allowed
++localparam NO_WRITE_BURST = 1'b1;   // 0= write burst enabled, 1=only single access write
++
++localparam MODE = { 3'b000, NO_WRITE_BURST, OP_MODE, CAS_LATENCY, ACCESS_TYPE, BURST_LENGTH}; 
++
++// ---------------------------------------------------------------------
++// ------------------------ cycle state machine ------------------------
++// ---------------------------------------------------------------------
++
++localparam STATE_IDLE      = 3'd0;   // first state in cycle
++localparam STATE_CMD_START = 3'd1;   // state in which a new command can be started
++localparam STATE_CMD_CONT  = STATE_CMD_START  + RASCAS_DELAY - 3'd1; // 4 command can be continued
++localparam STATE_LAST      = 3'd7;   // last state in cycle
++
++reg [2:0] q /* synthesis noprune */;
++reg last_ce, last_refresh;
++always @(posedge clk) begin
++	last_ce <= ce;
++	last_refresh <= refresh;
++
++	// start a new cycle in rising edge of ce or refresh
++	if((ce && !last_ce) || (refresh && !last_refresh))
++		q <= 3'd1;
++	
++	if(q != 0)
++			q <= q + 3'd1;
++end
++
++// ---------------------------------------------------------------------
++// --------------------------- startup/reset ---------------------------
++// ---------------------------------------------------------------------
++
++// wait 1ms (32 clkref cycles) after FPGA config is done before going
++// into normal operation. Initialize the ram in the last 16 reset cycles (cycles 15-0)
++reg [4:0] reset;
++always @(posedge clk) begin
++	if(init)	reset <= 5'h1f;
++	else if((q == STATE_LAST) && (reset != 0))
++		reset <= reset - 5'd1;
++end
++
++// ---------------------------------------------------------------------
++// ------------------ generate ram control signals ---------------------
++// ---------------------------------------------------------------------
++
++// all possible commands
++localparam CMD_INHIBIT         = 4'b1111;
++localparam CMD_NOP             = 4'b0111;
++localparam CMD_ACTIVE          = 4'b0011;
++localparam CMD_READ            = 4'b0101;
++localparam CMD_WRITE           = 4'b0100;
++localparam CMD_BURST_TERMINATE = 4'b0110;
++localparam CMD_PRECHARGE       = 4'b0010;
++localparam CMD_AUTO_REFRESH    = 4'b0001;
++localparam CMD_LOAD_MODE       = 4'b0000;
++
++reg [3:0] sd_cmd;   // current command sent to sd ram
++
++// drive control signals according to current command
++assign sd_cs  = sd_cmd[3];
++assign sd_ras = sd_cmd[2];
++assign sd_cas = sd_cmd[1];
++assign sd_we  = sd_cmd[0];
++
++// assign sd_data = we?{din, din}:16'bZZZZZZZZZZZZZZZZ;
++// assign dout = sd_data[7:0];
++
++always @(posedge clk) begin
++	sd_cmd <= CMD_INHIBIT;
++
++	if(reset != 0) begin
++		if(q == STATE_IDLE) begin
++			if(reset == 13)  sd_cmd <= CMD_PRECHARGE;
++			if(reset ==  2)  sd_cmd <= CMD_LOAD_MODE;
++		end
++	end else begin
++		if(q == STATE_IDLE) begin
++			if(ce && !last_ce)           sd_cmd <= CMD_ACTIVE;
++			if(refresh && !last_refresh) sd_cmd <= CMD_AUTO_REFRESH;
++		end else if((q == STATE_CMD_CONT)&&(!refresh)) begin
++			if(we)		 sd_cmd <= CMD_WRITE;
++			else if(ce)  sd_cmd <= CMD_READ;
++		end
++	end
++end
++	
++wire [12:0] reset_addr = (reset == 13)?13'b0010000000000:MODE;
++	
++wire [12:0] run_addr = 
++	(q == STATE_CMD_START)?{ 5'b00000, addr[15:8]}:{ 5'b00100, addr[7:0]};
++
++assign sd_addr = (reset != 0)?reset_addr:run_addr;
++
++assign sd_ba = 2'b00;
++
++endmodule
+diff -Naur vhdl_c64_c1541_sd.orig/mist/sigma_delta_dac.v vhdl_c64_c1541_sd.mist/mist/sigma_delta_dac.v
+--- vhdl_c64_c1541_sd.orig/mist/sigma_delta_dac.v	1970-01-01 01:00:00.000000000 +0100
++++ vhdl_c64_c1541_sd.mist/mist/sigma_delta_dac.v	2015-07-10 10:32:38.305288458 +0200
+@@ -0,0 +1,129 @@
++// sigmadelta.v
++// two channel second order sigma delta dac
++// taken from Minimig
++
++// audio data processing
++// stereo sigma/delta bitstream modulator
++module sigma_delta_dac (
++	input 			clk,			// bus clock
++	input	[14:0]	ldatasum,	// left channel data
++	input	[14:0] 	rdatasum,	// right channel data
++	output	reg 	left=0,		// left bitstream output
++	output	reg 	right=0		// right bitsteam output
++);
++
++//--------------------------------------------------------------------------------------
++
++// local signals
++localparam DW = 15;
++localparam CW = 2;
++localparam RW  = 4;
++localparam A1W = 2;
++localparam A2W = 5;
++
++wire [DW+2+0  -1:0] sd_l_er0, sd_r_er0;
++reg  [DW+2+0  -1:0] sd_l_er0_prev=0, sd_r_er0_prev=0;
++wire [DW+A1W+2-1:0] sd_l_aca1,  sd_r_aca1;
++wire [DW+A2W+2-1:0] sd_l_aca2,  sd_r_aca2;
++reg  [DW+A1W+2-1:0] sd_l_ac1=0, sd_r_ac1=0;
++reg  [DW+A2W+2-1:0] sd_l_ac2=0, sd_r_ac2=0;
++wire [DW+A2W+3-1:0] sd_l_quant, sd_r_quant;
++
++// LPF noise LFSR
++reg [24-1:0] seed1 = 24'h654321;
++reg [19-1:0] seed2 = 19'h12345;
++reg [24-1:0] seed_sum=0, seed_prev=0, seed_out=0;
++always @ (posedge clk) begin
++  if (&seed1)
++    seed1 <= #1 24'h654321;
++  else
++    seed1 <= #1 {seed1[22:0], ~(seed1[23] ^ seed1[22] ^ seed1[21] ^ seed1[16])};
++end
++always @ (posedge clk) begin
++  if (&seed2)
++    seed2 <= #1 19'h12345;
++  else
++    seed2 <= #1 {seed2[17:0], ~(seed2[18] ^ seed2[17] ^ seed2[16] ^ seed2[13] ^ seed2[0])};
++end
++always @ (posedge clk) begin
++  seed_sum  <= #1 seed1 + {5'b0, seed2};
++  seed_prev <= #1 seed_sum;
++  seed_out  <= #1 seed_sum - seed_prev;
++end
++
++// linear interpolate
++localparam ID=4; // counter size, also 2^ID = interpolation rate
++reg  [ID+0-1:0] int_cnt = 0;
++always @ (posedge clk) int_cnt <= #1 int_cnt + 'd1;
++
++reg  [DW+0-1:0] ldata_cur=0, ldata_prev=0;
++reg  [DW+0-1:0] rdata_cur=0, rdata_prev=0;
++wire [DW+1-1:0] ldata_step, rdata_step;
++reg  [DW+ID-1:0] ldata_int=0, rdata_int=0;
++wire [DW+0-1:0] ldata_int_out, rdata_int_out;
++assign ldata_step = {ldata_cur[DW-1], ldata_cur} - {ldata_prev[DW-1], ldata_prev}; // signed subtract
++assign rdata_step = {rdata_cur[DW-1], rdata_cur} - {rdata_prev[DW-1], rdata_prev}; // signed subtract
++always @ (posedge clk) begin
++  if (~|int_cnt) begin
++    ldata_prev <= #1 ldata_cur;
++    ldata_cur  <= #1 ldatasum; //{~ldatasum[DW-1], ldatasum[DW-2:0]}; // convert to offset binary, samples no longer signed!
++    rdata_prev <= #1 rdata_cur;
++    rdata_cur  <= #1 rdatasum; //{~rdatasum[DW-1], rdatasum[DW-2:0]}; // convert to offset binary, samples no longer signed!
++    ldata_int  <= #1 {ldata_cur[DW-1], ldata_cur, {ID{1'b0}}};
++    rdata_int  <= #1 {rdata_cur[DW-1], rdata_cur, {ID{1'b0}}};
++  end else begin
++    ldata_int  <= #1 ldata_int + {{ID{ldata_step[DW+1-1]}}, ldata_step};
++    rdata_int  <= #1 rdata_int + {{ID{rdata_step[DW+1-1]}}, rdata_step};
++  end
++end
++assign ldata_int_out = ldata_int[DW+ID-1:ID];
++assign rdata_int_out = rdata_int[DW+ID-1:ID];
++
++// input gain x3
++wire [DW+2-1:0] ldata_gain, rdata_gain;
++assign ldata_gain = {ldata_int_out[DW-1], ldata_int_out, 1'b0} + {{(2){ldata_int_out[DW-1]}}, ldata_int_out};
++assign rdata_gain = {rdata_int_out[DW-1], rdata_int_out, 1'b0} + {{(2){rdata_int_out[DW-1]}}, rdata_int_out};
++
++/*
++// random dither to 15 bits
++reg [DW-1:0] ldata=0, rdata=0;
++always @ (posedge clk) begin
++  ldata <= #1 ldata_gain[DW+2-1:2] + ( (~(&ldata_gain[DW+2-1-1:2]) && (ldata_gain[1:0] > seed_out[1:0])) ? 15'd1 : 15'd0 );
++  rdata <= #1 rdata_gain[DW+2-1:2] + ( (~(&ldata_gain[DW+2-1-1:2]) && (ldata_gain[1:0] > seed_out[1:0])) ? 15'd1 : 15'd0 );
++end
++*/
++
++// accumulator adders
++assign sd_l_aca1 = {{(A1W){ldata_gain[DW+2-1]}}, ldata_gain} - {{(A1W){sd_l_er0[DW+2-1]}}, sd_l_er0} + sd_l_ac1;
++assign sd_r_aca1 = {{(A1W){rdata_gain[DW+2-1]}}, rdata_gain} - {{(A1W){sd_r_er0[DW+2-1]}}, sd_r_er0} + sd_r_ac1;
++
++assign sd_l_aca2 = {{(A2W-A1W){sd_l_aca1[DW+A1W+2-1]}}, sd_l_aca1} - {{(A2W){sd_l_er0[DW+2-1]}}, sd_l_er0} - {{(A2W+1){sd_l_er0_prev[DW+2-1]}}, sd_l_er0_prev[DW+2-1:1]} + sd_l_ac2;
++assign sd_r_aca2 = {{(A2W-A1W){sd_r_aca1[DW+A1W+2-1]}}, sd_r_aca1} - {{(A2W){sd_r_er0[DW+2-1]}}, sd_r_er0} - {{(A2W+1){sd_r_er0_prev[DW+2-1]}}, sd_r_er0_prev[DW+2-1:1]} + sd_r_ac2;
++
++// accumulators
++always @ (posedge clk) begin
++  sd_l_ac1 <= #1 sd_l_aca1;
++  sd_r_ac1 <= #1 sd_r_aca1;
++  sd_l_ac2 <= #1 sd_l_aca2;
++  sd_r_ac2 <= #1 sd_r_aca2;
++end
++
++// value for quantizaton
++assign sd_l_quant = {sd_l_ac2[DW+A2W+2-1], sd_l_ac2} + {{(DW+A2W+3-RW){seed_out[RW-1]}}, seed_out[RW-1:0]};
++assign sd_r_quant = {sd_r_ac2[DW+A2W+2-1], sd_r_ac2} + {{(DW+A2W+3-RW){seed_out[RW-1]}}, seed_out[RW-1:0]};
++
++// error feedback
++assign sd_l_er0 = sd_l_quant[DW+A2W+3-1] ? {1'b1, {(DW+2-1){1'b0}}} : {1'b0, {(DW+2-1){1'b1}}};
++assign sd_r_er0 = sd_r_quant[DW+A2W+3-1] ? {1'b1, {(DW+2-1){1'b0}}} : {1'b0, {(DW+2-1){1'b1}}};
++always @ (posedge clk) begin
++  sd_l_er0_prev <= #1 (&sd_l_er0) ? sd_l_er0 : sd_l_er0+1;
++  sd_r_er0_prev <= #1 (&sd_r_er0) ? sd_r_er0 : sd_r_er0+1;
++end
++
++// output
++always @ (posedge clk) begin
++  left  <= #1 (~|ldata_gain) ? ~left  : ~sd_l_er0[DW+2-1];
++  right <= #1 (~|rdata_gain) ? ~right : ~sd_r_er0[DW+2-1];
++end
++
++endmodule
+diff -Naur vhdl_c64_c1541_sd.orig/mist/user_io.v vhdl_c64_c1541_sd.mist/mist/user_io.v
+--- vhdl_c64_c1541_sd.orig/mist/user_io.v	1970-01-01 01:00:00.000000000 +0100
++++ vhdl_c64_c1541_sd.mist/mist/user_io.v	2015-07-15 09:36:05.817530160 +0200
+@@ -0,0 +1,418 @@
++//
++// user_io.v
++//
++// user_io for the MiST board
++// http://code.google.com/p/mist-board/
++//
++// Copyright (c) 2014 Till Harbaum <till@harbaum.org>
++//
++// This source file is free software: you can redistribute it and/or modify
++// it under the terms of the GNU General Public License as published
++// by the Free Software Foundation, either version 3 of the License, or
++// (at your option) any later version.
++//
++// This source file is distributed in the hope that it will be useful,
++// but WITHOUT ANY WARRANTY; without even the implied warranty of
++// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++// GNU General Public License for more details.
++//
++// You should have received a copy of the GNU General Public License
++// along with this program.  If not, see <http://www.gnu.org/licenses/>.
++//
++
++// parameter STRLEN and the actual length of conf_str have to match
++ 
++module user_io #(parameter STRLEN=0) (
++	input [(8*STRLEN)-1:0] conf_str,
++
++	input      		SPI_CLK,
++	input      		SPI_SS_IO,
++	output     		reg SPI_MISO,
++	input      		SPI_MOSI,
++	
++	output reg [7:0] 	joystick_0,
++	output reg [7:0] 	joystick_1,
++	output reg [15:0] joystick_analog_0,
++	output reg [15:0] joystick_analog_1,
++	output [1:0] 		buttons,
++	output [1:0] 		switches,
++	output  				scandoubler_disable,
++
++	output reg [7:0]   status,
++
++	// connection to sd card emulation
++	input [31:0]  sd_lba,
++	input         sd_rd,
++	input         sd_wr,
++	output reg	  sd_ack,
++	input         sd_conf,
++	input         sd_sdhc,
++	output [7:0]  sd_dout,  // valid on rising edge of sd_dout_strobe
++	output reg	  sd_dout_strobe,
++	input [7:0]   sd_din,
++	output reg 	  sd_din_strobe,
++	output reg    sd_change,
++
++	// ps2 keyboard emulation
++	input 	  		ps2_clk,				// 12-16khz provided by core
++	output	 		ps2_kbd_clk,
++	output reg 		ps2_kbd_data,
++	output	 		ps2_mouse_clk,
++	output reg 		ps2_mouse_data,
++
++	// serial com port 
++	input [7:0]		serial_data,
++	input				serial_strobe
++);
++
++reg [6:0]         sbuf;
++reg [7:0]         cmd;
++reg [2:0] 	      bit_cnt;    // counts bits 0-7 0-7 ...
++reg [7:0]         byte_cnt;   // counts bytes
++reg [5:0]         joystick0;
++reg [5:0]         joystick1;
++reg [7:0] 	      but_sw;
++reg [2:0]         stick_idx;
++
++assign buttons = but_sw[1:0];
++assign switches = but_sw[3:2];
++assign scandoubler_disable = but_sw[4];
++assign sd_dout = { sbuf, SPI_MOSI};
++
++// this variant of user_io is for 8 bit cores (type == a4) only
++wire [7:0] core_type = 8'ha4;
++
++// command byte read by the io controller
++wire [7:0] sd_cmd = { 4'h5, sd_conf, sd_sdhc, sd_wr, sd_rd };
++
++// filter spi clock. the 8 bit gate delay is ~2.5ns in total
++wire [7:0] spi_sck_D = { spi_sck_D[6:0], SPI_CLK } /* synthesis keep */;
++wire spi_sck = (spi_sck && spi_sck_D != 8'h00) || (!spi_sck && spi_sck_D == 8'hff);
++
++// drive MISO only when transmitting core id
++always@(negedge spi_sck or posedge SPI_SS_IO) begin
++	if(SPI_SS_IO == 1) begin
++	   SPI_MISO <= 1'bZ;
++	end else begin
++
++		// first byte returned is always core type, further bytes are 
++		// command dependent
++      if(byte_cnt == 0) begin
++		  SPI_MISO <= core_type[~bit_cnt];
++
++		end else begin
++			// reading serial fifo
++		   if(cmd == 8'h1b) begin
++				// send alternating flag byte and data
++				if(byte_cnt[0]) 	SPI_MISO <= serial_out_status[~bit_cnt];
++				else					SPI_MISO <= serial_out_byte[~bit_cnt];
++			end
++			
++			// reading config string
++		   else if(cmd == 8'h14) begin
++				// returning a byte from string
++				if(byte_cnt < STRLEN + 1)
++					SPI_MISO <= conf_str[{STRLEN - byte_cnt,~bit_cnt}];
++				else
++					SPI_MISO <= 1'b0;
++			end
++			
++			// reading sd card status
++		   else if(cmd == 8'h16) begin
++				if(byte_cnt == 1)
++					SPI_MISO <= sd_cmd[~bit_cnt];
++				else if((byte_cnt >= 2) && (byte_cnt < 6))
++					SPI_MISO <= sd_lba[{5-byte_cnt, ~bit_cnt}];
++				else
++					SPI_MISO <= 1'b0;
++			end
++			
++			// reading sd card write data
++		   else if(cmd == 8'h18)
++				SPI_MISO <= sd_din[~bit_cnt];
++				
++			else
++				SPI_MISO <= 1'b0;
++		end
++   end
++end
++
++// ---------------- PS2 ---------------------
++
++// 8 byte fifos to store ps2 bytes
++localparam PS2_FIFO_BITS = 3;
++
++// keyboard
++reg [7:0] ps2_kbd_fifo [(2**PS2_FIFO_BITS)-1:0];
++reg [PS2_FIFO_BITS-1:0] ps2_kbd_wptr;
++reg [PS2_FIFO_BITS-1:0] ps2_kbd_rptr;
++
++// ps2 transmitter state machine
++reg [3:0] ps2_kbd_tx_state;
++reg [7:0] ps2_kbd_tx_byte;
++reg ps2_kbd_parity;
++
++assign ps2_kbd_clk = ps2_clk || (ps2_kbd_tx_state == 0);
++
++// ps2 transmitter
++// Takes a byte from the FIFO and sends it in a ps2 compliant serial format.
++reg ps2_kbd_r_inc;
++always@(posedge ps2_clk) begin
++	ps2_kbd_r_inc <= 1'b0;
++	
++	if(ps2_kbd_r_inc)
++		ps2_kbd_rptr <= ps2_kbd_rptr + 1;
++
++	// transmitter is idle?
++	if(ps2_kbd_tx_state == 0) begin
++		// data in fifo present?
++		if(ps2_kbd_wptr != ps2_kbd_rptr) begin
++			// load tx register from fifo
++			ps2_kbd_tx_byte <= ps2_kbd_fifo[ps2_kbd_rptr];
++			ps2_kbd_r_inc <= 1'b1;
++			
++			// reset parity
++			ps2_kbd_parity <= 1'b1;
++			
++			// start transmitter
++			ps2_kbd_tx_state <= 4'd1;
++
++			// put start bit on data line
++			ps2_kbd_data <= 1'b0;			// start bit is 0
++		end
++	end else begin
++	
++		// transmission of 8 data bits
++		if((ps2_kbd_tx_state >= 1)&&(ps2_kbd_tx_state < 9)) begin
++			ps2_kbd_data <= ps2_kbd_tx_byte[0];			  // data bits
++			ps2_kbd_tx_byte[6:0] <= ps2_kbd_tx_byte[7:1]; // shift down
++			if(ps2_kbd_tx_byte[0]) 
++				ps2_kbd_parity <= !ps2_kbd_parity;
++		end
++
++		// transmission of parity
++		if(ps2_kbd_tx_state == 9)
++			ps2_kbd_data <= ps2_kbd_parity;
++			
++		// transmission of stop bit
++		if(ps2_kbd_tx_state == 10)
++			ps2_kbd_data <= 1'b1;			// stop bit is 1
++
++		// advance state machine
++		if(ps2_kbd_tx_state < 11)
++			ps2_kbd_tx_state <= ps2_kbd_tx_state + 4'd1;
++		else	
++			ps2_kbd_tx_state <= 4'd0;
++	
++	end
++end
++  
++// mouse
++reg [7:0] ps2_mouse_fifo [(2**PS2_FIFO_BITS)-1:0];
++reg [PS2_FIFO_BITS-1:0] ps2_mouse_wptr;
++reg [PS2_FIFO_BITS-1:0] ps2_mouse_rptr;
++
++// ps2 transmitter state machine
++reg [3:0] ps2_mouse_tx_state;
++reg [7:0] ps2_mouse_tx_byte;
++reg ps2_mouse_parity;
++
++assign ps2_mouse_clk = ps2_clk || (ps2_mouse_tx_state == 0);
++
++// ps2 transmitter
++// Takes a byte from the FIFO and sends it in a ps2 compliant serial format.
++reg ps2_mouse_r_inc;
++always@(posedge ps2_clk) begin
++	ps2_mouse_r_inc <= 1'b0;
++	
++	if(ps2_mouse_r_inc)
++		ps2_mouse_rptr <= ps2_mouse_rptr + 1;
++
++	// transmitter is idle?
++	if(ps2_mouse_tx_state == 0) begin
++		// data in fifo present?
++		if(ps2_mouse_wptr != ps2_mouse_rptr) begin
++			// load tx register from fifo
++			ps2_mouse_tx_byte <= ps2_mouse_fifo[ps2_mouse_rptr];
++			ps2_mouse_r_inc <= 1'b1;
++			
++			// reset parity
++			ps2_mouse_parity <= 1'b1;
++			
++			// start transmitter
++			ps2_mouse_tx_state <= 4'd1;
++
++			// put start bit on data line
++			ps2_mouse_data <= 1'b0;			// start bit is 0
++		end
++	end else begin
++	
++		// transmission of 8 data bits
++		if((ps2_mouse_tx_state >= 1)&&(ps2_mouse_tx_state < 9)) begin
++			ps2_mouse_data <= ps2_mouse_tx_byte[0];			  // data bits
++			ps2_mouse_tx_byte[6:0] <= ps2_mouse_tx_byte[7:1]; // shift down
++			if(ps2_mouse_tx_byte[0]) 
++				ps2_mouse_parity <= !ps2_mouse_parity;
++		end
++
++		// transmission of parity
++		if(ps2_mouse_tx_state == 9)
++			ps2_mouse_data <= ps2_mouse_parity;
++			
++		// transmission of stop bit
++		if(ps2_mouse_tx_state == 10)
++			ps2_mouse_data <= 1'b1;			// stop bit is 1
++
++		// advance state machine
++		if(ps2_mouse_tx_state < 11)
++			ps2_mouse_tx_state <= ps2_mouse_tx_state + 4'd1;
++		else	
++			ps2_mouse_tx_state <= 4'd0;
++	
++	end
++end
++
++// fifo to receive serial data from core to be forwarded to io controller
++
++// 16 byte fifo to store serial bytes
++localparam SERIAL_OUT_FIFO_BITS = 6;
++reg [7:0] serial_out_fifo [(2**SERIAL_OUT_FIFO_BITS)-1:0];
++reg [SERIAL_OUT_FIFO_BITS-1:0] serial_out_wptr;
++reg [SERIAL_OUT_FIFO_BITS-1:0] serial_out_rptr;
++ 
++wire serial_out_data_available = serial_out_wptr != serial_out_rptr;
++wire [7:0] serial_out_byte = serial_out_fifo[serial_out_rptr] /* synthesis keep */;
++wire [7:0] serial_out_status = { 7'b1000000, serial_out_data_available};
++
++// status[0] is reset signal from io controller and is thus used to flush
++// the fifo
++always @(posedge serial_strobe or posedge status[0]) begin
++	if(status[0] == 1) begin
++		serial_out_wptr <= 0;
++	end else begin 
++		serial_out_fifo[serial_out_wptr] <= serial_data;
++		serial_out_wptr <= serial_out_wptr + 1;
++	end
++end 
++
++always@(negedge spi_sck or posedge status[0]) begin
++	if(status[0] == 1) begin
++		serial_out_rptr <= 0;
++	end else begin
++		if((byte_cnt != 0) && (cmd == 8'h1b)) begin
++			// read last bit -> advance read pointer
++			if((bit_cnt == 7) && !byte_cnt[0] && serial_out_data_available)
++				serial_out_rptr <= serial_out_rptr + 1;
++		end
++	end
++end
++
++// SPI receiver
++always@(posedge spi_sck or posedge SPI_SS_IO) begin
++
++	if(SPI_SS_IO == 1) begin
++	   bit_cnt <= 3'd0;
++	   byte_cnt <= 8'd0;
++		sd_ack <= 1'b0;
++		sd_dout_strobe <= 1'b0;
++		sd_din_strobe <= 1'b0;
++		sd_change <= 1'b0;
++	end else begin
++		sd_dout_strobe <= 1'b0;
++		sd_din_strobe <= 1'b0;
++		
++		if(bit_cnt != 7)
++			sbuf[6:0] <= { sbuf[5:0], SPI_MOSI };
++			
++		bit_cnt <= bit_cnt + 3'd1;
++		if((bit_cnt == 7)&&(byte_cnt != 8'd255)) 
++			byte_cnt <= byte_cnt + 8'd1;
++
++		// finished reading command byte
++      if(bit_cnt == 7) begin
++			if(byte_cnt == 0) begin
++				cmd <= { sbuf, SPI_MOSI};
++			
++				// fetch first byte when sectore FPGA->IO command has been seen
++				if({ sbuf, SPI_MOSI} == 8'h18)
++					sd_din_strobe <= 1'b1;
++					
++				if(({ sbuf, SPI_MOSI} == 8'h17) || ({ sbuf, SPI_MOSI} == 8'h18))
++					sd_ack <= 1'b1;
++					
++			end else begin
++			
++				// buttons and switches
++				if(cmd == 8'h01)
++					but_sw <= { sbuf, SPI_MOSI }; 
++
++				if(cmd == 8'h02)
++					joystick_0 <= { sbuf, SPI_MOSI };
++				 
++				if(cmd == 8'h03)
++					joystick_1 <= { sbuf, SPI_MOSI };
++				 
++				if(cmd == 8'h04) begin
++					// store incoming ps2 mouse bytes 
++					ps2_mouse_fifo[ps2_mouse_wptr] <= { sbuf, SPI_MOSI }; 
++					ps2_mouse_wptr <= ps2_mouse_wptr + 1;
++				end
++
++				if(cmd == 8'h05) begin
++					// store incoming ps2 keyboard bytes 
++					ps2_kbd_fifo[ps2_kbd_wptr] <= { sbuf, SPI_MOSI }; 
++					ps2_kbd_wptr <= ps2_kbd_wptr + 1;
++				end
++				
++				if(cmd == 8'h15)
++					status <= { sbuf[6:0], SPI_MOSI };
++				
++				// send sector IO -> FPGA
++				if(cmd == 8'h17) begin
++					// flag that download begins
++					sd_dout_strobe <= 1'b1;
++				end
++				
++				// send sector FPGA -> IO
++				if(cmd == 8'h18)
++					sd_din_strobe <= 1'b1;
++				
++				// send SD config IO -> FPGA
++				if(cmd == 8'h19) begin
++					// flag that download begins
++					// sd card knows data is config if sd_dout_strobe is asserted
++					// with sd_ack still being inactive (low)
++					sd_dout_strobe <= 1'b1;
++				end
++				
++				// joystick analog
++				if(cmd == 8'h1a) begin
++					// first byte is joystick indes
++					if(byte_cnt == 1)
++						stick_idx <= { sbuf[1:0], SPI_MOSI };
++					else if(byte_cnt == 2) begin
++						// second byte is x axis
++						if(stick_idx == 0)
++							joystick_analog_0[15:8] <= { sbuf, SPI_MOSI };
++						else if(stick_idx == 1)
++							joystick_analog_1[15:8] <= { sbuf, SPI_MOSI };
++					end else if(byte_cnt == 3) begin
++						// third byte is y axis
++						if(stick_idx == 0)
++							joystick_analog_0[7:0] <= { sbuf, SPI_MOSI };
++						else if(stick_idx == 1)
++							joystick_analog_1[7:0] <= { sbuf, SPI_MOSI };
++					end
++				end
++				
++				// set sd card status. The fact that this register is being	
++				// set by the arm controller indicates a possible disk change
++				if(cmd == 8'h1c)
++					sd_change <= 1'b1;
++
++			end
++		end
++	end
++end
++   
++endmodule
+diff -Naur vhdl_c64_c1541_sd.orig/rtl_dar/c1541_logic.vhd vhdl_c64_c1541_sd.mist/rtl_dar/c1541_logic.vhd
+--- vhdl_c64_c1541_sd.orig/rtl_dar/c1541_logic.vhd	2015-05-06 08:38:50.000000000 +0200
++++ vhdl_c64_c1541_sd.mist/rtl_dar/c1541_logic.vhd	2015-07-21 12:45:14.768840459 +0200
+@@ -122,7 +122,8 @@
+       if count(4 downto 0) = "01000" then
+         clk_1M_pulse <= '1';
+       end if;
+-      if count = "000100000" then -- DAR divide by 33 (otherwise real c64 miss EOI acknowledge)
++--      if count = "000100000" then -- DAR divide by 33 (otherwise real c64 miss EOI acknowledge)
++        if count = "000011111" then -- TH: divide by 32 
+       count := (others => '0');   -- DAR	
+ 			else                        -- DAR
+       count := std_logic_vector(unsigned(count) + 1);
+@@ -280,7 +281,6 @@
+ --     init_file   => "../roms/325302-1_901229-03.hex",   
+      init_file   => "../roms/1541_c000_01_and_e000_06aa.hex",   -- DAR tested OK
+ 
+-
+       numwords_a  => 16384,
+       widthad_a   => 14
+     )
+diff -Naur vhdl_c64_c1541_sd.orig/rtl_dar/c1541_sd.vhd vhdl_c64_c1541_sd.mist/rtl_dar/c1541_sd.vhd
+--- vhdl_c64_c1541_sd.orig/rtl_dar/c1541_sd.vhd	2015-05-02 17:58:00.000000000 +0200
++++ vhdl_c64_c1541_sd.mist/rtl_dar/c1541_sd.vhd	2015-07-21 14:43:01.972822833 +0200
+@@ -30,9 +30,10 @@
+ entity c1541_sd is
+ port(
+   clk32 : in std_logic;
+-  clk18 : in std_logic;
++  clk18: in std_logic;
+ 	reset : in std_logic;
+ 	
++	disk_change : in std_logic;
+ 	disk_num : in std_logic_vector(9 downto 0);
+ 
+ 	iec_atn_i  : in std_logic;
+@@ -189,6 +190,7 @@
+ 		ram_di         => ram_di,         --: out unsigned(7 downto 0);
+ 		ram_we         => ram_we,         
+   
++      change => disk_change,
+ 		track => unsigned(track_dbl(6 downto 1)),
+ 		image => unsigned(disk_num),
+   
+diff -Naur vhdl_c64_c1541_sd.orig/rtl_dar/c64_mist.vhd vhdl_c64_c1541_sd.mist/rtl_dar/c64_mist.vhd
+--- vhdl_c64_c1541_sd.orig/rtl_dar/c64_mist.vhd	1970-01-01 01:00:00.000000000 +0100
++++ vhdl_c64_c1541_sd.mist/rtl_dar/c64_mist.vhd	2015-07-22 12:38:38.116508615 +0200
+@@ -0,0 +1,736 @@
++---------------------------------------------------------------------------------
++-- DE2-35 Top level for FPGA64_027 by Dar (darfpga@aol.fr)
++-- http://darfpga.blogspot.fr
++--
++-- FPGA64 is Copyrighted 2005-2008 by Peter Wendrich (pwsoft@syntiac.com)
++-- http://www.syntiac.com/fpga64.html
++--
++-- Main features
++--  15KHz(TV) / 31Khz(VGA) : board switch(0)
++--  PAL(50Hz) / NTSC(60Hz) : board switch(1) and F12 key
++--  PS2 keyboard input with portA / portB joystick emulation : F11 key
++--  wm8731 sound output
++--  64Ko of board SRAM used
++--  External IEC bus available at gpio_1 (for drive 1541 or IEC/SD ...)
++--   activated by switch(5) (activated with no hardware will stuck IEC bus)
++--
++--  Internal emulated 1541 on raw SD card : D64 images start at 25x6KB boundaries
++--  Use hexidecimal disk editor such as HxD (www.mh-nexus.de) to build SD card.
++--  Cut D64 file and paste at 0x00000 (first), 0x40000 (second), 0x80000 (third),
++--  0xC0000(fourth), 0x100000(fith), 0x140000 (sixth) and so on.
++--  BE CAREFUL NOT WRITING ON YOUR OWN HARDDRIVE
++--
++-- Uses only one pll for 32MHz and 18MHz generation from 50MHz
++-- DE1 and DE0 nano Top level also available
++--     
++---------------------------------------------------------------------------------
++
++library IEEE;
++use IEEE.std_logic_1164.all;
++use IEEE.std_logic_unsigned.ALL;
++use IEEE.numeric_std.all;
++
++entity c64_mist is
++port(
++	-- Clocks
++   CLOCK_27        :       in      std_logic_vector(1 downto 0);
++
++   -- LED
++   LED             :       out     std_logic;
++
++   -- VGA
++   VGA_R           :       out     std_logic_vector(5 downto 0);
++   VGA_G           :       out     std_logic_vector(5 downto 0);
++   VGA_B           :       out     std_logic_vector(5 downto 0);
++   VGA_HS          :       out     std_logic;
++   VGA_VS          :       out     std_logic;
++
++        -- Serial
++--      UART_RXD        :       in      std_logic;
++--      UART_TXD        :       out     std_logic;
++
++   -- SDRAM
++   SDRAM_A         :       out             std_logic_vector(12 downto 0);
++   SDRAM_DQ                :       inout           std_logic_vector(15 downto 0);
++   SDRAM_DQML      :  out          std_logic;
++   SDRAM_DQMH      :  out          std_logic;
++   SDRAM_nWE       :  out          std_logic;
++   SDRAM_nCAS      :  out          std_logic;
++   SDRAM_nRAS      :  out          std_logic;
++   SDRAM_nCS       :  out          std_logic;
++   SDRAM_BA                :  out          std_logic_vector(1 downto 0);
++   SDRAM_CLK       :  out          std_logic;
++   SDRAM_CKE       :  out          std_logic;
++
++   -- AUDIO
++   AUDIO_L         : out std_logic;
++   AUDIO_R         : out std_logic;
++
++   -- SPI interface to io controller
++   SPI_SCK         : in std_logic;
++   SPI_DO          : inout std_logic;
++   SPI_DI          : in std_logic;
++   SPI_SS2         : in std_logic;
++   SPI_SS3         : in std_logic;
++   SPI_SS4         : in std_logic;
++   CONF_DATA0      : in std_logic
++);
++end c64_mist;
++
++architecture struct of c64_mist is
++
++component sdram is
++port (
++   -- interface to the MT48LC16M16 chip
++   sd_addr      :       out     std_logic_vector(12 downto 0);
++   sd_cs        :       out     std_logic;
++   sd_ba        :       out     std_logic_vector(1 downto 0);
++   sd_we        :       out     std_logic;
++   sd_ras       :       out     std_logic;
++   sd_cas       :       out     std_logic;
++
++   -- system interface
++   clk          :  in    std_logic;
++   init         :  in    std_logic;
++
++   -- cpu/chipset interface
++   addr         :  in    std_logic_vector(15 downto 0);
++   refresh      :  in    std_logic;
++   we           :  in    std_logic;
++   ce           :  in    std_logic
++);
++end component;
++
++---------
++-- User IO
++---------
++
++-- config string used by the io controller to fill the OSD
++constant CONF_STR : string := "C64;PRG;S1,D64;O2,Video standard,PAL,NTSC;O3,Joysticks,normal,swapped;O4,Scanlines,Off,On;T5,Reset";
++
++-- convert string to std_logic_vector to be given to user_io
++function to_slv(s: string) return std_logic_vector is 
++  constant ss: string(1 to s'length) := s; 
++  variable rval: std_logic_vector(1 to 8 * s'length); 
++  variable p: integer; 
++  variable c: integer; 
++begin 
++  for i in ss'range loop
++    p := 8 * i;
++    c := character'pos(ss(i));
++    rval(p - 7 to p) := std_logic_vector(to_unsigned(c,8)); 
++  end loop; 
++  return rval; 
++end function; 
++
++component user_io
++generic ( STRLEN : integer := 0 );
++port (
++      SPI_CLK, SPI_SS_IO, SPI_MOSI :in std_logic;
++      SPI_MISO : out std_logic;
++      conf_str : in std_logic_vector(8*STRLEN-1 downto 0);
++
++      switches : out std_logic_vector(1 downto 0);
++      buttons : out std_logic_vector(1 downto 0);
++      scandoubler_disable : out std_logic;
++
++      joystick_0 : out std_logic_vector(7 downto 0);
++      joystick_1 : out std_logic_vector(7 downto 0);
++      joystick_analog_0 : out std_logic_vector(15 downto 0);
++      joystick_analog_1 : out std_logic_vector(15 downto 0);
++      status : out std_logic_vector(7 downto 0);
++
++      sd_lba : in std_logic_vector(31 downto 0);
++      sd_rd : in std_logic;
++      sd_wr : in std_logic;
++      sd_ack : out std_logic;
++      sd_conf : in std_logic;
++      sd_sdhc : in std_logic;
++      sd_dout : out std_logic_vector(7 downto 0);
++      sd_dout_strobe : out std_logic;
++      sd_din : in std_logic_vector(7 downto 0);
++      sd_din_strobe : out std_logic;
++      sd_change : out std_logic;
++
++      ps2_clk : in std_logic;
++      ps2_kbd_clk : out std_logic;
++      ps2_kbd_data : out std_logic
++);
++end component user_io;
++
++---------
++-- sd card
++---------
++
++component sd_card
++   port (  io_lba       : out std_logic_vector(31 downto 0);
++           io_rd         : out std_logic;
++           io_wr         : out std_logic;
++           io_ack        : in std_logic;
++           io_sdhc       : out std_logic;
++           io_conf       : out std_logic;
++           io_din        : in std_logic_vector(7 downto 0);
++           io_din_strobe : in std_logic;
++           io_dout       : out std_logic_vector(7 downto 0);
++           io_dout_strobe : in std_logic;
++           allow_sdhc    : in std_logic;
++                          
++           sd_cs                :       in std_logic;
++           sd_sck       :       in std_logic;
++           sd_sdi       :       in std_logic;
++           sd_sdo       :       out std_logic
++  );
++  end component sd_card;
++
++---------
++-- OSD
++---------
++
++component osd
++  generic ( OSD_COLOR : integer );
++  port ( pclk         : in std_logic;
++      sck, sdi, ss    : in std_logic;
++		
++      -- VGA signals coming from core
++      red_in          : in std_logic_vector(5 downto 0);
++      green_in        : in std_logic_vector(5 downto 0);
++      blue_in         : in std_logic_vector(5 downto 0);
++      hs_in           : in std_logic;
++      vs_in           : in std_logic;
++
++      -- VGA signals going to video connector
++      red_out         : out std_logic_vector(5 downto 0);
++      green_out       : out std_logic_vector(5 downto 0);
++      blue_out        : out std_logic_vector(5 downto 0);
++      hs_out          : out std_logic;
++      vs_out          : out std_logic
++);
++end component osd;
++
++----------
++-- data_io
++----------
++
++component data_io
++  port ( 
++		-- io controller spi interface
++		sck:   in std_logic;
++      ss:    in std_logic;
++      sdi:   in std_logic;
++
++		downloading: out std_logic;
++		size: out std_logic_vector(15 downto 0);
++		
++      -- external ram interface
++      clk:  in std_logic;
++		wr:   out std_logic;
++		a:    out std_logic_vector(15 downto 0);
++		d:    out std_logic_vector(7 downto 0)
++);
++end component data_io;
++
++---------
++-- audio
++---------
++
++component sigma_delta_dac
++  port ( clk      : in std_logic;
++         ldatasum : in std_logic_vector(14 downto 0);
++         rdatasum : in std_logic_vector(14 downto 0);
++			left     : out std_logic;
++			right    : out std_logic
++);
++end component sigma_delta_dac;
++
++	signal pll_locked_in: std_logic_vector(1 downto 0);
++	signal pll_locked: std_logic;
++	signal clk_ntsc: std_logic;
++	signal c1541_reset: std_logic;
++	signal idle: std_logic;
++	signal ces: std_logic_vector(3 downto 0);
++	signal iec_cycle: std_logic;
++	signal iec_cycleD: std_logic;
++	signal buttons: std_logic_vector(1 downto 0);
++	
++	-- signals to connect "data_io" for direct PRG injection
++	signal ioctl_wr: std_logic;
++	signal ioctl_addr: std_logic_vector(15 downto 0);
++	signal ioctl_data: std_logic_vector(7 downto 0);
++	signal ioctl_ram_addr: std_logic_vector(15 downto 0);
++	signal ioctl_ram_data: std_logic_vector(7 downto 0);
++	signal ioctl_load_addr: std_logic_vector(15 downto 0);
++	signal ioctl_ram_wr: std_logic;
++	signal ioctl_iec_cycle_used: std_logic;
++	signal c64_addr: std_logic_vector(15 downto 0);
++	signal c64_data_in: std_logic_vector(7 downto 0);
++	signal c64_data_out: std_logic_vector(7 downto 0);
++	signal sdram_addr: std_logic_vector(15 downto 0);
++	signal sdram_data_out: std_logic_vector(7 downto 0);
++	
++	signal joyA : std_logic_vector(7 downto 0);
++	signal joyB : std_logic_vector(7 downto 0);
++	signal joyA_int : std_logic_vector(5 downto 0);
++	signal joyB_int : std_logic_vector(5 downto 0);
++	signal joyA_c64 : std_logic_vector(5 downto 0);
++	signal joyB_c64 : std_logic_vector(5 downto 0);
++	
++	signal c64_r : std_logic_vector(5 downto 0);
++	signal c64_g : std_logic_vector(5 downto 0);
++	signal c64_b : std_logic_vector(5 downto 0);
++	signal status : std_logic_vector(7 downto 0);
++	signal scandoubler_disable: std_logic;
++
++	signal sd_lba         : std_logic_vector(31 downto 0);
++	signal sd_rd          : std_logic;
++	signal sd_wr          : std_logic;
++	signal sd_ack         : std_logic;
++	signal sd_conf        : std_logic;
++	signal sd_sdhc        : std_logic;
++	signal sd_dout        : std_logic_vector(7 downto 0);
++	signal sd_dout_strobe : std_logic;
++	signal sd_din         : std_logic_vector(7 downto 0);
++	signal sd_din_strobe  : std_logic;
++	signal sd_change      : std_logic;
++	
++	-- these need to be redirected to the SDRAM
++	signal sdram_we : std_logic;
++	signal sdram_ce : std_logic;
++
++	signal ps2_clk : std_logic;
++	signal ps2_dat : std_logic;
++	
++	signal sd_dat  : std_logic;
++	signal sd_dat3 : std_logic;
++	signal sd_cmd  : std_logic;
++	signal sd_clk  : std_logic;
++	
++	signal c64_iec_atn_i  : std_logic;
++	signal c64_iec_clk_o  : std_logic;
++	signal c64_iec_data_o : std_logic;
++	signal c64_iec_atn_o  : std_logic;
++	signal c64_iec_data_i : std_logic;
++	signal c64_iec_clk_i  : std_logic;
++
++	signal c1541_iec_atn_i  : std_logic;
++	signal c1541_iec_clk_o  : std_logic;
++	signal c1541_iec_data_o : std_logic;
++	signal c1541_iec_atn_o  : std_logic;
++	signal c1541_iec_data_i : std_logic;
++	signal c1541_iec_clk_i  : std_logic;
++
++	signal tv15Khz_mode   : std_logic;
++	signal ntsc_init_mode : std_logic;
++
++	alias c64_addr_int : unsigned is unsigned(c64_addr);
++	alias c64_data_in_int   : unsigned is unsigned(c64_data_in);
++	alias c64_data_out_int   : unsigned is unsigned(c64_data_out);
++
++	signal clk64 : std_logic;
++	signal clk32 : std_logic;
++	signal clk32_fd : std_logic;
++	signal clk16 : std_logic;
++	signal clk18_fd : std_logic;
++	signal clk8 : std_logic;
++	signal osdclk : std_logic;
++	signal clkdiv : std_logic_vector(9 downto 0);
++
++	signal ram_ce : std_logic;
++	signal ram_we : std_logic;
++	signal r : unsigned(7 downto 0);
++	signal g : unsigned(7 downto 0);
++	signal b : unsigned(7 downto 0);
++	signal hsync : std_logic;
++	signal vsync : std_logic;
++	signal csync : std_logic;
++
++	signal audio_data : std_logic_vector(17 downto 0);
++	
++	signal reset_counter    : std_logic_vector(7 downto 0);
++	signal reset_n          : std_logic;
++	
++	signal disk_num         : std_logic_vector(7 downto 0);
++	signal led_disk         : std_logic_vector(7 downto 0);
++
++begin
++
++		-- 1541 activity led
++		LED <= not led_disk(6);
++
++		SDRAM_DQ(15 downto 8) <= (others => 'Z') when sdram_we='0' else (others => '0');
++		SDRAM_DQ(7 downto 0) <= (others => 'Z') when sdram_we='0' else sdram_data_out;
++		
++		-- read from sdram
++		c64_data_in <= SDRAM_DQ(7 downto 0);
++		
++		iec_cycle <= '1' when ces = "1011" else '0';
++		
++        -- User io
++        user_io_d : user_io
++        generic map (STRLEN => CONF_STR'length)
++        port map (
++                SPI_CLK => SPI_SCK,
++                SPI_SS_IO => CONF_DATA0,
++                SPI_MISO => SPI_DO,
++                SPI_MOSI => SPI_DI,
++
++					 joystick_0 => joyA,
++					 joystick_1 => joyB,
++					 
++                conf_str => to_slv(CONF_STR),
++
++                status => status,
++--                switches => switches,
++                buttons => buttons,
++                scandoubler_disable => scandoubler_disable,
++
++                sd_lba => sd_lba,
++                sd_rd => sd_rd,
++                sd_wr => sd_wr,
++                sd_ack => sd_ack,
++                sd_conf => sd_conf,
++                sd_sdhc => sd_sdhc,
++                sd_dout => sd_dout,
++                sd_dout_strobe => sd_dout_strobe,
++                sd_din => sd_din,
++                sd_din_strobe => sd_din_strobe,
++					 sd_change => sd_change,
++
++                ps2_clk => clkdiv(9),
++                ps2_kbd_clk => ps2_clk,
++                ps2_kbd_data => ps2_dat
++        );
++		  
++		-- rearrange joystick contacta for c64
++		joyA_int <= "0" & joyA(4) & joyA(0) & joyA(1) & joyA(2) & joyA(3);
++		joyB_int <= "0" & joyB(4) & joyB(0) & joyB(1) & joyB(2) & joyB(3);
++
++		-- swap joysticks if requested
++		joyA_c64 <= joyB_int when status(3)='1' else joyA_int;
++		joyB_c64 <= joyA_int when status(3)='1' else joyB_int;
++
++		  data_io_d : data_io
++        port map (
++				-- SPI interface
++				sck => SPI_SCK,
++				ss => SPI_SS2,
++				sdi => SPI_DI,
++			
++				-- ram interface
++				clk => clk32,
++				wr => ioctl_wr,
++				a => ioctl_addr,
++				d => ioctl_data
++			);
++
++	-- multiplex ram port between c64 core and data_io (io controller dma)
++	sdram_addr <= c64_addr when iec_cycle='0' else ioctl_ram_addr;
++	sdram_data_out <= c64_data_out when iec_cycle='0' else ioctl_ram_data;
++	-- ram_we and ce are active low
++	sdram_ce <= not ram_ce when iec_cycle='0' else ioctl_iec_cycle_used;
++	sdram_we <= not ram_we when iec_cycle='0' else ioctl_iec_cycle_used;
++
++   -- address
++	process(clk32)
++	begin
++		if falling_edge(clk32) then
++			iec_cycleD <= iec_cycle;
++
++			if(iec_cycle='1' and iec_cycleD='0' and ioctl_ram_wr='1') then
++				ioctl_ram_wr <= '0';
++				ioctl_iec_cycle_used <= '1';
++				ioctl_ram_addr <= std_logic_vector(unsigned(ioctl_load_addr) + unsigned(ioctl_addr) - 2);
++				ioctl_ram_data <= ioctl_data;
++			else 
++				if(iec_cycle='0') then
++					ioctl_iec_cycle_used <= '0';
++				end if;
++			end if;
++				
++		
++			if(ioctl_wr='1') then
++				if(ioctl_addr = 0) then
++					ioctl_load_addr(7 downto 0) <= ioctl_data;
++				elsif(ioctl_addr = 1) then
++					ioctl_load_addr(15 downto 8) <= ioctl_data;
++				else 
++					-- io controller sent a new byte. Store it until it can be
++					--	saved in RAM
++					ioctl_ram_wr <= '1';
++				end if;
++			end if;
++		end if;
++	end process;
++	  
++   sd_card_d: sd_card
++   port map
++   (
++         -- connection to io controller
++         io_lba => sd_lba,
++         io_rd  => sd_rd,
++         io_wr  => sd_wr,
++         io_ack => sd_ack,
++         io_conf => sd_conf,
++         io_sdhc => sd_sdhc,
++         io_din => sd_dout,
++         io_din_strobe => sd_dout_strobe,
++         io_dout => sd_din,
++         io_dout_strobe => sd_din_strobe,
++ 
++         allow_sdhc  => '1',   -- esxdos supports SDHC
++
++         -- connection to host
++         sd_cs  => sd_dat3,
++         sd_sck => sd_clk,
++         sd_sdi => sd_cmd,
++         sd_sdo => sd_dat
++    );
++
++	process(clk16)
++	begin
++		if rising_edge(clk16) then
++			clkdiv <= std_logic_vector(unsigned(clkdiv)+1);
++			clk8 <= not clk8;
++		end if;
++	end process;
++
++	process(clk32)
++	begin
++		if rising_edge(clk32) then
++			clk16 <= not clk16;
++		end if;
++	end process;
++
++	-- route video through osd
++	osdclk <= clk16 when tv15Khz_mode='0' else clk8;
++   osd_d : osd
++		generic map (OSD_COLOR => 4)
++   port map (
++		  
++      pclk => osdclk,
++      sck => SPI_SCK,
++      ss => SPI_SS3,
++      sdi => SPI_DI,
++
++      red_in => c64_r,
++      green_in => c64_g,
++      blue_in => c64_b,
++      hs_in => hsync,
++      vs_in => vsync,
++
++      red_out => VGA_R,
++      green_out => VGA_G,
++      blue_out => VGA_B
++   );
++		  
++	tv15Khz_mode <= scandoubler_disable;
++	ntsc_init_mode <= status(2);
++
++	pll_locked <= pll_locked_in(0) and pll_locked_in(1);
++	
++--	clk_32_18 : entity work.pll27_to_32_and_18
++--	port map(
++--		inclk0 => CLOCK_27(0),
++--		c0 => clk64,
++--		c1 => SDRAM_CLK,
++--		locked => pll_locked_in(0)
++--	);
++
++   -- pll to generate floppy clock
++	clk_c1541 : entity work.pll_32
++	port map(
++		inclk0 => CLOCK_27(0),
++		c0 => clk32_fd,
++		c1 => clk18_fd,
++		locked => pll_locked_in(1)
++	);
++ 
++   -- second pll to generate 64mhz clock and phase shifted ram clock	
++	clk_c64 : entity work.pll_27_to_64
++	port map(
++		inclk0 => CLOCK_27(0),
++		inclk1 => clk_ntsc,
++		clkswitch => ntsc_init_mode,
++		c0 => clk64,
++		c1 => SDRAM_CLK,
++		locked => pll_locked_in(0)
++	);
++
++	-- first pll used to generate base clock for ntsc mode
++	clk_ntsc_base : entity work.pll_pal_ntsc
++	port map(
++	inclk0 => CLOCK_27(0),
++		c0 => clk_ntsc
++	);
++
++	process(clk64)
++	begin
++		if rising_edge(clk64) then
++			clk32 <= not clk32;
++		end if;
++	end process;
++	
++	process(clk32)
++	begin
++		if rising_edge(clk32) then
++			reset_n <= '0';
++			-- Reset by:
++			-- Button at device, IO controller reboot, OSD or FPGA startup
++			if buttons(1)='1' or status(0)='1' or status(5)='1' or pll_locked = '0' then
++				reset_counter <= (others => '0');
++			else
++			  if reset_counter = X"FF" then
++					reset_n <= '1';
++				else
++					reset_counter <= std_logic_vector(unsigned(reset_counter)+1);
++				end if;
++			end if;
++		end if;
++	end process;
++
++	-- clock is always enabled and memory is never masked as we only
++	-- use one byte
++	SDRAM_CKE <= '1';
++	SDRAM_DQML <= '0';
++	SDRAM_DQMH <= '0';
++	
++	sdr: sdram port map(
++		sd_addr => SDRAM_A,
++		sd_ba => SDRAM_BA,
++		sd_cs => SDRAM_nCS,
++		sd_we => SDRAM_nWE,
++		sd_ras => SDRAM_nRAS,
++		sd_cas => SDRAM_nCAS,
++
++		clk => clk64,		
++		addr => sdram_addr,
++		init => not pll_locked,
++		we => sdram_we,
++		refresh => idle,       -- refresh ram in idle state
++		ce => sdram_ce
++	);
++	
++	-- decode audio
++   dac : sigma_delta_dac
++   port map (
++      clk => clk32,
++      ldatasum => audio_data(17 downto 3),
++      rdatasum => audio_data(17 downto 3),
++		left => AUDIO_L,
++		right => AUDIO_R
++	);
++	
++	fpga64 : entity work.fpga64_sid_iec
++	port map(
++		clk32 => clk32,
++		reset_n => reset_n,
++		kbd_clk => not ps2_clk,
++		kbd_dat => ps2_dat,
++		ramAddr => c64_addr_int,
++		ramDataOut => c64_data_out_int,
++		ramDataIn => c64_data_in_int,
++		ramCE => ram_ce,
++		ramWe => ram_we,
++		tv15Khz_mode => tv15Khz_mode,
++		ntscInitMode => ntsc_init_mode,
++		scanlines => status(4),
++		hsync => hsync,
++		vsync => vsync,
++		r => r,
++		g => g,
++		b => b,
++		game => '1',
++		exrom => '1',
++		irq_n => '1',
++		nmi_n => '1',
++		dma_n => '1',
++		ba => open,
++		joyA => unsigned(joyA_c64),
++		joyB => unsigned(joyB_c64),
++		serioclk => open,
++		ces => ces,
++		SIDclk => open,
++		still => open,
++		idle => idle,
++		audio_data => audio_data,
++		iec_data_o => c64_iec_data_o,
++		iec_atn_o  => c64_iec_atn_o,
++		iec_clk_o  => c64_iec_clk_o,
++		iec_data_i => not c64_iec_data_i,
++		iec_clk_i  => not c64_iec_clk_i,
++		iec_atn_i  => not c64_iec_atn_i,
++		disk_num => disk_num
++	);
++
++	-- 
++   c64_iec_atn_i  <= not ((not c64_iec_atn_o)  and (not c1541_iec_atn_o) );
++   c64_iec_data_i <= not ((not c64_iec_data_o) and (not c1541_iec_data_o));
++	c64_iec_clk_i  <= not ((not c64_iec_clk_o)  and (not c1541_iec_clk_o) );
++	
++	c1541_iec_atn_i  <= c64_iec_atn_i;
++	c1541_iec_data_i <= c64_iec_data_i;
++	c1541_iec_clk_i  <= c64_iec_clk_i;
++
++	-- 1541 reset is delayed by 2 seconds to give mist firmware enough
++	-- time to prepare the sd card
++	process(clk8, reset_n)
++		variable reset_cnt : integer range 0 to 16000000;
++	begin
++		if reset_n = '0' then
++			reset_cnt := 16000000;
++		elsif rising_edge(clk8) then
++			if reset_cnt /= 0 then
++				reset_cnt := reset_cnt - 1;
++			end if;
++		end if;
++
++		if reset_cnt = 0 then
++			c1541_reset <= '0';
++		else 
++			c1541_reset <= '1';
++		end if;
++	end process;
++	
++	c1541_sd : entity work.c1541_sd
++	port map
++	(
++    clk32 => clk32_fd,
++    clk18 => clk18_fd,
++	 reset => c1541_reset,
++
++	 disk_change => sd_change, 
++	disk_num => (others => '0'),   -- not seletable by f8 or similar
++
++	iec_atn_i  => c1541_iec_atn_i,
++	iec_data_i => c1541_iec_data_i,
++	iec_clk_i  => c1541_iec_clk_i,
++	
++	iec_atn_o  => c1541_iec_atn_o,
++	iec_data_o => c1541_iec_data_o,
++	iec_clk_o  => c1541_iec_clk_o,
++	
++	sd_dat  => sd_dat,
++	sd_dat3 => sd_dat3,
++	sd_cmd  => sd_cmd,
++	sd_clk  => sd_clk,
++
++	led => led_disk
++	);
++	
++	c64_r <= std_logic_vector(r(7 downto 2));
++	c64_g <= std_logic_vector(g(7 downto 2));
++	c64_b <= std_logic_vector(b(7 downto 2));
++
++	comp_sync : entity work.composite_sync
++	port map(
++		clk32 => clk32,
++		hsync => hsync,
++		vsync => vsync,
++		csync => csync
++	);
++
++   -- synchro composite/ synchro horizontale
++	VGA_HS <= csync when tv15Khz_mode = '1' else hsync;
++   -- commutation rapide / synchro verticale
++	VGA_VS <= '1'   when tv15Khz_mode = '1' else vsync;
++
++end struct;
+diff -Naur vhdl_c64_c1541_sd.orig/rtl_dar/fpga64_buslogic_roms_mmu.vhd vhdl_c64_c1541_sd.mist/rtl_dar/fpga64_buslogic_roms_mmu.vhd
+--- vhdl_c64_c1541_sd.orig/rtl_dar/fpga64_buslogic_roms_mmu.vhd	2015-05-06 08:40:28.000000000 +0200
++++ vhdl_c64_c1541_sd.mist/rtl_dar/fpga64_buslogic_roms_mmu.vhd	2015-07-20 12:39:18.839795946 +0200
+@@ -88,6 +88,7 @@
+ 	signal charData: unsigned(7 downto 0);
+ 	signal basicData: unsigned(7 downto 0);
+ 	signal kernalData: unsigned(7 downto 0);
++	alias kernalData_int : std_logic_vector is std_logic_vector(kernalData);
+ 
+ 	signal cs_CharReg : std_logic;
+ 	signal cs_BasicReg : std_logic;
+@@ -121,8 +122,21 @@
+ 			addr => cpuAddr(12 downto 0),
+ 			do => basicData
+ 		);
++		
++--    kernelrom : entity work.sprom
++--   generic map
++--    (
++--		init_file   => "../../roms/JiffyDOS_C64.hex",
++--      numwords_a  => 8192,
++--      widthad_a   => 13
++--    )
++--    port map
++--   (
++--      clock     => clk,
++--      address   => std_logic_vector(cpuAddr(12 downto 0)),
++--      q         => kernalData_int
++--    );
+ 
+---	kernelrom: entity work.rom_c64_Jiffy_kernel
+ 	kernelrom: entity work.rom_c64_kernal
+ 		port map (
+ 			clk => clk,
+diff -Naur vhdl_c64_c1541_sd.orig/rtl_dar/fpga64_keyboard_matrix_mark_mcdougall.vhd vhdl_c64_c1541_sd.mist/rtl_dar/fpga64_keyboard_matrix_mark_mcdougall.vhd
+--- vhdl_c64_c1541_sd.orig/rtl_dar/fpga64_keyboard_matrix_mark_mcdougall.vhd	2015-05-05 18:22:00.000000000 +0200
++++ vhdl_c64_c1541_sd.mist/rtl_dar/fpga64_keyboard_matrix_mark_mcdougall.vhd	2015-07-10 16:22:50.453236054 +0200
+@@ -387,10 +387,10 @@
+ 						if releaseFlag = '0' then
+ 							traceKey <= '1';
+ 						end if;
+-					when X"07" => -- F12
+-						if releaseFlag = '0' then
+-							videoKey <= '1';
+-						end if;
++--					when X"07" => -- F12
++--						if releaseFlag = '0' then
++--							videoKey <= '1';
++--						end if;
+ 					when X"09" => key_plus <= not releaseFlag;
+ 					when X"0A" => -- F8
+ 						if releaseFlag = '0' then
+diff -Naur vhdl_c64_c1541_sd.orig/rtl_dar/fpga64_sid_iec.vhd vhdl_c64_c1541_sd.mist/rtl_dar/fpga64_sid_iec.vhd
+--- vhdl_c64_c1541_sd.orig/rtl_dar/fpga64_sid_iec.vhd	2015-05-05 20:37:00.000000000 +0200
++++ vhdl_c64_c1541_sd.mist/rtl_dar/fpga64_sid_iec.vhd	2015-07-21 12:19:12.360844356 +0200
+@@ -36,7 +36,6 @@
+ 		resetCycles: integer := 4095
+ 	);
+ 	port(
+-		sysclk : in std_logic;
+ 		clk32 : in std_logic;
+ 		reset_n : in std_logic;
+ 
+@@ -46,14 +45,18 @@
+ 
+ 		-- external memory
+ 		ramAddr: out unsigned(15 downto 0);
+-		ramData: inout unsigned(7 downto 0);
++		ramDataIn: in unsigned(7 downto 0);
++		ramDataOut: out unsigned(7 downto 0);
+ 
+ 		ramCE: out std_logic;
+ 		ramWe: out std_logic;
+ 
++		idle: out std_logic;
++
+ 		-- VGA/SCART interface
+ 		tv15Khz_mode : in std_logic;
+ 		ntscInitMode : in std_logic;
++		scanlines : in std_logic;
+ 		hsync: out std_logic;
+ 		vsync: out std_logic;
+ 		r : out unsigned(7 downto 0);
+@@ -67,8 +70,6 @@
+ 		nmi_n : inout std_logic;
+ 		dma_n : in std_logic;
+ 		ba : out std_logic;
+-		dot_clk: out std_logic;
+-		cpu_clk: out std_logic;
+ 
+ 		-- joystick interface
+ 		joyA: in unsigned(5 downto 0);
+@@ -114,6 +115,23 @@
+ 		CYCLE_CPUC, CYCLE_CPUD, CYCLE_CPUE, CYCLE_CPUF
+ 	);
+ 
++	component scandoubler is
++	port (
++		clk	: in std_logic;  -- 32 MHz
++
++		-- c64 input
++		enable_in : in std_logic;  -- true on rising clock edge
++		video_in : in std_logic_vector(3 downto 0);
++		vsync_in : in std_logic;
++		hsync_in : in std_logic;
++		
++		-- vga output
++		video_out : out std_logic_vector(3 downto 0);
++		vsync_out : out std_logic;
++		hsync_out : out std_logic
++	);
++	end component;
++	
+ 	signal sysCycle : sysCycleDef := sysCycleDef'low;
+ 	signal sysCycleCnt : unsigned(2 downto 0);
+ 	signal phi0_cpu : std_logic;
+@@ -125,9 +143,6 @@
+ 	signal cycleRestartReg2 : std_logic;
+ 	signal cycleRestartEdge : std_logic;
+ 
+-	signal dotClkReg : std_logic;
+-	signal dotClkCnt : integer range 0 to 7;
+-
+ 	signal baLoc: std_logic;
+ 	signal irqLoc: std_logic;
+ 	signal nmiLoc: std_logic;
+@@ -220,8 +235,6 @@
+ 	signal trace2Key : std_logic;
+ 
+ 	-- video
+-	signal cyclesPerLine : unsigned(11 downto 0);
+-	signal scanConverterFaster : std_logic;
+ 	signal ColorIndex : unsigned(3 downto 0);
+ 	
+ 	signal vicColorIndex : unsigned(3 downto 0);
+@@ -229,25 +242,20 @@
+ 	signal vicVSync : std_logic;
+ 
+ 	signal vgaColorIndex : unsigned(3 downto 0);
++	alias vgaColorIndex_int : std_logic_vector is std_logic_vector(vgaColorIndex);
+ 	signal vgaR : unsigned(7 downto 0);
+ 	signal vgaG : unsigned(7 downto 0);
+ 	signal vgaB : unsigned(7 downto 0);
+ 	signal vgaVSync : std_logic;
+ 	signal vgaHSync : std_logic;
+-	signal vgaDebug : std_logic;
+-	signal vgaDebugDim : std_logic;
+ 	signal debuggerOn : std_logic;
+ 	signal traceStep : std_logic;
+-
++   signal scanline : std_logic;
++	
+ 	-- config
+ 	signal videoKey : std_logic;
+ 	signal ntscMode : std_logic;
+ 	signal ntscModeInvert : std_logic := '0' ;
+-
+-	signal videoConfigVideo : std_logic;
+-	signal videoConfigDim : std_logic;
+-	signal videoConfigShow : std_logic;
+-	signal videoConfigTimeout : unsigned(19 downto 0);
+ 	
+ begin
+ -- -----------------------------------------------------------------------
+@@ -255,6 +263,13 @@
+ -- -----------------------------------------------------------------------
+ 	ba <= baLoc;
+ 
++	idle <= '1' when
++		(sysCycle = CYCLE_IDLE0) or (sysCycle = CYCLE_IDLE1) or
++		(sysCycle = CYCLE_IDLE2) or (sysCycle = CYCLE_IDLE3) or
++		(sysCycle = CYCLE_IDLE4) or (sysCycle = CYCLE_IDLE5) or
++		(sysCycle = CYCLE_IDLE6) or (sysCycle = CYCLE_IDLE7) or
++		(sysCycle = CYCLE_IDLE8) else '0';
++	
+ -- -----------------------------------------------------------------------
+ -- System state machine, controls bus accesses
+ -- and triggers enables of other components
+@@ -262,19 +277,22 @@
+ 	process(clk32)
+ 	begin
+ 		if rising_edge(clk32) then
+-			cycleRestart <= '0';
++--			cycleRestart <= '0';
+ 			if sysCycle = sysCycleDef'high then
+ 				sysCycle <= sysCycleDef'low;
+-				sysCycleCnt <= sysCycleCnt + 1;
+-				cycleRestart <= '1';
+-			elsif sysCycle = CYCLE_CPU7
+-			and ntscMode = '1' then
+-				sysCycle <= CYCLE_CPU8;		-- NTSC 33 Cycles
+-			elsif sysCycle = CYCLE_CPUP
+-			and sysCycleCnt /= "001"
+-			and sysCycleCnt /= "100"
+-			and sysCycleCnt /= "111" then	-- PAL 34 + 3/8
+-				sysCycle <= CYCLE_CPU8;
++	elsif sysCycle = CYCLE_CPU6 then
++			sysCycle <= CYCLE_CPU8;
++
++--				sysCycleCnt <= sysCycleCnt + 1;
++--				cycleRestart <= '1';
++--			elsif sysCycle = CYCLE_CPU7
++--			and ntscMode = '1' then
++--				sysCycle <= CYCLE_CPU8;		-- NTSC 33 Cycles
++--			elsif sysCycle = CYCLE_CPUP
++--			and sysCycleCnt /= "001"       -- TH 34 + 1/4
++--			and sysCycleCnt /= "100"
++--			and sysCycleCnt /= "111" then	-- PAL 34 + 3/8
++--				sysCycle <= CYCLE_CPU8;
+ 			else
+ 				sysCycle <= sysCycleDef'succ(sysCycle);
+ 			end if;
+@@ -351,61 +369,22 @@
+ 		end if;
+ 	end process;
+ 	
+-	
+--- -----------------------------------------------------------------------
+--- Cartridge clocks
+--- -----------------------------------------------------------------------
+-	process(sysclk)
+-	begin
+-		if rising_edge(sysclk) then
+-			cycleRestartReg1 <= cycleRestart;
+-			cycleRestartReg2 <= cycleRestartReg1;
+-			cycleRestartEdge <= cycleRestartReg2;
+-
+-			dotClkCnt <= dotClkCnt + 1;
+-			if dotClkCnt = 6 then
+-				dotClkReg <= not dotClkReg;
+-				dotClkCnt <= 0;
+-				if ntscMode = '1'
+-				or dotClkReg = '1' then
+-					dotClkCnt <= 1;
+-				end if;
+-			end if;
+-			if cycleRestartReg2 = '1'
+-			and cycleRestartEdge = '0' then
+-				dotClkReg <= '1';
+-				dotClkCnt <= 0;
+-			end if;
+-		end if;
+-	end process;
+-	dot_clk <= dotClkReg;
+-	cpu_clk <= phi0_cpu;
+-
+ -- -----------------------------------------------------------------------
+ -- Scan-converter and VGA output
+ -- -----------------------------------------------------------------------
+-	myScanConverter: entity work.fpga64_cone_scanconverter
+-		generic map (
+-			videoWidth => 4
+-		)
+-		port map (
++	scandoubler_d: scandoubler 
++   port map
++   (
+ 			clk => clk32,
+-			cyclesPerLine => cyclesPerLine,
+-			faster => scanConverterFaster,
+-			hSyncPolarity => '0',
+-			vSyncPolarity => '0',
+ 			enable_in => enablePixel,
+-			video_in => vicColorIndex,
++			video_in => std_logic_vector(vicColorIndex),
+ 			hsync_in => vicHSync,
+ 			vsync_in => vicVSync,
+-			video_out => vgaColorIndex,
++			video_out => vgaColorIndex_int,
+ 			hsync_out => vgaHSync,
+ 			vsync_out => vgaVSync
+-		);
+-	
+-	cyclesPerLine <= to_unsigned(1080, 12) when ntscMode = '0' else to_unsigned(1088,12);
+-	scanConverterFaster <= not ntscMode;
+-	
++	);
++		
+ 	ColorIndex <= vicColorIndex when tv15Khz_mode = '1' else vgaColorIndex;
+ 
+ 	c64colors: entity work.fpga64_rgbcolor
+@@ -416,24 +395,31 @@
+ 			b => vgaB
+ 		);
+ 
++	-- toggle odd/even vga lines
++	process(vgaVSync, vgaHSync)
++	begin
++		if(vgaVSync = '0') then
++			scanline <= '0';
++		else
++			if rising_edge(vgaHSync) then
++				scanline <= not scanline;
++			end if;
++		end if;
++	end process;
++			
+ 	process(clk32)
+ 	begin
+ 		if rising_edge(clk32) then
+ 			r <= vgaR;
+ 			g <= vgaG;
+ 			b <= vgaB;
+---			if videoConfigShow = '1' and videoConfigDim = '1' then
+---			if videoConfigDim = '1' then
+---				r <= videoConfigVideo & vgaR(7 downto 1);
+---				g <= videoConfigVideo & vgaG(7 downto 1);
+---				b <= videoConfigVideo & vgaB(7 downto 1);
+---			end if;
+---			if vgaDebugDim = '1' then
+---				r <= vgaDebug & vgaR(7 downto 1);
+---				g <= vgaDebug & vgaG(7 downto 1);
+---				b <= vgaDebug & vgaB(7 downto 1);
+---			end if;				
+-		end if;
++			
++			if((scanline = '1') and (tv15Khz_mode = '0') and (scanlines='1')) then
++				r <= "0" & vgaR(7 downto 1);
++				g <= "0" & vgaG(7 downto 1);
++				b <= "0" & vgaB(7 downto 1);
++			end if;
++	   end if;
+ 	end process;
+ 
+ 	hSync <= not vicHSync when tv15Khz_mode = '1' else vgaHSync;
+@@ -578,13 +564,13 @@
+ 		if rising_edge(clk32) then
+ 			enablePixel <= '0';
+ 			if sysCycle = CYCLE_VIC2
+-			or sysCycle = CYCLE_IDLE2
+-			or sysCycle = CYCLE_IDLE6
++			or sysCycle = CYCLE_IDLE3      -- IDLE2
++			or sysCycle = CYCLE_IDLE7      -- IDLE6
+ 			or sysCycle = CYCLE_IEC2
+ 			or sysCycle = CYCLE_CPU2
+ 			or sysCycle = CYCLE_CPU6
+-			or sysCycle = CYCLE_CPUA
+-			or sysCycle = CYCLE_CPUE then
++			or sysCycle = CYCLE_CPUB       -- CPUA
++  			or sysCycle = CYCLE_CPUF then  -- CPUE
+ 				enablePixel <= '1';
+ 			end if;
+ 		end if;
+@@ -752,7 +738,7 @@
+ 	end process;
+ 	
+ 	-- Video modes
+-ntscMode <= ntscInitMode xor ntscModeInvert;
++   ntscMode <= ntscInitMode xor ntscModeInvert;
+ 	process(clk32)
+ 	begin
+ 		if rising_edge(clk32) then
+@@ -761,38 +747,6 @@
+ 			end if;
+ 		end if;
+ 	end process;
+-	
+-	-- Video config display (disabled)
+---	process(clk32)
+---	begin
+---		if rising_edge(clk32) then
+---			if videoKey = '1' then
+---				videoConfigTimeout <= (others => '1');
+---			end if;
+---			if endOfCycle = '1' then
+---				videoConfigShow <= '0';
+---				if videoConfigTimeout /= 0 then
+---					videoConfigTimeout <= videoConfigTimeout - 1;
+---					videoConfigShow <= '1';
+---				end if;
+---			end if;				
+---		end if;
+---	end process;
+-
+-	displayVideoConfig: entity work.fpga64_hexy_vmode
+-		generic map (
+-			xoffset => 200
+-		)
+-		port map (
+-			clk => clk32,
+-			vSync => vgaVSync,
+-			hSync => vgaHSync,
+-			video => videoConfigVideo,
+-			dim => videoConfigDim,
+-			ntscMode => ntscMode,
+-			hSyncPolarity => '0',
+-			vSyncPolarity => '0'
+-		);
+ 
+ 	mainMemoryBus: process(sysCycle, cpuDo, cs_ram, phi0_cpu, phi0_vic, cpuWe, systemWe, systemAddr)
+ 	begin
+@@ -801,36 +755,27 @@
+ 			ramAddr <= systemAddr;
+ 		end if;
+ 
+-		ramData <= (others => 'Z');
+ 		if (phi0_cpu = '1') and (cpuWe = '1') then
+-			ramData <= cpuDo;
+---			if (cs_sid = '1') and
+---			(sysCycle = CYCLE_CPU8 or
+---			sysCycle = CYCLE_CPU9 or
+---			sysCycle = CYCLE_CPUA or
+---			sysCycle = CYCLE_CPUB or
+---			sysCycle = CYCLE_CPUC or
+---			sysCycle = CYCLE_CPUD or
+---			sysCycle = CYCLE_CPUE or
+---			sysCycle = CYCLE_CPUF) then
+---				for i in 0 to 7 loop
+---					ramdata(i) <= 'Z';
+---					if cpuDo(i) = '0' then
+---						ramData(i) <= '0';
+---					end if;
+---				end loop;
+---			end if;
++			ramDataOut <= cpuDo;
+ 		elsif sysCycle >= CYCLE_IEC0 and sysCycle <= CYCLE_IEC3 then --IEC write
+-			ramdata(5)<= cia2_pao(5);
++			ramdataout(5)<= cia2_pao(5);
+ 			iec_data_o <= cia2_pao(5);
+-			ramdata(4)<= cia2_pao(4);
++			ramdataout(4)<= cia2_pao(4);
+ 			iec_clk_o <= cia2_pao(4);
+-			ramdata(3)<= cia2_pao(3);
++			ramdataout(3)<= cia2_pao(3);
+ 			iec_atn_o <= cia2_pao(3);
+-			ramdata(2)<= '0';   --lptstrobe
++			ramdataout(2)<= '0';   --lptstrobe
+ 		end if;
+ 
+ 		ramCE <= '1';
++
++		-- TH no ram access during idle phase
++		if sysCycle /= CYCLE_IDLE0 and sysCycle /= CYCLE_IDLE1 and sysCycle /= CYCLE_IDLE2 and 
++		   sysCycle /= CYCLE_IDLE3 and sysCycle /= CYCLE_IDLE4 and sysCycle /= CYCLE_IDLE5 and
++		   sysCycle /= CYCLE_IDLE6 and sysCycle /= CYCLE_IDLE7 and sysCycle /= CYCLE_IDLE8 and
++		   sysCycle /= CYCLE_IEC0 and sysCycle /= CYCLE_IEC1 and sysCycle /= CYCLE_IEC2 and 
++		   sysCycle /= CYCLE_IEC3 then
++			
+ 		ramWe <= not systemWe;
+ 		if sysCycle = CYCLE_IEC2 or sysCycle = CYCLE_IEC3 then
+ 			ramWe <= '0';
+@@ -839,6 +784,7 @@
+ 				ramCE <= '0';
+ 			end if;
+ 		end if;
++		end if;
+ 	end process;
+ 	
+ 	process(clk32)
+@@ -846,7 +792,7 @@
+ 		if rising_edge(clk32) then
+ 			if sysCycle = CYCLE_CPUD
+ 			or sysCycle = CYCLE_VIC2 then
+-				ramDataReg <= unsigned(ramData);
++				ramDataReg <= unsigned(ramDataIn);
+ 			end if;
+ 		end if;
+ 	end process;
+@@ -890,17 +836,6 @@
+ 		end if;
+ 	end process;
+ 
+---	debugBasicScreen: process(systemWe, cpuHasBus, systemData, systemAddr)
+---	begin
+---		if (pulseWrRam = '1') and (cpuHasBus = '1') and (systemAddr(15 downto 11)="00000") then
+---			debugWe <= '1';
+---		else
+---			debugWe <= '0';
+---		end if;
+---		debugAddr <= to_integer(systemAddr(10 downto 0));
+---		debugData <= systemData;
+---	end process;
+-
+ 	process(clk32)
+ 	begin
+ 		if rising_edge(clk32) then
+@@ -919,29 +854,6 @@
+ 		end if;
+ 	end process;
+ 
+-	
+-	hexyInstance : entity work.fpga64_hexy
+-		generic map (
+-			xoffset => 200,
+-			yoffset => 110
+-		)
+-		port map (
+-			clk => clk32,
+-			vSync => vgaVSync,
+-			hSync => vgaHSync,
+-			video => vgaDebug,
+-			dim => vgaDebugDim,
+-			
+-			spyAddr => cpuAddr,
+-			spyPc => cpuDebugPc,
+-			spyDo => cpuDo,
+-			spyOpcode => cpuDebugOpcode,
+-			spyA => cpuDebugA,
+-			spyX => cpuDebugX,
+-			spyY => cpuDebugY,
+-			spyS => cpuDebugS
+-		);
+-
+ 	cia2_pai(5 downto 0) <= cia2_pao(5 downto 0);
+ 	cia2_pbi(7 downto 0) <= cia2_pbo;
+ 
+diff -Naur vhdl_c64_c1541_sd.orig/rtl_dar/qmegawiz_errors_log.txt vhdl_c64_c1541_sd.mist/rtl_dar/qmegawiz_errors_log.txt
+--- vhdl_c64_c1541_sd.orig/rtl_dar/qmegawiz_errors_log.txt	1970-01-01 01:00:00.000000000 +0100
++++ vhdl_c64_c1541_sd.mist/rtl_dar/qmegawiz_errors_log.txt	2015-07-09 10:07:32.813573346 +0200
+@@ -0,0 +1,19 @@
++
++
++/home/tharbaum/tmp/mist/hdl/c64/vhdl_c64_c1541_sd/rtl_dar/pll27_to_32_and_18.vhd
++
++Jul 09 10AM:06:38>: Error in CNX file format.
++
++Error messages are listed in file
++/home/tharbaum/tmp/mist/hdl/c64/vhdl_c64_c1541_sd/rtl_dar/pll27_to_32_and_18.cnxerr.
++
++Can't create the custom megafunction variation file(s)
++
++/home/tharbaum/tmp/mist/hdl/c64/vhdl_c64_c1541_sd/rtl_dar/pll27_to_32_and_18.vhd
++
++Jul 09 10AM:07:32>: Error in CNX file format.
++
++Error messages are listed in file
++/home/tharbaum/tmp/mist/hdl/c64/vhdl_c64_c1541_sd/rtl_dar/pll27_to_32_and_18.cnxerr.
++
++Can't create the custom megafunction variation file(s)
+\ Kein Zeilenumbruch am Dateiende.
+diff -Naur vhdl_c64_c1541_sd.orig/rtl_dar/spi_controller.vhd vhdl_c64_c1541_sd.mist/rtl_dar/spi_controller.vhd
+--- vhdl_c64_c1541_sd.orig/rtl_dar/spi_controller.vhd	2015-05-02 17:57:00.000000000 +0200
++++ vhdl_c64_c1541_sd.mist/rtl_dar/spi_controller.vhd	2015-07-15 09:49:09.109528207 +0200
+@@ -16,10 +16,10 @@
+ 
+ entity spi_controller is
+   generic (
+---    BLOCK_SIZE     : natural := 512;
+---    BLOCK_BITS     : natural := 9;
+-    BLOCK_SIZE     : natural := 256;
+-    BLOCK_BITS     : natural := 8;
++    BLOCK_SIZE     : natural := 512;
++    BLOCK_BITS     : natural := 9;
++--    BLOCK_SIZE     : natural := 256;
++--   BLOCK_BITS     : natural := 8;
+ 		
+     TRACK_SIZE     : natural := 16#1A00#
+   );
+@@ -34,6 +34,7 @@
+     ram_write_addr : out unsigned(12 downto 0);
+     ram_di         : out unsigned(7 downto 0);
+     ram_we         : out std_logic;
++    change         : in  std_logic;             -- Force reload as disk may have changed
+     track          : in  unsigned(5 downto 0);  -- Track number (0-34)
+     image          : in  unsigned(9 downto 0);  -- Which disk image to read
+ 		busy           : out std_logic;
+@@ -103,8 +104,21 @@
+ 		414,433,452,471,490,508,526,544,562,580,598,615,632,649,666,683,700,717,734,751);
+ 	
+ 	signal start_sector : std_logic_vector(9 downto 0);
+-	
++	signal reload : std_logic;
+ begin
++
++	-- set reload flag whenever "change" rises and clear it once the	
++	-- state machine starts reloading the track
++	process(change, state)
++	begin
++	   if(state = READ_TRACK) then
++			reload <= '0';
++		else
++			if rising_edge(change) then
++				reload <= '1';
++			end if;
++		end if;
++	end process;
+ 
+   --ram_write_addr <= write_addr;
+ 
+@@ -313,7 +327,7 @@
+                 high_capacity <= false;
+               end if;
+               command <= CMD16;
+-              argument <= std_logic_vector(to_unsigned(BLOCK_SIZE, 32));
++              argument <= std_logic_vector(to_unsigned(BLOCK_SIZE, 32));
+               return_state <= CHECK_SET_BLOCKLEN;
+               state <= WAIT_NRC;
+             else
+@@ -341,7 +355,7 @@
+           -- Idle state where we sit waiting for user image/track requests ----
+           when IDLE =>
+ 						dbg_state <= x"01";
+-            if track /= current_track or image /= current_image then
++            if reload='1' or track /= current_track or image /= current_image then
+ 							----------------------------------------------------------
+               -- Compute the LBA (Logical Block Address) from the given
+               -- image/track numbers.
+@@ -371,12 +385,24 @@
+ 							lba := (X"0" & image & 
+ 											to_unsigned(start_sector_array(to_integer(unsigned(track))),10) &
+ 											X"00");
+-										 
+-              if high_capacity then
++										 
++				  -- check if track starts at 512 byte boundary ...
++				  if to_unsigned(start_sector_array(to_integer(unsigned(track))),10)(0)='1' then
++						-- ... no it doesn't. We thus start writing before the begin of the 
++						-- buffer so the first 256 bytes are effectively skipped
++						write_addr <= "1111100000000";
++					else
++						-- ... yes it does. We can just load the track to memory
++						write_addr <= (others => '0');
++				  end if;
++
++              if high_capacity then
++					-- TODO: This probably doesn't work in the same process where lba is set
++				  
+                 -- For SDHC, blocks are addressed by blocks, not bytes
+                 lba := lba srl BLOCK_BITS;
+-              end if;
+-              write_addr <= (others => '0');
++              end if;
++--              write_addr <= (others => '0');
+               CS_N <= '0';
+               state <= READ_TRACK;
+               current_track <= track;
+@@ -391,7 +417,7 @@
+           -- Read in a whole track into buffer memory -------------------------
+           when READ_TRACK =>
+ 						dbg_state <= x"02";
+-            if write_addr = TRACK_SIZE then
++            if write_addr = TRACK_SIZE or write_addr = (TRACK_SIZE-256) then
+               state <= IDLE;
+             else
+               command <= CMD17;
