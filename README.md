@@ -58,4 +58,4 @@ Start with these; more pages and details are available inside the wiki.
   * [How to compile the cores](https://github.com/mist-devel/mist-board/wiki/HowToCompileTheCore)
   * [How to port other FPGA projects to the MIST](https://github.com/mist-devel/mist-board/wiki/PortingCores)
 
-![http://mist-board.googlecode.com/svn/wiki/mist_board.jpg](http://mist-board.googlecode.com/svn/wiki/mist_board.jpg)
+![http://mist-board.googlecode.com/svn/wiki/mist_board.jpg](https://raw.githubusercontent.com/wiki/mist-devel/mist-board/mist_board.jpg)
