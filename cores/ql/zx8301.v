@@ -80,17 +80,9 @@ end
 
 // PAL video parameters					
 parameter H   = 512;        // width of visible area
-//parameter PAL_HFP = 112;    // unused time before hsync
-//parameter PAL_HSW = 96;     // width of hsync
-//parameter PAL_HBP = 176;    // unused time after hsync
-//// PAL total: 896
-//parameter NTSC_HFP = 112;   // unused time before hsync
-//parameter NTSC_HSW = 88;    // width of hsync
-//parameter NTSC_HBP = 176;   // unused time after hsync
-//// NTSC total: 888
-parameter PAL_HFP = 34;     // unused time before hsync
-parameter PAL_HSW = 72;     // width of hsync
-parameter PAL_HBP = 54;     // unused time after hsync
+parameter PAL_HFP  = 24;    // unused time before hsync
+parameter PAL_HSW  = 72;    // width of hsync
+parameter PAL_HBP  = 64;    // unused time after hsync
 // PAL total: 672
 parameter NTSC_HFP = 34;    // unused time before hsync
 parameter NTSC_HSW = 64;    // width of hsync
@@ -98,9 +90,9 @@ parameter NTSC_HBP = 54;    // unused time after hsync
 // NTSC total: 664
    
 parameter V   = 256;        // height of visible area
-parameter PAL_VFP = 15;     // unused time before vsync
+parameter PAL_VFP = 25;     // unused time before vsync
 parameter PAL_VSW =  6;     // width of vsync
-parameter PAL_VBP = 35;     // unused time after vsync
+parameter PAL_VBP = 25;     // unused time after vsync
 // PAL total: 312
 parameter NTSC_VFP = 2;     // unused time before vsync
 parameter NTSC_VSW = 2;     // width of vsync

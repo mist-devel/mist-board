@@ -21,111 +21,97 @@
 //
 
 module ipc (
-	input 		reset,
-	input 		clk_bus,
+	input 		 reset,
+	input        clk_sys,
 
-	input 		ipc_bit_strobe,
-	input 		ipc_bit,
-	output reg 	ipc_reply_bit,
-	output 		ipc_busy,
+	// synchronous serial connection
+	output       comctrl,
+	input        comdata_in,
+	output       comdata_out,
+
+	output       audio,
+	output [1:0] ipl,
+
+	input [4:0]  js0,
+	input [4:0]  js1,
 	
-	input 		ps2_kbd_clk,
-	input 		ps2_kbd_data
+	input 		 ps2_kbd_clk,
+	input 		 ps2_kbd_data
 );
-
-assign ipc_busy = 1'b0;
 
 // ---------------------------------------------------------------------------------
 // -------------------------------------- KBD --------------------------------------
 // ---------------------------------------------------------------------------------
 
-reg key_strobe;
-wire [8:0] key;
-wire key_available, key_pressed;
+wire [63:0] kbd_matrix;
 
 keyboard keyboard (
         .reset    ( reset        ),
-        .clk      ( clk_bus      ),
+        .clk      ( clk11        ),
 
         .ps2_clk  ( ps2_kbd_clk  ),
         .ps2_data ( ps2_kbd_data ),
 
-		  .keycode_available ( key_available ),
-		  .keycode           ( key           ),
-		  .strobe            ( key_strobe    ),
-		  .pressed           ( key_pressed   )
+		  .js0      ( js0          ),
+		  .js1      ( js1          ),
+		  
+		  .matrix   ( kbd_matrix   )
 );
 
 // ---------------------------------------------------------------------------------
-// ----------------------------------- simple IPC ----------------------------------
+// ----------------------------------- 8049 clock ----------------------------------
 // ---------------------------------------------------------------------------------
 
-reg [15:0] ipc_reply;
-reg [3:0] ipc_unexpected /* synthesis noprune */;
-reg [7:0] ipc_reply_len;
-reg [3:0] ipc_cmd;
-reg [31:0] ipc_len /* synthesis noprune */;
+wire clk11;
+wire pll_locked;
+pll_ipc pll_ipc (
+	 .inclk0 ( clk_sys    ),
+	 .locked ( pll_locked ),
+	 .c0     ( clk11      )           // 11 MHz
+);
 
-always @(posedge ipc_bit_strobe or posedge reset) begin
-	if(reset) begin
-		ipc_len <= 32'd0;
-		ipc_reply_len <= 8'h00;
-		ipc_reply <= 8'h00; 
-		ipc_reply_bit <= 1'b0; 
-		ipc_unexpected <= 4'h0;
-		key_strobe <= 1'b0;
-	end else begin
-		key_strobe <= 1'b0;
+// make sure IPC clock is stable before it starts
+wire ipc_reset = reset || !pll_locked;
 
-		if(ipc_reply_len == 0) begin
-			ipc_cmd <= { ipc_cmd[2:0], ipc_bit};
-			ipc_len <= ipc_len + 32'd1;
-		
-			// last bit of a 4 bit command being written?
-			if(ipc_len[1:0] == 2'b11) begin
-				case({ ipc_cmd[2:0], ipc_bit }) 
-					// request status 
-					1: begin	
-						// send 8 bit ipc status reply, bit 0 -> 1=kbd data available
-						ipc_reply_len <= 8'd8;
-						ipc_reply_bit <= 1'b0;
-						ipc_reply <= { 7'b0000000, key_available, 8'h00 };
-					end
-					
-					// keyboard
-					// nibble: PNNN   N = chars in buffer, P = last key still pressed
-					// N*(
-					//   nibble: ctrl/alt/shift
-					//   byte:   keycode
-					// )
-					8: begin
-						if(key_available) begin
-							// currently we can only report one key at once ...
-							ipc_reply_len <= 8'd16;
-							ipc_reply_bit <= 1'b0;
-							ipc_reply <= { 1'b0, 3'd1, 1'b0, key[8:6], 2'b00, key[5:0]};
-							key_strobe <= 1'b1;
-						end else begin
-							// no key to report
-							ipc_reply_len <= 8'd4;
-							ipc_reply_bit <= 1'b0;
-							ipc_reply <= { 1'b0, 3'd0, 12'h000};
-						end
-					end
-					
-					default: begin
-						if(ipc_unexpected == 0)
-							ipc_unexpected <= { ipc_cmd[2:0], ipc_bit };
-					end
-				endcase;
-			end
-		end else begin
-			// sending reply: shift it out through the ipc_reply_bit register
-			ipc_reply_len <= ipc_reply_len - 8'd1;
-			ipc_reply_bit <= ipc_reply[15];
-			ipc_reply <= { ipc_reply[14:0], 1'b0 }; 
-		end
-	end
-end
+// ---------------------------------------------------------------------------------
+// -------------------------------------- 8049 -------------------------------------
+// ---------------------------------------------------------------------------------
+
+assign audio = t8049_p2_o[1];
+assign ipl = t8049_p2_o[3:2];
+
+wire [7:0] t8049_p1_o;
+wire [7:0] t8049_db_i;
+
+wire [7:0] t8049_p2_o;
+wire [7:0] t8049_p2_i = { comdata_out && comdata_in, 7'b0000000 };
+
+assign comdata_out = t8049_p2_o[7];
+
+t8049_notri #(0) t8049 (
+	.xtal_i    ( clk11      ),
+   .xtal_en_i ( 1'b1       ),
+   .reset_n_i ( !ipc_reset ),
+	.t0_i      ( 1'b0       ),
+   .t1_i      ( 1'b0       ),
+   .int_n_i   ( 1'b1       ),
+   .wr_n_o    ( comctrl    ),
+   .ea_i      ( 1'b0       ),
+   .db_i      ( t8049_db_i ),
+   .p1_i      ( 8'h00      ),
+   .p1_o      ( t8049_p1_o ),
+   .p2_i      ( t8049_p2_i ),
+   .p2_o      ( t8049_p2_o )
+);
+
+assign t8049_db_i = 
+	(t8049_p1_o[0]?kbd_matrix[ 7: 0]:8'h00)|
+	(t8049_p1_o[1]?kbd_matrix[15: 8]:8'h00)|
+	(t8049_p1_o[2]?kbd_matrix[23:16]:8'h00)|
+	(t8049_p1_o[3]?kbd_matrix[31:24]:8'h00)|
+	(t8049_p1_o[4]?kbd_matrix[39:32]:8'h00)|
+	(t8049_p1_o[5]?kbd_matrix[47:40]:8'h00)|
+	(t8049_p1_o[6]?kbd_matrix[55:48]:8'h00)|
+	(t8049_p1_o[7]?kbd_matrix[63:56]:8'h00);
 
 endmodule

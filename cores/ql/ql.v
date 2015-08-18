@@ -75,6 +75,8 @@ wire [7:0] status;
 wire tv15khz;
 wire [1:0] buttons;
 
+wire [7:0] js0, js1;
+
 wire ps2_kbd_clk, ps2_kbd_data;
 
 // generate ps2_clock
@@ -94,6 +96,9 @@ user_io #(.STRLEN(CONF_STR_LEN)) user_io (
 
 		.scandoubler_disable ( tv15khz   ),
 		.buttons        ( buttons        ),
+
+		.joystick_0     ( js0            ),
+		.joystick_1     ( js1            ),
 		
       // ps2 interface
       .ps2_clk        ( ps2_clock      ),
@@ -285,13 +290,19 @@ wire mdv_men;
 wire mdv_read;
 wire [24:0] mdv_addr;
 
+wire audio;
+assign AUDIO_L = audio;
+assign AUDIO_R = audio;
+
 zx8302 zx8302 (
 	.reset        ( reset        ),
 	.init         ( !pll_locked  ),
-	.clk          ( clk21       ),
+	.clk_sys      ( CLOCK_27[0]  ),
+	.clk          ( clk21        ),
 
 	.ipl          ( cpu_ipl      ),
 	.led          ( LED          ),
+	.audio        ( audio        ),
 	
 	// CPU connection
 	.clk_bus      ( clk2    ),
@@ -301,6 +312,10 @@ zx8302 zx8302 (
 	.cpu_ds       ( cpu_ds       ),
 	.cpu_din      ( cpu_dout     ),
    .cpu_dout     ( zx8302_dout  ),
+
+	// joysticks 
+	.js0          ( js0[4:0]     ),
+	.js1          ( js1[4:0]     ),
 	
 	.ps2_kbd_clk  ( ps2_kbd_clk  ),
 	.ps2_kbd_data ( ps2_kbd_data ),
@@ -343,7 +358,7 @@ wire [15:0] cpu_din =
 wire [31:0] cpu_addr;
 wire [1:0] cpu_ds;
 wire [15:0] cpu_dout;
-wire [2:0] cpu_ipl;
+wire [1:0] cpu_ipl;
 wire cpu_rw;
 wire [1:0] cpu_busstate;
 wire cpu_rd = (cpu_busstate == 2'b00) || (cpu_busstate == 2'b10);
@@ -359,7 +374,7 @@ TG68KdotC_Kernel #(0,0,0,0,0,0) tg68k (
         .nReset         ( ~reset         ),
         .clkena_in      ( cpu_enable     ), 
         .data_in        ( cpu_din        ),
-        .IPL            ( cpu_ipl        ),
+        .IPL            ( {cpu_ipl[0], cpu_ipl }),  // ipl 0 and 2 are tied together on 68008
         .IPL_autovector ( 1'b1           ),
         .berr           ( 1'b0           ),
         .clr_berr       ( 1'b0           ),

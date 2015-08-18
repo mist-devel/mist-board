@@ -22,11 +22,12 @@
 
 module zx8302 (
 		input          clk,       // 21 mhz
+		input          clk_sys,   // 27 MHz board clock
       input          reset,
       input          init,
 		
 		// interrupts
-		output [2:0]   ipl,
+		output [1:0]   ipl,
 
 		// sdram interface for microdrive emulation
 		output [24:0]  mdv_addr,
@@ -38,11 +39,16 @@ module zx8302 (
 		// interface to watch MDV cartridge upload
 		input [24:0]   mdv_dl_addr,
 		input          mdv_download,
-
+ 
 		output         led,
+		output         audio,
 		
 		// vertical synv 
 		input          vs,
+
+		// joysticks
+		input [4:0]    js0,
+		input [4:0]    js1,
 		
 		input          ps2_kbd_clk,
 		input          ps2_kbd_data,
@@ -63,13 +69,14 @@ module zx8302 (
 // ---------------------------------------------------------------------------------
 
 reg [7:0] mctrl;
-reg ipc_bit_strobe;
-wire ipc_reply_bit;
+
+reg ipc_write;
+reg [3:0] ipc_write_data;
 
 // cpu is writing io registers
 always @(negedge clk_bus) begin
 	irq_ack <= 5'd0;
-	ipc_bit_strobe <= 1'b0;
+	ipc_write <= 1'b0;
 	
 	// cpu writes to 0x18XXX area
 	if(cpu_sel && cpu_wr) begin
@@ -89,14 +96,10 @@ always @(negedge clk_bus) begin
 				// S = start bit (should be 0)
 				// D = data bit (0/1)
 				// E = stop bit (should be 1)
-				// X = extra stopbit (should be 1)
-				
-				// QL will always write 11D0 here with one exception: At startup it sends
-				// one single bit through the start bit by writing 0001. Thus we ignore
-				// anything which doesn't match the 11D0 pattern
-				if((cpu_din[3:2]== 2'b11)&&(cpu_din[0]==1'b0))
-					ipc_bit_strobe <= 1'b1;
-			end
+            // X = extra stopbit (should be 1)
+				ipc_write <= 1'b1;
+				ipc_write_data <= cpu_din[3:0];
+         end
 
 			// cpu writes interrupt register
 			if(cpu_addr == 2'b10) begin
@@ -121,7 +124,7 @@ end
 // bit 6       IPC busy
 // bit 7       COMDATA
 
-wire [7:0] io_status = { ipc_reply_bit, ipc_busy, 2'b00,
+wire [7:0] io_status = { zx8302_comdata_in, ipc_busy, 2'b00,
 		mdv_gap, mdv_rx_ready, mdv_tx_empty, 1'b0 };
 
 assign cpu_dout =
@@ -139,19 +142,54 @@ assign cpu_dout =
 // -------------------------------------- IPC --------------------------------------
 // ---------------------------------------------------------------------------------
 	
+wire ipc_comctrl;
+wire ipc_comdata_out;
+
+// 8302 sees its own comdata as well as the one from the ipc
+wire zx8302_comdata_in = ipc_comdata_in && ipc_comdata_out;
+
+// comdata shift register
+wire ipc_comdata_in = comdata_reg[0];
+reg [3:0] comdata_reg /* synthesis noprune */;
+reg [1:0] comdata_cnt /* synthesis noprune */; 
+
+always @(negedge ipc_comctrl or posedge reset or posedge ipc_write) begin
+	if(reset) begin
+		comdata_reg <= 4'b0000;
+		comdata_cnt <= 2'd0;
+	end else if(ipc_write) begin
+		comdata_reg <= ipc_write_data;
+		comdata_cnt <= 2'd2;
+	end else begin
+		comdata_reg <= { 1'b0, comdata_reg[3:1] };
+		if(comdata_cnt != 0)
+			comdata_cnt <= comdata_cnt - 2'd1;
+	end
+end
+
+// comdata is busy until two bits have been shifted out
+wire ipc_busy = (comdata_cnt != 0);
+
+wire [1:0] ipc_ipl;
+
 ipc ipc (	
 	.reset    	    ( reset          ),
-	.clk_bus        ( clk_bus        ),
+	.clk_sys        ( clk_sys        ),   // 27 MHz board clock
 
-	.ipc_bit_strobe ( ipc_bit_strobe ),
-	.ipc_bit        ( cpu_din[1]     ),
-	.ipc_reply_bit  ( ipc_reply_bit  ),
-	.ipc_busy       ( ipc_busy       ),
+	.comctrl        ( ipc_comctrl    ),
+	.comdata_in     ( ipc_comdata_in ),
+	.comdata_out    ( ipc_comdata_out),
+
+   .audio          ( audio          ),
+	.ipl            ( ipc_ipl        ),
+
+	.js0            ( js0            ),
+	.js1            ( js1            ),
 	
 	.ps2_kbd_clk    ( ps2_kbd_clk    ),
 	.ps2_kbd_data   ( ps2_kbd_data   )
 );
-	
+
 // ---------------------------------------------------------------------------------
 // -------------------------------------- IRQs -------------------------------------
 // ---------------------------------------------------------------------------------
@@ -161,9 +199,8 @@ wire [7:0] irq_pending = {1'b0, (mdv_sel == 0), clk64k,
 reg [2:0] irq_mask;
 reg [4:0] irq_ack;
 
-
-// any pending irq raises ipl to 2
-assign ipl = (irq_pending[4:0] == 0)?3'b111:3'b101;
+// any pending irq raises ipl to 2 and the ipc can control both ipl lines
+assign ipl = { ipc_ipl[1] && (irq_pending[4:0] == 0), ipc_ipl[0] };
 
 // vsync irq is set whenever vsync rises
 reg vsync_irq;
@@ -236,7 +273,7 @@ always @(posedge clk64k)
 
 wire clk64k;
 pll_rtc pll_rtc (
-	 .inclk0(clk),
+	 .inclk0(clk_sys),
 	 .c0(clk64k)           // 65536Hz
 );
 
