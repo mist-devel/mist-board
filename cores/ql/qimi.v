@@ -67,7 +67,7 @@ reg sign_x, sign_y;
 reg [7:0] x_reg;
 
 // counter to limit irq rate to 2khz
-reg [9:0] irq_holdoff;
+reg [11:0] irq_holdoff;
 
 always @(posedge clk) begin
 	if(reset) begin
@@ -75,11 +75,11 @@ always @(posedge clk) begin
 		y_pos <= 10'd0;
 		cnt <= 2'd0;
 		irq <= 1'b0;
-		irq_holdoff <= 10'd0;
+		irq_holdoff <= 12'd0;
 	end else begin
 		// check if we have to fire another irq	
 		if(irq_holdoff != 0) begin
-			irq_holdoff <= irq_holdoff - 10'd1;
+			irq_holdoff <= irq_holdoff - 12'd1;
 			if((irq_holdoff == 1) && (x_mov || y_mov))
 				irq <= 1'b1;
 		end
@@ -105,7 +105,7 @@ always @(posedge clk) begin
 				cnt <= 2'd0;
 				
 				if(irq_holdoff == 0)
-					irq_holdoff <= 10'd1;
+					irq_holdoff <= 12'd1;
 			end
 		end else begin
 			// one bit has been reported to host
@@ -124,7 +124,7 @@ always @(posedge clk) begin
 				irq <= 1'b0;
 				
 				// next irq after some time ...
-				irq_holdoff <= 10'd1000;
+				irq_holdoff <= 12'd4000;
 			end
 		end
 	end
