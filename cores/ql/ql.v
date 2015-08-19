@@ -62,13 +62,14 @@ module ql (
 parameter CONF_STR = {
         "QL;;",
         "F1,MDV;",
-        "O2,RAM,128k,640k;",
-        "O3,Video mode,PAL,NTSC;",
-        "O4,Scanlines,Off,On;",
-        "T5,Reset"
+        "O2,MDV direction,normal,reverse;",
+        "O3,RAM,128k,640k;",
+        "O4,Video mode,PAL,NTSC;",
+        "O5,Scanlines,Off,On;",
+        "T6,Reset"
 };
 
-parameter CONF_STR_LEN = 4+7+17+23+20+8;
+parameter CONF_STR_LEN = 4+7+32+17+23+20+8;
 
 // the status register is controlled by the on screen display (OSD)
 wire [7:0] status;
@@ -78,6 +79,7 @@ wire [1:0] buttons;
 wire [7:0] js0, js1;
 
 wire ps2_kbd_clk, ps2_kbd_data;
+wire ps2_mouse_clk, ps2_mouse_data;
 
 // generate ps2_clock
 wire ps2_clock = ps2_clk_div[6];  // ~20khz
@@ -104,6 +106,8 @@ user_io #(.STRLEN(CONF_STR_LEN)) user_io (
       .ps2_clk        ( ps2_clock      ),
       .ps2_kbd_clk    ( ps2_kbd_clk    ),
       .ps2_kbd_data   ( ps2_kbd_data   ),
+      .ps2_mouse_clk  ( ps2_mouse_clk  ),
+      .ps2_mouse_data ( ps2_mouse_data ),
 
       .status         ( status         )
 );
@@ -242,9 +246,9 @@ zx8301 zx8301 (
 	 .clk_video		( clk10      ),
 	 .video_cycle  ( video_cycle   ),
 
-	 .ntsc         ( status[3]     ),
+	 .ntsc         ( status[4]     ),
 	 .scandoubler  ( !tv15khz      ),
-	 .scanlines    ( status[4]     ),
+	 .scanlines    ( status[5]     ),
 
 	 .clk_bus      ( clk2     ),
 	 .cpu_cs       ( zx8301_cs     ),
@@ -271,7 +275,7 @@ wire rom_download = dio_download && (dio_index == 0);
 reg [11:0] reset_cnt;
 wire reset = (reset_cnt != 0);
 always @(posedge clk2) begin
-	if(buttons[1] || status[0] || status[5] || !pll_locked || rom_download)
+	if(buttons[1] || status[0] || status[6] || !pll_locked || rom_download)
 		reset_cnt <= 12'hfff;
 	else if(reset_cnt != 0)
 		reset_cnt <= reset_cnt - 1;
@@ -300,12 +304,13 @@ zx8302 zx8302 (
 	.clk_sys      ( CLOCK_27[0]  ),
 	.clk          ( clk21        ),
 
+	.xint         ( qimi_irq     ),
 	.ipl          ( cpu_ipl      ),
 	.led          ( LED          ),
 	.audio        ( audio        ),
 	
 	// CPU connection
-	.clk_bus      ( clk2    ),
+	.clk_bus      ( clk2         ),
 	.cpu_sel      ( zx8302_sel   ),
 	.cpu_wr       ( cpu_wr       ),
 	.cpu_addr     ( zx8302_addr  ),
@@ -329,11 +334,35 @@ zx8302 zx8302 (
 	.mdv_men      ( mdv_men      ),
 	.video_cycle  ( video_cycle  ),
 	
+	.mdv_reverse  ( status[2]    ),
+
 	.mdv_download ( mdv_download ),
 	.mdv_dl_addr  ( dio_addr     )
 
 );
 	 
+// ---------------------------------------------------------------------------------
+// --------------------------- QIMI compatible mouse -------------------------------
+// ---------------------------------------------------------------------------------
+
+// qimi is at 1bfxx
+wire qimi_sel = cpu_io && (cpu_addr[13:8] == 6'b111111);
+wire [7:0] qimi_data;
+wire qimi_irq;
+	
+qimi qimi(
+   .reset     ( reset          ),
+	.clk       ( clk2           ),
+
+	.cpu_sel   ( qimi_sel       ),
+	.cpu_addr  ( { cpu_addr[5], cpu_addr[1] } ),
+	.cpu_data  ( qimi_data      ),
+	.irq       ( qimi_irq       ),
+	
+	.ps2_clk   ( ps2_mouse_clk  ),
+	.ps2_data  ( ps2_mouse_data )
+);
+
 // ---------------------------------------------------------------------------------
 // -------------------------------------- CPU --------------------------------------
 // ---------------------------------------------------------------------------------
@@ -341,13 +370,16 @@ zx8302 zx8302 (
 // address decoding
 wire cpu_io   = ({cpu_addr[19:14], 2'b00} == 8'h18);   // internal IO $18000-$1bffff
 wire cpu_bram = (cpu_addr[19:17] == 3'b001);           // 128k RAM at $20000
-wire cpu_xram = status[2] && ((cpu_addr[19:18] == 2'b01) ||
+wire cpu_xram = status[3] && ((cpu_addr[19:18] == 2'b01) ||
 							(cpu_addr[19:18] == 2'b10));      // 512k RAM at $40000 if enabled
 wire cpu_ram = cpu_bram || cpu_xram;                   // any RAM
 wire cpu_rom  = (cpu_addr[19:16] == 4'h0);             // 64k ROM at $0
 wire cpu_mem  = cpu_ram || cpu_rom;                    // any memory mapped to sdram
 
-wire [15:0] io_dout = cpu_addr[6]?16'h0000:zx8302_dout;	
+wire [15:0] io_dout = 
+	qimi_sel?{qimi_data, qimi_data}:
+	(!cpu_addr[6])?zx8302_dout:
+	16'h0000;	
 
 // demultiplex the various data sources
 wire [15:0] cpu_din =

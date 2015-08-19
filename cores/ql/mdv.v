@@ -24,6 +24,8 @@ module mdv (
    input clk,               // 21mhz clock
 	input reset,
 	
+	input reverse,
+	
 	input sel,
 
    // control bits	
@@ -59,8 +61,6 @@ assign tx_empty = 1'b0;
 // microdrive implementation works with images which are uploaded by the user into
 // the part of ram which is unavailable to the 68k CPU (>16MB). It is then continously
 // replayed from there at 200kbit/s
-
-reg [7:0] mdv_sector /* synthesis noprune */;
 
 reg [24:0] mdv_end /* synthesis noprune */;
 
@@ -134,7 +134,6 @@ always @(posedge mdv_clk) begin
 			mdv_gap_cnt <= 10'd0;      // count bytes until gap
 			mdv_gap_state <= 1'b1;      // toggle header + data gap
 			mdv_gap_active <= 1'b1;     // gap atm
-			mdv_sector <= 8'd0;
          mdv_gap <= 1'b1; 
 		end else begin
 			mdv_gap_cnt <= mdv_gap_cnt + 10'd1;
@@ -162,18 +161,17 @@ always @(posedge mdv_clk) begin
 					mdv_gap_active <= 1'b1;          // now comes a gap
 					mdv_gap <= 1'b1;
 
-				        // The sectors on cartridges are written in descending order
-				        // The images seem to contain them in ascending order. So we
-				        // have to replay them backwards for better performance
+					if(reverse) begin
+						// The sectors on cartridges are written in descending order
+						// Some images seem to contain them in ascending order. So we
+				      // have to replay them backwards for better performance
 
-				        if(mem_addr == BASE_ADDR + 343 - 1)
-					  mem_addr <= mdv_end - 343 + 1;
-				        else
-				          mem_addr <= mem_addr - 2*343 + 1;
-				   
-					mdv_sector <= mdv_sector + 8'd1;
+				      if(mem_addr == BASE_ADDR + 343 - 1)
+							mem_addr <= mdv_end - 343 + 1;
+						else
+							mem_addr <= mem_addr - 2*343 + 1;
+					end
 				end
-			
 			end
 		end
 	end

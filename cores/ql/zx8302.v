@@ -28,7 +28,8 @@ module zx8302 (
 		
 		// interrupts
 		output [1:0]   ipl,
-
+		input          xint,
+		
 		// sdram interface for microdrive emulation
 		output [24:0]  mdv_addr,
 		input [15:0]   mdv_din,
@@ -39,7 +40,8 @@ module zx8302 (
 		// interface to watch MDV cartridge upload
 		input [24:0]   mdv_dl_addr,
 		input          mdv_download,
- 
+
+		input          mdv_reverse,
 		output         led,
 		output         audio,
 		
@@ -129,8 +131,8 @@ wire [7:0] io_status = { zx8302_comdata_in, ipc_busy, 2'b00,
 
 assign cpu_dout =
 	// 18000/18001 and 18002/18003
-	(cpu_addr == 2'b00)?rtc[46:31]:
-	(cpu_addr == 2'b01)?rtc[30:15]:
+	(cpu_addr == 2'b00)?rtc[47:32]:
+	(cpu_addr == 2'b01)?rtc[31:16]:
 
 	// 18020/18021 and 18022/18023
 	(cpu_addr == 2'b10)?{io_status, irq_pending}:
@@ -195,7 +197,7 @@ ipc ipc (
 // ---------------------------------------------------------------------------------
 
 wire [7:0] irq_pending = {1'b0, (mdv_sel == 0), clk64k,
-		1'b0, vsync_irq, 1'b0, 1'b0, gap_irq };
+		xint_irq, vsync_irq, 1'b0, 1'b0, gap_irq };
 reg [2:0] irq_mask;
 reg [4:0] irq_ack;
 
@@ -219,6 +221,14 @@ always @(posedge gap_irq_in or posedge gap_irq_reset) begin
 	else	      	     	gap_irq <= 1'b1;
 end
 
+// toggling the mask will also trigger irqs ...
+wire xint_irq_in = xint && irq_mask[2];
+reg xint_irq;
+wire xint_irq_reset = reset || irq_ack[4];
+always @(posedge xint_irq_in or posedge xint_irq_reset) begin
+	if(xint_irq_reset) 	xint_irq <= 1'b0;
+	else	      	     	xint_irq <= 1'b1;
+end
 
 
 // ---------------------------------------------------------------------------------
@@ -233,10 +243,12 @@ wire [7:0] mdv_byte;
 assign led = !mdv_sel[0];
 
 mdv mdv (
-   .clk      ( clk       ),
+   .clk      ( clk          ),
 	.reset    ( init         ),
 	
 	.sel      ( mdv_sel[0]   ),
+
+	.reverse  ( mdv_reverse  ),
 
    // control bits	
 	.gap      ( mdv_gap      ),
@@ -267,9 +279,9 @@ always @(negedge mctrl[1])
 // ---------------------------------------------------------------------------------
 
 // PLL for the real time clock (rtc)
-reg [46:0] rtc;
+reg [47:0] rtc;
 always @(posedge clk64k)
-	rtc <= rtc + 47'd1;
+	rtc <= rtc + 48'd1;
 
 wire clk64k;
 pll_rtc pll_rtc (
