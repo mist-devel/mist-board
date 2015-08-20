@@ -57,6 +57,15 @@ module ql (
    output [5:0] VGA_B
 );
 
+// -------------------------------------------------------------------------
+// ------------------------------ user_io ----------------------------------
+// -------------------------------------------------------------------------
+
+// user_io implements a connection to the io controller and receives various
+// kind of user input from there (keyboard, buttons, mouse). It is also used
+// by the fake SD card to exchange data with the real sd card connected to the
+// io controller
+
 // the configuration string is returned to the io controller to allow
 // it to control the menu on the OSD 
 parameter CONF_STR = {
@@ -109,46 +118,83 @@ user_io #(.STRLEN(CONF_STR_LEN)) user_io (
       .ps2_mouse_clk  ( ps2_mouse_clk  ),
       .ps2_mouse_data ( ps2_mouse_data ),
 
-      .status         ( status         )
+      .status         ( status         ),
+		
+		// interface to embedded legacy sd card wrapper
+		.sd_lba     	( sd_lba				),
+		.sd_rd      	( sd_rd				),
+		.sd_wr      	( sd_wr				),
+		.sd_ack     	( sd_ack				),
+		.sd_conf    	( sd_conf			),
+		.sd_sdhc    	( sd_sdhc			),
+		.sd_dout    	( sd_dout			),
+		.sd_dout_strobe (sd_dout_strobe	),
+		.sd_din     	( sd_din				),
+		.sd_din_strobe ( sd_din_strobe	)
 );
 
-// csync for tv15khz
-// QLs vsync is positive, QLs hsync is negative
-wire vga_csync = !(!vga_hsync ^ vga_vsync);
-wire vga_hsync, vga_vsync;
+// -------------------------------------------------------------------------
+// ---------------- fake sd card for use with ql-sd ------------------------
+// -------------------------------------------------------------------------
 
-// TV SCART has csync on hsync pin and "high" on vsync pin
-assign VGA_VS = tv15khz?1'b1:vga_vsync;
-assign VGA_HS = tv15khz?vga_csync:vga_hsync;
+// conections between user_io (implementing the SPIU communication 
+// to the io controller) and the legacy 
+wire [31:0] sd_lba;
+wire sd_rd;
+wire sd_wr;
+wire sd_ack;
+wire sd_conf;
+wire sd_sdhc; 
+wire [7:0] sd_dout;
+wire sd_dout_strobe;
+wire [7:0] sd_din;
+wire sd_din_strobe;
 
-// tv15hkz has half the pixel rate		  
-wire osd_clk = tv15khz?clk10:clk21;
+sd_card sd_card (
+		// connection to io controller
+		.io_lba 			( sd_lba 			),
+		.io_rd  			( sd_rd				),
+		.io_wr  			( sd_wr				),
+		.io_ack 			( sd_ack				),
+		.io_conf 		( sd_conf			),
+		.io_sdhc 		( sd_sdhc			),
+		.io_din 			( sd_dout			),
+		.io_din_strobe ( sd_dout_strobe	),
+		.io_dout 		( sd_din				),
+		.io_dout_strobe( sd_din_strobe	),
+ 
+		.allow_sdhc 	( 1'b1				),   // QLSD supports SDHC
 
-// include the on screen display
-osd #(12,0,5) osd (
-   .pclk       ( osd_clk     ),
-
-   // spi for OSD
-   .sdi        ( SPI_DI       ),
-   .sck        ( SPI_SCK      ),
-   .ss         ( SPI_SS3      ),
-
-   .red_in     ( video_r      ),
-   .green_in   ( video_g      ),
-   .blue_in    ( video_b      ),
-   .hs_in      ( video_hs     ),
-   .vs_in      ( video_vs     ),
-
-   .red_out    ( VGA_R        ),
-   .green_out  ( VGA_G        ),
-   .blue_out   ( VGA_B        ),
-   .hs_out     ( vga_hsync    ),
-   .vs_out     ( vga_vsync    )
+		// connection to local CPU
+		.sd_cs   		( sd_cs         	),
+		.sd_sck  		( sd_sck				),
+		.sd_sdi  		( sd_sdi				),
+		.sd_sdo  		( sd_sdo 	    	)
 );
+
+wire qlsd_rd = cpu_rom && (cpu_addr[15:0] == 16'hfee4);  // only one register actually returns data
+wire [7:0] qlsd_dout;
+wire sd_cs, sd_sck, sd_sdi, sd_sdo;
+
+qlromext qlromext (
+		.clk				( CLOCK_27[0]		),   // fastest we can offer
+		.clk_bus       ( clk2            ),
+		.romoel        ( !(cpu_rom && cpu_cycle) ),
+		.a       		( cpu_addr[15:0]	),
+		.d             ( qlsd_dout       ),
+		.sd_do         ( sd_sdo          ),
+		.sd_cs1l       ( sd_cs           ),
+		.sd_clk        ( sd_sck          ),
+		.sd_di         ( sd_sdi          ),
+		.io2           ( 1'b0            )
+); 
+			
+// -------------------------------------------------------------------------
+// ---------------- interface to the external sdram ------------------------
+// -------------------------------------------------------------------------
 
 // SDRAM control signals
 assign SDRAM_CKE = 1'b1;
-
 
 // CPU and data_io share the same bus cycle. Thus the CPU cannot run while
 // (ROM) data is being downloaded which wouldn't make any sense, anyway
@@ -267,6 +313,41 @@ zx8301 zx8301 (
 	 .b            ( video_b       )
 );
 
+
+// csync for tv15khz
+// QLs vsync is positive, QLs hsync is negative
+wire vga_csync = !(!vga_hsync ^ vga_vsync);
+wire vga_hsync, vga_vsync;
+
+// TV SCART has csync on hsync pin and "high" on vsync pin
+assign VGA_VS = tv15khz?1'b1:vga_vsync;
+assign VGA_HS = tv15khz?vga_csync:vga_hsync;
+
+// tv15hkz has half the pixel rate		  
+wire osd_clk = tv15khz?clk10:clk21;
+
+// include the on screen display
+osd #(12,0,5) osd (
+   .pclk       ( osd_clk     ),
+
+   // spi for OSD
+   .sdi        ( SPI_DI       ),
+   .sck        ( SPI_SCK      ),
+   .ss         ( SPI_SS3      ),
+
+   .red_in     ( video_r      ),
+   .green_in   ( video_g      ),
+   .blue_in    ( video_b      ),
+   .hs_in      ( video_hs     ),
+   .vs_in      ( video_vs     ),
+
+   .red_out    ( VGA_R        ),
+   .green_out  ( VGA_G        ),
+   .blue_out   ( VGA_B        ),
+   .hs_out     ( vga_hsync    ),
+   .vs_out     ( vga_vsync    )
+);
+
 // ---------------------------------------------------------------------------------
 // -------------------------------------- reset ------------------------------------
 // ---------------------------------------------------------------------------------
@@ -338,7 +419,6 @@ zx8302 zx8302 (
 
 	.mdv_download ( mdv_download ),
 	.mdv_dl_addr  ( dio_addr     )
-
 );
 	 
 // ---------------------------------------------------------------------------------
@@ -368,13 +448,14 @@ qimi qimi(
 // ---------------------------------------------------------------------------------
 
 // address decoding
-wire cpu_io   = ({cpu_addr[19:14], 2'b00} == 8'h18);   // internal IO $18000-$1bffff
-wire cpu_bram = (cpu_addr[19:17] == 3'b001);           // 128k RAM at $20000
-wire cpu_xram = status[3] && ((cpu_addr[19:18] == 2'b01) ||
-							(cpu_addr[19:18] == 2'b10));      // 512k RAM at $40000 if enabled
-wire cpu_ram = cpu_bram || cpu_xram;                   // any RAM
-wire cpu_rom  = (cpu_addr[19:16] == 4'h0);             // 64k ROM at $0
-wire cpu_mem  = cpu_ram || cpu_rom;                    // any memory mapped to sdram
+wire cpu_act = cpu_rd || cpu_wr;
+wire cpu_io   = cpu_act && ({cpu_addr[19:14], 2'b00} == 8'h18);   // internal IO $18000-$1bffff
+wire cpu_bram = cpu_act &&(cpu_addr[19:17] == 3'b001);           	// 128k RAM at $20000
+wire cpu_xram = cpu_act && status[3] && ((cpu_addr[19:18] == 2'b01) ||
+							(cpu_addr[19:18] == 2'b10));      				// 512k RAM at $40000 if enabled
+wire cpu_ram = cpu_bram || cpu_xram;                   				// any RAM
+wire cpu_rom  = cpu_act && (cpu_addr[19:16] == 4'h0);             // 64k ROM at $0
+wire cpu_mem  = cpu_ram || cpu_rom;                    				// any memory mapped to sdram
 
 wire [15:0] io_dout = 
 	qimi_sel?{qimi_data, qimi_data}:
@@ -383,6 +464,7 @@ wire [15:0] io_dout =
 
 // demultiplex the various data sources
 wire [15:0] cpu_din =
+	qlsd_rd?{qlsd_dout, qlsd_dout}:    // qlsd maps into rom area
 	cpu_mem?sdram_dout:
 	cpu_io?io_dout:
 	16'hffff;
@@ -420,8 +502,6 @@ TG68KdotC_Kernel #(0,0,0,0,0,0) tg68k (
         .nResetOut      (                ),
         .FC             (                )
 );
-
-
 
 // -------------------------------------------------------------------------
 // -------------------------- clock generation -----------------------------

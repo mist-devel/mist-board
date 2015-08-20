@@ -23,3 +23,4 @@ Features:
   - microdrive emulation
     - qlay format
 - qimi mouse
+- QL-SD sd card interface

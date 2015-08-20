@@ -155,6 +155,8 @@ set_global_assignment -name FITTER_EFFORT "FAST FIT"
 set_global_assignment -name POWER_PRESET_COOLING_SOLUTION "23 MM HEAT SINK WITH 200 LFPM AIRFLOW"
 set_global_assignment -name POWER_BOARD_THERMAL_MODEL "NONE (CONSERVATIVE)"
 set_instance_assignment -name CURRENT_STRENGTH_NEW "MAXIMUM CURRENT" -to VGA_*
+set_global_assignment -name VERILOG_FILE qlromext.v
+set_global_assignment -name VERILOG_FILE sd_card.v
 set_global_assignment -name VERILOG_FILE qimi.v
 set_global_assignment -name VHDL_FILE "t49_rom-struct-a.vhd"
 set_global_assignment -name VHDL_FILE "t48/rtl/vhdl/system/t49_rom-e.vhd"
