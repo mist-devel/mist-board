@@ -26,7 +26,7 @@ Selecting "Start Compilation" from the "Processing" menu will create the led.rbf
 file. Putting this under the name "core.rbf" on sd card and booting the
 mist from that card should result in the FPGA led blinking once a second.
 
-https://github.com/mist-devel/mist-board/raw/master/tutorials/led/quartus.png
+![https://github.com/mist-devel/mist-board/raw/master/tutorials/led/quartus.png](https://github.com/mist-devel/mist-board/raw/master/tutorials/led/quartus.png)
 
 Using signaltap
 ---------------
