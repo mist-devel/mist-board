@@ -1,0 +1,296 @@
+<session jtag_chain="USB-Blaster [4-1]" jtag_device="@1: EP3C25/EP4CE22 (0x020F30DD)" sof_file="led.sof">
+  <display_tree gui_logging_enabled="0">
+    <display_branch instance="auto_signaltap_0" log="USE_GLOBAL_TEMP" signal_set="USE_GLOBAL_TEMP" trigger="USE_GLOBAL_TEMP"/>
+  </display_tree>
+  <global_info>
+    <single attribute="active instance" value="0"/>
+    <multi attribute="frame size" size="2" value="744,397"/>
+    <single attribute="jtag widget visible" value="1"/>
+    <multi attribute="jtag widget size" size="2" value="351,126"/>
+    <single attribute="instance widget visible" value="1"/>
+    <single attribute="config widget visible" value="1"/>
+    <single attribute="hierarchy widget visible" value="0"/>
+    <single attribute="data log widget visible" value="0"/>
+  </global_info>
+  <instance entity_name="sld_signaltap" is_auto_node="yes" name="auto_signaltap_0" source_file="sld_signaltap.vhd">
+    <node_ip_info instance_id="0" mfg_id="110" node_id="0" version="6"/>
+    <position_info>
+      <single attribute="active tab" value="0"/>
+      <single attribute="data vertical scroll position" value="0"/>
+      <single attribute="data horizontal scroll position" value="11"/>
+      <single attribute="zoom level numerator" value="16"/>
+      <single attribute="zoom level denominator" value="1"/>
+      <single attribute="zoom offset numerator" value="8184"/>
+      <single attribute="zoom offset denominator" value="1"/>
+    </position_info>
+    <signal_set global_temp="1" name="signal_set: 2015/05/17 21:21:00  #0">
+      <clock name="CLOCK_27" polarity="posedge" tap_mode="probeonly"/>
+      <config ram_type="AUTO" reserved_data_nodes="0" reserved_storage_qualifier_nodes="0" reserved_trigger_nodes="0" sample_depth="128" trigger_in_enable="no" trigger_out_enable="no"/>
+      <top_entity/>
+      <signal_vec>
+        <trigger_input_vec>
+          <wire name="LED" tap_mode="classic"/>
+          <wire name="clk" tap_mode="classic"/>
+          <wire name="counter[0]" tap_mode="classic"/>
+          <wire name="counter[10]" tap_mode="classic"/>
+          <wire name="counter[11]" tap_mode="classic"/>
+          <wire name="counter[12]" tap_mode="classic"/>
+          <wire name="counter[13]" tap_mode="classic"/>
+          <wire name="counter[14]" tap_mode="classic"/>
+          <wire name="counter[15]" tap_mode="classic"/>
+          <wire name="counter[16]" tap_mode="classic"/>
+          <wire name="counter[17]" tap_mode="classic"/>
+          <wire name="counter[18]" tap_mode="classic"/>
+          <wire name="counter[19]" tap_mode="classic"/>
+          <wire name="counter[1]" tap_mode="classic"/>
+          <wire name="counter[20]" tap_mode="classic"/>
+          <wire name="counter[21]" tap_mode="classic"/>
+          <wire name="counter[22]" tap_mode="classic"/>
+          <wire name="counter[23]" tap_mode="classic"/>
+          <wire name="counter[24]" tap_mode="classic"/>
+          <wire name="counter[25]" tap_mode="classic"/>
+          <wire name="counter[26]" tap_mode="classic"/>
+          <wire name="counter[27]" tap_mode="classic"/>
+          <wire name="counter[28]" tap_mode="classic"/>
+          <wire name="counter[29]" tap_mode="classic"/>
+          <wire name="counter[2]" tap_mode="classic"/>
+          <wire name="counter[30]" tap_mode="classic"/>
+          <wire name="counter[31]" tap_mode="classic"/>
+          <wire name="counter[3]" tap_mode="classic"/>
+          <wire name="counter[4]" tap_mode="classic"/>
+          <wire name="counter[5]" tap_mode="classic"/>
+          <wire name="counter[6]" tap_mode="classic"/>
+          <wire name="counter[7]" tap_mode="classic"/>
+          <wire name="counter[8]" tap_mode="classic"/>
+          <wire name="counter[9]" tap_mode="classic"/>
+        </trigger_input_vec>
+        <data_input_vec>
+          <wire name="LED" tap_mode="classic"/>
+          <wire name="clk" tap_mode="classic"/>
+          <wire name="counter[0]" tap_mode="classic"/>
+          <wire name="counter[10]" tap_mode="classic"/>
+          <wire name="counter[11]" tap_mode="classic"/>
+          <wire name="counter[12]" tap_mode="classic"/>
+          <wire name="counter[13]" tap_mode="classic"/>
+          <wire name="counter[14]" tap_mode="classic"/>
+          <wire name="counter[15]" tap_mode="classic"/>
+          <wire name="counter[16]" tap_mode="classic"/>
+          <wire name="counter[17]" tap_mode="classic"/>
+          <wire name="counter[18]" tap_mode="classic"/>
+          <wire name="counter[19]" tap_mode="classic"/>
+          <wire name="counter[1]" tap_mode="classic"/>
+          <wire name="counter[20]" tap_mode="classic"/>
+          <wire name="counter[21]" tap_mode="classic"/>
+          <wire name="counter[22]" tap_mode="classic"/>
+          <wire name="counter[23]" tap_mode="classic"/>
+          <wire name="counter[24]" tap_mode="classic"/>
+          <wire name="counter[25]" tap_mode="classic"/>
+          <wire name="counter[26]" tap_mode="classic"/>
+          <wire name="counter[27]" tap_mode="classic"/>
+          <wire name="counter[28]" tap_mode="classic"/>
+          <wire name="counter[29]" tap_mode="classic"/>
+          <wire name="counter[2]" tap_mode="classic"/>
+          <wire name="counter[30]" tap_mode="classic"/>
+          <wire name="counter[31]" tap_mode="classic"/>
+          <wire name="counter[3]" tap_mode="classic"/>
+          <wire name="counter[4]" tap_mode="classic"/>
+          <wire name="counter[5]" tap_mode="classic"/>
+          <wire name="counter[6]" tap_mode="classic"/>
+          <wire name="counter[7]" tap_mode="classic"/>
+          <wire name="counter[8]" tap_mode="classic"/>
+          <wire name="counter[9]" tap_mode="classic"/>
+        </data_input_vec>
+        <storage_qualifier_input_vec>
+          <wire name="LED" tap_mode="classic"/>
+          <wire name="clk" tap_mode="classic"/>
+          <wire name="counter[0]" tap_mode="classic"/>
+          <wire name="counter[10]" tap_mode="classic"/>
+          <wire name="counter[11]" tap_mode="classic"/>
+          <wire name="counter[12]" tap_mode="classic"/>
+          <wire name="counter[13]" tap_mode="classic"/>
+          <wire name="counter[14]" tap_mode="classic"/>
+          <wire name="counter[15]" tap_mode="classic"/>
+          <wire name="counter[16]" tap_mode="classic"/>
+          <wire name="counter[17]" tap_mode="classic"/>
+          <wire name="counter[18]" tap_mode="classic"/>
+          <wire name="counter[19]" tap_mode="classic"/>
+          <wire name="counter[1]" tap_mode="classic"/>
+          <wire name="counter[20]" tap_mode="classic"/>
+          <wire name="counter[21]" tap_mode="classic"/>
+          <wire name="counter[22]" tap_mode="classic"/>
+          <wire name="counter[23]" tap_mode="classic"/>
+          <wire name="counter[24]" tap_mode="classic"/>
+          <wire name="counter[25]" tap_mode="classic"/>
+          <wire name="counter[26]" tap_mode="classic"/>
+          <wire name="counter[27]" tap_mode="classic"/>
+          <wire name="counter[28]" tap_mode="classic"/>
+          <wire name="counter[29]" tap_mode="classic"/>
+          <wire name="counter[2]" tap_mode="classic"/>
+          <wire name="counter[30]" tap_mode="classic"/>
+          <wire name="counter[31]" tap_mode="classic"/>
+          <wire name="counter[3]" tap_mode="classic"/>
+          <wire name="counter[4]" tap_mode="classic"/>
+          <wire name="counter[5]" tap_mode="classic"/>
+          <wire name="counter[6]" tap_mode="classic"/>
+          <wire name="counter[7]" tap_mode="classic"/>
+          <wire name="counter[8]" tap_mode="classic"/>
+          <wire name="counter[9]" tap_mode="classic"/>
+        </storage_qualifier_input_vec>
+      </signal_vec>
+      <presentation>
+        <unified_setup_data_view>
+          <node name="counter" order="msb_to_lsb" radix="unsigned_dec" type="register">
+            <node data_index="26" duplicate_name_allowed="false" is_data_input="true" is_node_valid="true" is_storage_input="true" is_trigger_input="true" name="counter[31]" storage_index="26" tap_mode="classic" trigger_index="26" type="unknown"/>
+            <node data_index="25" duplicate_name_allowed="false" is_data_input="true" is_node_valid="true" is_storage_input="true" is_trigger_input="true" name="counter[30]" storage_index="25" tap_mode="classic" trigger_index="25" type="unknown"/>
+            <node data_index="23" duplicate_name_allowed="false" is_data_input="true" is_node_valid="true" is_storage_input="true" is_trigger_input="true" name="counter[29]" storage_index="23" tap_mode="classic" trigger_index="23" type="unknown"/>
+            <node data_index="22" duplicate_name_allowed="false" is_data_input="true" is_node_valid="true" is_storage_input="true" is_trigger_input="true" name="counter[28]" storage_index="22" tap_mode="classic" trigger_index="22" type="unknown"/>
+            <node data_index="21" duplicate_name_allowed="false" is_data_input="true" is_node_valid="true" is_storage_input="true" is_trigger_input="true" name="counter[27]" storage_index="21" tap_mode="classic" trigger_index="21" type="unknown"/>
+            <node data_index="20" duplicate_name_allowed="false" is_data_input="true" is_node_valid="true" is_storage_input="true" is_trigger_input="true" name="counter[26]" storage_index="20" tap_mode="classic" trigger_index="20" type="unknown"/>
+            <node data_index="19" duplicate_name_allowed="false" is_data_input="true" is_node_valid="true" is_storage_input="true" is_trigger_input="true" name="counter[25]" storage_index="19" tap_mode="classic" trigger_index="19" type="unknown"/>
+            <node data_index="18" duplicate_name_allowed="false" is_data_input="true" is_node_valid="true" is_storage_input="true" is_trigger_input="true" name="counter[24]" storage_index="18" tap_mode="classic" trigger_index="18" type="unknown"/>
+            <node data_index="17" duplicate_name_allowed="false" is_data_input="true" is_node_valid="true" is_storage_input="true" is_trigger_input="true" name="counter[23]" storage_index="17" tap_mode="classic" trigger_index="17" type="unknown"/>
+            <node data_index="16" duplicate_name_allowed="false" is_data_input="true" is_node_valid="true" is_storage_input="true" is_trigger_input="true" name="counter[22]" storage_index="16" tap_mode="classic" trigger_index="16" type="unknown"/>
+            <node data_index="15" duplicate_name_allowed="false" is_data_input="true" is_node_valid="true" is_storage_input="true" is_trigger_input="true" name="counter[21]" storage_index="15" tap_mode="classic" trigger_index="15" type="unknown"/>
+            <node data_index="14" duplicate_name_allowed="false" is_data_input="true" is_node_valid="true" is_storage_input="true" is_trigger_input="true" name="counter[20]" storage_index="14" tap_mode="classic" trigger_index="14" type="unknown"/>
+            <node data_index="12" duplicate_name_allowed="false" is_data_input="true" is_node_valid="true" is_storage_input="true" is_trigger_input="true" name="counter[19]" storage_index="12" tap_mode="classic" trigger_index="12" type="unknown"/>
+            <node data_index="11" duplicate_name_allowed="false" is_data_input="true" is_node_valid="true" is_storage_input="true" is_trigger_input="true" name="counter[18]" storage_index="11" tap_mode="classic" trigger_index="11" type="unknown"/>
+            <node data_index="10" duplicate_name_allowed="false" is_data_input="true" is_node_valid="true" is_storage_input="true" is_trigger_input="true" name="counter[17]" storage_index="10" tap_mode="classic" trigger_index="10" type="unknown"/>
+            <node data_index="9" duplicate_name_allowed="false" is_data_input="true" is_node_valid="true" is_storage_input="true" is_trigger_input="true" name="counter[16]" storage_index="9" tap_mode="classic" trigger_index="9" type="unknown"/>
+            <node data_index="8" duplicate_name_allowed="false" is_data_input="true" is_node_valid="true" is_storage_input="true" is_trigger_input="true" name="counter[15]" storage_index="8" tap_mode="classic" trigger_index="8" type="unknown"/>
+            <node data_index="7" duplicate_name_allowed="false" is_data_input="true" is_node_valid="true" is_storage_input="true" is_trigger_input="true" name="counter[14]" storage_index="7" tap_mode="classic" trigger_index="7" type="unknown"/>
+            <node data_index="6" duplicate_name_allowed="false" is_data_input="true" is_node_valid="true" is_storage_input="true" is_trigger_input="true" name="counter[13]" storage_index="6" tap_mode="classic" trigger_index="6" type="unknown"/>
+            <node data_index="5" duplicate_name_allowed="false" is_data_input="true" is_node_valid="true" is_storage_input="true" is_trigger_input="true" name="counter[12]" storage_index="5" tap_mode="classic" trigger_index="5" type="unknown"/>
+            <node data_index="4" duplicate_name_allowed="false" is_data_input="true" is_node_valid="true" is_storage_input="true" is_trigger_input="true" name="counter[11]" storage_index="4" tap_mode="classic" trigger_index="4" type="unknown"/>
+            <node data_index="3" duplicate_name_allowed="false" is_data_input="true" is_node_valid="true" is_storage_input="true" is_trigger_input="true" name="counter[10]" storage_index="3" tap_mode="classic" trigger_index="3" type="unknown"/>
+            <node data_index="33" duplicate_name_allowed="false" is_data_input="true" is_node_valid="true" is_storage_input="true" is_trigger_input="true" name="counter[9]" storage_index="33" tap_mode="classic" trigger_index="33" type="unknown"/>
+            <node data_index="32" duplicate_name_allowed="false" is_data_input="true" is_node_valid="true" is_storage_input="true" is_trigger_input="true" name="counter[8]" storage_index="32" tap_mode="classic" trigger_index="32" type="unknown"/>
+            <node data_index="31" duplicate_name_allowed="false" is_data_input="true" is_node_valid="true" is_storage_input="true" is_trigger_input="true" name="counter[7]" storage_index="31" tap_mode="classic" trigger_index="31" type="unknown"/>
+            <node data_index="30" duplicate_name_allowed="false" is_data_input="true" is_node_valid="true" is_storage_input="true" is_trigger_input="true" name="counter[6]" storage_index="30" tap_mode="classic" trigger_index="30" type="unknown"/>
+            <node data_index="29" duplicate_name_allowed="false" is_data_input="true" is_node_valid="true" is_storage_input="true" is_trigger_input="true" name="counter[5]" storage_index="29" tap_mode="classic" trigger_index="29" type="unknown"/>
+            <node data_index="28" duplicate_name_allowed="false" is_data_input="true" is_node_valid="true" is_storage_input="true" is_trigger_input="true" name="counter[4]" storage_index="28" tap_mode="classic" trigger_index="28" type="unknown"/>
+            <node data_index="27" duplicate_name_allowed="false" is_data_input="true" is_node_valid="true" is_storage_input="true" is_trigger_input="true" name="counter[3]" storage_index="27" tap_mode="classic" trigger_index="27" type="unknown"/>
+            <node data_index="24" duplicate_name_allowed="false" is_data_input="true" is_node_valid="true" is_storage_input="true" is_trigger_input="true" name="counter[2]" storage_index="24" tap_mode="classic" trigger_index="24" type="unknown"/>
+            <node data_index="13" duplicate_name_allowed="false" is_data_input="true" is_node_valid="true" is_storage_input="true" is_trigger_input="true" name="counter[1]" storage_index="13" tap_mode="classic" trigger_index="13" type="unknown"/>
+            <node data_index="2" duplicate_name_allowed="false" is_data_input="true" is_node_valid="true" is_storage_input="true" is_trigger_input="true" name="counter[0]" storage_index="2" tap_mode="classic" trigger_index="2" type="unknown"/>
+          </node>
+          <node data_index="0" duplicate_name_allowed="false" is_data_input="true" is_node_valid="true" is_storage_input="true" is_trigger_input="true" level-0="rising edge" name="LED" storage_index="0" tap_mode="classic" trigger_index="0" type="unknown"/>
+          <node data_index="1" duplicate_name_allowed="false" is_data_input="true" is_node_valid="true" is_storage_input="true" is_trigger_input="true" name="clk" storage_index="1" tap_mode="classic" trigger_index="1" type="unknown"/>
+        </unified_setup_data_view>
+        <data_view>
+          <bus name="counter" order="msb_to_lsb" radix="unsigned_dec" type="register">
+            <net data_index="26" duplicate_name_allowed="false" is_data_input="true" is_node_valid="true" is_storage_input="true" is_trigger_input="true" name="counter[31]" storage_index="26" tap_mode="classic" trigger_index="26" type="unknown"/>
+            <net data_index="25" duplicate_name_allowed="false" is_data_input="true" is_node_valid="true" is_storage_input="true" is_trigger_input="true" name="counter[30]" storage_index="25" tap_mode="classic" trigger_index="25" type="unknown"/>
+            <net data_index="23" duplicate_name_allowed="false" is_data_input="true" is_node_valid="true" is_storage_input="true" is_trigger_input="true" name="counter[29]" storage_index="23" tap_mode="classic" trigger_index="23" type="unknown"/>
+            <net data_index="22" duplicate_name_allowed="false" is_data_input="true" is_node_valid="true" is_storage_input="true" is_trigger_input="true" name="counter[28]" storage_index="22" tap_mode="classic" trigger_index="22" type="unknown"/>
+            <net data_index="21" duplicate_name_allowed="false" is_data_input="true" is_node_valid="true" is_storage_input="true" is_trigger_input="true" name="counter[27]" storage_index="21" tap_mode="classic" trigger_index="21" type="unknown"/>
+            <net data_index="20" duplicate_name_allowed="false" is_data_input="true" is_node_valid="true" is_storage_input="true" is_trigger_input="true" name="counter[26]" storage_index="20" tap_mode="classic" trigger_index="20" type="unknown"/>
+            <net data_index="19" duplicate_name_allowed="false" is_data_input="true" is_node_valid="true" is_storage_input="true" is_trigger_input="true" name="counter[25]" storage_index="19" tap_mode="classic" trigger_index="19" type="unknown"/>
+            <net data_index="18" duplicate_name_allowed="false" is_data_input="true" is_node_valid="true" is_storage_input="true" is_trigger_input="true" name="counter[24]" storage_index="18" tap_mode="classic" trigger_index="18" type="unknown"/>
+            <net data_index="17" duplicate_name_allowed="false" is_data_input="true" is_node_valid="true" is_storage_input="true" is_trigger_input="true" name="counter[23]" storage_index="17" tap_mode="classic" trigger_index="17" type="unknown"/>
+            <net data_index="16" duplicate_name_allowed="false" is_data_input="true" is_node_valid="true" is_storage_input="true" is_trigger_input="true" name="counter[22]" storage_index="16" tap_mode="classic" trigger_index="16" type="unknown"/>
+            <net data_index="15" duplicate_name_allowed="false" is_data_input="true" is_node_valid="true" is_storage_input="true" is_trigger_input="true" name="counter[21]" storage_index="15" tap_mode="classic" trigger_index="15" type="unknown"/>
+            <net data_index="14" duplicate_name_allowed="false" is_data_input="true" is_node_valid="true" is_storage_input="true" is_trigger_input="true" name="counter[20]" storage_index="14" tap_mode="classic" trigger_index="14" type="unknown"/>
+            <net data_index="12" duplicate_name_allowed="false" is_data_input="true" is_node_valid="true" is_storage_input="true" is_trigger_input="true" name="counter[19]" storage_index="12" tap_mode="classic" trigger_index="12" type="unknown"/>
+            <net data_index="11" duplicate_name_allowed="false" is_data_input="true" is_node_valid="true" is_storage_input="true" is_trigger_input="true" name="counter[18]" storage_index="11" tap_mode="classic" trigger_index="11" type="unknown"/>
+            <net data_index="10" duplicate_name_allowed="false" is_data_input="true" is_node_valid="true" is_storage_input="true" is_trigger_input="true" name="counter[17]" storage_index="10" tap_mode="classic" trigger_index="10" type="unknown"/>
+            <net data_index="9" duplicate_name_allowed="false" is_data_input="true" is_node_valid="true" is_storage_input="true" is_trigger_input="true" name="counter[16]" storage_index="9" tap_mode="classic" trigger_index="9" type="unknown"/>
+            <net data_index="8" duplicate_name_allowed="false" is_data_input="true" is_node_valid="true" is_storage_input="true" is_trigger_input="true" name="counter[15]" storage_index="8" tap_mode="classic" trigger_index="8" type="unknown"/>
+            <net data_index="7" duplicate_name_allowed="false" is_data_input="true" is_node_valid="true" is_storage_input="true" is_trigger_input="true" name="counter[14]" storage_index="7" tap_mode="classic" trigger_index="7" type="unknown"/>
+            <net data_index="6" duplicate_name_allowed="false" is_data_input="true" is_node_valid="true" is_storage_input="true" is_trigger_input="true" name="counter[13]" storage_index="6" tap_mode="classic" trigger_index="6" type="unknown"/>
+            <net data_index="5" duplicate_name_allowed="false" is_data_input="true" is_node_valid="true" is_storage_input="true" is_trigger_input="true" name="counter[12]" storage_index="5" tap_mode="classic" trigger_index="5" type="unknown"/>
+            <net data_index="4" duplicate_name_allowed="false" is_data_input="true" is_node_valid="true" is_storage_input="true" is_trigger_input="true" name="counter[11]" storage_index="4" tap_mode="classic" trigger_index="4" type="unknown"/>
+            <net data_index="3" duplicate_name_allowed="false" is_data_input="true" is_node_valid="true" is_storage_input="true" is_trigger_input="true" name="counter[10]" storage_index="3" tap_mode="classic" trigger_index="3" type="unknown"/>
+            <net data_index="33" duplicate_name_allowed="false" is_data_input="true" is_node_valid="true" is_storage_input="true" is_trigger_input="true" name="counter[9]" storage_index="33" tap_mode="classic" trigger_index="33" type="unknown"/>
+            <net data_index="32" duplicate_name_allowed="false" is_data_input="true" is_node_valid="true" is_storage_input="true" is_trigger_input="true" name="counter[8]" storage_index="32" tap_mode="classic" trigger_index="32" type="unknown"/>
+            <net data_index="31" duplicate_name_allowed="false" is_data_input="true" is_node_valid="true" is_storage_input="true" is_trigger_input="true" name="counter[7]" storage_index="31" tap_mode="classic" trigger_index="31" type="unknown"/>
+            <net data_index="30" duplicate_name_allowed="false" is_data_input="true" is_node_valid="true" is_storage_input="true" is_trigger_input="true" name="counter[6]" storage_index="30" tap_mode="classic" trigger_index="30" type="unknown"/>
+            <net data_index="29" duplicate_name_allowed="false" is_data_input="true" is_node_valid="true" is_storage_input="true" is_trigger_input="true" name="counter[5]" storage_index="29" tap_mode="classic" trigger_index="29" type="unknown"/>
+            <net data_index="28" duplicate_name_allowed="false" is_data_input="true" is_node_valid="true" is_storage_input="true" is_trigger_input="true" name="counter[4]" storage_index="28" tap_mode="classic" trigger_index="28" type="unknown"/>
+            <net data_index="27" duplicate_name_allowed="false" is_data_input="true" is_node_valid="true" is_storage_input="true" is_trigger_input="true" name="counter[3]" storage_index="27" tap_mode="classic" trigger_index="27" type="unknown"/>
+            <net data_index="24" duplicate_name_allowed="false" is_data_input="true" is_node_valid="true" is_storage_input="true" is_trigger_input="true" name="counter[2]" storage_index="24" tap_mode="classic" trigger_index="24" type="unknown"/>
+            <net data_index="13" duplicate_name_allowed="false" is_data_input="true" is_node_valid="true" is_storage_input="true" is_trigger_input="true" name="counter[1]" storage_index="13" tap_mode="classic" trigger_index="13" type="unknown"/>
+            <net data_index="2" duplicate_name_allowed="false" is_data_input="true" is_node_valid="true" is_storage_input="true" is_trigger_input="true" name="counter[0]" storage_index="2" tap_mode="classic" trigger_index="2" type="unknown"/>
+          </bus>
+          <net data_index="0" duplicate_name_allowed="false" is_data_input="true" is_node_valid="true" is_storage_input="true" is_trigger_input="true" level-0="rising edge" name="LED" storage_index="0" tap_mode="classic" trigger_index="0" type="unknown"/>
+          <net data_index="1" duplicate_name_allowed="false" is_data_input="true" is_node_valid="true" is_storage_input="true" is_trigger_input="true" name="clk" storage_index="1" tap_mode="classic" trigger_index="1" type="unknown"/>
+        </data_view>
+        <setup_view>
+          <bus name="counter" order="msb_to_lsb" radix="unsigned_dec" type="register">
+            <net data_index="26" duplicate_name_allowed="false" is_data_input="true" is_node_valid="true" is_storage_input="true" is_trigger_input="true" name="counter[31]" storage_index="26" tap_mode="classic" trigger_index="26" type="unknown"/>
+            <net data_index="25" duplicate_name_allowed="false" is_data_input="true" is_node_valid="true" is_storage_input="true" is_trigger_input="true" name="counter[30]" storage_index="25" tap_mode="classic" trigger_index="25" type="unknown"/>
+            <net data_index="23" duplicate_name_allowed="false" is_data_input="true" is_node_valid="true" is_storage_input="true" is_trigger_input="true" name="counter[29]" storage_index="23" tap_mode="classic" trigger_index="23" type="unknown"/>
+            <net data_index="22" duplicate_name_allowed="false" is_data_input="true" is_node_valid="true" is_storage_input="true" is_trigger_input="true" name="counter[28]" storage_index="22" tap_mode="classic" trigger_index="22" type="unknown"/>
+            <net data_index="21" duplicate_name_allowed="false" is_data_input="true" is_node_valid="true" is_storage_input="true" is_trigger_input="true" name="counter[27]" storage_index="21" tap_mode="classic" trigger_index="21" type="unknown"/>
+            <net data_index="20" duplicate_name_allowed="false" is_data_input="true" is_node_valid="true" is_storage_input="true" is_trigger_input="true" name="counter[26]" storage_index="20" tap_mode="classic" trigger_index="20" type="unknown"/>
+            <net data_index="19" duplicate_name_allowed="false" is_data_input="true" is_node_valid="true" is_storage_input="true" is_trigger_input="true" name="counter[25]" storage_index="19" tap_mode="classic" trigger_index="19" type="unknown"/>
+            <net data_index="18" duplicate_name_allowed="false" is_data_input="true" is_node_valid="true" is_storage_input="true" is_trigger_input="true" name="counter[24]" storage_index="18" tap_mode="classic" trigger_index="18" type="unknown"/>
+            <net data_index="17" duplicate_name_allowed="false" is_data_input="true" is_node_valid="true" is_storage_input="true" is_trigger_input="true" name="counter[23]" storage_index="17" tap_mode="classic" trigger_index="17" type="unknown"/>
+            <net data_index="16" duplicate_name_allowed="false" is_data_input="true" is_node_valid="true" is_storage_input="true" is_trigger_input="true" name="counter[22]" storage_index="16" tap_mode="classic" trigger_index="16" type="unknown"/>
+            <net data_index="15" duplicate_name_allowed="false" is_data_input="true" is_node_valid="true" is_storage_input="true" is_trigger_input="true" name="counter[21]" storage_index="15" tap_mode="classic" trigger_index="15" type="unknown"/>
+            <net data_index="14" duplicate_name_allowed="false" is_data_input="true" is_node_valid="true" is_storage_input="true" is_trigger_input="true" name="counter[20]" storage_index="14" tap_mode="classic" trigger_index="14" type="unknown"/>
+            <net data_index="12" duplicate_name_allowed="false" is_data_input="true" is_node_valid="true" is_storage_input="true" is_trigger_input="true" name="counter[19]" storage_index="12" tap_mode="classic" trigger_index="12" type="unknown"/>
+            <net data_index="11" duplicate_name_allowed="false" is_data_input="true" is_node_valid="true" is_storage_input="true" is_trigger_input="true" name="counter[18]" storage_index="11" tap_mode="classic" trigger_index="11" type="unknown"/>
+            <net data_index="10" duplicate_name_allowed="false" is_data_input="true" is_node_valid="true" is_storage_input="true" is_trigger_input="true" name="counter[17]" storage_index="10" tap_mode="classic" trigger_index="10" type="unknown"/>
+            <net data_index="9" duplicate_name_allowed="false" is_data_input="true" is_node_valid="true" is_storage_input="true" is_trigger_input="true" name="counter[16]" storage_index="9" tap_mode="classic" trigger_index="9" type="unknown"/>
+            <net data_index="8" duplicate_name_allowed="false" is_data_input="true" is_node_valid="true" is_storage_input="true" is_trigger_input="true" name="counter[15]" storage_index="8" tap_mode="classic" trigger_index="8" type="unknown"/>
+            <net data_index="7" duplicate_name_allowed="false" is_data_input="true" is_node_valid="true" is_storage_input="true" is_trigger_input="true" name="counter[14]" storage_index="7" tap_mode="classic" trigger_index="7" type="unknown"/>
+            <net data_index="6" duplicate_name_allowed="false" is_data_input="true" is_node_valid="true" is_storage_input="true" is_trigger_input="true" name="counter[13]" storage_index="6" tap_mode="classic" trigger_index="6" type="unknown"/>
+            <net data_index="5" duplicate_name_allowed="false" is_data_input="true" is_node_valid="true" is_storage_input="true" is_trigger_input="true" name="counter[12]" storage_index="5" tap_mode="classic" trigger_index="5" type="unknown"/>
+            <net data_index="4" duplicate_name_allowed="false" is_data_input="true" is_node_valid="true" is_storage_input="true" is_trigger_input="true" name="counter[11]" storage_index="4" tap_mode="classic" trigger_index="4" type="unknown"/>
+            <net data_index="3" duplicate_name_allowed="false" is_data_input="true" is_node_valid="true" is_storage_input="true" is_trigger_input="true" name="counter[10]" storage_index="3" tap_mode="classic" trigger_index="3" type="unknown"/>
+            <net data_index="33" duplicate_name_allowed="false" is_data_input="true" is_node_valid="true" is_storage_input="true" is_trigger_input="true" name="counter[9]" storage_index="33" tap_mode="classic" trigger_index="33" type="unknown"/>
+            <net data_index="32" duplicate_name_allowed="false" is_data_input="true" is_node_valid="true" is_storage_input="true" is_trigger_input="true" name="counter[8]" storage_index="32" tap_mode="classic" trigger_index="32" type="unknown"/>
+            <net data_index="31" duplicate_name_allowed="false" is_data_input="true" is_node_valid="true" is_storage_input="true" is_trigger_input="true" name="counter[7]" storage_index="31" tap_mode="classic" trigger_index="31" type="unknown"/>
+            <net data_index="30" duplicate_name_allowed="false" is_data_input="true" is_node_valid="true" is_storage_input="true" is_trigger_input="true" name="counter[6]" storage_index="30" tap_mode="classic" trigger_index="30" type="unknown"/>
+            <net data_index="29" duplicate_name_allowed="false" is_data_input="true" is_node_valid="true" is_storage_input="true" is_trigger_input="true" name="counter[5]" storage_index="29" tap_mode="classic" trigger_index="29" type="unknown"/>
+            <net data_index="28" duplicate_name_allowed="false" is_data_input="true" is_node_valid="true" is_storage_input="true" is_trigger_input="true" name="counter[4]" storage_index="28" tap_mode="classic" trigger_index="28" type="unknown"/>
+            <net data_index="27" duplicate_name_allowed="false" is_data_input="true" is_node_valid="true" is_storage_input="true" is_trigger_input="true" name="counter[3]" storage_index="27" tap_mode="classic" trigger_index="27" type="unknown"/>
+            <net data_index="24" duplicate_name_allowed="false" is_data_input="true" is_node_valid="true" is_storage_input="true" is_trigger_input="true" name="counter[2]" storage_index="24" tap_mode="classic" trigger_index="24" type="unknown"/>
+            <net data_index="13" duplicate_name_allowed="false" is_data_input="true" is_node_valid="true" is_storage_input="true" is_trigger_input="true" name="counter[1]" storage_index="13" tap_mode="classic" trigger_index="13" type="unknown"/>
+            <net data_index="2" duplicate_name_allowed="false" is_data_input="true" is_node_valid="true" is_storage_input="true" is_trigger_input="true" name="counter[0]" storage_index="2" tap_mode="classic" trigger_index="2" type="unknown"/>
+          </bus>
+          <net data_index="0" duplicate_name_allowed="false" is_data_input="true" is_node_valid="true" is_storage_input="true" is_trigger_input="true" level-0="rising edge" name="LED" storage_index="0" tap_mode="classic" trigger_index="0" type="unknown"/>
+          <net data_index="1" duplicate_name_allowed="false" is_data_input="true" is_node_valid="true" is_storage_input="true" is_trigger_input="true" name="clk" storage_index="1" tap_mode="classic" trigger_index="1" type="unknown"/>
+        </setup_view>
+        <trigger_in_editor/>
+        <trigger_out_editor/>
+      </presentation>
+      <trigger CRC="6D2776E4" attribute_mem_mode="false" gap_record="true" global_temp="1" name="trigger: 2015/05/17 21:29:52  #0" position="pre" power_up_trigger_mode="false" record_data_gap="true" segment_size="1" storage_mode="off" storage_qualifier_disabled="no" storage_qualifier_port_is_pin="true" storage_qualifier_port_name="auto_stp_external_storage_qualifier" storage_qualifier_port_tap_mode="classic" trigger_type="circular">
+        <power_up_trigger position="pre" storage_qualifier_disabled="no"/>
+        <events use_custom_flow_control="no">
+          <level enabled="yes" name="condition1" type="basic">'LED' == rising edge
+            <power_up enabled="yes">
+            </power_up>
+            <op_node/>
+          </level>
+        </events>
+        <storage_qualifier_events>
+          <transitional>1111111111111111111111111111111111
+            <pwr_up_transitional>1111111111111111111111111111111111</pwr_up_transitional>
+          </transitional>
+          <storage_qualifier_level type="basic">
+            <power_up>
+            </power_up>
+            <op_node/>
+          </storage_qualifier_level>
+          <storage_qualifier_level type="basic">
+            <power_up>
+            </power_up>
+            <op_node/>
+          </storage_qualifier_level>
+          <storage_qualifier_level type="basic">
+            <power_up>
+            </power_up>
+            <op_node/>
+          </storage_qualifier_level>
+        </storage_qualifier_events>
+        <log>
+          <data global_temp="1" name="log: Trig @ 2015/05/17 21:29:53 (0:0:0.0 elapsed)" power_up_mode="false" sample_depth="128" trigger_position="16">00011111101101011000000000000100110011111110110101100000000000010011000111111011000110000000100001001100111111101100011000000010000100110001111110110101100000001000010011001111111011010110000000100001001100011111101100011000000000010100110011111110110001100000000001010011000111111011010110000000000101001100111111101101011000000000010100110001111110110001100000001001010011001111111011000110000000100101001100011111101101011000000010010100110011111110110101100000001001010011000111111011000110000000000011001100111111101100011000000000001100111100000000000000000000000000000000111000000000000000000000000000000011000000000001000000000000000000001110000000000100000000000000000000110000000000000000000000100000000011100000000000000000000010000000001100000000000100000000001000000000111000000000010000000000100000000011000000000000000000000000010000001110000000000000000000000001000000110000000000010000000000000100000011100000000001000000000000010000001100000000000000000000001001000000111000000000000000000000100100000011000000000001000000000010010000001110000000000100000000001001000000110000000000000000000000000010000011100000000000000000000000001000001100000000000100000000000000100000111000000000010000000000000010000011000000000000000000000010001000001110000000000000000000001000100000110000000000010000000000100010000011100000000001000000000010001000001100000000000000000000000001100000111000000000000000000000000110000011000000000001000000000000011000001110000000000100000000000001100000110000000000000000000000100110000011100000000000000000000010011000001100000000000100000000001001100000111000000000010000000000100110000011000000000000000000000000000100001110000000000000000000000000010000110000000000010000000000000001000011100000000001000000000000000100001100000000000000000000001000010000111000000000000000000000100001000011000000000001000000000010000100001110000000000100000000001000010000110000000000000000000000000101000011100000000000000000000000010100001100000000000100000000000001010000111000000000010000000000000101000011000000000000000000000010010100001110000000000000000000001001010000110000000000010000000000100101000011100000000001000000000010010100001100000000000000000000000000110000111000000000000000000000000011000011000000000001000000000000001100001110000000000100000000000000110000110000000000000000000000100011000011100000000000000000000010001100001100000000000100000000001000110000111000000000010000000000100011000011000000000000000000000000011100001110000000000000000000000001110000110000000000010000000000000111000011100000000001000000000000011100001100000000000000000000001001110000111000000000000000000000100111000011000000000001000000000010011100001110000000000100000000001001110000110000000000000000000000000000100011100000000000000000000000000010001100000000000100000000000000001000111000000000010000000000000000100011000000000000000000000010000010001110000000000000000000001000001000110000000000010000000000100000100011100000000001000000000010000010001100000000000000000000000001001000111000000000000000000000000100100011000000000001000000000000010010001110000000000100000000000001001000110000000000000000000000100100100011100000000000000000000010010010001100000000000100000000001001001000111000000000010000000000100100100011000000000000000000000000001010001110000000000000000000000000101000110000000000010000000000000010100011100000000001000000000000001010001100000000000000000000001000101000111000000000000000000000100010100011000000000001000000000010001010001110000000000100000000001000101000110000000000000000000000000110100011100000000000000000000000011010001100000000000100000000000001101000111000000000010000000000000110100011000000000000000000000010011010001110000000000000000000001001101000110000000000010000000000100110100011100000000001000000000010011010001100000000000000000000000000011000111000000000000000000000000001100011000000000001000000000000000110001110000000000100000000000000011000110000000000000000000000100001100011100000000000000000000010000110001100000000000100000000001000011000111000000000010000000000100001100011000000000000000000000000010110001110000000000000000000000001011000110000000000010000000000000101100011100000000001000000000000010110001100000000000000000000001001011000111000000000000000000000100101100011000000000001000000000010010110001110000000000100000000001001011000</data>
+          <extradata>1111111111111111T111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111</extradata>
+        </log>
+      </trigger>
+    </signal_set>
+  </instance>
+  <mnemonics/>
+  <static_plugin_mnemonics/>
+</session>
