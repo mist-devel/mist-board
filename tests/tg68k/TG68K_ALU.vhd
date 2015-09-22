@@ -22,7 +22,7 @@
 
 library ieee;
 use ieee.std_logic_1164.all;
--- use ieee.std_logic_unsigned.all;
+use ieee.std_logic_unsigned.all;
 use IEEE.numeric_std.all;
 use work.TG68K_Pack.all;
 
@@ -204,7 +204,7 @@ PROCESS (OP2out, reg_QB, opcode, OP1out, OP1in, exe_datatype, addsub_q, execOPC,
 			ALUout <= result(31 downto 0);
 			IF bf_fffo='1' THEN
 				ALUout <= (OTHERS =>'0');
-				ALUout(5 downto 0) <= std_logic_vector(unsigned(bf_firstbit) + unsigned(bf_shift));
+				ALUout(5 downto 0) <= bf_firstbit + bf_shift;
 			END IF;
 		END IF;
 		
@@ -293,7 +293,7 @@ PROCESS (OP1out, OP2out, execOPC, datatype, Flags, long_start, movem_presub, exe
 				ELSE
 					addsub_b <= "00000000000000000000000000000100";
 				END IF;
-			ELSE
+			ELSE 
 				addsub_b <= "00000000000000000000000000000010";
 			END IF;
 		ELSE	
@@ -308,7 +308,7 @@ PROCESS (OP1out, OP2out, execOPC, datatype, Flags, long_start, movem_presub, exe
 		ELSE					--SUB
 			notaddsub_b <= NOT ('0'&addsub_b&c_in(0));
 		END IF;
-		add_result <= std_logic_vector( unsigned('0'&addsub_a&notaddsub_b(0)) + unsigned(notaddsub_b));
+		add_result <= (('0'&addsub_a&notaddsub_b(0))+notaddsub_b);
 		c_in(1) <= add_result(9) XOR addsub_a(8) XOR addsub_b(8);
 		c_in(2) <= add_result(17) XOR addsub_a(16) XOR addsub_b(16);
 		c_in(3) <= add_result(33);
@@ -336,27 +336,25 @@ PROCESS (OP1out, OP2out, pack_a, niba_hc, niba_h, niba_l, niba_lc, nibs_hc, nibs
   
 --BCD_ARITH-------------------------------------------------------------------
 	--ADC
-		bcd_a <= niba_hc & std_logic_vector(unsigned(niba_h(4 downto 1)) + ('0',niba_hc,niba_hc,'0'))  &
-                                   std_logic_vector(unsigned(niba_l(4 downto 1)) + ('0',niba_lc,niba_lc,'0'));
-		niba_l <= std_logic_vector(unsigned('0'&OP1out(3 downto 0)&'1') + unsigned('0'&OP2out(3 downto 0)&Flags(4)));
+		bcd_a <= niba_hc&(niba_h(4 downto 1)+('0',niba_hc,niba_hc,'0'))&(niba_l(4 downto 1)+('0',niba_lc,niba_lc,'0'));
+		niba_l <= ('0'&OP1out(3 downto 0)&'1') + ('0'&OP2out(3 downto 0)&Flags(4));
 		niba_lc <= niba_l(5) OR (niba_l(4) AND niba_l(3)) OR (niba_l(4) AND niba_l(2));
 
-		niba_h <= std_logic_vector(unsigned('0'&OP1out(7 downto 4)&'1') + unsigned('0'&OP2out(7 downto 4)&niba_lc));
+		niba_h <= ('0'&OP1out(7 downto 4)&'1') + ('0'&OP2out(7 downto 4)&niba_lc);
 		niba_hc <= niba_h(5) OR (niba_h(4) AND niba_h(3)) OR (niba_h(4) AND niba_h(2));
 	--SBC			
-		bcd_s <= nibs_hc & std_logic_vector(unsigned(nibs_h(4 downto 1)) - ('0',nibs_hc,nibs_hc,'0')) &
-                                   std_logic_vector(unsigned(nibs_l(4 downto 1)) - ('0',nibs_lc,nibs_lc,'0'));
-		nibs_l <= std_logic_vector(unsigned('0'&OP1out(3 downto 0)&'0') - unsigned('0'&OP2out(3 downto 0)&Flags(4)));
+		bcd_s <= nibs_hc&(nibs_h(4 downto 1)-('0',nibs_hc,nibs_hc,'0'))&(nibs_l(4 downto 1)-('0',nibs_lc,nibs_lc,'0'));
+		nibs_l <= ('0'&OP1out(3 downto 0)&'0') - ('0'&OP2out(3 downto 0)&Flags(4));
 		nibs_lc <= nibs_l(5);
 
-		nibs_h <= std_logic_vector(unsigned('0'&OP1out(7 downto 4)&'0') - unsigned('0'&OP2out(7 downto 4)&nibs_lc));
+		nibs_h <= ('0'&OP1out(7 downto 4)&'0') - ('0'&OP2out(7 downto 4)&nibs_lc);
 		nibs_hc <= nibs_h(5);
 	END PROCESS;
 			
 -----------------------------------------------------------------------------
 -- Bits
 -----------------------------------------------------------------------------
-PROCESS (clk, exe_opcode, OP1out, OP2out, one_bit_in, bchg, bset, bit_Number, sndOPC)
+PROCESS (clk, exe_opcode, OP1out, OP2out, one_bit_in, bchg, bset, bit_Number, sndOPC, reg_QB)
 	BEGIN
 		IF rising_edge(clk) THEN		
 	        IF  clkena_lw = '1' THEN
@@ -506,7 +504,7 @@ PROCESS (clk, mux, mask, bitnr, bf_ins, bf_bchg, bf_bset, bf_exts, bf_shift, inm
 		sign <= (OTHERS => '0'); 
 		bf_NFlag <= datareg(to_integer(unsigned(bf_width)));
 		FOR i in 0 to 31 LOOP
-			IF i > unsigned(bf_width(4 downto 0)) THEN
+			IF i>bf_width(4 downto 0) THEN
 				datareg(i) <= '0'; 
 				sign(i) <= '1'; 
 			END IF;	
@@ -788,18 +786,18 @@ PROCESS (exe_opcode, OP2out, muls_msb, mulu_reg, FAsign, mulu_sign, reg_QA, fakt
 			result_mulu(15 downto 0) <= 'X'&mulu_reg(15 downto 1);	
 			IF mulu_reg(0)='1' THEN
 				IF FAsign='1' THEN
-					result_mulu(63 downto 47) <= std_logic_vector(muls_msb & unsigned(mulu_reg(63 downto 48)) - unsigned(mulu_sign&faktorB(31 downto 16)) );	
+					result_mulu(63 downto 47) <= (muls_msb&mulu_reg(63 downto 48)-(mulu_sign&faktorB(31 downto 16)));	
 				ELSE
-					result_mulu(63 downto 47) <= std_logic_vector(muls_msb & unsigned(mulu_reg(63 downto 48)) + unsigned(mulu_sign&faktorB(31 downto 16)) );	
+					result_mulu(63 downto 47) <= (muls_msb&mulu_reg(63 downto 48)+(mulu_sign&faktorB(31 downto 16)));	
 				END IF;
 			END IF;	
 		ELSE				-- 32 Bit
 			result_mulu <= muls_msb&mulu_reg(63 downto 1);	
 			IF mulu_reg(0)='1' THEN
 				IF FAsign='1' THEN
-					result_mulu(63 downto 31) <= std_logic_vector(muls_msb & unsigned(mulu_reg(63 downto 32))-unsigned(mulu_sign&faktorB));	
+					result_mulu(63 downto 31) <= (muls_msb&mulu_reg(63 downto 32)-(mulu_sign&faktorB));	
 				ELSE
-					result_mulu(63 downto 31) <= std_logic_vector(muls_msb & unsigned(mulu_reg(63 downto 32))+unsigned(mulu_sign&faktorB));	
+					result_mulu(63 downto 31) <= (muls_msb&mulu_reg(63 downto 32)+(mulu_sign&faktorB));	
 				END IF;
 			END IF;	
 		END IF;
@@ -825,7 +823,7 @@ PROCESS (clk)
 					mulu_reg(63 downto 32) <= (OTHERS=>'0');
 					IF divs='1' AND ((exe_opcode(15)='1' AND reg_QA(15)='1') OR (exe_opcode(15)='0' AND reg_QA(31)='1')) THEN				--MULS Neg faktor
 						FAsign <= '1';
-						mulu_reg(31 downto 0) <= std_logic_vector(0-unsigned(reg_QA));
+						mulu_reg(31 downto 0) <= 0-reg_QA;
 					ELSE
 						FAsign <= '0';
 						mulu_reg(31 downto 0) <= reg_QA;
@@ -861,9 +859,9 @@ PROCESS (execOPC, OP1out, OP2out, div_reg, div_neg, div_bit, div_sub, div_quot, 
 			OP2outext <= (OTHERS=> '0');
 		END IF;
 		IF signedOP='1' AND OP2out(31) ='1' THEN
-			div_sub <= std_logic_vector(unsigned(div_reg(63 downto 31)) + unsigned('1'&OP2out(31 downto 0)));
+			div_sub <= (div_reg(63 downto 31))+('1'&OP2out(31 downto 0));
 		ELSE
-			div_sub <= std_logic_vector(unsigned(div_reg(63 downto 31))-unsigned('0'&OP2outext(15 downto 0)&OP2out(15 downto 0)));
+			div_sub <= (div_reg(63 downto 31))-('0'&OP2outext(15 downto 0)&OP2out(15 downto 0));
 		END IF;	
 		IF DIV_Mode=0 THEN
 			div_bit <= div_sub(16);
@@ -896,7 +894,7 @@ PROCESS (clk)
 					nozero <= '0';
 					IF divs='1' AND divisor(63)='1' THEN				-- Neg divisor
 						OP1_sign <= '1';
-						div_reg <= std_logic_vector(0-unsigned(divisor));
+						div_reg <= 0-divisor;
 					ELSE
 						OP1_sign <= '0';
 						div_reg <= divisor;
@@ -909,21 +907,21 @@ PROCESS (clk)
 					div_qsign <= NOT div_bit;
 					div_neg <= signedOP AND (OP2out(31) XOR OP1_sign);
 					IF DIV_Mode=0 THEN
-						div_over(32 downto 16) <= std_logic_vector(unsigned('0'&div_reg(47 downto 32))-unsigned('0'&OP2out(15 downto 0)));
+						div_over(32 downto 16) <= ('0'&div_reg(47 downto 32))-('0'&OP2out(15 downto 0));
 					ELSE	
-						div_over <= std_logic_vector(unsigned('0'&div_reg(63 downto 32))-unsigned('0'&OP2out));
+						div_over <= ('0'&div_reg(63 downto 32))-('0'&OP2out);
 					END IF;	
 				END IF;
 				IF exec(write_reminder)='0' THEN
 --				IF exec_DIVU='0' THEN
 					IF div_neg='1' THEN
-						result_div(31 downto 0) <= std_logic_vector(0-unsigned(div_quot(31 downto 0)));
+						result_div(31 downto 0) <= 0-div_quot(31 downto 0);
 					ELSE
 						result_div(31 downto 0) <= div_quot(31 downto 0);
 					END IF;	
 					
 					IF OP1_sign='1' THEN
-						result_div(63 downto 32) <= std_logic_vector(0-unsigned(div_quot(63 downto 32)));
+						result_div(63 downto 32) <= 0-div_quot(63 downto 32);
 					ELSE
 						result_div(63 downto 32) <= div_quot(63 downto 32);
 					END IF;	

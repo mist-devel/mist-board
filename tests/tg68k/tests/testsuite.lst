@@ -1,0 +1,22 @@
+
+
+Sections:
+S01  CODE
+
+
+Sources:
+
+
+Symbols:
+testword2 LAB (0x178) sec=CODE 
+loopf LAB (0x172) sec=CODE 
+loop LAB (0x168) sec=CODE 
+testword1 LAB (0x174) sec=CODE 
+fail LAB (0x16a) sec=CODE 
+testword4 EXPR(65796) 
+testword3 EXPR(65792) 
+start LAB (0x8) sec=CODE 
+REPTN EXPR(4294967295) INTERNAL 
+__VASM EXPR(4) INTERNAL 
+
+There have been no errors.

@@ -1,0 +1,6 @@
+	;; bcd tests
+
+	andi	#$ef,ccr	; clear x bit
+	clr	d0
+	abcd	#$12,d0
+	

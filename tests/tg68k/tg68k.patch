@@ -1,0 +1,80 @@
+--- orig/TG68KdotC_Kernel.vhd	2015-09-22 09:10:45.647403092 +0200
++++ TG68KdotC_Kernel.vhd	2015-09-22 09:18:03.919401999 +0200
+@@ -2,6 +2,7 @@
+ ------------------------------------------------------------------------------
+ --                                                                          --
+ -- Copyright (c) 2009-2013 Tobias Gubener                                   --
++-- Patches by MikeJ, Till Harbaum, Rok Krajnk, ...                          --
+ -- Subdesign fAMpIGA by TobiFlex                                            --
+ --                                                                          --
+ -- This source file is free software: you can redistribute it and/or modify --
+@@ -19,13 +20,6 @@
+ --                                                                          --
+ ------------------------------------------------------------------------------
+ ------------------------------------------------------------------------------
+--- bugfix session 07/08.Feb.2013
+--- movem ,-(an)
+--- movem (an)+,          - thanks  Gerhard Suttner
+--- btst dn,#data         - thanks  Peter Graf
+--- movep                 - thanks  Till Harbaum
+--- IPL vector            - thanks  Till Harbaum
+---
+ 
+ -- optimize Register file
+ 
+@@ -43,11 +37,10 @@
+ -- CHK2
+ -- CMP2
+ -- cpXXX Coprozessor stuff
+--- PACK
+ -- TRAPcc
+--- UNPK
+ 
+ -- done 020:
++-- PACK, UNPK
+ -- Bitfields
+ -- address modes
+ -- long bra
+@@ -673,7 +666,7 @@
+ 				END IF;
+ 				IF state="10" THEN
+ 					ea_data <= data_read;
+-				ELSIF exec(get_2ndOPC)='1' THEN
++				ELSIF exec(get_2ndOPC)='1' OR set_PCbase='1' THEN --TH cmpi (d16,PC) fix
+ 					ea_data <= addr;
+ 				ELSIF exec(store_ea_data)='1' OR (direct_data='1' AND state="00") THEN
+ 					ea_data <= last_data_read;
+@@ -2494,17 +2487,22 @@
+ 							set_exec(opcBF) <= '1';
+ 							IF opcode(10)='1' OR opcode(8)='0' THEN
+ 								set_exec(opcBFwb) <= '1';
+---                                                      END IF;
+---                                                      IF opcode(10 downto 8)="111" THEN
++                                                                IF opcode(10 downto 8)/="111" THEN -- bfins
++                                                                  set_exec(ea_data_OP2) <= '1'; -- for the flags
++                                                                END IF;
+ 								set_exec(ea_data_OP1) <= '1';
+ 							END IF;
++
++                                                        -- BFCHG, BFCLR, BFSET, BFINS
+ 							IF opcode(10 downto 8)="010" OR opcode(10 downto 8)="100" OR opcode(10 downto 8)="110" OR opcode(10 downto 8)="111" THEN
+ 								write_back <= '1';
+ 							END IF;
+ 							ea_only <= '1';
++                                                        -- BFEXTU, BFEXTS, BFFFO
+ 							IF opcode(10 downto 8)="001" OR opcode(10 downto 8)="011" OR opcode(10 downto 8)="101" THEN
+ 								set_exec(Regwrena) <= '1';
+ 							END IF;
++                                                        -- register destination
+ 							IF opcode(4 downto 3)="00" THEN
+ 								set_exec(Regwrena) <= '1';
+ 								IF exec(ea_build)='1' THEN
+@@ -2533,7 +2531,7 @@
+ 							IF setexecOPC='1' THEN
+ 								IF opcode(10 downto 8)="111" THEN       --BFINS
+ 									source_2ndHbits <= '1';
+-								ELSE
++								ELSIF opcode(10 downto 8)="001" or opcode(10 downto 8)="011" THEN	--BFEXT
+ 									source_lowbits <= '1';
+ 									dest_2ndHbits <= '1';
+ 								END IF;
