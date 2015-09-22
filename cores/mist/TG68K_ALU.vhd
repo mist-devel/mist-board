@@ -101,6 +101,8 @@ architecture logic of TG68K_ALU is
 	
     signal bcd_a		  : std_logic_vector(8 downto 0);
     signal bcd_s		  : std_logic_vector(8 downto 0);
+    signal pack_out		  : std_logic_vector(15 downto 0);
+    signal pack_a		  : std_logic_vector(15 downto 0);
     signal result_mulu    : std_logic_vector(63 downto 0);
     signal result_div     : std_logic_vector(63 downto 0);
     signal set_mV_Flag	  : std_logic;
@@ -193,7 +195,7 @@ BEGIN
 -- set OP1in
 -----------------------------------------------------------------------------
 PROCESS (OP2out, reg_QB, opcode, OP1out, OP1in, exe_datatype, addsub_q, execOPC, exec,
-	     bcd_a, bcd_s, result_mulu, result_div, exe_condition, bf_shift,
+	     pack_out, bcd_a, bcd_s, result_mulu, result_div, exe_condition, bf_shift,
 	     Flags, FlagsSR, bits_out, exec_tas, rot_out, exe_opcode, result, bf_fffo, bf_firstbit, bf_datareg)
 	BEGIN
 		ALUout <= OP1in;
@@ -254,6 +256,8 @@ PROCESS (OP2out, reg_QB, opcode, OP1out, OP1in, exe_datatype, addsub_q, execOPC,
 			ELSE	
 				OP1in(15 downto 8) <= FlagsSR;
 			END IF;
+		ELSIF exec(opcPACK)='1' THEN
+			OP1in(15 downto 0) <= pack_out;
 		END IF;
 	END PROCESS;
 	
@@ -318,8 +322,18 @@ PROCESS (OP1out, OP2out, execOPC, datatype, Flags, long_start, movem_presub, exe
 ------------------------------------------------------------------------------
 --ALU
 ------------------------------------------------------------------------------		
-PROCESS (OP1out, OP2out, niba_hc, niba_h, niba_l, niba_lc, nibs_hc, nibs_h, nibs_l, nibs_lc, Flags)
+PROCESS (OP1out, OP2out, pack_a, niba_hc, niba_h, niba_l, niba_lc, nibs_hc, nibs_h, nibs_l, nibs_lc, Flags)
 	BEGIN
+                IF exe_opcode(7 downto 6) = "01" THEN
+                  -- PACK
+                  pack_a <= std_logic_vector(unsigned(OP1out(15 downto 0))+unsigned(OP2out(15 downto 0))); 
+                  pack_out <= "00000000" & pack_a(11 downto 8) & pack_a(3 downto 0);
+                ELSE
+                  -- UNPK
+                  pack_a <= "0000" & OP2out(7 downto 4) & "0000" & OP2out(3 downto 0);
+                  pack_out <= std_logic_vector(unsigned(OP1out(15 downto 0))+unsigned(pack_a)); 
+                END IF;
+  
 --BCD_ARITH-------------------------------------------------------------------
 	--ADC
 		bcd_a <= niba_hc&(niba_h(4 downto 1)+('0',niba_hc,niba_hc,'0'))&(niba_l(4 downto 1)+('0',niba_lc,niba_lc,'0'));
@@ -340,7 +354,7 @@ PROCESS (OP1out, OP2out, niba_hc, niba_h, niba_l, niba_lc, nibs_hc, nibs_h, nibs
 -----------------------------------------------------------------------------
 -- Bits
 -----------------------------------------------------------------------------
-PROCESS (clk, exe_opcode, OP1out, OP2out, one_bit_in, bchg, bset, bit_Number, sndOPC)
+PROCESS (clk, exe_opcode, OP1out, OP2out, one_bit_in, bchg, bset, bit_Number, sndOPC, reg_QB)
 	BEGIN
 		IF rising_edge(clk) THEN		
 	        IF  clkena_lw = '1' THEN
