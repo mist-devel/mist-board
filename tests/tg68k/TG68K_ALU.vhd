@@ -61,6 +61,7 @@ generic(
 		bf_shift      	 	: in std_logic_vector(5 downto 0);
 		bf_width        	: in std_logic_vector(5 downto 0);
 		bf_loffset        	: in std_logic_vector(4 downto 0);
+                bf_offset               : in std_logic_vector(5 downto 0);
 		      
         set_V_Flag	        : buffer bit;
         Flags         	 	: buffer std_logic_vector(7 downto 0);
@@ -195,7 +196,7 @@ BEGIN
 -- set OP1in
 -----------------------------------------------------------------------------
 PROCESS (OP2out, reg_QB, opcode, OP1out, OP1in, exe_datatype, addsub_q, execOPC, exec,
-	     pack_out, bcd_a, bcd_s, result_mulu, result_div, exe_condition, bf_shift,
+	     pack_out, bcd_a, bcd_s, result_mulu, result_div, exe_condition, bf_shift, bf_offset, bf_width,
 	     Flags, FlagsSR, bits_out, exec_tas, rot_out, exe_opcode, result, bf_fffo, bf_firstbit, bf_datareg)
 	BEGIN
 		ALUout <= OP1in;
@@ -204,7 +205,7 @@ PROCESS (OP2out, reg_QB, opcode, OP1out, OP1in, exe_datatype, addsub_q, execOPC,
 			ALUout <= result(31 downto 0);
 			IF bf_fffo='1' THEN
 				ALUout <= (OTHERS =>'0');
-				ALUout(5 downto 0) <= bf_firstbit + bf_shift;
+				ALUout(5 downto 0) <= bf_offset + bf_width - bf_firstbit;
 			END IF;
 		END IF;
 		

@@ -27,7 +27,8 @@ package TG68K_Pack is
 	type micro_states is (idle, nop, ld_nn, st_nn, ld_dAn1, ld_AnXn1, ld_AnXn2, st_dAn1, ld_AnXnbd1, ld_AnXnbd2, ld_AnXnbd3,
 						  ld_229_1, ld_229_2, ld_229_3, ld_229_4, st_229_1, st_229_2, st_229_3, st_229_4,
 						  st_AnXn1, st_AnXn2, bra1, bsr1, bsr2, nopnop, dbcc1, movem1, movem2, movem3,
-						  andi, op_AxAy, cmpm, link1, link2, unlink1, unlink2, int1, int2, int3, int4, rte1, rte2, rte3, trap0, trap1, trap2, trap3,
+						  andi, op_AxAy, cmpm, link1, link2, unlink1, unlink2, int1, int2, int3, int4, rte1,
+                                                  rte2, rte3, rte4, rte5, trap00, trap0, trap1, trap2, trap3,
 						  trap4, trap5, trap6, movec1, movep1, movep2, movep3, movep4, movep5, rota1, bf1,
 						  mul1, mul2, mul_end1,  mul_end2, div1, div2, div3, div4, div_end1, div_end2, pack1, pack2, pack3);
 
@@ -238,6 +239,7 @@ package TG68K_Pack is
 		bf_shift                : in std_logic_vector(5 downto 0);
 		bf_width                : in std_logic_vector(5 downto 0);
 		bf_loffset              : in std_logic_vector(4 downto 0);
+                bf_offset               : in std_logic_vector(5 downto 0);
 
 		set_V_Flag              : buffer bit;
 		Flags                   : buffer std_logic_vector(7 downto 0);

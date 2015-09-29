@@ -7,7 +7,7 @@
 unsigned int  m68k_read_memory_8(unsigned int address) {
   unsigned int retval = (address & 1)?
     (mem_read(address, 3) & 0xff):(mem_read(address, 3) >> 8);
-  //  printf("%s(%x)=%x\n", __FUNCTION__, address, retval);
+  // printf("%s(%x)=%x\n", __FUNCTION__, address, retval);
   return retval;
 }
 

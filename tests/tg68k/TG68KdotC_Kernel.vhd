@@ -111,6 +111,8 @@ architecture logic of TG68KdotC_Kernel is
 
 	signal opcode               : std_logic_vector(15 downto 0);
 	signal exe_opcode           : std_logic_vector(15 downto 0);
+	signal exe_pc               : std_logic_vector(31 downto 0);
+	signal last_opc_pc          : std_logic_vector(31 downto 0);
 	signal sndOPC               : std_logic_vector(15 downto 0);
 
 	signal last_opc_read        : std_logic_vector(15 downto 0);
@@ -222,7 +224,7 @@ architecture logic of TG68KdotC_Kernel is
 	signal trapd                : bit;
 	signal trap_SR              : std_logic_vector(7 downto 0);
 	signal make_trace           : std_logic;
-	signal make_berr     		 : std_logic;
+	signal make_berr     	    : std_logic;
 
 	signal set_stop             : bit;
 	signal stop                 : bit;
@@ -268,7 +270,8 @@ architecture logic of TG68KdotC_Kernel is
 	signal last_data_read       : std_logic_vector(31 downto 0);
 	signal last_data_in         : std_logic_vector(31 downto 0);
 
-	signal bf_offset            : std_logic_vector(5 downto 0);
+        signal alu_bf_offset        : std_logic_vector(5 downto 0);
+        signal bf_offset            : std_logic_vector(5 downto 0);
 	signal bf_width             : std_logic_vector(5 downto 0);
 	signal bf_bhits             : std_logic_vector(5 downto 0);
 	signal bf_shift             : std_logic_vector(5 downto 0);
@@ -328,6 +331,7 @@ ALU: TG68K_ALU
 		bf_ext_out     => bf_ext_out,
 		bf_shift       => alu_bf_shift,
 		bf_width       => alu_width,
+		bf_offset      => alu_bf_offset,
 		bf_loffset     => alu_bf_loffset(4 downto 0),
 		set_V_Flag     => set_V_Flag,                     --: buffer bit;
 		Flags          => Flags,                          --: buffer std_logic_vector(8 downto 0);
@@ -676,8 +680,17 @@ PROCESS (clk)
 					data_write_tmp <= TG68_PC;
 				ELSIF exec(writePC_add)='1' THEN
 					data_write_tmp <= TG68_PC_add;
+				ELSIF micro_state=trap00 THEN
+                                          data_write_tmp <= exe_pc; --TH
 				ELSIF micro_state=trap0 THEN
-					data_write_tmp(15 downto 0) <= trap_vector(15 downto 0);
+                                        -- this is only active for 010+ since in 000 writePC is
+                                        -- true in state trap0
+                                        if trap_trace='1' then
+                                          -- stack frame format #2
+                                          data_write_tmp(15 downto 0) <= "0010" & trap_vector(11 downto 0); --TH
+                                        else
+                                          data_write_tmp(15 downto 0) <= "0000" & trap_vector(11 downto 0);
+                                        end if;
 				ELSIF exec(hold_dwr)='1' THEN
 					data_write_tmp <= data_write_tmp;
 				ELSIF exec(exg)='1' THEN
@@ -990,6 +1003,7 @@ PROCESS (clk, IPL, setstate, state, exec_write_back, set_direct_data, next_micro
 					END IF;
 					IF state="00" THEN
 						last_opc_read <= data_read(15 downto 0);
+						last_opc_pc <= tg68_pc;
 					END IF;
 					IF setopcode='1' THEN
 						trap_interrupt <= '0';
@@ -1079,8 +1093,10 @@ PROCESS (clk, IPL, setstate, state, exec_write_back, set_direct_data, next_micro
 					IF setopcode='1' AND berr='0' THEN
 						IF state="00" THEN
 							opcode <= data_read(15 downto 0);
+                                                        exe_pc <= tg68_pc;
 						ELSE
 							opcode <= last_opc_read(15 downto 0);
+                                                        exe_pc <= last_opc_pc;
 						END IF;
 						nextpass <= '0';
 					ELSIF setinterrupt='1' THEN
@@ -1129,11 +1145,12 @@ PROCESS (clk, IPL, setstate, state, exec_write_back, set_direct_data, next_micro
 PROCESS (clk, Reset, sndOPC, reg_QA, reg_QB, bf_width, bf_offset, bf_bhits, opcode, setstate, bf_shift)
 	BEGIN
 		IF sndOPC(11)='1' THEN
-			bf_offset <= '0'&reg_QA(4 downto 0);
+			alu_bf_offset <= '0'&reg_QA(4 downto 0);
 		ELSE
-			bf_offset <= '0'&sndOPC(10 downto 6);
+			alu_bf_offset <= '0'&sndOPC(10 downto 6);
 		END IF;
 
+                bf_offset <= alu_bf_offset;
 		bf_width(5) <= '0';
 		IF sndOPC(5)='1' THEN
 			bf_width(4 downto 0) <= reg_QB(4 downto 0)-1;
@@ -1326,7 +1343,7 @@ PROCESS (clk, cpu, OP1out, OP2out, opcode, exe_condition, nextpass, micro_state,
 		END CASE;
 
 		IF trapmake='1' AND trapd='0' THEN
-			next_micro_state <= trap0;
+                        next_micro_state <= trap0;
 			IF VBR_Stackframe=0 OR (cpu(0)='0' AND VBR_Stackframe=2) THEN
 				set(writePC_add) <= '1';
 --                              set_datatype <= "10";
@@ -1344,7 +1361,11 @@ PROCESS (clk, cpu, OP1out, OP2out, opcode, exe_condition, nextpass, micro_state,
 			setstate <= "01";
 		END IF;	
 		IF micro_state=int1 OR (interrupt='1' AND trap_trace='1') THEN
-			next_micro_state <= trap0;
+                        if trap_trace='1' AND (VBR_Stackframe=1 OR (cpu(0)='1' AND VBR_Stackframe=2)) then
+                          next_micro_state <= trap00;  --TH
+                        else
+                          next_micro_state <= trap0;
+                        end if;
 --                      IF cpu(0)='0' THEN
 --                              set_datatype <= "10";
 --                      END IF;
@@ -2295,7 +2316,6 @@ PROCESS (clk, cpu, OP1out, OP2out, opcode, exe_condition, nextpass, micro_state,
            -- immediate value is kept in op1
            -- source value is in op2
            
-           -- xyz
            if opcode(3)='0' then -- R/M bit = 0 -> Dy->Dy, 1 -(Ax),-(Ay)
              dest_hbits <='1';      -- dest register is encoded in bits 9-11
              source_lowbits <= '1'; -- source register is encoded in bits 0-2
@@ -2531,7 +2551,7 @@ PROCESS (clk, cpu, OP1out, OP2out, opcode, exe_condition, nextpass, micro_state,
 							IF setexecOPC='1' THEN
 								IF opcode(10 downto 8)="111" THEN       --BFINS
 									source_2ndHbits <= '1';
-								ELSIF opcode(10 downto 8)="001" or opcode(10 downto 8)="011" THEN	--BFEXT
+								ELSIF opcode(10 downto 8)="001" or opcode(10 downto 8)="011" OR opcode(10 downto 8)="101" THEN	--BFEXT,BFFFO
 									source_lowbits <= '1';
 									dest_2ndHbits <= '1';
 								END IF;
@@ -2887,7 +2907,7 @@ PROCESS (clk, cpu, OP1out, OP2out, opcode, exe_condition, nextpass, micro_state,
 					END IF;
 
 				WHEN op_AxAy =>         -- op -(Ax),-(Ay)
-								set_direct_data <= '1';
+					set_direct_data <= '1';
 					set(presub) <= '1';
 					dest_hbits <= '1';
 					dest_areg <= '1';
@@ -2918,7 +2938,13 @@ PROCESS (clk, cpu, OP1out, OP2out, opcode, exe_condition, nextpass, micro_state,
 				WHEN unlink2 =>         -- unlink
 					set(ea_data_OP2) <= '1';
 
-				WHEN trap0 =>           -- TRAP
+				WHEN trap00 =>          -- TRAP format #2
+					next_micro_state <= trap0;
+					set(presub) <= '1';
+					setstackaddr <='1';
+					setstate <= "11";
+					datatype <= "10";
+                                WHEN trap0 =>           -- TRAP
 					set(presub) <= '1';
 					setstackaddr <='1';
 					setstate <= "11";
@@ -2935,6 +2961,7 @@ PROCESS (clk, cpu, OP1out, OP2out, opcode, exe_condition, nextpass, micro_state,
 						next_micro_state <= trap2;
 					END IF;
 				WHEN trap1 =>           -- TRAP
+                                        -- additional word for 68020
 					IF trap_interrupt='1' OR trap_trace='1' THEN
 						writePC <= '1';
 					END IF;
@@ -2982,6 +3009,15 @@ PROCESS (clk, cpu, OP1out, OP2out, opcode, exe_condition, nextpass, micro_state,
 					datatype <= "01";
 					writeSR <= '1';
 					next_micro_state <= trap3;
+
+                                        
+                                        -- return from exception - RTE
+                                        -- fetch PC and status register from stack
+                                        -- 010+ fetches another word containing
+                                        -- the 12 bit vector offset and the
+                                        -- frame format. If the frame format is
+                                        -- 2 another two words have to be taken
+                                        -- from the stack
                                 WHEN rte1 =>            -- RTE
 					datatype <= "10";
 					setstate <= "10";
@@ -2996,6 +3032,7 @@ PROCESS (clk, cpu, OP1out, OP2out, opcode, exe_condition, nextpass, micro_state,
 					datatype <= "01";
 					set(update_FC) <= '1';
 					IF VBR_Stackframe=1 OR (cpu(0)='1' AND VBR_Stackframe=2) THEN
+                                                -- 010+ reads another word
 						setstate <= "10";
 						set(postadd) <= '1';
 						setstackaddr <= '1';
@@ -3004,9 +3041,26 @@ PROCESS (clk, cpu, OP1out, OP2out, opcode, exe_condition, nextpass, micro_state,
 						next_micro_state <= nop;
 					END IF;
 				WHEN rte3 =>            -- RTE
+                                        setstate <= "01"; -- idle state to wait
+                                                          -- for input data to
+                                                          -- arrive
+                                        next_micro_state <= rte4;
+       				WHEN rte4 =>            -- RTE
+                                        -- check for stack frame format #2
+                                        if last_data_in(15 downto 12)="0010" then
+                                          -- read another 32 bits in this case
+                                         setstate <= "10"; -- read
+                                          datatype <= "10"; -- long word
+                                          set(postadd) <= '1';
+                                          setstackaddr <= '1';
+                                          next_micro_state <= rte5;
+                                        else
+                                          datatype <= "01";
+                                          next_micro_state <= nop;
+                                        end if;
+    				WHEN rte5 =>            -- RTE
 					next_micro_state <= nop;
---                                      set(update_FC) <= '1';
-
+                                        
 				WHEN movec1 =>          -- MOVEC
 					set(briefext) <= '1';
 					set_writePCbig <='1';
