@@ -77,9 +77,6 @@ wire [7:0]  mem_do;
 wire        mem_we;
 wire        mem_sync;
 
-// mist's doubled video 
-wire 			video_r, video_g, video_b, video_hs, video_vs;
-
 // core's raw audio 
 wire [15:0]	coreaud_l, coreaud_r;
 
@@ -103,12 +100,18 @@ clockgen CLOCKS(
 	.inclk0	(CLOCK_27[0]),
 	.c0		(clk_32m),
 	.c1 		(clk_24m),
-//	.c2		(SDRAM_CLK), 	
 	.locked	(pll_ready)  // pll locked output
 );
 
-osd #(0,100,4) OSD (
-   .pclk       ( clk_24m          ),
+// without scan doubler only half the pixel clock is used
+reg clk_12m;
+always @(clk_24m)
+	clk_12m <= !clk_12m;
+
+wire clk_osd = scandoubler_disable?clk_12m:clk_24m;
+	
+osd #(0,0,4) OSD (
+   .pclk       ( clk_osd      ),
 
    // spi for OSD
    .sdi        ( SPI_DI       ),
@@ -125,9 +128,16 @@ osd #(0,100,4) OSD (
    .red_out    ( VGA_R        ),
    .green_out  ( VGA_G        ),
    .blue_out   ( VGA_B        ),
-   .hs_out     ( VGA_HS       ),
-   .vs_out     ( VGA_VS       )
+   .hs_out     ( v_hs         ),
+   .vs_out     ( v_vs         )
 );
+
+wire v_hs, v_vs;
+
+// create composite sync for 15khz
+wire csync = !(v_vs ^ v_hs);
+assign VGA_HS = scandoubler_disable?csync:v_hs;
+assign VGA_VS = scandoubler_disable?1'b1:v_vs;
 
 // conections between user_io (implementing the SPIU communication 
 // to the io controller) and the legacy 
@@ -142,6 +152,8 @@ wire sd_dout_strobe;
 wire [7:0] sd_din;
 wire sd_din_strobe;
 
+wire scandoubler_disable;
+
 user_io #(.STRLEN(CONF_STR_LEN)) user_io(
    .conf_str      ( CONF_STR        ),
    // the spi interface
@@ -154,7 +166,8 @@ user_io #(.STRLEN(CONF_STR_LEN)) user_io(
    .status        (status           ),
 	.switches      (switches         ),
    .buttons       (buttons          ),
-	
+	.scandoubler_disable ( scandoubler_disable ),
+
    // interface to embedded legacy sd card wrapper
    .sd_lba     	( sd_lba				),
    .sd_rd      	( sd_rd				),
@@ -231,9 +244,14 @@ wire user_via_cb2_in;
 // the bbc is being reset of the pll isn't stable, if the ram isn't ready,
 // of the arm boots or if the user selects reset from the osd or of the user
 // presses the "core" button or the io controller uploads a rom
-wire reset = ~pll_ready || ~sdram_ready || status[0] || status[1] ||
+wire reset_in = ~pll_ready || ~sdram_ready || status[0] || status[1] ||
 		buttons[1] || loader_active;
 
+// synchronize reset with memory state machine
+reg reset;
+always @(posedge mem_sync)
+	reset <= reset_in;
+		
 bbc BBC(
 	
 	.CLK32M_I	( clk_32m		),
@@ -245,9 +263,9 @@ bbc BBC(
 	
 	.VIDEO_CLKEN ( core_clken	),
 	
-    .VIDEO_R	( core_r		),
-	.VIDEO_G	( core_g		),
-	.VIDEO_B	( core_b		),
+    .VIDEO_R	 ( core_r		  ),
+	 .VIDEO_G	 ( core_g		  ),
+	 .VIDEO_B	 ( core_b		  ),
     
     .MEM_ADR    ( mem_adr       ),
     .MEM_WE     ( mem_we        ),
@@ -263,6 +281,7 @@ bbc BBC(
 	 .user_via_cb1_in ( user_via_cb1_in   ),
 	 .user_via_cb2_in ( user_via_cb2_in   ),
 
+	.DIP_SWITCH ( 8'b00000000 ),
 	
 	.PS2_CLK	( ps2_clk 		),
 	.PS2_DAT	( ps2_dat		),
@@ -355,6 +374,9 @@ audio	AUDIO	(
 	.audio_r			( AUDIO_R		)
 );
 
+wire sd_hs, sd_vs;
+wire sd_r, sd_g, sd_b;
+
 scandoubler SCANDOUBLE(
 
 	.clk_16		( clk_32m		),
@@ -369,17 +391,23 @@ scandoubler SCANDOUBLE(
 	
 	.clk			( clk_32m		),
 	
-	.vs_out		( video_vs		),
-	.hs_out		( video_hs		),
+	.vs_out		( sd_vs			),
+	.hs_out		( sd_hs			),
 	
-	.r_out		( video_r		),
-	.g_out		( video_g		),
-	.b_out		( video_b		)
+	.r_out		( sd_r			),
+	.g_out		( sd_g			),
+	.b_out		( sd_b			)
 );
 
-always @(posedge clk_32m) begin 
+// switch between doubled and non-doubled video 
+wire video_r = scandoubler_disable?core_r:sd_r;
+wire video_g = scandoubler_disable?core_g:sd_g;
+wire video_b = scandoubler_disable?core_b:sd_b;
+wire video_hs = scandoubler_disable?core_hs:sd_hs;
+wire video_vs = scandoubler_disable?core_vs:sd_vs;
+
+always @(posedge clk_32m)
 	clk_14k_div <= clk_14k_div + 'd1;
-end
 
 assign mem_di = 
 	(mem_adr[15:14] == 2'b10) && (mem_romsel == 4'hf) ? basic_do : 

@@ -25,57 +25,59 @@
 module user_io #(parameter STRLEN=0) (
 	input [(8*STRLEN)-1:0] conf_str,
 
-	input      		SPI_CLK,
-	input      		SPI_SS_IO,
-	output     		reg SPI_MISO,
-	input      		SPI_MOSI,
+	input 		       SPI_CLK,
+	input 		       SPI_SS_IO,
+	output reg 	       SPI_MISO,
+	input 		       SPI_MOSI,
 	
-	output reg [7:0] 	joystick_0,
-	output reg [7:0] 	joystick_1,
-	output reg [15:0] joystick_analog_0,
-	output reg [15:0] joystick_analog_1,
-	output [1:0] 		buttons,
-	output [1:0] 		switches,
-
-	output reg [7:0]   status,
+	output reg [7:0]       joystick_0,
+	output reg [7:0]       joystick_1,
+	output reg [15:0]      joystick_analog_0,
+	output reg [15:0]      joystick_analog_1,
+	output [1:0] 	       buttons,
+	output [1:0] 	       switches,
+	output 		       scandoubler_disable,
+				      
+	output reg [7:0]       status,
 
 	// connection to sd card emulation
-	input [31:0]  sd_lba,
-	input         sd_rd,
-	input         sd_wr,
-	output reg	  sd_ack,
-	input         sd_conf,
-	input         sd_sdhc,
-	output [7:0]  sd_dout,  // valid on rising edge of sd_dout_strobe
-	output reg	  sd_dout_strobe,
-	input [7:0]   sd_din,
-	output reg 	  sd_din_strobe,
+	input [31:0] 	       sd_lba,
+	input 		       sd_rd,
+	input 		       sd_wr,
+	output reg 	       sd_ack,
+	input 		       sd_conf,
+	input 		       sd_sdhc,
+	output [7:0] 	       sd_dout, // valid on rising edge of sd_dout_strobe
+	output reg 	       sd_dout_strobe,
+	input [7:0] 	       sd_din,
+	output reg 	       sd_din_strobe,
 	
 
 	// ps2 keyboard emulation
-	input 	  		ps2_clk,				// 12-16khz provided by core
-	output	 		ps2_kbd_clk,
-	output reg 		ps2_kbd_data,
-	output	 		ps2_mouse_clk,
-	output reg 		ps2_mouse_data,
+	input 		       ps2_clk, // 12-16khz provided by core
+	output 		       ps2_kbd_clk,
+	output reg 	       ps2_kbd_data,
+	output 		       ps2_mouse_clk,
+	output reg 	       ps2_mouse_data,
 
 	// serial com port 
-	input [7:0]		serial_data,
-	input				serial_strobe
+	input [7:0] 	       serial_data,
+	input 		       serial_strobe
 );
 
 reg [6:0]         sbuf;
 reg [7:0]         cmd;
-reg [2:0] 	      bit_cnt;    // counts bits 0-7 0-7 ...
+reg [2:0] 	  bit_cnt;    // counts bits 0-7 0-7 ...
 reg [7:0]         byte_cnt;   // counts bytes
 reg [5:0]         joystick0;
 reg [5:0]         joystick1;
-reg [3:0] 	      but_sw;
+reg [4:0] 	  but_sw;
 reg [2:0]         stick_idx;
 
 assign buttons = but_sw[1:0];
 assign switches = but_sw[3:2];
 assign sd_dout = { sbuf, SPI_MOSI};
+assign scandoubler_disable = but_sw[4];
 
 // this variant of user_io is for 8 bit cores (type == a4) only
 wire [7:0] core_type = 8'ha4;
@@ -341,7 +343,7 @@ always@(posedge spi_sck or posedge SPI_SS_IO) begin
 			
 				// buttons and switches
 				if(cmd == 8'h01)
-					but_sw <= { sbuf[2:0], SPI_MOSI }; 
+					but_sw <= { sbuf[3:0], SPI_MOSI }; 
 
 				if(cmd == 8'h02)
 					joystick_0 <= { sbuf, SPI_MOSI };
