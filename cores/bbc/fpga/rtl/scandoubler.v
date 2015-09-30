@@ -23,20 +23,21 @@ module scandoubler (
   input 	   clk,     // 31.875 MHz
   input        clk_16,  // from shifter
   input		   clk_16_en,
+  input        scanlines,
   
   // shifter video interface
   input 	   hs_in,
   input 	   vs_in,
-  input  	   r_in,
-  input  	   g_in,
-  input  	   b_in,
+  input  	r_in,
+  input  	g_in,
+  input  	b_in,
 
   // output interface
-  output reg 	   hs_out,
+  output reg      hs_out,
   output reg 	   vs_out,
-  output reg  		r_out,
-  output reg  		g_out,
-  output reg  		b_out,
+  output reg [1:0] r_out,
+  output reg [1:0] g_out,
+  output reg [1:0] b_out,
 
   output 	   is15k
 );
@@ -61,9 +62,15 @@ always @(posedge clk) begin
          scanline <= !scanline;
 
     // if no scanlines or not a scanline
-    r_out <= sd_out[2];
-    g_out <= sd_out[1];
-    b_out <= sd_out[0];
+	 if(!scanlines || !scanline) begin
+		r_out <= { sd_out[2], sd_out[2] };
+		g_out <= { sd_out[1], sd_out[1] };
+		b_out <= { sd_out[0], sd_out[0] };
+	end else begin
+		r_out <= { 1'b0, sd_out[2] };
+		g_out <= { 1'b0, sd_out[1] };
+		b_out <= { 1'b0, sd_out[0] };
+	end
 end
    
 

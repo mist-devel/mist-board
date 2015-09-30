@@ -42,14 +42,17 @@ module bbc_mist_top(
   input          CONF_DATA0  // SPI_SS for user_io
 );
 
+assign LED = 1'b0;
+
 // the configuration string is returned to the io controller to allow
 // it to control the menu on the OSD 
 parameter CONF_STR = {
         "BBC;ROM;",
-        "T1,Reset;"
+        "O1,Scanlines,Off,On;",
+        "T2,Reset;"
 };
 
-parameter CONF_STR_LEN = 8+9;
+parameter CONF_STR_LEN = 8+20+9;
 
 // generated clocks
 wire clk_32m /* synthesis keep */ ;
@@ -66,8 +69,7 @@ wire [14:0] vid_adr;
 wire [7:0]  vid_data;
 
 wire [15:0] mem_adr;
-assign LED = (mem_romsel == 0) || (loader_addr == 0) || (loader_data == 0) || loader_we;
-wire [3:0]  mem_romsel /* synthesis keep */;
+wire [3:0]  mem_romsel;
 
 wire [7:0]  mem_di;
 wire [7:0]  rom_do;
@@ -193,7 +195,7 @@ wire sd_sdo = user_via_cb2_in;
 assign user_via_cb1_in = user_via_pb_out[1];
 
 sd_card sd_card (
-        // connection to io controller
+   // connection to io controller
    .io_lba (sd_lba ),
    .io_rd  (sd_rd),
    .io_wr  (sd_wr),
@@ -215,12 +217,10 @@ sd_card sd_card (
 );
 
 // data loading 
-wire 			loader_active 	/* synthesis keep */ ;
-wire 			loader_we 		/* synthesis keep */ ;
-wire [24:0]	loader_addr 	/* synthesis keep */ ;
-wire [7:0]	loader_data 	/* synthesis keep */ ;
-
-// http://beebwiki.mdfs.net/index.php/Paged_ROM
+wire 			loader_active;
+wire 			loader_we;
+wire [24:0]	loader_addr;
+wire [7:0]	loader_data;
 	 
 data_io DATA_IO  (
 	.sck				( SPI_SCK 			),
@@ -244,7 +244,7 @@ wire user_via_cb2_in;
 // the bbc is being reset of the pll isn't stable, if the ram isn't ready,
 // of the arm boots or if the user selects reset from the osd or of the user
 // presses the "core" button or the io controller uploads a rom
-wire reset_in = ~pll_ready || ~sdram_ready || status[0] || status[1] ||
+wire reset_in = ~pll_ready || ~sdram_ready || status[0] || status[2] ||
 		buttons[1] || loader_active;
 
 // synchronize reset with memory state machine
@@ -375,12 +375,16 @@ audio	AUDIO	(
 );
 
 wire sd_hs, sd_vs;
-wire sd_r, sd_g, sd_b;
+wire [1:0] sd_r;
+wire [1:0] sd_g;
+wire [1:0] sd_b;
 
 scandoubler SCANDOUBLE(
 
 	.clk_16		( clk_32m		),
 	.clk_16_en	( core_clken	),
+
+	.scanlines  ( status[1]    ),
 	
 	.vs_in		( core_vs		),
 	.hs_in		( core_hs		),
@@ -400,9 +404,9 @@ scandoubler SCANDOUBLE(
 );
 
 // switch between doubled and non-doubled video 
-wire video_r = scandoubler_disable?core_r:sd_r;
-wire video_g = scandoubler_disable?core_g:sd_g;
-wire video_b = scandoubler_disable?core_b:sd_b;
+wire [1:0] video_r = scandoubler_disable?core_r:sd_r;
+wire [1:0] video_g = scandoubler_disable?core_g:sd_g;
+wire [1:0] video_b = scandoubler_disable?core_b:sd_b;
 wire video_hs = scandoubler_disable?core_hs:sd_hs;
 wire video_vs = scandoubler_disable?core_vs:sd_vs;
 

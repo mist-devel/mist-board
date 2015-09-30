@@ -34,9 +34,9 @@ module osd (
 	input         sdi,
 
 	// VGA signals coming from core
-	input   	    red_in,
-	input   	    green_in,
-	input   	    blue_in,
+	input   	    [1:0] red_in,
+	input   	    [1:0] green_in,
+	input   	    [1:0] blue_in,
 	input			hs_in,
 	input			vs_in,
 	
@@ -194,9 +194,9 @@ always @(posedge pclk)
   osd_byte <= osd_buffer[{osd_vcnt[6:4], osd_hcnt}];
 
 wire [2:0] osd_color = OSD_COLOR;
-assign red_out   = !osd_de? {6{red_in}}     :  {osd_pixel, osd_pixel, osd_color[2], {3{red_in}}  };
-assign green_out = !osd_de? {6{green_in}}   :  {osd_pixel, osd_pixel, osd_color[1], {3{green_in}} };
-assign blue_out  = !osd_de? {6{blue_in}}    :  {osd_pixel, osd_pixel, osd_color[0], {3{blue_in}} };
+assign red_out   = !osd_de? {3{red_in}}     :  {osd_pixel, osd_pixel, osd_color[2], {red_in, red_in[1]}  };
+assign green_out = !osd_de? {3{green_in}}   :  {osd_pixel, osd_pixel, osd_color[1], {green_in, green_in[1]} };
+assign blue_out  = !osd_de? {3{blue_in}}    :  {osd_pixel, osd_pixel, osd_color[0], {blue_in, blue_in[1]} };
 
 assign hs_out = hs_in;
 assign vs_out = vs_in;
