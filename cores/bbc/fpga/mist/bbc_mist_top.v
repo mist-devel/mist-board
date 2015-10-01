@@ -49,10 +49,11 @@ assign LED = 1'b0;
 parameter CONF_STR = {
         "BBC;ROM;",
         "O1,Scanlines,Off,On;",
-        "T2,Reset;"
+        "O2,ROM mapping,High,Low;",
+        "T3,Reset;"
 };
 
-parameter CONF_STR_LEN = 8+20+9;
+parameter CONF_STR_LEN = 8+20+24+9;
 
 // generated clocks
 wire clk_32m /* synthesis keep */ ;
@@ -241,11 +242,25 @@ wire [7:0] user_via_pb_out;
 wire user_via_cb1_in;
 wire user_via_cb2_in;
 
+// reset core whenever the user changes the rom mapping
+reg last_rom_map;
+reg [11:0] rom_map_counter = 12'h0;
+always @(posedge clk_32m) begin
+	last_rom_map <= status[2];
+
+	if(last_rom_map != status[2])
+		rom_map_counter <= 12'hfff;
+	else if(rom_map_counter != 0)
+		rom_map_counter <= rom_map_counter - 12'd1;
+end
+
+wire rom_remap_reset = (rom_map_counter != 0);
+
 // the bbc is being reset of the pll isn't stable, if the ram isn't ready,
 // of the arm boots or if the user selects reset from the osd or of the user
 // presses the "core" button or the io controller uploads a rom
-wire reset_in = ~pll_ready || ~sdram_ready || status[0] || status[2] ||
-		buttons[1] || loader_active;
+wire reset_in = ~pll_ready || ~sdram_ready || status[0] || status[3] ||
+		buttons[1] || loader_active || rom_remap_reset;
 
 // synchronize reset with memory state machine
 reg reset;
@@ -303,8 +318,7 @@ wire [24:0] sdram_adr =
 	cpu_ram?{ 9'b000000000, mem_adr }:          // ordinary ram access
 	{ 7'b0000001, mem_romsel, mem_adr[13:0] };  // sideways ram/rom access
 
-wire sdram_we = 
-	loader_active?loader_we:(mem_we && cpu_ram);
+wire sdram_we = loader_active?loader_we:(mem_we && (cpu_ram || sideways_ram));
 	
 wire [7:0] sdram_di = 
 	loader_active?loader_data:mem_do;
@@ -349,13 +363,6 @@ basic2 basic2 (
 	.clock 	( clk_32m			),
    .address	( mem_adr[13:0]	),
    .q			( basic_do			)
-);
-
-wire [7:0] dfs_do;
-dfs09 dfs09 (
-	.clock 	( clk_32m			),
-   .address	( mem_adr[12:0]	),
-   .q			( dfs_do			   )
 );
 
 wire [7:0] smmc_do;
@@ -413,13 +420,21 @@ wire video_vs = scandoubler_disable?core_vs:sd_vs;
 always @(posedge clk_32m)
 	clk_14k_div <= clk_14k_div + 'd1;
 
+// map 64k sideways ram to bank 4,5,6 and 7
+wire sideways_ram = 
+	(mem_adr[15:14] == 2'b10) && (mem_romsel[3:2] == 2'b01);
+
+// status[2] is '1' of low mapping is selected in the menu
+wire basic_map = status[2]?(mem_romsel == 4'h0):(mem_romsel == 4'he);
+wire smmc_map = status[2]?(mem_romsel == 4'h2):(mem_romsel == 4'hc);
+	
 assign mem_di = 
-	(mem_adr[15:14] == 2'b10) && (mem_romsel == 4'hf) ? basic_do : 
-//	((mem_adr[15:14] == 2'b10) && (mem_romsel == 4'he)) ? dfs_do :
-	((mem_adr[15:14] == 2'b10) && (mem_romsel == 4'he)) ? smmc_do :
-	((mem_adr[15:14] == 2'b10) && (mem_romsel == 4'hd)) ? ram_do :
+	((mem_adr[15:14] == 2'b10) && basic_map) ? basic_do : 
+	((mem_adr[15:14] == 2'b10) && smmc_map) ? smmc_do :
+	((mem_adr[15:14] == 2'b10) && (mem_romsel == 4'ha)) ? ram_do :
 	mos_rom ? os_do : 
 	cpu_ram ? ram_do :
+	sideways_ram ? ram_do :
 	8'hff;
 
 endmodule // bbc_mist_top

@@ -593,9 +593,8 @@ assign cpu_di = ram_enable === 1'b 1 ? MEM_DI :
 //  un-decoded locations are pulled down by RP1
 assign cpu_irq_n = sys_via_irq_n & user_via_irq_n; // & tube_irq_n;
 
-// can we write to ram?
-// TODO: Allow writing to sideways
-assign ram_we = ~RESET_I & ram_enable & ~cpu_r_nw;
+// can we write to ram? Further decodig happens on top-level to deal with sideways ram etc
+assign ram_we = ~RESET_I & ~cpu_r_nw;
 
 // system via interrupt lines.
 assign sys_via_ca1_in = VSYNC;

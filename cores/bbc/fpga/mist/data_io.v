@@ -88,7 +88,7 @@ always@(posedge spi_sck, posedge ss) begin
 				// prepare 
 				if(sdi) begin
 					// download rom into sideways rom slot e
-					laddr <= { 7'b0000001, 4'hd, 14'h0 } - 25'd1;
+					laddr <= { 7'b0000001, 4'ha, 14'h0 } - 25'd1;
 					downloading_reg <= 1'b1; 
 				end else
 					downloading_reg <= 1'b0; 
