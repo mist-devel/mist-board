@@ -109,6 +109,7 @@ wire    [7:0] cpu_do;
 
 //  CRTC signals
 wire    crtc_clken; 
+wire    crtc_clken_adr; 
 wire    [7:0] crtc_do; 
 wire    crtc_de; 
 wire    crtc_cursor; 
@@ -368,6 +369,7 @@ keyboard KEYB (
 mc6845 CRTC (
 	 .CLOCK(CLK32M_I),
 	 .CLKEN(crtc_clken),
+	 .CLKEN_ADR(crtc_clken_adr),
 	 .nRESET(reset_n),
 	 .ENABLE(crtc_enable),
 	 .R_nW(cpu_r_nw),
@@ -404,6 +406,7 @@ vidproc VIDEO_ULA (
 		.CLKEN(VIDEO_CLKEN),
 		.nRESET(reset_n),
 		.CLKEN_CRTC(crtc_clken),
+		.CLKEN_CRTC_ADR(crtc_clken_adr),
 		.ENABLE(vidproc_enable),
 		.A0(cpu_a[0]),
 		.DI_CPU(cpu_do),

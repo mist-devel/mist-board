@@ -47,6 +47,7 @@ module vidproc (
            input   		CLKEN,
            input   		nRESET,
            output  		CLKEN_CRTC,
+			  output       CLKEN_CRTC_ADR,
            input   		ENABLE,
            input   		A0,
            input [7:0] 	DI_CPU,
@@ -142,7 +143,11 @@ assign clken_pixel = r0_pixel_rate === 2'b 11 ? CLKEN :
 //  The CRT controller is always enabled in the 15th cycle, so that the result
 //  is ready for latching into the shift register in cycle 0.  If 2 MHz mode is
 //  selected then the CRTC is also enabled in the 7th cycle
-assign CLKEN_CRTC = CLKEN & !clken_counter[0] & !clken_counter[1] & clken_counter[2] &
+assign CLKEN_CRTC = CLKEN & clken_counter[0] & clken_counter[1] & clken_counter[2] &
+       (clken_counter[3] | r0_crtc_2mhz);
+
+// extra signal for crtc address setup a little earlier		 
+assign CLKEN_CRTC_ADR = CLKEN & clken_counter[0] & clken_counter[1] & !clken_counter[2] &
        (clken_counter[3] | r0_crtc_2mhz);
 
 //  The result is fetched from the CRTC in cycle 0 and also cycle 8 if 2 MHz
