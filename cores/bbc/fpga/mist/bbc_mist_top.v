@@ -155,20 +155,30 @@ wire sd_dout_strobe;
 wire [7:0] sd_din;
 wire sd_din_strobe;
 
+wire [7:0] joystick_0;
+wire [7:0] joystick_1;
+wire [15:0] joystick_analog_0;
+wire [15:0] joystick_analog_1;
+
 wire scandoubler_disable;
 
 user_io #(.STRLEN(CONF_STR_LEN)) user_io(
    .conf_str      ( CONF_STR        ),
    // the spi interface
 
-   .SPI_CLK     	(SPI_SCK          ),
-   .SPI_SS_IO     (CONF_DATA0       ),
-   .SPI_MISO      (SPI_DO           ),   // tristate handling inside user_io
-   .SPI_MOSI      (SPI_DI           ),
+   .SPI_CLK     	( SPI_SCK         ),
+   .SPI_SS_IO     ( CONF_DATA0      ),
+   .SPI_MISO      ( SPI_DO          ),   // tristate handling inside user_io
+   .SPI_MOSI      ( SPI_DI          ),
 	
-   .status        (status           ),
-	.switches      (switches         ),
-   .buttons       (buttons          ),
+	.joystick_0        ( joystick_0 ),
+	.joystick_1        ( joystick_1 ),
+	.joystick_analog_0 ( joystick_analog_0 ),
+	.joystick_analog_1 ( joystick_analog_1 ),
+
+   .status        ( status          ),
+	.switches      ( switches        ),
+   .buttons       ( buttons         ),
 	.scandoubler_disable ( scandoubler_disable ),
 
    // interface to embedded legacy sd card wrapper
@@ -295,6 +305,12 @@ bbc BBC(
 	 .user_via_pb_out ( user_via_pb_out   ),
 	 .user_via_cb1_in ( user_via_cb1_in   ),
 	 .user_via_cb2_in ( user_via_cb2_in   ),
+
+	 .joy_but    ( { joystick_1[4], joystick_0[4] } ),
+	 .joy0_axis0 ( joystick_analog_0[15:8] ),
+	 .joy0_axis1 ( joystick_analog_0[7:0]  ),
+	 .joy1_axis0 ( joystick_analog_1[15:8] ),
+	 .joy1_axis1 ( joystick_analog_1[7:0]  ),
 
 	.DIP_SWITCH ( 8'b00000000 ),
 	

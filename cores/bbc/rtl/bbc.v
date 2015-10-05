@@ -41,6 +41,13 @@ module bbc(
 	input          user_via_cb1_in,
 	input          user_via_cb2_in,
 	
+	// analog joystick input 
+	input [1:0]	 	joy_but,
+	input [7:0] 	joy0_axis0,
+	input [7:0] 	joy0_axis1,
+	input [7:0] 	joy1_axis0,
+	input [7:0] 	joy1_axis1,
+	
 	// boot settings
 	input [7:0]		DIP_SWITCH
 );
@@ -126,6 +133,9 @@ reg     [14:0] display_a;
 //  "VIDPROC" signals
 wire    vidproc_invert_n; 
 wire    vidproc_disen;  
+
+// ADC signals
+wire    [7:0] adc_do; 
 
 //  SAA5050 signals
 wire    ttxt_glr; 
@@ -365,7 +375,24 @@ keyboard KEYB (
 	 .BREAK_OUT		( keyb_break	),
 	 .DIP_SWITCH	( DIP_SWITCH	)
 );
-		
+
+adc ADC (
+	 .CLOCK(CLK32M_I),
+	 .CLKEN(crtc_clken),
+	 .nRESET(reset_n),
+	 .ENABLE(adc_enable),
+	 .R_nW(cpu_r_nw),
+	 .A(cpu_a[1:0]),
+	 .DI(cpu_do),
+	 .DO(adc_do),
+
+	 // adc is used for analog joystick input 
+	 .ch0 ( joy0_axis0 ),
+	 .ch1 ( joy0_axis1 ),
+	 .ch2 ( joy1_axis0 ),
+	 .ch3 ( joy1_axis1 )
+);
+
 mc6845 CRTC (
 	 .CLOCK(CLK32M_I),
 	 .CLKEN(crtc_clken),
@@ -589,6 +616,7 @@ assign cpu_di = ram_enable === 1'b 1 ? MEM_DI :
 	acia_enable === 1'b 1 ? 8'b 00000010 : 
 	sys_via_enable === 1'b 1 ? sys_via_do : 
 	user_via_enable === 1'b 1 ? user_via_do : 
+	adc_enable === 1'b 1 ? adc_do : 
 	//tube_enable === 1'b 1 ? tube_do : 
 	//adlc_enable === 1'b 1 ? bbcddr_out :
 	'd0; 
@@ -612,7 +640,7 @@ assign sys_via_pa_in[6:0] = sys_via_pa_out[6:0];
 assign sound_di = sys_via_pa_out; 
 
 //  Others (idle until missing bits implemented)
-assign sys_via_pb_in[7:4] = {4{1'b 1}}; 
+assign sys_via_pb_in[7:4] = { 2'b11, !joy_but[1], !joy_but[0] }; 
 
 
 assign MEM_ADR = cpu_a[15:0];
