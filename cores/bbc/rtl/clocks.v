@@ -91,7 +91,7 @@ always @(posedge clk_32m)
       end
    else if (mhz2_clken === 1'b 1 )
       begin
-      if (cpu_cycle_mask === 1'b 0)
+      if ((mhz1_enable === 1'b 1) && (cpu_cycle_mask === 1'b 0))
          begin
 
 			//  Block CPU cycles until 1 MHz cycle has completed

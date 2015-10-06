@@ -171,10 +171,11 @@ user_io #(.STRLEN(CONF_STR_LEN)) user_io(
    .SPI_MISO      ( SPI_DO          ),   // tristate handling inside user_io
    .SPI_MOSI      ( SPI_DI          ),
 	
-	.joystick_0        ( joystick_0 ),
-	.joystick_1        ( joystick_1 ),
-	.joystick_analog_0 ( joystick_analog_0 ),
-	.joystick_analog_1 ( joystick_analog_1 ),
+	// use mist joystick 1 as bbc primary joystick
+	.joystick_0        ( joystick_1 ),
+	.joystick_1        ( joystick_0 ),
+	.joystick_analog_0 ( joystick_analog_1 ),
+	.joystick_analog_1 ( joystick_analog_0 ),
 
    .status        ( status          ),
 	.switches      ( switches        ),

@@ -3,13 +3,13 @@
 # Script to install gcc as described on 
 # http://retroramblings.net/?p=315
 
-BINUTILS_VERSION=binutils-2.23.1
+BINUTILS_VERSION=binutils-2.25.1
 BINUTILS_ARCHIVE=${BINUTILS_VERSION}.tar.bz2
-BINUTILS_MD5=33adb18c3048d057ac58d07a3f1adb38
+BINUTILS_MD5=ac493a78de4fee895961d025b7905be4
 
-GCC_VERSION=gcc-4.8.0
+GCC_VERSION=gcc-4.9.3
 GCC_ARCHIVE=${GCC_VERSION}.tar.bz2
-GCC_MD5=e6040024eb9e761c3bea348d1fa5abb0
+GCC_MD5=6f831b4d251872736e8e9cc09746f327
 
 NEWLIB_VERSION=newlib-2.0.0
 NEWLIB_ARCHIVE=${NEWLIB_VERSION}.tar.gz
@@ -19,19 +19,19 @@ if [ ! -d archives ]; then
     mkdir archives
 fi
 
-if [ ! -f archives/${BINUTILS_ARCHIVE} ]; then
-    echo "Downloading ${BINUTILS_ARCHIVE} ..."
-    wget -Parchives ftp://ftp.fu-berlin.de/unix/gnu/binutils/${BINUTILS_ARCHIVE}
-fi
+#if [ ! -f archives/${BINUTILS_ARCHIVE} ]; then
+#    echo "Downloading ${BINUTILS_ARCHIVE} ..."
+#    wget -Parchives ftp://ftp.fu-berlin.de/unix/gnu/binutils/${BINUTILS_ARCHIVE}
+#fi
 
-if [ `md5sum -b archives/${BINUTILS_ARCHIVE} | cut -d* -f1` != ${BINUTILS_MD5} ]; then
-    echo "Archive is broken: $BINUTILS_ARCHIVE"
-    exit 1;
-fi
+#if [ `md5sum -b archives/${BINUTILS_ARCHIVE} | cut -d* -f1` != ${BINUTILS_MD5} ]; then
+#    echo "Archive is broken: $BINUTILS_ARCHIVE"
+#    exit 1;
+#fi
 
 if [ ! -f archives/${GCC_ARCHIVE} ]; then
     echo "Downloading ${GCC_ARCHIVE} ..."
-    wget -Parchives ftp://ftp.fu-berlin.de/unix/languages/gcc/releases/gcc-4.8.0/${GCC_ARCHIVE}
+    wget -Parchives ftp://ftp.fu-berlin.de/unix/languages/gcc/releases/gcc-4.9.3/${GCC_ARCHIVE}
 fi
 
 if [ `md5sum -b archives/${GCC_ARCHIVE} | cut -d* -f1` != ${GCC_MD5} ]; then
@@ -52,19 +52,19 @@ fi
 # ------------------------ build binutils ------------------
 echo "Building ${BINUTILS_VERSION}"
 
-if [ -d ${BINUTILS_VERSION} ]; then
-    echo "Cleaning up previous build ..."
-    rm -rf ${BINUTILS_VERSION} 
-fi
+#if [ -d ${BINUTILS_VERSION} ]; then
+#    echo "Cleaning up previous build ..."
+#    rm -rf ${BINUTILS_VERSION} 
+#fi
 
-tar xfj archives/${BINUTILS_ARCHIVE}
-cd ${BINUTILS_VERSION}
-mkdir arm-none-eabi
-cd arm-none-eabi
-../configure --target=arm-none-eabi --prefix=/opt/arm-none-eabi
-make
-sudo make install
-cd ../../
+#tar xfj archives/${BINUTILS_ARCHIVE}
+#cd ${BINUTILS_VERSION}
+#mkdir arm-none-eabi
+#cd arm-none-eabi
+#../configure --target=arm-none-eabi --prefix=/opt/arm-none-eabi
+#make
+#sudo make install
+#cd ../../
 
 # ------------------------ build gcc ------------------
 export PATH=/opt/arm-none-eabi/bin:$PATH
