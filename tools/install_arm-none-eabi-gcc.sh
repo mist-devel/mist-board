@@ -19,15 +19,15 @@ if [ ! -d archives ]; then
     mkdir archives
 fi
 
-#if [ ! -f archives/${BINUTILS_ARCHIVE} ]; then
-#    echo "Downloading ${BINUTILS_ARCHIVE} ..."
-#    wget -Parchives ftp://ftp.fu-berlin.de/unix/gnu/binutils/${BINUTILS_ARCHIVE}
-#fi
+if [ ! -f archives/${BINUTILS_ARCHIVE} ]; then
+    echo "Downloading ${BINUTILS_ARCHIVE} ..."
+    wget -Parchives ftp://ftp.fu-berlin.de/unix/gnu/binutils/${BINUTILS_ARCHIVE}
+fi
 
-#if [ `md5sum -b archives/${BINUTILS_ARCHIVE} | cut -d* -f1` != ${BINUTILS_MD5} ]; then
-#    echo "Archive is broken: $BINUTILS_ARCHIVE"
-#    exit 1;
-#fi
+if [ `md5sum -b archives/${BINUTILS_ARCHIVE} | cut -d* -f1` != ${BINUTILS_MD5} ]; then
+    echo "Archive is broken: $BINUTILS_ARCHIVE"
+    exit 1;
+fi
 
 if [ ! -f archives/${GCC_ARCHIVE} ]; then
     echo "Downloading ${GCC_ARCHIVE} ..."
@@ -52,19 +52,19 @@ fi
 # ------------------------ build binutils ------------------
 echo "Building ${BINUTILS_VERSION}"
 
-#if [ -d ${BINUTILS_VERSION} ]; then
-#    echo "Cleaning up previous build ..."
-#    rm -rf ${BINUTILS_VERSION} 
-#fi
+if [ -d ${BINUTILS_VERSION} ]; then
+    echo "Cleaning up previous build ..."
+    rm -rf ${BINUTILS_VERSION} 
+fi
 
-#tar xfj archives/${BINUTILS_ARCHIVE}
-#cd ${BINUTILS_VERSION}
-#mkdir arm-none-eabi
-#cd arm-none-eabi
-#../configure --target=arm-none-eabi --prefix=/opt/arm-none-eabi
-#make
-#sudo make install
-#cd ../../
+tar xfj archives/${BINUTILS_ARCHIVE}
+cd ${BINUTILS_VERSION}
+mkdir arm-none-eabi
+cd arm-none-eabi
+../configure --target=arm-none-eabi --prefix=/opt/arm-none-eabi
+make
+sudo make install
+cd ../../
 
 # ------------------------ build gcc ------------------
 export PATH=/opt/arm-none-eabi/bin:$PATH
