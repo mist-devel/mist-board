@@ -7,13 +7,13 @@ BINUTILS_VERSION=binutils-2.25.1
 BINUTILS_ARCHIVE=${BINUTILS_VERSION}.tar.bz2
 BINUTILS_MD5=ac493a78de4fee895961d025b7905be4
 
-GCC_VERSION=gcc-4.9.3
+GCC_VERSION=gcc-5.2.0
 GCC_ARCHIVE=${GCC_VERSION}.tar.bz2
-GCC_MD5=6f831b4d251872736e8e9cc09746f327
+GCC_MD5=a51bcfeb3da7dd4c623e27207ed43467
 
-NEWLIB_VERSION=newlib-2.0.0
+NEWLIB_VERSION=newlib-2.2.0
 NEWLIB_ARCHIVE=${NEWLIB_VERSION}.tar.gz
-NEWLIB_MD5=e3e936235e56d6a28afb2a7f98b1a635
+NEWLIB_MD5=f2294ded26e910a73637ecdfbdd1ef05
 
 if [ ! -d archives ]; then
     mkdir archives
@@ -31,7 +31,7 @@ fi
 
 if [ ! -f archives/${GCC_ARCHIVE} ]; then
     echo "Downloading ${GCC_ARCHIVE} ..."
-    wget -Parchives ftp://ftp.fu-berlin.de/unix/languages/gcc/releases/gcc-4.9.3/${GCC_ARCHIVE}
+    wget -Parchives ftp://ftp.fu-berlin.de/unix/languages/gcc/releases/gcc-5.2.0/${GCC_ARCHIVE}
 fi
 
 if [ `md5sum -b archives/${GCC_ARCHIVE} | cut -d* -f1` != ${GCC_MD5} ]; then
