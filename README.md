@@ -1,7 +1,5 @@
-**This project has recently moved here since [Google Code](http://code.google.com/p/mist-board/) will close.**
-
-
-# [Project News and Documentation](https://github.com/mist-devel/mist-board/wiki) #
+**For further information see our [Wiki](https://github.com/mist-devel/mist-board/wiki) or jump directly to the [Getting started page](https://github.com/mist-devel/mist-b
+oard/wiki/GettingStarted).**
 
 Get your own MIST board [here](http://lotharek.pl/product.php?pid=96)!
 
