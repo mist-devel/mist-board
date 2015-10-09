@@ -50,6 +50,8 @@ module keyboard (
 		input   [2:0] ROW,
 		output   KEYPRESS,
 		output   INT,
+		// external SHIFT key
+		input    SHIFT,
 		//  BREAK key output - 1 when pressed
 		output reg  BREAK_OUT,
 		//  DIP switch inputs
@@ -67,6 +69,7 @@ reg     [7:0] keys [0:15];
 reg     [3:0] col;
 reg     _release_;
 reg     extended;
+reg     ext_shift;
 
 //  Shortcut to current key column
 
@@ -143,6 +146,11 @@ always @(posedge CLOCK) begin
         keys[15] <= 'd0;
 		
     end else  begin
+
+		  // map external shift key onto left shift
+		  ext_shift <= SHIFT;
+		  if(SHIFT || ext_shift)
+				keys[0][0] <= SHIFT;
 
         //  Copy DIP switches through to row 0
         keys[2][0] <= DIP_SWITCH[7];

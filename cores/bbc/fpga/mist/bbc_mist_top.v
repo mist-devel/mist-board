@@ -50,10 +50,11 @@ parameter CONF_STR = {
         "BBC;ROM;",
         "O1,Scanlines,Off,On;",
         "O2,ROM mapping,High,Low;",
-        "T3,Reset;"
+        "O3,Auto boot,Off,On;",
+        "T4,Reset;"
 };
 
-parameter CONF_STR_LEN = 8+20+24+9;
+parameter CONF_STR_LEN = 8+20+24+20+9;
 
 // generated clocks
 wire clk_32m /* synthesis keep */ ;
@@ -270,14 +271,25 @@ wire rom_remap_reset = (rom_map_counter != 0);
 // the bbc is being reset of the pll isn't stable, if the ram isn't ready,
 // of the arm boots or if the user selects reset from the osd or of the user
 // presses the "core" button or the io controller uploads a rom
-wire reset_in = ~pll_ready || ~sdram_ready || status[0] || status[3] ||
+wire reset_in = ~pll_ready || ~sdram_ready || status[0] || status[4] ||
 		buttons[1] || loader_active || rom_remap_reset;
 
 // synchronize reset with memory state machine
 reg reset;
 always @(posedge mem_sync)
 	reset <= reset_in;
-		
+
+// the autoboot feature simply works by pressing shift for 2 seconds after 
+// the bbc has been reset
+wire autoboot_shift = status[3] && (autoboot_counter != 0 );
+reg [24:0] autoboot_counter;
+always @(posedge clk_32m) begin
+	if(reset) 
+		autoboot_counter <= 25'd32000000;
+	else if(autoboot_counter != 0)
+		autoboot_counter <= autoboot_counter - 25'd1;
+end
+
 bbc BBC(
 	
 	.CLK32M_I	( clk_32m		),
@@ -302,6 +314,8 @@ bbc BBC(
     
     .VID_ADR    ( vid_adr       ),
     .VID_DI     ( vid_data      ),
+	
+    .SHIFT     ( autoboot_shift ),
 	
 	 .user_via_pb_out ( user_via_pb_out   ),
 	 .user_via_cb1_in ( user_via_cb1_in   ),

@@ -36,6 +36,9 @@ module bbc(
 	output [15:0]	AUDIO_L,
 	output [15:0]	AUDIO_R,
 
+	// externally pressed "shift" key for autoboot
+	input          SHIFT,
+	
 	// expose pins required for mmc
 	output [7:0]   user_via_pb_out,
 	input          user_via_cb1_in,
@@ -372,6 +375,7 @@ keyboard KEYB (
 	 .ROW				( keyb_row		),
 	 .KEYPRESS		( keyb_out		),
 	 .INT				( keyb_int		),
+	 .SHIFT        ( SHIFT        ),
 	 .BREAK_OUT		( keyb_break	),
 	 .DIP_SWITCH	( DIP_SWITCH	)
 );
