@@ -2,9 +2,7 @@ Plus Too for MiST
 =================
 
 This is the source code of the MiST port of the Plus Too project. The
-original files can be founf at:
-
-http://www.bigmessowires.com/2012/12/15/plus-too-files/
+original files can be found at the [Plus Too project page](http://www.bigmessowires.com/2012/12/15/plus-too-files/).
 
 Changes
 -------
@@ -20,4 +18,4 @@ itself. No functional changes have been made (yet). Major changes were:
 - Use of MiSTS PS2 mouse emulation
   - Need to disable all parts dealing with mouse inialization
 
-Binaries are available at https://github.com/mist-devel/mist-binaries/tree/master/cores/plustoo.
+Binaries are available at the [binaries repository](https://github.com/mist-devel/mist-binaries/tree/master/cores/plus_too).
