@@ -132,10 +132,10 @@ wire mouseData;
 	);
 	
 	// generate ~16kHz for ps2
-	wire ps2_clk = ps2_clk_div[10];
-	reg [10:0] ps2_clk_div;
+	wire ps2_clk = ps2_clk_div[8];
+	reg [8:0] ps2_clk_div;
 	always @(posedge clk8)
-		ps2_clk_div <= ps2_clk_div + 11'd1;
+		ps2_clk_div <= ps2_clk_div + 9'd1;
 	
 	// set the real-world inputs to sane defaults
 	localparam keyClk = 1'b0,
@@ -251,7 +251,8 @@ wire mouseData;
 		.extraRomReadAck(extraRomReadAck));
 	
 	wire [2:0] _debugIPL = sw[0] == 1'b1 ? 3'b111 : _cpuIPL; // suppress interrupts when sw0 on	
-	
+
+/*	
 	TG68 m68k(
 		.clk(clk8), 
 		.reset(_cpuReset), 
@@ -266,6 +267,31 @@ wire mouseData;
 		.lds(_cpuLDS), 
 		.rw(_cpuRW), 
 		.drive_data(cpuDriveData)); 
+*/	
+
+   assign _cpuAS = !(cpu_busstate != 2'b01);
+	wire [1:0] cpu_busstate;
+	wire cpu_clkena = (!_debugDTACK) || (cpu_busstate == 2'b01);
+	TG68KdotC_Kernel #(0,0,0,0,0,0) m68k (
+        .clk            ( clk8           ),
+        .nReset         ( _cpuReset      ),
+        .clkena_in      ( cpu_clkena     ), 
+        .data_in        ( dataControllerDataOut ),
+        .IPL            ( _debugIPL      ),
+        .IPL_autovector ( 1'b1           ),
+        .berr           ( 1'b0           ),
+        .clr_berr       ( 1'b0           ),
+        .CPU            ( 2'b00          ),   // 00=68000
+        .addr           ( {cpuAddrHi, cpuAddr} ),
+        .data_write     ( cpuDataOut     ),
+        .nUDS           ( _cpuUDS        ),
+        .nLDS           ( _cpuLDS        ),
+        .nWr            ( _cpuRW         ),
+        .busstate       ( cpu_busstate   ), // 00-> fetch code 10->read data 11->write data 01->no memaccess
+        .nResetOut      (                ),
+        .FC             (                )
+);
+
 	
 	addrController_top ac0(
 		.clk8(clk8), 
