@@ -7,8 +7,8 @@ original files can be found at the [Plus Too project page](http://www.bigmessowi
 Changes
 -------
 
-All changes made to the original source code are due to the porting process
-itself. No functional changes have been made (yet). Major changes were:
+Initial changes made to the original source code are due to the porting process
+itself. Major changes were:
 
 - Use of SDRAM for RAM as well as ROM and floppy image buffer
   - SDRAM clocking at 130 MHz
@@ -17,5 +17,9 @@ itself. No functional changes have been made (yet). Major changes were:
 - Use of MiSTs on screen display for floppy image selection
 - Use of MiSTS PS2 mouse emulation
   - Need to disable all parts dealing with mouse inialization
+
+Functional changes:
+
+- tg68k cpu core updated to latest version
 
 Binaries are available at the [binaries repository](https://github.com/mist-devel/mist-binaries/tree/master/cores/plus_too).
