@@ -39,6 +39,16 @@ module plusToo_top(
   input wire            CONF_DATA0  // SPI_SS for user_io
   );
 
+// ------------------------------ Plus Too Bus Timing ---------------------------------
+// for stability and maintainability reasons the whole timing has been simplyfied:
+//                00           01             10           11
+//    ______ _____________ _____________ _____________ _____________ ___
+//    ______X_video_cycle_X____unused___X__cpu_cycle__X___unused____X___
+//                        ^                    ^      ^
+//                        |                    |      |
+//                      video                 cpu    cpu
+//                       read                write   read
+  
 // include the OSD into the video data path
 osd #(10,0,2) osd (
    .pclk       ( clk32        ),
@@ -114,20 +124,26 @@ wire [7:0] ledg;
 // ps2 interface for mouse, to be mapped into user_io
 wire mouseClk;
 wire mouseData;
+wire keyClk;
+wire keyData;
 
 	 // NO REAL LOGIC SHOULD GO IN THIS MODULE!
 	// It may not exist in the hand-built Plus Too.
 	// Only interconnections and interfaces specific to the dev board should go here
 	
+assign SDRAM_CLK = !clk64;
+	
 	// synthesize a 32.5 MHz clock
-	wire clk32; 
-	wire clk128;
+	wire clk64;
 	wire pll_locked;
-	clock325MHz cs0(
+	
+	reg clk32; 
+	always @(posedge clk64)
+		clk32 <= !clk32;
+	
+	pll cs0(
 		.inclk0	( CLOCK_27[0]	),
-		.c0		( clk32			), 	
-		.c1		( clk128			), 
-		.c2		( SDRAM_CLK		), 
+		.c0		( clk64			), 	
 		.locked	( pll_locked	)
 	);
 	
@@ -138,16 +154,14 @@ wire mouseData;
 		ps2_clk_div <= ps2_clk_div + 9'd1;
 	
 	// set the real-world inputs to sane defaults
-	localparam keyClk = 1'b0,
-				  keyData = 1'b0,
-				  serialIn = 1'b0,
+	localparam serialIn = 1'b0,
 				  interruptButton = 1'b0,
 				  configROMSize = 1'b1, // 128K ROM
 				  configRAMSize = 2'b01; // 512K RAM
 				  
 	// interconnects
 	// CPU
-	wire clk8, _cpuReset, _cpuAS, _cpuUDS, _cpuLDS, _cpuRW, _cpuDTACK, cpuDriveData;
+	wire clk8, _cpuReset, _cpuAS, _cpuUDS, _cpuLDS, _cpuRW, _cpuDTACK;
 	wire [2:0] _cpuIPL;
 	wire [7:0] cpuAddrHi;
 	wire [23:0] cpuAddr;
@@ -217,8 +231,8 @@ wire mouseData;
                  
       // ps2 interface
       .ps2_clk    	( ps2_clk     	),
-      .ps2_kbd_clk	(           	),
-      .ps2_kbd_data	( 				 	),
+      .ps2_kbd_clk	( keyClk      	),
+      .ps2_kbd_data	( keyData 		),
 		.ps2_mouse_clk ( mouseClk		),
       .ps2_mouse_data( mouseData	   )
 	);
@@ -425,7 +439,7 @@ sdram sdram (
    .sd_cas         ( SDRAM_nCAS               ),
 
    // system interface
-   .clk_128        ( clk128                   ),
+   .clk_64         ( clk64                    ),
    .clk_8          ( clk8                     ),
    .init           ( !pll_locked              ),
 

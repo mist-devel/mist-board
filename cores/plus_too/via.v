@@ -117,7 +117,12 @@ module via(
 	output _irq,
 	output [15:0] dataOut,
 	output memoryOverlayOn,
-	output SEL // to IWM
+	output SEL, // to IWM
+	
+	input [7:0] kbd_in_data,
+	input kbd_in_strobe,
+	output [7:0] kbd_out_data,
+	output reg kbd_out_strobe
 );
 
 	wire [7:0] dataInHi = dataIn[15:8];
@@ -130,12 +135,44 @@ module via(
 	reg [6:0] viaIFR;
 	reg [6:0] viaIER;
 	reg [7:0] viaACR;
+	reg [7:0] viaSR;
 	reg [15:0] viaTimer1Count;
 	reg [15:0] viaTimer1Latch;
 	reg [15:0] viaTimer2Count;
 	reg [7:0] viaTimer2LatchLow;
 	reg viaTimer2Armed;
+
 	
+	// shift register can be written by CPU and by external source
+	/* Write to SR (including external input) */
+	assign kbd_out_data = viaSR;
+   always @(negedge clk8 or negedge _reset) begin
+		if (_reset == 1'b0)
+			viaSR <= 8'b0;           
+		else begin
+			if((selectVIA == 1'b1) && (_cpuUDS == 1'b0) && 
+				(_cpuRW == 1'b0) && (cpuAddrRegHi == 4'hA))
+						viaSR <= dataInHi;
+						
+         if (viaACR[4:2] == 3'b011 && kbd_in_strobe)
+                  viaSR <= kbd_in_data;
+      end
+	end
+
+	/* Generate sr_out_strobe */
+   always @(negedge clk8 or negedge _reset) begin
+	if (_reset == 1'b0)
+		kbd_out_strobe <= 1'b0;                
+   else begin
+		if((selectVIA == 1'b1) && (_cpuUDS == 1'b0) && 
+			(_cpuRW == 1'b0) && (cpuAddrRegHi == 4'hA) && 
+			(viaACR[4:2] == 3'b111))
+				kbd_out_strobe <= 1;
+         else
+            kbd_out_strobe <= 0;   
+      end
+    end
+ 	
 	// divide by 10 clock divider for the VIA timers: 0.78336 MHz
 	reg [3:0] clkDiv;
 	always @(posedge clk8) begin
@@ -148,13 +185,13 @@ module via(
 	
 	// store previous vblank value, for edge detection
 	reg _lastVblank;
-	always @(posedge clk8) begin
+	always @(negedge clk8) begin
 		_lastVblank <= _vblank;
 	end
-	
+
 	// count vblanks, and set 1 second interrupt after 60 vblanks
 	reg [5:0] vblankCount;
-	always @(posedge clk8) begin
+	always @(negedge clk8) begin
 		if (_vblank == 1'b0 && _lastVblank == 1'b1) begin
 			if (vblankCount != 59) begin
 				vblankCount <= vblankCount + 1'b1;
@@ -168,7 +205,7 @@ module via(
 	
 	// register write
 	wire loadT2 = selectVIA == 1'b1 && _cpuUDS == 1'b0 && _cpuRW == 1'b0 && cpuAddrRegHi == 4'h9;
-	always @(posedge clk8 or negedge _reset) begin
+	always @(negedge clk8 or negedge _reset) begin
 		if (_reset == 1'b0) begin
 			viaB0DDR <= 1'b1;
 			viaADataOut <= 8'b01111111;
@@ -183,6 +220,8 @@ module via(
 			viaTimer2Armed <= 0;
 		end
 		else begin
+//			kbd_out_strobe <= 1'b0;
+
 			if (selectVIA == 1'b1 && _cpuUDS == 1'b0) begin
 				if (_cpuRW == 1'b0) begin
 					// normal register writes
@@ -208,6 +247,10 @@ module via(
 							viaTimer2Armed = 1'b1;
 							viaIFR[`INT_T2] <= 1'b0;
 						end
+						4'hA: begin // shift register
+							if( viaACR[4:2] == 3'b111 )
+								viaIFR[`INT_KEYREADY] <= 1'b1;
+						end
 						4'hB: // Aux control register
 							viaACR <= dataInHi;		
 						// 4'hC: ignore PCR
@@ -231,6 +274,8 @@ module via(
 						end
 						4'h8: // reading T2C-L clears the T2 interrupt flag
 							viaIFR[`INT_T2] <= 1'b0; 
+						4'hA: // reading SR clears the SR interrupt flag
+							viaIFR[`INT_KEYREADY] <= 1'b0;
 						4'hF: begin // reading (and writing?) register A clears VBLANK and ONESEC interrupt flags
 							viaIFR[`INT_ONESEC] <= 1'b0;
 							viaIFR[`INT_VBLANK] <= 1'b0;
@@ -252,49 +297,54 @@ module via(
 				end
 				viaTimer2Count <= viaTimer2Count - 1'b1;
 			end
+			
+			// Shift in under control of external clock
+         if (viaACR[4:2] == 3'b011 && kbd_in_strobe)
+				viaIFR[`INT_KEYREADY] <= 1;
+			
 		end
 	end
 	
 	// register read
 	always @(*) begin
 		dataOutHi = 8'hBE;
-		
-		if (_cpuRW == 1'b1 && selectVIA == 1'b1 && _cpuUDS == 1'b0) begin
-			case (cpuAddrRegHi)
-				4'h0: // B
-					// TODO: clear CB1 and CB2 interrupts
-					dataOutHi = { viaBDataOut[7], ~_hblank, mouseY2, mouseX2, mouseButton, viaBDataOut[2:1], viaB0DDR == 1'b1 ? viaBDataOut[0] : rtcData };
-				4'h2: // B DDR
-					dataOutHi = { 7'b1000011, viaB0DDR };
-				4'h3: // A DDR
-					dataOutHi = 8'b01111111;
-				4'h4: // timer 1 count low
-					dataOutHi = viaTimer1Count[7:0];
-				4'h5: // timer 1 count high
-					dataOutHi = viaTimer1Count[15:8];
-				4'h6: // timer 1 latch low
-					dataOutHi = viaTimer1Latch[7:0];
-				4'h7: // timer 1 latch high
-					dataOutHi = viaTimer1Latch[15:8];
-				4'h8: // timer 2 count low
-					dataOutHi = viaTimer2Count[7:0]; 
-				4'h9: // timer 2 count high
-					dataOutHi = viaTimer2Count[15:8];	
-				4'hB: // Aux control register
-					dataOutHi = viaACR;
-				4'hC: // PCR
-					dataOutHi = 0; 					
-				4'hD: // IFR
-					dataOutHi = { viaIFR & viaIER == 0 ? 1'b0 : 1'b1, viaIFR };
-				4'hE: // IER
-					dataOutHi = { 1'b1, viaIER };			
-				4'hF: // A
-					// TODO: clear CA1 and CA2 interrupts
-					dataOutHi = { sccWReq, viaADataOut[6:0] };
-				default:
-					dataOutHi = 8'hBE;
-			endcase
-		end	
+	
+		case (cpuAddrRegHi)
+			4'h0: // B
+				// TODO: clear CB1 and CB2 interrupts
+				dataOutHi = { viaBDataOut[7], ~_hblank, mouseY2, mouseX2, mouseButton, viaBDataOut[2:1], viaB0DDR == 1'b1 ? viaBDataOut[0] : rtcData };
+			4'h2: // B DDR
+				dataOutHi = { 7'b1000011, viaB0DDR };
+			4'h3: // A DDR
+				dataOutHi = 8'b01111111;
+			4'h4: // timer 1 count low
+				dataOutHi = viaTimer1Count[7:0];
+			4'h5: // timer 1 count high
+				dataOutHi = viaTimer1Count[15:8];
+			4'h6: // timer 1 latch low
+				dataOutHi = viaTimer1Latch[7:0];
+			4'h7: // timer 1 latch high
+				dataOutHi = viaTimer1Latch[15:8];
+			4'h8: // timer 2 count low
+				dataOutHi = viaTimer2Count[7:0]; 
+			4'h9: // timer 2 count high
+				dataOutHi = viaTimer2Count[15:8];	
+			4'hA: // shift register
+				dataOutHi = viaSR;	
+			4'hB: // Aux control register
+				dataOutHi = viaACR;
+			4'hC: // PCR
+				dataOutHi = 0; 					
+			4'hD: // IFR
+				dataOutHi = { viaIFR & viaIER == 0 ? 1'b0 : 1'b1, viaIFR };
+			4'hE: // IER
+				dataOutHi = { 1'b1, viaIER };			
+			4'hF: // A
+				// TODO: clear CA1 and CA2 interrupts
+				dataOutHi = { sccWReq, viaADataOut[6:0] };
+			default:
+				dataOutHi = 8'hBE;
+		endcase
 	end
 	
 	assign memoryOverlayOn = viaADataOut[4];

@@ -47,6 +47,7 @@ module scc(input	sysclk,
 
 	/* Register access is semi-insane */
 	reg [3:0]	rindex;
+	reg [3:0]	rindex_latch;
 	wire 		wreg_a;
 	wire 		wreg_b;
 	wire 		wdata_a;
@@ -139,23 +140,28 @@ module scc(input	sysclk,
 	assign rdata_a = cs & (~we) & (rs[1] | (rindex == 8)) &  rs[0];
 	assign rdata_b = cs & (~we) & (rs[1] | (rindex == 8)) & ~rs[0];
 
+	// make sure rindex changes after the cpu cycle has ended so
+	// read data is still stable while cpu advances
+	always@(negedge sysclk)
+		rindex <= rindex_latch;
+
 	/* Register index is set by a write to WR0 and reset
 	 * after any subsequent write. We ignore the side
 	 */
-	always@(posedge sysclk or posedge reset) begin
+	always@(negedge sysclk or posedge reset) begin
 		if (reset)
-		  rindex <= 0;
+		  rindex_latch <= 0;
 		else if (cs && !rs[1]) begin
 			/* Default, reset index */
-			rindex <= 0;
+			rindex_latch <= 0;
 
 			/* Write to WR0 */
 			if (we && rindex == 0) begin
 				/* Get low index bits */
-				rindex[2:0] <= wdata[2:0];
+				rindex_latch[2:0] <= wdata[2:0];
 				  
 				/* Add point high */
-				rindex[3] <= (wdata[5:3] == 3'b001);
+				rindex_latch[3] <= (wdata[5:3] == 3'b001);
 			end
 		end
 	end
@@ -173,7 +179,7 @@ module scc(input	sysclk,
 
 	/* WR1
 	 * Reset: bit 5 and 2 unchanged */
-	always@(posedge sysclk or posedge reset_hw) begin
+	always@(negedge sysclk or posedge reset_hw) begin
 		if (reset_hw)
 		  wr1_a <= 0;
 		else begin
@@ -183,7 +189,7 @@ module scc(input	sysclk,
 			  wr1_a <= wdata;
 		end
 	end
-	always@(posedge sysclk or posedge reset_hw) begin
+	always@(negedge sysclk or posedge reset_hw) begin
 		if (reset_hw)
 		  wr1_b <= 0;
 		else begin
@@ -197,7 +203,7 @@ module scc(input	sysclk,
 	/* WR2
 	 * Reset: unchanged 
 	 */
-	always@(posedge sysclk or posedge reset_hw) begin
+	always@(negedge sysclk or posedge reset_hw) begin
 		if (reset_hw)
 		  wr2 <= 0;
 		else if ((wreg_a || wreg_b) && rindex == 2)
@@ -207,7 +213,7 @@ module scc(input	sysclk,
 	/* WR3
 	 * Reset: bit 0 to 0, otherwise unchanged.
 	 */
-	always@(posedge sysclk or posedge reset_hw) begin
+	always@(negedge sysclk or posedge reset_hw) begin
 		if (reset_hw)
 		  wr3_a <= 0;
 		else begin
@@ -217,7 +223,7 @@ module scc(input	sysclk,
 			  wr3_a <= wdata;
 		end
 	end
-	always@(posedge sysclk or posedge reset_hw) begin
+	always@(negedge sysclk or posedge reset_hw) begin
 		if (reset_hw)
 		  wr3_b <= 0;
 		else begin
@@ -231,7 +237,7 @@ module scc(input	sysclk,
 	/* WR4
 	 * Reset: Bit 2 to 1, otherwise unchanged
 	 */
-	always@(posedge sysclk or posedge reset_hw) begin
+	always@(negedge sysclk or posedge reset_hw) begin
 		if (reset_hw)
 		  wr4_a <= 0;
 		else begin
@@ -241,7 +247,7 @@ module scc(input	sysclk,
 			  wr4_a <= wdata;
 		end
 	end
-	always@(posedge sysclk or posedge reset_hw) begin
+	always@(negedge sysclk or posedge reset_hw) begin
 		if (reset_hw)
 		  wr4_b <= 0;
 		else begin
@@ -255,7 +261,7 @@ module scc(input	sysclk,
 	/* WR5
 	 * Reset: Bits 7,4,3,2,1 to 0
 	 */
-	always@(posedge sysclk or posedge reset_hw) begin
+	always@(negedge sysclk or posedge reset_hw) begin
 		if (reset_hw)
 		  wr5_a <= 0;
 		else begin
@@ -265,7 +271,7 @@ module scc(input	sysclk,
 			  wr5_a <= wdata;
 		end
 	end
-	always@(posedge sysclk or posedge reset_hw) begin
+	always@(negedge sysclk or posedge reset_hw) begin
 		if (reset_hw)
 		  wr5_b <= 0;
 		else begin
@@ -279,13 +285,13 @@ module scc(input	sysclk,
 	/* WR6
 	 * Reset: Unchanged.
 	 */
-	always@(posedge sysclk or posedge reset_hw) begin
+	always@(negedge sysclk or posedge reset_hw) begin
 		if (reset_hw)
 		  wr6_a <= 0;
 		else if (wreg_a && rindex == 6)
 		  wr6_a <= wdata;
 	end
-	always@(posedge sysclk or posedge reset_hw) begin
+	always@(negedge sysclk or posedge reset_hw) begin
 		if (reset_hw)
 		  wr6_b <= 0;
 		else if (wreg_b && rindex == 6)
@@ -295,13 +301,13 @@ module scc(input	sysclk,
 	/* WR7
 	 * Reset: Unchanged.
 	 */
-	always@(posedge sysclk or posedge reset_hw) begin
+	always@(negedge sysclk or posedge reset_hw) begin
 		if (reset_hw)
 		  wr7_a <= 0;
 		else if (wreg_a && rindex == 7)
 		  wr7_a <= wdata;
 	end
-	always@(posedge sysclk or posedge reset_hw) begin
+	always@(negedge sysclk or posedge reset_hw) begin
 		if (reset_hw)
 		  wr7_b <= 0;
 		else if (wreg_b && rindex == 7)
@@ -311,7 +317,7 @@ module scc(input	sysclk,
 	/* WR9. Special: top bits are reset, handled separately, bottom
 	 * bits are only reset by a hw reset
 	 */
-	always@(posedge sysclk or posedge reset_hw) begin
+	always@(negedge sysclk or posedge reset_hw) begin
 		if (reset_hw)
 		  wr9 <= 0;
 		else if ((wreg_a || wreg_b) && rindex == 9)
@@ -321,7 +327,7 @@ module scc(input	sysclk,
 	/* WR10
 	 * Reset: all 0, except chanel reset retains 6 and 5
 	 */
-	always@(posedge sysclk or posedge reset) begin
+	always@(negedge sysclk or posedge reset) begin
 		if (reset)
 		  wr10_a <= 0;
 		else begin
@@ -331,7 +337,7 @@ module scc(input	sysclk,
 			  wr10_a <= wdata;
 		end		
 	end
-	always@(posedge sysclk or posedge reset) begin
+	always@(negedge sysclk or posedge reset) begin
 		if (reset)
 		  wr10_b <= 0;
 		else begin
@@ -345,13 +351,13 @@ module scc(input	sysclk,
 	/* WR11
 	 * Reset: On full reset only, not channel reset
 	 */
-	always@(posedge sysclk or posedge reset) begin
+	always@(negedge sysclk or posedge reset) begin
 		if (reset)
 		  wr11_a <= 8'b00001000;
 		else if (wreg_a && rindex == 11)
 		  wr11_a <= wdata;
 	end
-	always@(posedge sysclk or posedge reset) begin
+	always@(negedge sysclk or posedge reset) begin
 		if (reset)
 		  wr11_b <= 8'b00001000;
 		else if (wreg_b && rindex == 11)
@@ -361,13 +367,13 @@ module scc(input	sysclk,
 	/* WR12
 	 * Reset: Unchanged
 	 */
-	always@(posedge sysclk or posedge reset_hw) begin
+	always@(negedge sysclk or posedge reset_hw) begin
 		if (reset_hw)
 		  wr12_a <= 0;
 		else if (wreg_a && rindex == 12)
 		  wr12_a <= wdata;
 	end
-	always@(posedge sysclk or posedge reset_hw) begin
+	always@(negedge sysclk or posedge reset_hw) begin
 		if (reset_hw)
 		  wr12_b <= 0;		
 		else if (wreg_b && rindex == 12)
@@ -377,13 +383,13 @@ module scc(input	sysclk,
 	/* WR13
 	 * Reset: Unchanged
 	 */
-	always@(posedge sysclk or posedge reset_hw) begin
+	always@(negedge sysclk or posedge reset_hw) begin
 		if (reset_hw)
 		  wr13_a <= 0;
 		else if (wreg_a && rindex == 13)
 		  wr13_a <= wdata;
 	end
-	always@(posedge sysclk or posedge reset_hw) begin
+	always@(negedge sysclk or posedge reset_hw) begin
 		if (reset_hw)
 		  wr13_b <= 0;		
 		else if (wreg_b && rindex == 13)
@@ -395,7 +401,7 @@ module scc(input	sysclk,
 	 * Chan reset also maitains bottom 2 bits, bit 4 also
 	 * reset to a different value
 	 */
-	always@(posedge sysclk or posedge reset_hw) begin
+	always@(negedge sysclk or posedge reset_hw) begin
 		if (reset_hw)
 		  wr14_a <= 0;
 		else begin
@@ -407,7 +413,7 @@ module scc(input	sysclk,
 			  wr14_a <= wdata;
 		end		
 	end
-	always@(posedge sysclk or posedge reset_hw) begin
+	always@(negedge sysclk or posedge reset_hw) begin
 		if (reset_hw)
 		  wr14_b <= 0;
 		else begin
@@ -421,17 +427,14 @@ module scc(input	sysclk,
 	end
 
 	/* WR15 */
-	always@(posedge sysclk or posedge reset) begin
-		if (reset)
+	always@(negedge sysclk or posedge reset) begin
+		if (reset) begin
 		  wr15_a <= 8'b11111000;
-		else if (wreg_a && rindex == 15)
-		  wr15_a <= wdata;			
-	end
-	always@(posedge sysclk or posedge reset) begin
-		if (reset)
 		  wr15_b <= 8'b11111000;
-		else if (wreg_b && rindex == 15)
-		  wr15_b <= wdata;			
+		end else if (rindex == 15) begin
+		  if(wreg_a) wr15_a <= wdata;			
+		  if(wreg_b) wr15_b <= wdata;			
+		end
 	end
 	
 	/* Read data mux */	

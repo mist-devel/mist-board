@@ -56,13 +56,16 @@ module addrController_top(
 	always @(posedge clk8) begin
 		busCycle <= busCycle + 1'b1;
 	end
+	
 	// video controls memory bus during the first clock of the four-clock cycle
-	assign videoBusControl = busCycle == 2'b00;
-		
+	assign videoBusControl = (busCycle == 2'b00);
+	// cpu controls memory bus during the third clock of the four-clock cycle
+	wire cpuBusControl = (busCycle == 2'b10);
+	
 	// DTACK generation	
 	// TODO: delay DTACK for once full bus cycle when RAM is accessed, to match Mac Plus memory timing
 	// TODO: according to datasheet, /DTACK should continue to be asserted through the final bus cycle too
-	assign _cpuDTACK = ~(_cpuAS == 1'b0 && busCycle == 2'b10 && videoBusControl == 1'b0);
+	assign _cpuDTACK = ~(_cpuAS == 1'b0 && cpuBusControl);
 	
 	// interconnects
 	wire selectRAM, selectROM;
@@ -70,12 +73,12 @@ module addrController_top(
 	
 	// RAM/ROM control signals
 	wire videoControlActive = _hblank == 1'b1 || loadSound;
-	assign _romCS = ~((videoBusControl == 1'b1 && videoControlActive == 1'b0) || (videoBusControl == 1'b0 && selectROM == 1'b1));
-	assign _romOE = ~((videoBusControl == 1'b1 && videoControlActive == 1'b0) || (videoBusControl == 1'b0 && selectROM == 1'b1 && _cpuRW == 1'b1)); 
+	assign _romCS = ~((videoBusControl && videoControlActive == 1'b0) || (cpuBusControl && selectROM == 1'b1));
+	assign _romOE = ~((videoBusControl && videoControlActive == 1'b0) || (cpuBusControl && selectROM == 1'b1 && _cpuRW == 1'b1)); 
 	assign _romWE = 1'b1;
-	assign _ramCS = ~((videoBusControl == 1'b1 && videoControlActive == 1'b1) || (videoBusControl == 1'b0 && selectRAM == 1'b1));
-	assign _ramOE = ~((videoBusControl == 1'b1 && videoControlActive == 1'b1) || (videoBusControl == 1'b0 && selectRAM == 1'b1 && _cpuRW == 1'b1));
-	assign _ramWE = ~(videoBusControl == 1'b0 && selectRAM && _cpuRW == 1'b0);
+	assign _ramCS = ~((videoBusControl && videoControlActive == 1'b1) || (cpuBusControl && selectRAM == 1'b1));
+	assign _ramOE = ~((videoBusControl && videoControlActive == 1'b1) || (cpuBusControl && selectRAM == 1'b1 && _cpuRW == 1'b1));
+	assign _ramWE = ~(cpuBusControl && selectRAM && _cpuRW == 1'b0);
 	assign _memoryUDS = videoBusControl ? 1'b0 : _cpuUDS;
 	assign _memoryLDS = videoBusControl ? 1'b0 : _cpuLDS;
 	wire [21:0] addrMux = videoBusControl ? videoAddr : cpuAddr[21:0];
@@ -104,9 +107,11 @@ module addrController_top(
 	
 	assign extraRomReadAck = videoBusControl == 1'b1 && videoControlActive == 1'b0;
 	assign memoryAddr = videoBusControl == 1'b1 && videoControlActive == 1'b0 ? extraRomReadAddr : macAddr;
-	
+
 	// address decoding
 	wire selectSCCByAddress;
+	wire selectIWMByAddress;
+	wire selectVIAByAddress;
 	addrDecoder ad(
 		.address(cpuAddr),
 		.enable(!videoBusControl),
@@ -115,11 +120,13 @@ module addrController_top(
 		.selectRAM(selectRAM),
 		.selectROM(selectROM),
 		.selectSCC(selectSCCByAddress),
-		.selectIWM(selectIWM),
-		.selectVIA(selectVIA),
+		.selectIWM(selectIWMByAddress),
+		.selectVIA(selectVIAByAddress),
 		.selectInterruptVectors(selectInterruptVectors));
 		
-	/* SCC register access is a mess. Reads and writes can have side-effects that alter the meaning of subsequent reads
+	/* TH: The following isn't 100% true anymore but kept for now for documentation purposes ...
+	
+		SCC register access is a mess. Reads and writes can have side-effects that alter the meaning of subsequent reads
 		and writes to the same address. It's not safe to do multiple reads of the same address, or multiple writes of the
 		same value to the same address. So we need to be sure we only perform one read or write per 4-clock CPU bus cycle.
 		
@@ -142,8 +149,9 @@ module addrController_top(
 		Another solution would be to create a custom clock for the SCC, whose positive edge is the negative edge of
 		clock 3 of the bus cycle.
 	*/
-	assign selectSCC = selectSCCByAddress && (busCycle == 2'b10 || // reads and writes enable on clock 2
-															(_cpuRW == 1'b1 && busCycle == 2'b11 && clk8)); // reads enable on first half of clock 3 
+	assign selectSCC = selectSCCByAddress && cpuBusControl;
+	assign selectIWM = selectIWMByAddress && cpuBusControl;
+	assign selectVIA = selectVIAByAddress && cpuBusControl;
 	
 	// video
 	videoTimer vt(

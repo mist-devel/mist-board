@@ -38,8 +38,8 @@ module dataController_top(
 	input keyData, 				// need pull-up
 	 
 	// mouse:
-	inout mouseClk, 				// need pull-up
-	inout mouseData, 				// need pull-up
+	input mouseClk, 				// need pull-up
+	input mouseData, 				// need pull-up
 	
 	// serial:
 	input serialIn, 				// need pull-up
@@ -141,8 +141,12 @@ module dataController_top(
 		._irq(_viaIrq),
 		.dataOut(viaDataOut),
 		.memoryOverlayOn(memoryOverlayOn),
-		.SEL(SEL));
-	
+		.SEL(SEL),
+		.kbd_in_data(kbd_in_data),
+		.kbd_in_strobe(kbd_in_strobe),
+		.kbd_out_data(kbd_out_data),
+		.kbd_out_strobe(kbd_out_strobe)
+		);
 	// IWM
 	iwm i(
 		.clk8(clk8),
@@ -166,7 +170,7 @@ module dataController_top(
 		.sysclk(clk8),
 	   .reset_hw(~_cpuReset),
 	   .cs(selectSCC && (_cpuLDS == 1'b0 || _cpuUDS == 1'b0)),
-	   .we(~_cpuRW), 
+	   .we(!_cpuRW),
 	   .rs(cpuAddrRegLo), 
 	   .wdata(cpuDataIn[15:8]),
 	   .rdata(sccDataOut),
@@ -202,4 +206,20 @@ module dataController_top(
 		.y2(mouseY2),
 		.button(mouseButton));
 
+   wire [7:0] kbd_in_data;
+	wire kbd_in_strobe;
+   wire [7:0] kbd_out_data;
+	wire kbd_out_strobe;
+		
+	// Keyboard
+	ps2_kbd kbd(
+		.sysclk(clk8),
+		.reset(~_cpuReset),
+		.ps2dat(keyData),
+		.ps2clk(keyClk),
+		.data_out(kbd_out_data),              // data from mac
+		.strobe_out(kbd_out_strobe),
+		.data_in(kbd_in_data),         // data to mac
+		.strobe_in(kbd_in_strobe));
+		
 endmodule
