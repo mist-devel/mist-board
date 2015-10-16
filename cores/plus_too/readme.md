@@ -21,5 +21,7 @@ itself. Major changes were:
 Functional changes:
 
 - tg68k cpu core updated to latest version
+- Keyboard support
+- Cleaned up overall timing
 
 Binaries are available at the [binaries repository](https://github.com/mist-devel/mist-binaries/tree/master/cores/plus_too).
