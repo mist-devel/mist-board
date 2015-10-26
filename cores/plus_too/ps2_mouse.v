@@ -21,9 +21,7 @@ module ps2_mouse(input	sysclk,
 		 output reg y1,
 		 output reg x2,
 		 output reg y2,
-		 output reg button,
-		 
-		 output reg [15:0] debug
+		 output reg button
 );
 	wire 		istrobe;
 	wire [7:0] 	ibyte;
@@ -39,7 +37,7 @@ module ps2_mouse(input	sysclk,
 	reg [9:0] 	yacc;
 	reg		xsign;
 	reg		ysign;
-	reg [12:0] 	clkdiv;
+	reg [11:0] 	clkdiv;
 	wire		tick;	
 	wire[1:0]	dbg_lowstate;
 	
@@ -133,7 +131,10 @@ module ps2_mouse(input	sysclk,
 					  next = ps2m_state_init;
 				  end
 			  end
-			  ps2m_state_byte0: next = ps2m_state_byte1;
+			  ps2m_state_byte0:
+				  if(ibyte[3])      // bit 3 must be 1
+					next = ps2m_state_byte1;
+			  
 			  ps2m_state_byte1: next = ps2m_state_byte2;
 			  ps2m_state_byte2: next = ps2m_state_byte0;
 			  default: // shouldn't ever get into these states
@@ -166,7 +167,8 @@ module ps2_mouse(input	sysclk,
 		if (reset)
 		  button <= 1;
 		else if (istrobe && state == ps2m_state_byte0)
-		  button <= ~ibyte[0];		
+			if(ibyte[3])
+				button <= ~ibyte[0];		
 
 	/* Clock divider to flush accumulators */
 	always@(posedge sysclk or posedge reset)
@@ -202,8 +204,10 @@ module ps2_mouse(input	sysclk,
 			xsign <= 0;
 			ysign <= 0;			
 		end else if (istrobe && state == ps2m_state_byte0) begin
-			xsign <= ibyte[4];
-			ysign <= ibyte[5];
+			if(ibyte[3]) begin
+				xsign <= ibyte[4];
+				ysign <= ibyte[5];
+			end
 		end
 	end
 
@@ -218,7 +222,7 @@ module ps2_mouse(input	sysclk,
 			else
 			  /* Decrement */
 			  if (tick && xacc != 0)
-			    xacc <= xacc + { {9{~xsign}}, 1'b1 };
+			    xacc <= xacc + { {9{~xacc[9]}}, 1'b1 };
 		end
 	end
 	
@@ -232,19 +236,7 @@ module ps2_mouse(input	sysclk,
 			else
 			  /* Decrement */
 			  if (tick && yacc != 0)
-			    yacc <= yacc + { {9{~ysign}}, 1'b1 };
-		end
-	end
-
-	/* Some debug signals for my own sanity */
-	always@(posedge sysclk or posedge reset) begin
-		if (reset)
-		  debug <= 0;
-		else begin
-			if (istrobe)
-			  debug[15:8] <= ibyte;
-			debug[7:0] <= { ps2clk, ps2dat, dbg_lowstate, 1'b0,
-					state };
+			    yacc <= yacc + { {9{~yacc[9]}}, 1'b1 };
 		end
 	end
 endmodule

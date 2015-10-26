@@ -70,15 +70,15 @@ module floppy(
 	input [7:0] writeData,		
 	output [7:0] readData,
 	
-	input useDiskImage,
 	input advanceDriveHead,  // prevents overrun when debugging, does not exist on a real Mac!
 	output reg newByteReady,
 	input insertDisk,
-	output diskInDrive,
-	
-	output [21:0] extraRomReadAddr,
-	input extraRomReadAck,
-	input [7:0] extraRomReadData
+	input diskSides,
+	output diskEject,
+
+	output [21:0] dskReadAddr,
+	input dskReadAck,
+	input [7:0] dskReadData
 );
 
 	reg [15:0] driveRegs;
@@ -105,63 +105,39 @@ module floppy(
 		driveRegs[`DRIVE_REG_CSTIN], // disk in drive
 		driveRegs[`DRIVE_REG_DIRTN] // step direction
 	};
+
+	// latch incoming data
+	reg [7:0] dskReadDataLatch;
+	always @(posedge clk8)
+		if(dskReadAck)
+			dskReadDataLatch <= dskReadData;
+	
+	// generate glitch free data clock
+	reg data_clock;
+	always @(posedge clk8)
+		data_clock <= (diskDataByteTimer == 0);
+	
+	wire [7:0] dskReadDataEnc;
+	
+	// include track encoder
+	floppy_track_encoder enc (
+		.clk		( newByteReady ),   
+		.rst     ( !_reset ),
+		
+		.side    ( driveSide ),
+		.sides   ( doubleSidedDisk ),
+		.track   ( driveTrack ),
+
+		.addr    ( dskReadAddr ),
+		
+		.strobe  ( ), 			    
+		.idata   ( dskReadDataLatch ),
+		.odata   ( dskReadDataEnc )
+	);
 	
 	// TODO: auto-detect doubleSidedDisk from image file size
-	wire doubleSidedDisk = 1'b1;
+	wire doubleSidedDisk = diskSides;
 	
-	// number of bytes in one side of the current track 
-	reg [15:0] diskImageTrackSideLen;
-	always @(*) begin
-		case (driveTrack[6:4]) 
-			3'b000:
-				diskImageTrackSideLen = 12 * 1024;
-			3'b001:
-				diskImageTrackSideLen = 11 * 1024;	
-			3'b010:
-				diskImageTrackSideLen = 10 * 1024;	
-			3'b011:
-				diskImageTrackSideLen = 9 * 1024;	
-			3'b100:
-				diskImageTrackSideLen = 8 * 1024;	
-			default:
-				diskImageTrackSideLen = 8 * 1024;	
-		endcase
-	end
-	wire [15:0] diskImageTrackLen = doubleSidedDisk ? {diskImageTrackSideLen[14:0], 1'b0 } : diskImageTrackSideLen;
-	// number of bytes in one side of the track before the current track (used for stepping backwards)
-	wire [6:0] driveTrackMinus1 = driveTrack - 1'b1; // can't step backward from track 0, so underflow doesn't matter
-	reg [15:0] diskImageTrackMinus1SideLen;
-	always @(*) begin
-		case (driveTrackMinus1[6:4]) 
-			3'b000:
-				diskImageTrackMinus1SideLen = 12 * 1024;
-			3'b001:
-				diskImageTrackMinus1SideLen = 11 * 1024;	
-			3'b010:
-				diskImageTrackMinus1SideLen = 10 * 1024;	
-			3'b011:
-				diskImageTrackMinus1SideLen = 9 * 1024;	
-			3'b100:
-				diskImageTrackMinus1SideLen = 8 * 1024;	
-			default:
-				diskImageTrackMinus1SideLen = 8 * 1024;	
-		endcase
-	end
-	wire [15:0] diskImageTrackMinus1Len = doubleSidedDisk ? {diskImageTrackMinus1SideLen[14:0], 1'b0 } : diskImageTrackMinus1SideLen;
-	
-	
-	// offset from the start of the disk image to the start of the current track
-	reg [21:0] diskImageTrackBase;
-
-	// bytes offset in the current side of the current track, must be less than diskImageTrackSideLen
-	reg [15:0] diskImageHeadOffset;
-	
-	assign extraRomReadAddr = 
-		22'h020000 + 
-		diskImageTrackBase + 
-		((driveSide && doubleSidedDisk) ? diskImageTrackSideLen : 0) +
-		diskImageHeadOffset;
-
 	wire [3:0] driveReadAddr = {ca2,ca1,ca0,SEL};
 	
 	// a byte is read or written every 128 clocks (2 us per bit * 8 bits = 16 us, @ 8 MHz = 128 clocks)
@@ -171,40 +147,39 @@ module floppy(
 	reg readyToAdvanceHead;
 	always @(posedge clk8 or negedge _reset) begin
 		if (_reset == 1'b0) begin		
-			diskImageHeadOffset <= 1'b0;
 			driveSide <= 0;
 			diskImageData <= 8'h00;
 			diskDataIn <= 8'hFF;
 			diskDataByteTimer <= 0;
 			readyToAdvanceHead <= 1;
+			newByteReady <= 1'b0;
 		end 
 		else begin			
-			// a timer governs when the next disk byte will become available
-			diskDataByteTimer <= diskDataByteTimer + 1'b1;
-			
 			// at time 0, latch a new byte and advance the drive head
 			if (diskDataByteTimer == 0 && readyToAdvanceHead && diskImageData != 0) begin
-				diskDataIn <= useDiskImage ? diskImageData : 8'hFF;
+				diskDataIn <= diskImageData;
 				newByteReady <= 1'b1;
-				
-				if (diskImageHeadOffset + 1'b1 >= diskImageTrackSideLen)
-					diskImageHeadOffset <= 0;
-				else
-					diskImageHeadOffset <= diskImageHeadOffset + 1'b1;
-					
+				diskDataByteTimer <= 1;  // make timer run again
+									
 				// clear diskImageData after it's used, so we can tell when we get a new one from the disk	
 				diskImageData <= 0;
 				
 				// for debugging, don't advance the head until the IWM says it's ready
 				readyToAdvanceHead <= 1'b1; // TEMP: treat IWM as always ready
 			end
+			
+			// extraRomReadAck comes every hsync which is every 21us. The iwm data rates
+			// is 8MHZ/128 = 16us
 			else begin
+				// a timer governs when the next disk byte will become available
+				diskDataByteTimer <= diskDataByteTimer + 1'b1;
+			
 				newByteReady <= 1'b0;
 				
-				if (extraRomReadAck) begin
+				if (dskReadAck) begin
 					// whenever ACK is received, store the data from the current diskImageAddr 
-					diskImageData <= extraRomReadData;
-				end
+					diskImageData <= dskReadDataEnc;  // xyz
+ 				end
 				
 				if (advanceDriveHead) begin
 					readyToAdvanceHead <= 1'b1;
@@ -221,10 +196,11 @@ module floppy(
 		end
 	end
 	
+	// create a signal on the falling edge of lstrb
 	reg lstrbPrev;
-	always @(posedge clk8) begin
+	always @(posedge clk8)
 		lstrbPrev <= lstrb;
-	end
+		
 	wire lstrbEdge = lstrb == 1'b0 && lstrbPrev == 1'b1;
 	
 	assign readData = _enable == 1'b1 ? 8'hZZ :
@@ -249,11 +225,12 @@ module floppy(
 										/* W: ?? reset disk switch flag ? */
 	// disk in drive indicators
 	reg [23:0] ejectIndicatorTimer;
-	assign diskInDrive = ~driveRegs[`DRIVE_REG_CSTIN] | ejectIndicatorTimer[20];
+	assign diskEject = (ejectIndicatorTimer != 0);
 	
 	always @(posedge clk8 or negedge _reset) begin
 		if (_reset == 1'b0) begin		
 			driveRegs[`DRIVE_REG_CSTIN] <= 1'b1;
+			ejectIndicatorTimer <= 24'd0;
 		end 
 		else if (_enable == 1'b0 && lstrbEdge == 1'b1 && driveWriteAddr == `DRIVE_REG_EJECT && ca2 == 1'b1) begin
 			// eject the disk
@@ -275,16 +252,13 @@ module floppy(
 	always @(posedge clk8 or negedge _reset) begin
 		if (_reset == 1'b0) begin	
 			driveTrack <= 0; 
-			diskImageTrackBase <= 0;
 		end 
 		else if (_enable == 1'b0 && lstrbEdge == 1'b1 && driveWriteAddr == `DRIVE_REG_STEP && ca2 == 1'b0) begin
 			if (driveRegs[`DRIVE_REG_DIRTN] == 1'b0 && driveTrack != 7'h4F) begin
 				driveTrack <= driveTrack + 1'b1;
-				diskImageTrackBase <= diskImageTrackBase + diskImageTrackLen;
 			end
 			if (driveRegs[`DRIVE_REG_DIRTN] == 1'b1 && driveTrack != 0) begin
 				driveTrack <= driveTrack - 1'b1;
-				diskImageTrackBase <= diskImageTrackBase - diskImageTrackMinus1Len;
 			end
 		end
 	end

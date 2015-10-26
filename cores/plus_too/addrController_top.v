@@ -18,27 +18,23 @@ module addrController_top(
 	output [21:0] memoryAddr,
 	output _memoryUDS,
 	output _memoryLDS,	
-	output _romCS,
 	output _romOE,
-	output _romWE,
-	output _ramCS,
 	output _ramOE,	
 	output _ramWE,	
 	output videoBusControl,
+	output dioBusControl,
 	
 	// peripherals:
 	output selectSCC,
 	output selectIWM,
 	output selectVIA,
-	output selectInterruptVectors,
 	
 	// video:
 	output hsync,
 	output vsync,
 	output _hblank,
 	output _vblank,
-	output loadNormalPixels,
-	output loadDebugPixels,
+	output loadPixels,
 	
 	// audio:
 	output loadSound,
@@ -46,23 +42,32 @@ module addrController_top(
 	// misc
 	input memoryOverlayOn,
 	
-	// extra/debug ROM interface
-	input [21:0] extraRomReadAddr,
-	output extraRomReadAck
+	// interface to read dsk image from ram
+	input [21:0] dskReadAddrInt,
+	output dskReadAckInt,
+	input [21:0] dskReadAddrExt,
+	output dskReadAckExt
 );
+
+assign dioBusControl = extraBusControl;
 
 	// interleaved RAM access for CPU and video
 	reg [1:0] busCycle;
-	always @(posedge clk8) begin
+	always @(posedge clk8)
 		busCycle <= busCycle + 1'b1;
-	end
+	
 	// video controls memory bus during the first clock of the four-clock cycle
-	assign videoBusControl = busCycle == 2'b00;
-		
+	assign videoBusControl = (busCycle == 2'b00);
+	// cpu controls memory bus during the third clock of the four-clock cycle
+	wire cpuBusControl = (busCycle == 2'b10);
+
+	//
+	wire extraBusControl = (busCycle == 2'b01);
+	
 	// DTACK generation	
 	// TODO: delay DTACK for once full bus cycle when RAM is accessed, to match Mac Plus memory timing
 	// TODO: according to datasheet, /DTACK should continue to be asserted through the final bus cycle too
-	assign _cpuDTACK = ~(_cpuAS == 1'b0 && busCycle == 2'b10 && videoBusControl == 1'b0);
+	assign _cpuDTACK = ~(_cpuAS == 1'b0 && cpuBusControl);
 	
 	// interconnects
 	wire selectRAM, selectROM;
@@ -70,43 +75,62 @@ module addrController_top(
 	
 	// RAM/ROM control signals
 	wire videoControlActive = _hblank == 1'b1 || loadSound;
-	assign _romCS = ~((videoBusControl == 1'b1 && videoControlActive == 1'b0) || (videoBusControl == 1'b0 && selectROM == 1'b1));
-	assign _romOE = ~((videoBusControl == 1'b1 && videoControlActive == 1'b0) || (videoBusControl == 1'b0 && selectROM == 1'b1 && _cpuRW == 1'b1)); 
-	assign _romWE = 1'b1;
-	assign _ramCS = ~((videoBusControl == 1'b1 && videoControlActive == 1'b1) || (videoBusControl == 1'b0 && selectRAM == 1'b1));
-	assign _ramOE = ~((videoBusControl == 1'b1 && videoControlActive == 1'b1) || (videoBusControl == 1'b0 && selectRAM == 1'b1 && _cpuRW == 1'b1));
-	assign _ramWE = ~(videoBusControl == 1'b0 && selectRAM && _cpuRW == 1'b0);
-	assign _memoryUDS = videoBusControl ? 1'b0 : _cpuUDS;
-	assign _memoryLDS = videoBusControl ? 1'b0 : _cpuLDS;
+
+	assign _romOE = ~(extraBusControl || (cpuBusControl && selectROM == 1'b1 && _cpuRW == 1'b1)); 
+//	assign _romOE = ~((videoBusControl && videoControlActive == 1'b0) || (cpuBusControl && selectROM == 1'b1 && _cpuRW == 1'b1)); 
+	
+	assign _ramOE = ~((videoBusControl && videoControlActive == 1'b1) || 
+						(cpuBusControl && selectRAM == 1'b1 && _cpuRW == 1'b1));
+	assign _ramWE = ~(cpuBusControl && selectRAM && _cpuRW == 1'b0);
+	
+	assign _memoryUDS = cpuBusControl ? _cpuUDS : 1'b0;
+	assign _memoryLDS = cpuBusControl ? _cpuLDS : 1'b0;
 	wire [21:0] addrMux = videoBusControl ? videoAddr : cpuAddr[21:0];
 	wire [21:0] macAddr;
 	assign macAddr[15:0] = addrMux[15:0];
+
+	// video always addresses ram
+	wire ram_access = (cpuBusControl && selectRAM) || videoBusControl;
 	
 	// simulate smaller RAM/ROM sizes
-	assign macAddr[16] = selectROM == 1'b1 && configROMSize == 1'b0 ? 1'b0 :  // force A16 to 0 for 64K ROM access
+	assign macAddr[16] = selectROM && configROMSize == 1'b0 ? 1'b0 :     // force A16 to 0 for 64K ROM access
 									addrMux[16]; 
-	assign macAddr[17] = selectRAM == 1'b1 && configRAMSize == 2'b00 ? 1'b0 : // force A17 to 0 for 128K RAM access
-									selectROM == 1'b1 && configROMSize == 1'b1 ? 1'b0 :  // force A17 to 0 for 128K ROM access
-									selectROM == 1'b1 && configROMSize == 1'b0 ? 1'b1 :  // force A17 to 1 for 64K ROM access (64K ROM image is at $20000)
+	assign macAddr[17] = ram_access && configRAMSize == 2'b00 ? 1'b0 :   // force A17 to 0 for 128K RAM access
+									selectROM && configROMSize == 1'b1 ? 1'b0 :  // force A17 to 0 for 128K ROM access
+									selectROM && configROMSize == 1'b0 ? 1'b1 :  // force A17 to 1 for 64K ROM access (64K ROM image is at $20000)
 									addrMux[17]; 
-	assign macAddr[18] = selectRAM == 1'b1 && configRAMSize == 2'b00 ? 1'b0 : // force A18 to 0 for 128K RAM access
-									selectROM == 1'b1 ? 1'b0 : 								  // force A18 to 0 for ROM access
+	assign macAddr[18] = ram_access && configRAMSize == 2'b00 ? 1'b0 :   // force A18 to 0 for 128K RAM access
+									selectROM ? 1'b0 : 								   // force A18 to 0 for ROM access
 									addrMux[18]; 
-	assign macAddr[19] = selectRAM == 1'b1 && configRAMSize[1] == 1'b0 ? 1'b0 : // force A19 to 0 for 128K or 512K RAM access
-									selectROM == 1'b1 ? 1'b0 : 								  // force A19 to 0 for ROM access
+	assign macAddr[19] = ram_access && configRAMSize[1] == 1'b0 ? 1'b0 : // force A19 to 0 for 128K or 512K RAM access
+									selectROM ? 1'b0 : 								   // force A19 to 0 for ROM access
 									addrMux[19]; 
-	assign macAddr[20] = selectRAM == 1'b1 && configRAMSize != 2'b11 ? 1'b0 : // force A20 to 0 for all but 4MB RAM access
-									selectROM == 1'b1 ? 1'b0 : 								  // force A20 to 0 for ROM access
+	assign macAddr[20] = ram_access && configRAMSize != 2'b11 ? 1'b0 :   // force A20 to 0 for all but 4MB RAM access
+									selectROM ? 1'b0 : 								   // force A20 to 0 for ROM access
 									addrMux[20]; 
-	assign macAddr[21] = selectRAM == 1'b1 && configRAMSize != 2'b11 ? 1'b0 : // force A21 to 0 for all but 4MB RAM access
-									selectROM == 1'b1 ? 1'b0 : 								  // force A21 to 0 for ROM access
+	assign macAddr[21] = ram_access && configRAMSize != 2'b11 ? 1'b0 :   // force A21 to 0 for all but 4MB RAM access
+									selectROM ? 1'b0 : 								   // force A21 to 0 for ROM access
 									addrMux[21]; 
 	
-	assign extraRomReadAck = videoBusControl == 1'b1 && videoControlActive == 1'b0;
-	assign memoryAddr = videoBusControl == 1'b1 && videoControlActive == 1'b0 ? extraRomReadAddr : macAddr;
-	
+	// allocate memory slots in the extra cycle
+	reg [2:0] extra_slot_count;
+	always @(posedge clk8)
+		if(busCycle == 2'b11) 
+			extra_slot_count <= extra_slot_count + 2'd1;
+			
+	// loppy emulation gets extra slots 0 and 1
+	assign dskReadAckInt = (extraBusControl == 1'b1) && (extra_slot_count == 0);
+	assign dskReadAckExt = (extraBusControl == 1'b1) && (extra_slot_count == 1);
+
+	assign memoryAddr = 
+		dskReadAckInt ? dskReadAddrInt + 22'h100000:   // first dsk image at 1MB
+		dskReadAckExt ? dskReadAddrExt + 22'h200000:   // second dsk image at 2MB
+		macAddr;
+
 	// address decoding
 	wire selectSCCByAddress;
+	wire selectIWMByAddress;
+	wire selectVIAByAddress;
 	addrDecoder ad(
 		.address(cpuAddr),
 		.enable(!videoBusControl),
@@ -115,11 +139,12 @@ module addrController_top(
 		.selectRAM(selectRAM),
 		.selectROM(selectROM),
 		.selectSCC(selectSCCByAddress),
-		.selectIWM(selectIWM),
-		.selectVIA(selectVIA),
-		.selectInterruptVectors(selectInterruptVectors));
+		.selectIWM(selectIWMByAddress),
+		.selectVIA(selectVIAByAddress));
 		
-	/* SCC register access is a mess. Reads and writes can have side-effects that alter the meaning of subsequent reads
+	/* TH: The following isn't 100% true anymore but kept for now for documentation purposes ...
+	
+		SCC register access is a mess. Reads and writes can have side-effects that alter the meaning of subsequent reads
 		and writes to the same address. It's not safe to do multiple reads of the same address, or multiple writes of the
 		same value to the same address. So we need to be sure we only perform one read or write per 4-clock CPU bus cycle.
 		
@@ -142,8 +167,9 @@ module addrController_top(
 		Another solution would be to create a custom clock for the SCC, whose positive edge is the negative edge of
 		clock 3 of the bus cycle.
 	*/
-	assign selectSCC = selectSCCByAddress && (busCycle == 2'b10 || // reads and writes enable on clock 2
-															(_cpuRW == 1'b1 && busCycle == 2'b11 && clk8)); // reads enable on first half of clock 3 
+	assign selectSCC = selectSCCByAddress && cpuBusControl;
+	assign selectIWM = selectIWMByAddress && cpuBusControl;
+	assign selectVIA = selectVIAByAddress && cpuBusControl;
 	
 	// video
 	videoTimer vt(
@@ -154,8 +180,7 @@ module addrController_top(
 		.vsync(vsync), 
 		._hblank(_hblank),
 		._vblank(_vblank), 
-		.loadNormalPixels(loadNormalPixels), 
-		.loadDebugPixels(loadDebugPixels),
+		.loadPixels(loadPixels), 
 		.loadSound(loadSound));
 		
 endmodule

@@ -1,8 +1,7 @@
 module dataController_top(
 	// clocks:
 	input clk32,					// 32.5 MHz pixel clock
-	input clk8,						// 8.125 MHz CPU clock
-	output clk8out,				// this module generates the 8.125MHz clock used for itself and other modules
+	output clk8,						// 8.125 MHz CPU clock
 	
 	// system control:
 	input _systemReset,
@@ -19,27 +18,24 @@ module dataController_top(
 	input _cpuLDS,	
 	input _cpuRW,
 	output [15:0] cpuDataOut,
-	output cpuDriveData,
 	
 	// peripherals:
 	input selectSCC,
 	input selectIWM,
 	input selectVIA,
-	input selectInterruptVectors,
 	
 	// RAM/ROM:
 	input videoBusControl,	
 	input [15:0] memoryDataIn,
 	output [15:0] memoryDataOut,
-	output memoryDriveData,
 	
 	// keyboard:
 	input keyClk, 					// need pull-up
 	input keyData, 				// need pull-up
 	 
 	// mouse:
-	inout mouseClk, 				// need pull-up
-	inout mouseData, 				// need pull-up
+	input mouseClk, 				// need pull-up
+	input mouseData, 				// need pull-up
 	
 	// serial:
 	input serialIn, 				// need pull-up
@@ -54,17 +50,17 @@ module dataController_top(
 	// audio:
 	input loadSound,	
 	output sound,	
-	
-	// debugging:
-	input interruptButton,
-	
+		
 	// misc
 	output memoryOverlayOn,
 	input [1:0] insertDisk,
-	output [1:0] diskInDrive,
-	
-	output [21:0] extraRomReadAddr,
-	input extraRomReadAck
+	input [1:0] diskSides,
+	output [1:0] diskEject,
+
+	output [21:0] dskReadAddrInt,
+	input dskReadAckInt,
+	output [21:0] dskReadAddrExt,
+	input dskReadAckExt
 );
 	
 	// divide 32.5 MHz clock by four to get CPU clock
@@ -72,7 +68,7 @@ module dataController_top(
 	always @(posedge clk32) begin
 		clkPhase <= clkPhase + 1'b1;
 	end
-	assign clk8out = clkPhase[1];
+	assign clk8 = clkPhase[1];
 	
 	// CPU reset generation
 	// For initial CPU reset, RESET and HALT must be asserted for at least 100ms = 800,000 clocks of clk8
@@ -103,7 +99,10 @@ module dataController_top(
 	wire mouseX1, mouseX2, mouseY1, mouseY2, mouseButton;
 	
 	// interrupt control
-	assign _cpuIPL = { interruptButton, _sccIrq, ~(_sccIrq & ~_viaIrq) };
+	assign _cpuIPL = 
+		!_viaIrq?3'b110:
+		!_sccIrq?3'b101:
+		3'b111;
 	
 	// Sound
 	assign sound = 0;
@@ -114,14 +113,11 @@ module dataController_top(
 	// CPU-side data output mux
 	assign cpuDataOut = selectIWM ? iwmDataOut :
 							  selectVIA ? viaDataOut :
-							  selectSCC ? { sccDataOutDelayed, 8'hEF } :
-							  selectInterruptVectors ? { 13'h3, cpuAddrRegLo } : // use A3-A1 to construct an interrupt vector number offset from $18
+							  selectSCC ? { sccDataOut, 8'hEF } :
 							  memoryDataIn;	
-	assign cpuDriveData = _cpuRW == 1'b1;
 	
 	// Memory-side
 	assign memoryDataOut = cpuDataIn;
-	assign memoryDriveData = _cpuRW == 1'b0 && videoBusControl == 1'b0;
 	
 	// VIA
 	via v(
@@ -141,8 +137,13 @@ module dataController_top(
 		._irq(_viaIrq),
 		.dataOut(viaDataOut),
 		.memoryOverlayOn(memoryOverlayOn),
-		.SEL(SEL));
-	
+		.SEL(SEL),
+		.kbd_in_data(kbd_in_data),
+		.kbd_in_strobe(kbd_in_strobe),
+		.kbd_out_data(kbd_out_data),
+		.kbd_out_strobe(kbd_out_strobe)
+		);
+		
 	// IWM
 	iwm i(
 		.clk8(clk8),
@@ -155,18 +156,22 @@ module dataController_top(
 		.SEL(SEL),
 		.dataOut(iwmDataOut),
 		.insertDisk(insertDisk),
-		.diskInDrive(diskInDrive),
+		.diskSides(diskSides),
+		.diskEject(diskEject),
 		
-		.extraRomReadAddr(extraRomReadAddr),
-		.extraRomReadAck(extraRomReadAck),
-		.extraRomReadData(memoryDataIn[7:0]));
+		.dskReadAddrInt(dskReadAddrInt),
+		.dskReadAckInt(dskReadAckInt),
+		.dskReadAddrExt(dskReadAddrExt),
+		.dskReadAckExt(dskReadAckExt),
+		.dskReadData(memoryDataIn[7:0])
+	);
 
 	// SCC
 	scc s(
 		.sysclk(clk8),
 	   .reset_hw(~_cpuReset),
 	   .cs(selectSCC && (_cpuLDS == 1'b0 || _cpuUDS == 1'b0)),
-	   .we(~_cpuRW), 
+	   .we(!_cpuRW),
 	   .rs(cpuAddrRegLo), 
 	   .wdata(cpuDataIn[15:8]),
 	   .rdata(sccDataOut),
@@ -174,14 +179,7 @@ module dataController_top(
 		.dcd_a(mouseX1),
 		.dcd_b(mouseY1),
 		.wreq(sccWReq));
-	
-	// apply a one cycle delay to CPU data reads from the SCC: 
-	// see comment about SCC register access in addrController_top.v
-	reg [7:0] sccDataOutDelayed;
-	always @(posedge clk8) begin
-		sccDataOutDelayed <= sccDataOut;
-	end
-	
+		
 	// Video
 	videoShifter vs(
 		.clk32(clk32), 
@@ -202,4 +200,20 @@ module dataController_top(
 		.y2(mouseY2),
 		.button(mouseButton));
 
+   wire [7:0] kbd_in_data;
+	wire kbd_in_strobe;
+   wire [7:0] kbd_out_data;
+	wire kbd_out_strobe;
+		
+	// Keyboard
+	ps2_kbd kbd(
+		.sysclk(clk8),
+		.reset(~_cpuReset),
+		.ps2dat(keyData),
+		.ps2clk(keyClk),
+		.data_out(kbd_out_data),              // data from mac
+		.strobe_out(kbd_out_strobe),
+		.data_in(kbd_in_data),         // data to mac
+		.strobe_in(kbd_in_strobe));
+		
 endmodule

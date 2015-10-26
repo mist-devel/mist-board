@@ -33,7 +33,7 @@ module sdram (
 
 	// cpu/chipset interface
 	input 		 		init,			// init signal after FPGA config to initialize RAM
-	input 		 		clk_128,		// sdram is accessed at 128MHz
+	input 		 		clk_64,		// sdram is accessed at 64MHz
 	input          	clk_8,      // 8MHz chipset clock to which sdram state machine is synchonized
 	
 	input [15:0]  		din,			// data input from chipset/cpu
@@ -44,7 +44,7 @@ module sdram (
 	input 		 		we          // cpu/chipset requests write
 );
 
-localparam RASCAS_DELAY   = 3'd3;   // tRCD=20ns -> 3 cycles@128MHz
+localparam RASCAS_DELAY   = 3'd2;   // tRCD=20ns -> 3 cycles@128MHz
 localparam BURST_LENGTH   = 3'b000; // 000=1, 001=2, 010=4, 011=8
 localparam ACCESS_TYPE    = 1'b0;   // 0=sequential, 1=interleaved
 localparam CAS_LATENCY    = 3'd3;   // 2/3 allowed
@@ -61,20 +61,20 @@ localparam MODE = { 3'b000, NO_WRITE_BURST, OP_MODE, CAS_LATENCY, ACCESS_TYPE, B
 // The state machine runs at 128Mhz synchronous to the 8 Mhz chipset clock.
 // It wraps from T15 to T0 on the rising edge of clk_8
 
-localparam STATE_FIRST     = 4'd0;   // first state in cycle
-localparam STATE_CMD_START = 4'd1;   // state in which a new command can be started
+localparam STATE_FIRST     = 3'd0;   // first state in cycle
+localparam STATE_CMD_START = 3'd1;   // state in which a new command can be started
 localparam STATE_CMD_CONT  = STATE_CMD_START  + RASCAS_DELAY; // command can be continued
 localparam STATE_READ      = STATE_CMD_CONT + CAS_LATENCY + 4'd1;
-localparam STATE_LAST      = 4'd15;  // last state in cycle
+localparam STATE_LAST      = 3'd7;  // last state in cycle
 
-reg [3:0] t;
-always @(posedge clk_128) begin
+reg [2:0] t;
+always @(posedge clk_64) begin
 	// 128Mhz counter synchronous to 8 Mhz clock
 	// force counter to pass state 0 exactly after the rising edge of clk_8
 	if(((t == STATE_LAST)  && ( clk_8 == 0)) ||
 		((t == STATE_FIRST) && ( clk_8 == 1)) ||
 		((t != STATE_LAST) && (t != STATE_FIRST)))
-			t <= t + 4'd1;
+			t <= t + 3'd1;
 end
 
 // ---------------------------------------------------------------------
@@ -84,7 +84,7 @@ end
 // wait 1ms (32 8Mhz cycles) after FPGA config is done before going
 // into normal operation. Initialize the ram in the last 16 reset cycles (cycles 15-0)
 reg [4:0] reset;
-always @(posedge clk_128) begin
+always @(posedge clk_64) begin
 	if(init)	reset <= 5'h1f;
 	else if((t == STATE_LAST) && (reset != 0))
 		reset <= reset - 5'd1;
@@ -117,7 +117,7 @@ assign sd_we  = sd_cmd[0];
 assign sd_data = we?din:16'bZZZZZZZZZZZZZZZZ;
 assign dout = sd_data;
 
-always @(posedge clk_128) begin
+always @(posedge clk_64) begin
 	sd_cmd <= CMD_INHIBIT;  // default: idle
 
 	if(reset != 0) begin

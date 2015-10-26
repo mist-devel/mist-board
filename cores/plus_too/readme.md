@@ -15,11 +15,19 @@ itself. Major changes were:
   - ROM upload using the MISTs IO controller
   - Floppy image upload using the MISTs IO controller
 - Use of MiSTs on screen display for floppy image selection
-- Use of MiSTS PS2 mouse emulation
+- Use of MiSTs PS2 mouse emulation
   - Need to disable all parts dealing with mouse inialization
 
 Functional changes:
 
 - tg68k cpu core updated to latest version
+- floppy disk images use 400k or 800k dsk format
+- support for second floppy disk
+- SDRAM clock reduced to 65MHz
+- PS2 keyboard support
+- removed debug overlay
+- removed irq vector generation
+- various timing simplifications
+- fix mouse counter wrapping
 
 Binaries are available at the [binaries repository](https://github.com/mist-devel/mist-binaries/tree/master/cores/plus_too).
