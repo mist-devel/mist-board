@@ -337,6 +337,7 @@ set_instance_assignment -name CURRENT_STRENGTH_NEW 8MA -to AUDIO_R
 set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to UART_RX
 
 
+<<<<<<< HEAD
 set_global_assignment -name SLD_NODE_CREATOR_ID 110 -section_id auto_signaltap_0
 set_global_assignment -name SLD_NODE_ENTITY_NAME sld_signaltap -section_id auto_signaltap_0
 set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_clk -to "pll:cs0|c0" -section_id auto_signaltap_0
@@ -541,6 +542,8 @@ set_global_assignment -name SLD_NODE_PARAMETER_ASSIGNMENT "SLD_ADVANCED_TRIGGER_
 set_global_assignment -name SLD_NODE_PARAMETER_ASSIGNMENT "SLD_TRIGGER_LEVEL_PIPELINE=1" -section_id auto_signaltap_0
 set_global_assignment -name SLD_NODE_PARAMETER_ASSIGNMENT "SLD_ENABLE_ADVANCED_TRIGGER=0" -section_id auto_signaltap_0
 set_global_assignment -name VERILOG_FILE floppy_track_encoder.v
+=======
+>>>>>>> 6a3164f3c71aa22fabf665c4838932b2343298ea
 set_global_assignment -name VERILOG_FILE ps2_kbd.v
 set_global_assignment -name VHDL_FILE TG68K_Pack.vhd
 set_global_assignment -name VHDL_FILE TG68KdotC_Kernel.vhd
@@ -561,6 +564,7 @@ set_global_assignment -name VERILOG_FILE dataController_top.v
 set_global_assignment -name VERILOG_FILE videoTimer.v
 set_global_assignment -name VERILOG_FILE videoShifter.v
 set_global_assignment -name VERILOG_FILE plusToo_top.v
+<<<<<<< HEAD
 set_global_assignment -name VERILOG_FILE floppy.v
 set_global_assignment -name SIGNALTAP_FILE stp1.stp
 set_global_assignment -name QIP_FILE pll.qip
@@ -1044,3 +1048,11 @@ set_global_assignment -name SLD_NODE_PARAMETER_ASSIGNMENT "SLD_NODE_CRC_LOWORD=6
 set_global_assignment -name SLD_NODE_PARAMETER_ASSIGNMENT "SLD_NODE_CRC_HIWORD=1089" -section_id auto_signaltap_0
 set_instance_assignment -name PARTITION_HIERARCHY root_partition -to | -section_id Top
 set_global_assignment -name SLD_FILE db/stp1_auto_stripped.stp
+=======
+set_global_assignment -name VERILOG_FILE debugPanel.v
+set_global_assignment -name VERILOG_FILE fontGen.v
+set_global_assignment -name VERILOG_FILE floppy.v
+set_global_assignment -name SIGNALTAP_FILE stp1.stp
+set_global_assignment -name QIP_FILE pll.qip
+set_instance_assignment -name PARTITION_HIERARCHY root_partition -to | -section_id Top
+>>>>>>> 6a3164f3c71aa22fabf665c4838932b2343298ea

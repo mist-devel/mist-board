@@ -21,6 +21,7 @@ itself. Major changes were:
 Functional changes:
 
 - tg68k cpu core updated to latest version
+<<<<<<< HEAD
 - floppy disk images use 400k or 800k dsk format
 - support for second floppy disk
 - SDRAM clock reduced to 65MHz
@@ -29,5 +30,9 @@ Functional changes:
 - removed irq vector generation
 - various timing simplifications
 - fix mouse counter wrapping
+=======
+- Keyboard support
+- Cleaned up overall timing
+>>>>>>> 6a3164f3c71aa22fabf665c4838932b2343298ea
 
 Binaries are available at the [binaries repository](https://github.com/mist-devel/mist-binaries/tree/master/cores/plus_too).
