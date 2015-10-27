@@ -106,10 +106,14 @@ module floppy(
 		driveRegs[`DRIVE_REG_DIRTN] // step direction
 	};
 
+	reg dskReadAckD;
+	always @(negedge clk8)
+		dskReadAckD <= dskReadAck;
+
 	// latch incoming data
 	reg [7:0] dskReadDataLatch;
 	always @(posedge clk8)
-		if(dskReadAck)
+		if(dskReadAckD)
 			dskReadDataLatch <= dskReadData;
 	
 	// generate glitch free data clock

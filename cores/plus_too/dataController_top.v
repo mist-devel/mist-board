@@ -47,10 +47,11 @@ module dataController_top(
 	input _vblank,
 	input loadPixels,
 
-	// audio:
-	input loadSound,	
-	output sound,	
-		
+	// audio
+	output [10:0] audioOut,  // 8 bit audio + 3 bit volume
+	output snd_alt,
+	input loadSound,
+	
 	// misc
 	output memoryOverlayOn,
 	input [1:0] insertDisk,
@@ -63,11 +64,33 @@ module dataController_top(
 	input dskReadAckExt
 );
 	
+	// add binary volume levels according to volume setting
+	assign audioOut = 
+		(snd_vol[0]?audio_x1:11'd0) +
+		(snd_vol[1]?audio_x2:11'd0) +
+		(snd_vol[2]?audio_x4:11'd0);
+
+	// three binary volume levels *1, *2 and *4
+	wire [10:0] audio_x1 = { 3'b000, audio_latch };
+	wire [10:0] audio_x2 = { 2'b00, audio_latch, 1'b0 };
+	wire [10:0] audio_x4 = { 1'b0, audio_latch, 2'b00};
+	
+	reg loadSoundD;
+	always @(negedge clk8)
+		loadSoundD <= loadSound;
+
+	reg [7:0] audio_latch;
+	always @(posedge clk8) begin
+		if(loadSoundD) begin
+			if(snd_ena) audio_latch <= 8'h80;
+			else  	 	audio_latch <= memoryDataIn[15:8];
+		end
+	end
+	
 	// divide 32.5 MHz clock by four to get CPU clock
 	reg [1:0] clkPhase;
-	always @(posedge clk32) begin
+	always @(posedge clk32)
 		clkPhase <= clkPhase + 1'b1;
-	end
 	assign clk8 = clkPhase[1];
 	
 	// CPU reset generation
@@ -103,10 +126,7 @@ module dataController_top(
 		!_viaIrq?3'b110:
 		!_sccIrq?3'b101:
 		3'b111;
-	
-	// Sound
-	assign sound = 0;
-	
+		
 	// Serial port
 	assign serialOut = 0;
 	
@@ -118,6 +138,10 @@ module dataController_top(
 	
 	// Memory-side
 	assign memoryDataOut = cpuDataIn;
+	
+	
+	wire [2:0] snd_vol;
+	wire snd_ena;
 	
 	// VIA
 	via v(
@@ -138,6 +162,11 @@ module dataController_top(
 		.dataOut(viaDataOut),
 		.memoryOverlayOn(memoryOverlayOn),
 		.SEL(SEL),
+		
+		.snd_vol(snd_vol),
+		.snd_ena(snd_ena),
+		.snd_alt(snd_alt),
+		
 		.kbd_in_data(kbd_in_data),
 		.kbd_in_strobe(kbd_in_strobe),
 		.kbd_out_data(kbd_out_data),

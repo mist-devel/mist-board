@@ -35,10 +35,10 @@ module addrController_top(
 	output _hblank,
 	output _vblank,
 	output loadPixels,
-	
-	// audio:
+		
+	input  snd_alt,
 	output loadSound,
-	
+		
 	// misc
 	input memoryOverlayOn,
 	
@@ -49,12 +49,45 @@ module addrController_top(
 	output dskReadAckExt
 );
 
-assign dioBusControl = extraBusControl;
+	// -------------- audio engine (may be moved into seperate module) ---------------
+	assign loadSound = sndReadAck;
+
+	localparam SIZE = 20'd67704;   // 168*608/2 clk8 events per frame
+	localparam STEP = 20'd5920;    // one step every 16*370 clk8 events
+	
+	reg [21:0] audioAddr; 
+	reg [19:0] snd_div;
+	
+	reg sndReadAckD;
+	always @(negedge clk8)
+		sndReadAckD <= sndReadAck;
+	
+	reg vblankD, vblankD2;
+	always @(posedge clk8) begin
+		if(sndReadAckD) begin
+			vblankD <= _vblank;
+			vblankD2 <= vblankD;
+		
+			// falling adge of _vblank = begin of vblank phase
+			if(vblankD2 && !vblankD) begin
+				audioAddr <= snd_alt?22'h3FA100:22'h3FFD00;
+				snd_div <= 20'd0;
+			end else begin
+				if(snd_div >= SIZE-1) begin
+					snd_div <= snd_div - SIZE + STEP;
+					audioAddr <= audioAddr + 22'd2;
+				end else
+					snd_div <= snd_div + STEP;
+			end
+		end
+	end
+	
+	assign dioBusControl = extraBusControl;
 
 	// interleaved RAM access for CPU and video
 	reg [1:0] busCycle;
 	always @(posedge clk8)
-		busCycle <= busCycle + 1'b1;
+		busCycle <= busCycle + 2'd1;
 	
 	// video controls memory bus during the first clock of the four-clock cycle
 	assign videoBusControl = (busCycle == 2'b00);
@@ -74,42 +107,44 @@ assign dioBusControl = extraBusControl;
 	wire [21:0] videoAddr;
 	
 	// RAM/ROM control signals
-	wire videoControlActive = _hblank == 1'b1 || loadSound;
+	wire videoControlActive = _hblank;
 
-	assign _romOE = ~(extraBusControl || (cpuBusControl && selectROM == 1'b1 && _cpuRW == 1'b1)); 
-//	assign _romOE = ~((videoBusControl && videoControlActive == 1'b0) || (cpuBusControl && selectROM == 1'b1 && _cpuRW == 1'b1)); 
+	wire extraRomRead = dskReadAckInt || dskReadAckExt;
+	assign _romOE = ~(extraRomRead || (cpuBusControl && selectROM == 1'b1 && _cpuRW == 1'b1)); 
 	
-	assign _ramOE = ~((videoBusControl && videoControlActive == 1'b1) || 
+	wire extraRamRead = sndReadAck;
+	assign _ramOE = ~((videoBusControl && videoControlActive == 1'b1) || (extraRamRead) ||
 						(cpuBusControl && selectRAM == 1'b1 && _cpuRW == 1'b1));
 	assign _ramWE = ~(cpuBusControl && selectRAM && _cpuRW == 1'b0);
 	
 	assign _memoryUDS = cpuBusControl ? _cpuUDS : 1'b0;
 	assign _memoryLDS = cpuBusControl ? _cpuLDS : 1'b0;
-	wire [21:0] addrMux = videoBusControl ? videoAddr : cpuAddr[21:0];
+	wire [21:0] addrMux = sndReadAck ? audioAddr : videoBusControl ? videoAddr : cpuAddr[21:0];
 	wire [21:0] macAddr;
 	assign macAddr[15:0] = addrMux[15:0];
 
-	// video always addresses ram
-	wire ram_access = (cpuBusControl && selectRAM) || videoBusControl;
+	// video and sound always addresses ram
+	wire ram_access = (cpuBusControl && selectRAM) || videoBusControl || sndReadAck;
+	wire rom_access = (cpuBusControl && selectROM);
 	
 	// simulate smaller RAM/ROM sizes
-	assign macAddr[16] = selectROM && configROMSize == 1'b0 ? 1'b0 :     // force A16 to 0 for 64K ROM access
+	assign macAddr[16] = rom_access && configROMSize == 1'b0 ? 1'b0 :     // force A16 to 0 for 64K ROM access
 									addrMux[16]; 
 	assign macAddr[17] = ram_access && configRAMSize == 2'b00 ? 1'b0 :   // force A17 to 0 for 128K RAM access
-									selectROM && configROMSize == 1'b1 ? 1'b0 :  // force A17 to 0 for 128K ROM access
-									selectROM && configROMSize == 1'b0 ? 1'b1 :  // force A17 to 1 for 64K ROM access (64K ROM image is at $20000)
+									rom_access && configROMSize == 1'b1 ? 1'b0 :  // force A17 to 0 for 128K ROM access
+									rom_access && configROMSize == 1'b0 ? 1'b1 :  // force A17 to 1 for 64K ROM access (64K ROM image is at $20000)
 									addrMux[17]; 
 	assign macAddr[18] = ram_access && configRAMSize == 2'b00 ? 1'b0 :   // force A18 to 0 for 128K RAM access
-									selectROM ? 1'b0 : 								   // force A18 to 0 for ROM access
+									rom_access ? 1'b0 : 								   // force A18 to 0 for ROM access
 									addrMux[18]; 
 	assign macAddr[19] = ram_access && configRAMSize[1] == 1'b0 ? 1'b0 : // force A19 to 0 for 128K or 512K RAM access
-									selectROM ? 1'b0 : 								   // force A19 to 0 for ROM access
+									rom_access ? 1'b0 : 								   // force A19 to 0 for ROM access
 									addrMux[19]; 
 	assign macAddr[20] = ram_access && configRAMSize != 2'b11 ? 1'b0 :   // force A20 to 0 for all but 4MB RAM access
-									selectROM ? 1'b0 : 								   // force A20 to 0 for ROM access
+									rom_access ? 1'b0 : 								   // force A20 to 0 for ROM access
 									addrMux[20]; 
 	assign macAddr[21] = ram_access && configRAMSize != 2'b11 ? 1'b0 :   // force A21 to 0 for all but 4MB RAM access
-									selectROM ? 1'b0 : 								   // force A21 to 0 for ROM access
+									rom_access ? 1'b0 : 								   // force A21 to 0 for ROM access
 									addrMux[21]; 
 	
 	// allocate memory slots in the extra cycle
@@ -118,9 +153,11 @@ assign dioBusControl = extraBusControl;
 		if(busCycle == 2'b11) 
 			extra_slot_count <= extra_slot_count + 2'd1;
 			
-	// loppy emulation gets extra slots 0 and 1
+	// floppy emulation gets extra slots 0 and 1
 	assign dskReadAckInt = (extraBusControl == 1'b1) && (extra_slot_count == 0);
 	assign dskReadAckExt = (extraBusControl == 1'b1) && (extra_slot_count == 1);
+	// audio gets extra slot 2
+	assign sndReadAck    = (extraBusControl == 1'b1) && (extra_slot_count == 2);
 
 	assign memoryAddr = 
 		dskReadAckInt ? dskReadAddrInt + 22'h100000:   // first dsk image at 1MB
@@ -180,7 +217,6 @@ assign dioBusControl = extraBusControl;
 		.vsync(vsync), 
 		._hblank(_hblank),
 		._vblank(_vblank), 
-		.loadPixels(loadPixels), 
-		.loadSound(loadSound));
+		.loadPixels(loadPixels));
 		
 endmodule

@@ -118,6 +118,10 @@ module via(
 	output [15:0] dataOut,
 	output memoryOverlayOn,
 	output SEL, // to IWM
+
+	output snd_ena,
+	output snd_alt,
+	output [2:0] snd_vol,
 	
 	input [7:0] kbd_in_data,
 	input kbd_in_strobe,
@@ -220,8 +224,6 @@ module via(
 			viaTimer2Armed <= 0;
 		end
 		else begin
-//			kbd_out_strobe <= 1'b0;
-
 			if (selectVIA == 1'b1 && _cpuUDS == 1'b0) begin
 				if (_cpuRW == 1'b0) begin
 					// normal register writes
@@ -346,6 +348,10 @@ module via(
 				dataOutHi = 8'hBE;
 		endcase
 	end
+	
+	assign snd_vol = viaADataOut[2:0];
+	assign snd_alt = !viaADataOut[3];
+	assign snd_ena = viaBDataOut[7];
 	
 	assign memoryOverlayOn = viaADataOut[4];
 	assign SEL = viaADataOut[5];

@@ -1,6 +1,6 @@
 // PlusToo_top for the MIST FPGA board
 
-module plusToo_top(
+module plusToo_top( 
   // clock inputs
   input wire [ 2-1:0]   CLOCK_27, // 27 MHz
   // LED outputs
@@ -198,9 +198,13 @@ assign SDRAM_CLK = !clk64;
 	wire [15:0] memoryDataOut;
 	
 	// peripherals
-	wire loadSound, loadPixels, pixelOut, _hblank, _vblank;
+	wire loadPixels, pixelOut, _hblank, _vblank;
 	wire memoryOverlayOn, selectSCC, selectIWM, selectVIA;	 
 	wire [15:0] dataControllerDataOut;
+	
+	// audio
+	wire snd_alt;
+	wire loadSound;
 	
 	// floppy disk image interface
 	wire dskReadAckInt;
@@ -299,8 +303,10 @@ assign SDRAM_CLK = !clk64;
 		._hblank(_hblank),
 		._vblank(_vblank),
 		.loadPixels(loadPixels),
-		.loadSound(loadSound), 
 		.memoryOverlayOn(memoryOverlayOn),
+
+		.snd_alt(snd_alt),
+		.loadSound(loadSound),
 
 		.dskReadAddrInt(dskReadAddrInt),
 		.dskReadAckInt(dskReadAckInt),
@@ -325,7 +331,16 @@ assign SDRAM_CLK = !clk64;
 		else if(rst_cnt != 0)
 			rst_cnt <= rst_cnt - 16'd1;
 	end
-	
+
+	wire [10:0] audio;
+	sigma_delta_dac dac (
+		.clk ( clk32 ),
+		.ldatasum ( { audio, 3'h0 } ),
+		.rdatasum ( { audio, 3'h0 } ),
+		.left ( AUDIO_L ),
+		.right ( AUDIO_R )
+	);
+
 	dataController_top dc0(
 		.clk32(clk32), 
 		.clk8(clk8),  
@@ -345,21 +360,30 @@ assign SDRAM_CLK = !clk64;
 		.videoBusControl(videoBusControl),
 		.memoryDataOut(memoryDataOut),
 		.memoryDataIn(sdram_do),
+		
+		// peripherals
 		.keyClk(keyClk), 
 		.keyData(keyData), 
 		.mouseClk(mouseClk),
 		.mouseData(mouseData),
 		.serialIn(serialIn), 
+		
+		// video
 		._hblank(_hblank),
 		._vblank(_vblank), 
 		.pixelOut(pixelOut),
-		.loadPixels(loadPixels), 
-		.loadSound(loadSound),
+		.loadPixels(loadPixels),
+		
 		.memoryOverlayOn(memoryOverlayOn),
+
+		.audioOut(audio),
+		.snd_alt(snd_alt),
+		.loadSound(loadSound),
+		
+		// floppy disk interface
 		.insertDisk( { dsk_ext_ins, dsk_int_ins} ),
 		.diskSides( { dsk_ext_ds, dsk_int_ds} ),
 		.diskEject(diskEject),
-		
 		.dskReadAddrInt(dskReadAddrInt),
 		.dskReadAckInt(dskReadAckInt),
 		.dskReadAddrExt(dskReadAddrExt),
