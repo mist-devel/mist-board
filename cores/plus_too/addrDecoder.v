@@ -88,8 +88,7 @@ module addrDecoder(
 	output reg selectROM,
 	output reg selectSCC,
 	output reg selectIWM,
-	output reg selectVIA,
-	output reg selectInterruptVectors
+	output reg selectVIA
 );
 
 	always @(*) begin
@@ -98,7 +97,6 @@ module addrDecoder(
 		selectSCC = 0;
 		selectIWM = 0;
 		selectVIA = 0;
-		selectInterruptVectors = 0;	
 		
 		if (_cpuAS == 0 && enable == 1'b1) begin
 			casez (address[23:20])
@@ -124,8 +122,6 @@ module addrDecoder(
 					selectIWM = 1'b1;
 				4'b1110:
 					selectVIA = 1'b1;
-				4'b1111:
-					selectInterruptVectors = 1'b1;
 				default:
 					; // select nothing
 			endcase

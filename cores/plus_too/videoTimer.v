@@ -7,9 +7,7 @@ module videoTimer(
 	 output reg vsync,
 	 output _hblank,
 	 output _vblank,
-	 output loadNormalPixels,
-	 output loadDebugPixels,
-	 output loadSound
+	 output loadPixels
 );
 
 	// timing data from http://tinyvga.com/vga-timing/1024x768@60Hz
@@ -69,9 +67,6 @@ module videoTimer(
 							 (kVisibleHeightStart/2 * kVisibleWidth/2) +
 							 { ypos[9:1], xpos[6:2], 1'b0 };
 	
-	assign loadNormalPixels = _vblank == 1'b1 && _hblank == 1'b1 && busCycle == 2'b00;
-	assign loadDebugPixels = _vblank == 1'b0 && _hblank == 1'b1 && busCycle == 2'b00;
-	
-	assign loadSound = 1'b0;
+	assign loadPixels = _vblank == 1'b1 && _hblank == 1'b1 && busCycle == 2'b00;
 	
 endmodule

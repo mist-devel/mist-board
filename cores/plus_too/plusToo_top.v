@@ -1,6 +1,6 @@
 // PlusToo_top for the MIST FPGA board
 
-module plusToo_top(
+module plusToo_top( 
   // clock inputs
   input wire [ 2-1:0]   CLOCK_27, // 27 MHz
   // LED outputs
@@ -43,7 +43,7 @@ module plusToo_top(
 // for stability and maintainability reasons the whole timing has been simplyfied:
 //                00           01             10           11
 //    ______ _____________ _____________ _____________ _____________ ___
-//    ______X_video_cycle_X____unused___X__cpu_cycle__X___unused____X___
+//    ______X_video_cycle_X______IO_____X__cpu_cycle__X___unused____X___
 //                        ^                    ^      ^
 //                        |                    |      |
 //                      video                 cpu    cpu
@@ -82,8 +82,41 @@ wire [23:0] dio_addr;
 wire [4:0] dio_index;
 wire [15:0] dio_data;
 
-// disk image is being stored right after os rom at word offset 0x10000 
-wire [20:0] dio_a = (dio_index == 0)?dio_addr[20:0]:{21'h10000 + dio_addr[20:0]};
+// good floppy image sizes are 819200 bytes and 409600 bytes
+reg dsk_int_ds, dsk_ext_ds;  // double sided image inserted
+reg dsk_int_ss, dsk_ext_ss;  // single sided image inserted
+
+// any known type of disk image inserted?
+wire dsk_int_ins = dsk_int_ds || dsk_int_ss;
+wire dsk_ext_ins = dsk_ext_ds || dsk_ext_ss;
+
+// at the end of a download latch file size
+// diskEject is set by macos on eject
+always @(negedge dio_download or posedge diskEject[0]) begin
+	if(diskEject[0]) begin
+		dsk_int_ds <= 1'b0;
+		dsk_int_ss <= 1'b0;
+	end else if(dio_index == 1) begin
+		dsk_int_ds <= (dio_addr == 409599);   // double sides disk, addr counts words, not bytes
+		dsk_int_ss <= (dio_addr == 204799);   // single sided disk
+	end
+end	
+	
+always @(negedge dio_download or posedge diskEject[1]) begin
+	if(diskEject[1]) begin
+		dsk_ext_ds <= 1'b0;
+		dsk_ext_ss <= 1'b0;
+	end else if(dio_index == 2) begin
+		dsk_ext_ds <= (dio_addr == 409599);   // double sides disk, addr counts words, not bytes
+		dsk_ext_ss <= (dio_addr == 204799);   // single sided disk
+	end
+end
+
+// disk images are being stored right after os rom at word offset 0x80000 and 0x100000 
+wire [20:0] dio_a = 
+	(dio_index == 0)?dio_addr[20:0]:                 // os rom
+	(dio_index == 1)?{21'h80000 + dio_addr[20:0]}:   // first dsk image at 512k word addr
+	{21'h100000 + dio_addr[20:0]};                   // second dsk image at 1M word addr
    
 data_io data_io (
    // io controller spi interface
@@ -95,7 +128,7 @@ data_io data_io (
    .index    ( dio_index ),        // 0=rom download, 1=disk image
                  
    // external ram interface
-   .clk   ( clk8      ),
+   .clk   ( download_cycle ),
    .wr    ( dio_write ),
    .addr  ( dio_addr  ),
    .data  ( dio_data  )
@@ -112,24 +145,12 @@ wire vsync;
 wire [3:0] red;
 wire [3:0] green;
 wire [3:0] blue;
-
-// various debug signals for the DE1/DE2. These don't exist on the MIST
-// and will be optimized away ...
-wire [6:0] hex0;
-wire [6:0] hex1;
-wire [6:0] hex2;
-wire [6:0] hex3;
-wire [7:0] ledg;
 	 
 // ps2 interface for mouse, to be mapped into user_io
 wire mouseClk;
 wire mouseData;
 wire keyClk;
 wire keyData;
-
-	 // NO REAL LOGIC SHOULD GO IN THIS MODULE!
-	// It may not exist in the hand-built Plus Too.
-	// Only interconnections and interfaces specific to the dev board should go here
 	
 assign SDRAM_CLK = !clk64;
 	
@@ -155,9 +176,9 @@ assign SDRAM_CLK = !clk64;
 	
 	// set the real-world inputs to sane defaults
 	localparam serialIn = 1'b0,
-				  interruptButton = 1'b0,
-				  configROMSize = 1'b1, // 128K ROM
-				  configRAMSize = 2'b01; // 512K RAM
+				  configROMSize = 1'b1;  // 128K ROM
+
+	wire [1:0] configRAMSize = status[3]?2'b11:2'b10; // 1MB/4MB
 				  
 	// interconnects
 	// CPU
@@ -168,50 +189,45 @@ assign SDRAM_CLK = !clk64;
 	wire [15:0] cpuDataOut;
 	
 	// RAM/ROM
-	wire _romCS, _romOE;
-	wire _ramCS, _ramOE, _ramWE;
+	wire _romOE;
+	wire _ramOE, _ramWE;
 	wire _memoryUDS, _memoryLDS;
 	wire videoBusControl;
+	wire dioBusControl;
 	wire [21:0] memoryAddr;
 	wire [15:0] memoryDataOut;
-	wire memoryDriveData;
-	wire [15:0] memoryDataInMux;
 	
 	// peripherals
-	wire loadSound, loadNormalPixels, loadDebugPixels, pixelOut, _hblank, _vblank;
-	wire memoryOverlayOn, selectSCC, selectIWM, selectVIA, selectInterruptVectors;	 
+	wire loadPixels, pixelOut, _hblank, _vblank;
+	wire memoryOverlayOn, selectSCC, selectIWM, selectVIA;	 
 	wire [15:0] dataControllerDataOut;
-	wire dataControllerDriveData;
 	
-	// debug panel
-	wire _debugDTACK, driveDebugData, loadPixels, extraRomReadAck;
-	wire [15:0] debugDataOut;
-	wire [21:0] extraRomReadAddr;
+	// audio
+	wire snd_alt;
+	wire loadSound;
 	
-	// LED debug lights
-	assign ledg = { 2'b00, diskInDrive[1], diskInDrive[1], diskInDrive[0], diskInDrive[0], 2'b00 };
+	// floppy disk image interface
+	wire dskReadAckInt;
+	wire [21:0] dskReadAddrInt;
+	wire dskReadAckExt;
+	wire [21:0] dskReadAddrExt;
 	
 	// convert 1-bit pixel data to 4:4:4 RGB
-	// force pixels in debug area to appear green
-	assign red[3:0] = _vblank == 1'b0 ? 4'h0 : { pixelOut, pixelOut, pixelOut, pixelOut };
+	assign red[3:0] =   { pixelOut, pixelOut, pixelOut, pixelOut };
 	assign green[3:0] = { pixelOut, pixelOut, pixelOut, pixelOut };
-	assign blue[3:0] = _vblank == 1'b0 ? 4'h0 : { pixelOut, pixelOut, pixelOut, pixelOut };
+	assign blue[3:0] =  { pixelOut, pixelOut, pixelOut, pixelOut };
 	
-	// memory-side data input mux
-	// In a hand-built system, both RAM and ROM data will be on the same physical pins,
-	// making this mux unnecessary
-	assign memoryDataInMux = driveDebugData ? debugDataOut :
-									sdram_do;
-
 	// the configuration string is returned to the io controller to allow
 	// it to control the menu on the OSD 
 	parameter CONF_STR = {
         "PLUS_TOO;;",
-        "F1,BIN;",
-        "T2,Reset"
+        "F1,DSK;",
+        "F2,DSK;",
+		  "O3,Memory,1MB,4MB;",
+        "T4,Reset"
 	};
 	
-	parameter CONF_STR_LEN = 10+7+8;
+	parameter CONF_STR_LEN = 10+7+7+18+8;
 
 	// the status register is controlled by the on screen display (OSD)
 	wire [7:0] status;
@@ -237,61 +253,15 @@ assign SDRAM_CLK = !clk64;
       .ps2_mouse_data( mouseData	   )
 	);
 
-
-	debugPanel dp(
-		.clk8(clk8),
-		.sw(sw),
-		.key(key),
-		.videoBusControl(videoBusControl),
-		.loadNormalPixels(loadNormalPixels),
-		.loadDebugPixels(loadDebugPixels),
-		.loadPixelsOut(loadPixels),
-		._dtackIn(_cpuDTACK),
-		.cpuAddrHi(cpuAddrHi),
-		.cpuAddr(cpuAddr),
-		._cpuRW(_cpuRW),
-		._cpuUDS(_cpuUDS),
-		._cpuLDS(_cpuLDS),
-		.dataControllerDataOut(dataControllerDataOut),
-		.cpuDataOut(cpuDataOut),
-		.memoryAddr(memoryAddr),
-		._dtackOut(_debugDTACK),
-		.hex0(hex0),
-		.hex1(hex1),
-		.hex2(hex2),
-		.hex3(hex3),
-		.driveDebugData(driveDebugData),
-		.debugDataOut(debugDataOut),
-		.extraRomReadAck(extraRomReadAck));
-	
-	wire [2:0] _debugIPL = sw[0] == 1'b1 ? 3'b111 : _cpuIPL; // suppress interrupts when sw0 on	
-
-/*	
-	TG68 m68k(
-		.clk(clk8), 
-		.reset(_cpuReset), 
-		.clkena_in(1'b1),
-		.data_in(dataControllerDataOut), 
-		.IPL(_debugIPL), 
-		.dtack(_debugDTACK), 
-		.addr({cpuAddrHi, cpuAddr}), 
-		.data_out(cpuDataOut), 
-		.as(_cpuAS), 
-		.uds(_cpuUDS), 
-		.lds(_cpuLDS), 
-		.rw(_cpuRW), 
-		.drive_data(cpuDriveData)); 
-*/	
-
    assign _cpuAS = !(cpu_busstate != 2'b01);
 	wire [1:0] cpu_busstate;
-	wire cpu_clkena = (!_debugDTACK) || (cpu_busstate == 2'b01);
+	wire cpu_clkena = (!_cpuDTACK) || (cpu_busstate == 2'b01);
 	TG68KdotC_Kernel #(0,0,0,0,0,0) m68k (
         .clk            ( clk8           ),
         .nReset         ( _cpuReset      ),
         .clkena_in      ( cpu_clkena     ), 
         .data_in        ( dataControllerDataOut ),
-        .IPL            ( _debugIPL      ),
+        .IPL            ( _cpuIPL        ),
         .IPL_autovector ( 1'b1           ),
         .berr           ( 1'b0           ),
         .clr_berr       ( 1'b0           ),
@@ -320,44 +290,59 @@ assign SDRAM_CLK = !clk64;
 		.memoryAddr(memoryAddr),			
 		._memoryUDS(_memoryUDS),
 		._memoryLDS(_memoryLDS),
-		._romCS(_romCS),
 		._romOE(_romOE), 
-		._ramCS(_ramCS), 
 		._ramOE(_ramOE), 
 		._ramWE(_ramWE),
 		.videoBusControl(videoBusControl),	
+		.dioBusControl(dioBusControl),	
 		.selectSCC(selectSCC),
 		.selectIWM(selectIWM),
 		.selectVIA(selectVIA),
-		.selectInterruptVectors(selectInterruptVectors),
 		.hsync(hsync), 
 		.vsync(vsync),
 		._hblank(_hblank),
 		._vblank(_vblank),
-		.loadNormalPixels(loadNormalPixels),
-		.loadDebugPixels(loadDebugPixels),
-		.loadSound(loadSound), 
+		.loadPixels(loadPixels),
 		.memoryOverlayOn(memoryOverlayOn),
-		
-		.extraRomReadAddr(extraRomReadAddr),
-		.extraRomReadAck(extraRomReadAck));
+
+		.snd_alt(snd_alt),
+		.loadSound(loadSound),
+
+		.dskReadAddrInt(dskReadAddrInt),
+		.dskReadAckInt(dskReadAckInt),
+		.dskReadAddrExt(dskReadAddrExt),
+		.dskReadAckExt(dskReadAckExt)
+	);
 	
-	wire [1:0] diskInDrive;
+	wire [1:0] diskEject;
 	
 	// addional ~8ms delay in reset
+	wire rom_download = dio_download && (dio_index == 0);
 	wire n_reset = (rst_cnt == 0);
 	reg [15:0] rst_cnt;
+	reg last_mem_config;
 	always @(posedge clk8) begin
+		last_mem_config <= status[3];
+	
 		// various source can reset the mac
-		if(!pll_locked || status[0] || status[2] || buttons[1] || dio_download) 
+		if(!pll_locked || status[0] || status[4] || buttons[1] || 
+			rom_download || (last_mem_config != status[3])) 
 			rst_cnt <= 16'd65535;
 		else if(rst_cnt != 0)
 			rst_cnt <= rst_cnt - 16'd1;
 	end
-	
+
+	wire [10:0] audio;
+	sigma_delta_dac dac (
+		.clk ( clk32 ),
+		.ldatasum ( { audio, 3'h0 } ),
+		.rdatasum ( { audio, 3'h0 } ),
+		.left ( AUDIO_L ),
+		.right ( AUDIO_R )
+	);
+
 	dataController_top dc0(
 		.clk32(clk32), 
-		.clk8out(clk8),
 		.clk8(clk8),  
 		._systemReset(n_reset), 
 		._cpuReset(_cpuReset), 
@@ -367,52 +352,53 @@ assign SDRAM_CLK = !clk64;
 		._cpuRW(_cpuRW), 
 		.cpuDataIn(cpuDataOut),
 		.cpuDataOut(dataControllerDataOut), 	
-		.cpuDriveData(dataControllerDriveData),
 		.cpuAddrRegHi(cpuAddr[12:9]),
 		.cpuAddrRegLo(cpuAddr[2:1]),		
 		.selectSCC(selectSCC),
 		.selectIWM(selectIWM),
 		.selectVIA(selectVIA),
-		.selectInterruptVectors(selectInterruptVectors),
 		.videoBusControl(videoBusControl),
 		.memoryDataOut(memoryDataOut),
-		.memoryDataIn(memoryDataInMux),
-		.memoryDriveData(memoryDriveData),
+		.memoryDataIn(sdram_do),
+		
+		// peripherals
 		.keyClk(keyClk), 
 		.keyData(keyData), 
 		.mouseClk(mouseClk),
 		.mouseData(mouseData),
 		.serialIn(serialIn), 
+		
+		// video
 		._hblank(_hblank),
 		._vblank(_vblank), 
-		.pixelOut(pixelOut), 
-		.loadPixels(loadPixels), 
-		.loadSound(loadSound),
-		.interruptButton(1'b1), 
+		.pixelOut(pixelOut),
+		.loadPixels(loadPixels),
+		
 		.memoryOverlayOn(memoryOverlayOn),
-		.insertDisk( 2'b01 ),
-		.diskInDrive(diskInDrive),
+
+		.audioOut(audio),
+		.snd_alt(snd_alt),
+		.loadSound(loadSound),
 		
-		.extraRomReadAddr(extraRomReadAddr),
-		.extraRomReadAck(extraRomReadAck));
+		// floppy disk interface
+		.insertDisk( { dsk_ext_ins, dsk_int_ins} ),
+		.diskSides( { dsk_ext_ds, dsk_int_ds} ),
+		.diskEject(diskEject),
+		.dskReadAddrInt(dskReadAddrInt),
+		.dskReadAckInt(dskReadAckInt),
+		.dskReadAddrExt(dskReadAddrExt),
+		.dskReadAckExt(dskReadAckExt)
+		);
 		
-	// ram/rom maps directly into 68k address space
+// sdram used for ram/rom maps directly into 68k address space
+wire download_cycle = dio_download && dioBusControl;
 
-// multiplex sdram between mac and the rom downloader
-// 4MB RAM
-// wire [24:0] sdram_addr = dio_download?{ 3'b001, dio_a[20:0] }:{ 2'b00, ~_romOE, memoryAddr[21:1] };
+wire [24:0] sdram_addr = download_cycle?{ 4'b0001, dio_a[20:0] }:{ 3'b000, ~_romOE, memoryAddr[21:1] };
 
-wire [20:0] memoryAddrEx = 
-	extraRomReadAck?memoryAddr[21:1]:              // full access to floppy image
-//	memoryAddr[21:1];                              // CPU access not masked giving 4MB ram
-	{ 3'b000, memoryAddr[18:1]} ;                  // CPU access masked for 512k ram
-
-wire [24:0] sdram_addr = dio_download?{ 4'b0001, dio_a[20:0] }:{ 3'b000, ~_romOE, memoryAddrEx };
-
-wire [15:0] sdram_din = dio_download?dio_data:memoryDataOut;
-wire [1:0] sdram_ds = dio_download?2'b11:{ !_memoryUDS, !_memoryLDS };
-wire sdram_we = dio_download?dio_write:!_ramWE;
-wire sdram_oe = dio_download?1'b0:(!_ramOE || !_romOE);
+wire [15:0] sdram_din = download_cycle?dio_data:memoryDataOut;
+wire [1:0] sdram_ds = download_cycle?2'b11:{ !_memoryUDS, !_memoryLDS };
+wire sdram_we = download_cycle?dio_write:!_ramWE;
+wire sdram_oe = download_cycle?1'b0:(!_ramOE || !_romOE);
 
 
 // during rom/disk download ffff is returned so the screen is black during download
@@ -420,9 +406,10 @@ wire sdram_oe = dio_download?1'b0:(!_ramOE || !_romOE);
 // we thus need to properly demultiplex the word returned from sdram in that case
 wire [15:0] extra_rom_data_demux = memoryAddr[0]?
 	{sdram_out[7:0],sdram_out[7:0]}:{sdram_out[15:8],sdram_out[15:8]};
-wire [15:0] sdram_do = dio_download?16'hffff:
-	extraRomReadAck?extra_rom_data_demux:
+wire [15:0] sdram_do = download_cycle?16'hffff:
+	(dskReadAckInt || dskReadAckExt)?extra_rom_data_demux:
 	sdram_out;
+	
 wire [15:0] sdram_out;
 	
 assign SDRAM_CKE         = 1'b1;

@@ -13,9 +13,7 @@ module ps2_kbd(	input			sysclk,
 		input			strobe_out,
 
 		output [7:0]		data_in,
-		output 			strobe_in,
-
-		output reg [15:0]	debug
+		output 			strobe_in
 );
 
 	reg [8:0] 		keymac;
@@ -262,7 +260,7 @@ module ps2_kbd(	input			sysclk,
 	/* Data to Mac ... XXX: Handle keypad and special case capslock */
 	assign data_in = cmd_test 	? 8'h7d :
 			 cmd_model	? 8'h03 :
-			 key_pending	? keymac[7:0] : 8'h7b;	
+			 (key_pending && !keymac[8]) ? keymac[7:0] : 8'h7b;	
 
 	/* Keymap. XXX add option to assign ctrl/alt/windows to cmd/option
 	 * differently
@@ -785,16 +783,4 @@ module ps2_kbd(	input			sysclk,
 	 	  endcase // case ({extended,ps2key[7:0]})
 		  keymac[7] <= keybreak;
 	  end
-
-	/* Some debug signals for my own sanity */
-	always@(posedge sysclk or posedge reset) begin
-		if (reset)
-		  debug <= 0;
-		else begin
-			if (istrobe)
-			  debug[15:8] <= ibyte;
-			debug[7:0] <= { ps2clk, ps2dat, dbg_lowstate, 2'b0,
-					state };
-		end
-	end
 endmodule

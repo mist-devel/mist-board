@@ -40,11 +40,15 @@ module iwm(
 	input SEL, // from VIA
 	output [15:0] dataOut,
 	input [1:0] insertDisk,
-	output [1:0] diskInDrive,
+	output [1:0] diskEject,
+	input [1:0] diskSides,
 	
-	output [21:0] extraRomReadAddr,
-	input extraRomReadAck,
-	input [7:0] extraRomReadData
+	// interface to fetch data for internal drive
+	output [21:0] dskReadAddrInt,
+	input dskReadAckInt,
+	output [21:0] dskReadAddrExt,
+	input dskReadAckExt,
+	input [7:0] dskReadData
 );
 
 	wire [7:0] dataInLo = dataIn[7:0];
@@ -82,14 +86,16 @@ module iwm(
 		._enable(~diskEnableInt),
 		.writeData(writeData),
 		.readData(readDataInt),
-		.useDiskImage(1'b1),
 		.advanceDriveHead(advanceDriveHead),
 		.newByteReady(newByteReadyInt),
 		.insertDisk(insertDisk[0]),
-		.diskInDrive(diskInDrive[0]),
-		.extraRomReadAddr(extraRomReadAddr),
-		.extraRomReadAck(extraRomReadAck),
-		.extraRomReadData(extraRomReadData));
+		.diskSides(diskSides[0]),
+		.diskEject(diskEject[0]),	
+		
+		.dskReadAddr(dskReadAddrInt),
+		.dskReadAck(dskReadAckInt),
+		.dskReadData(dskReadData)
+	);
 		
 	floppy floppyExt(
 		.clk8(clk8),
@@ -102,11 +108,16 @@ module iwm(
 		._enable(~diskEnableExt),
 		.writeData(writeData),
 		.readData(readDataExt),
-		.useDiskImage(1'b0),
 		.advanceDriveHead(advanceDriveHead),
 		.newByteReady(newByteReadyExt),
 		.insertDisk(insertDisk[1]),
-		.diskInDrive(diskInDrive[1]));
+		.diskSides(diskSides[1]),
+		.diskEject(diskEject[1]),
+		
+		.dskReadAddr(dskReadAddrExt),
+		.dskReadAck(dskReadAckExt),
+		.dskReadData(dskReadData)
+	);
 	
 	wire [7:0] readData = selectExternalDrive ? readDataExt : readDataInt;
 	wire newByteReady = selectExternalDrive ? newByteReadyExt : newByteReadyInt;
@@ -241,7 +252,7 @@ module iwm(
 	wire iwmRead = (_cpuRW == 1'b1 && selectIWM == 1'b1 && _cpuLDS == 1'b0);
 	reg iwmReadPrev;
 	reg [3:0] readLatchClearTimer; 
-	always @(posedge clk8 or negedge _reset) begin
+	always @(negedge clk8 or negedge _reset) begin
 		if (_reset == 1'b0) begin	
 			readDataLatch <= 0;
 			readLatchClearTimer <= 0;

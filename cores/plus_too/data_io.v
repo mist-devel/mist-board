@@ -40,6 +40,10 @@ module data_io (
 // spi client
 // *********************************************************************************
 
+// filter spi clock. the 8 bit gate delay is ~2.5ns in total
+wire [7:0] spi_sck_D = { spi_sck_D[6:0], sck } /* synthesis keep */;
+wire spi_sck = (spi_sck && spi_sck_D != 8'h00) || (!spi_sck && spi_sck_D == 8'hff);
+
 // this core supports only the display related OSD commands
 // of the minimig
 reg [14:0]     sbuf;
@@ -58,7 +62,7 @@ assign downloading = downloading_reg;
 reg downloading_reg = 1'b0;
 
 // data_io has its own SPI interface to the io controller
-always@(posedge sck, posedge ss) begin
+always@(posedge spi_sck, posedge ss) begin
 	if(ss == 1'b1)
 		cnt <= 5'd0;
 	else begin
