@@ -327,10 +327,12 @@ always @(posedge CLK) begin
                 endcase
             end
 
-            if (r_acr[7] === 1'b 1 & t1_toggle === 1'b 1) begin
-                r_orb[7] <= ~r_orb[7];
-                //  toggle
-            end
+				if (r_acr[7] === 1'b1) begin
+					if(t1_load_counter)
+						r_orb[7] <= 1'b0; 			// writing T1C-H resets bit 7
+					else if (t1_toggle === 1'b1)
+						r_orb[7] <= ~r_orb[7]; 		// toggle
+				end
         end
     end
 end
