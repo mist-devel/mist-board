@@ -8,11 +8,9 @@ module addrController_top(
 
 	// 68000 CPU memory interface:
 	input [23:0] cpuAddr,
-	input _cpuAS,
 	input _cpuUDS,
 	input _cpuLDS,
 	input _cpuRW,	
-	output _cpuDTACK,	
 	
 	// RAM/ROM:
 	output [21:0] memoryAddr,
@@ -23,8 +21,10 @@ module addrController_top(
 	output _ramWE,	
 	output videoBusControl,
 	output dioBusControl,
+	output cpuBusControl,
 	
 	// peripherals:
+	output selectSCSI,
 	output selectSCC,
 	output selectIWM,
 	output selectVIA,
@@ -52,7 +52,7 @@ module addrController_top(
 	// -------------- audio engine (may be moved into seperate module) ---------------
 	assign loadSound = sndReadAck;
 
-	localparam SIZE = 20'd67704;   // 168*608/2 clk8 events per frame
+	localparam SIZE = 20'd135408;  // 168*806 clk8 events per frame
 	localparam STEP = 20'd5920;    // one step every 16*370 clk8 events
 	
 	reg [21:0] audioAddr; 
@@ -86,22 +86,41 @@ module addrController_top(
 
 	// interleaved RAM access for CPU and video
 	reg [1:0] busCycle;
+	reg [1:0] extra_slot_count;
+	reg [1:0] subCycle;
+	
 	always @(posedge clk8)
 		busCycle <= busCycle + 2'd1;
+		
+	reg extra_slot_advance;
+	always @(negedge clk8)
+		extra_slot_advance <= (busCycle == 2'b11);
 	
+	// allocate memory slots in the extra cycle
+	always @(posedge clk8) begin
+		if(extra_slot_advance) begin
+			extra_slot_count <= extra_slot_count + 2'd1;
+			
+			// the subcycle counter counts 0-1-2-0-1-2 and is used to give
+			// the cpu 2 out of three bus cycles for a speed close to a real mac
+			
+			// Update: Counter now runs 0-1-2-3-0-1-2... so the CPU runs 3 out of
+			// 4 cycles. Making it slower (e.g. 2/3) will cause the floppy ot stop
+			// working reliably. Making it faster will cause scsi to stop working ...
+			
+	//		if(subCycle == 2'd2) subCycle <= 2'd0;
+	//		else  
+			subCycle <= subCycle + 2'd1;
+		end
+	end
+
 	// video controls memory bus during the first clock of the four-clock cycle
 	assign videoBusControl = (busCycle == 2'b00);
 	// cpu controls memory bus during the third clock of the four-clock cycle
-	wire cpuBusControl = (busCycle == 2'b10);
-
+	assign cpuBusControl = (busCycle == 2'b10) && (subCycle != 2'd2);
 	//
 	wire extraBusControl = (busCycle == 2'b01);
-	
-	// DTACK generation	
-	// TODO: delay DTACK for once full bus cycle when RAM is accessed, to match Mac Plus memory timing
-	// TODO: according to datasheet, /DTACK should continue to be asserted through the final bus cycle too
-	assign _cpuDTACK = ~(_cpuAS == 1'b0 && cpuBusControl);
-	
+		
 	// interconnects
 	wire selectRAM, selectROM;
 	wire [21:0] videoAddr;
@@ -110,12 +129,12 @@ module addrController_top(
 	wire videoControlActive = _hblank;
 
 	wire extraRomRead = dskReadAckInt || dskReadAckExt;
-	assign _romOE = ~(extraRomRead || (cpuBusControl && selectROM == 1'b1 && _cpuRW == 1'b1)); 
+	assign _romOE = ~(extraRomRead || (cpuBusControl && selectROM && _cpuRW)); 
 	
 	wire extraRamRead = sndReadAck;
-	assign _ramOE = ~((videoBusControl && videoControlActive == 1'b1) || (extraRamRead) ||
-						(cpuBusControl && selectRAM == 1'b1 && _cpuRW == 1'b1));
-	assign _ramWE = ~(cpuBusControl && selectRAM && _cpuRW == 1'b0);
+	assign _ramOE = ~((videoBusControl && videoControlActive) || (extraRamRead) ||
+						(cpuBusControl && selectRAM && _cpuRW));
+	assign _ramWE = ~(cpuBusControl && selectRAM && !_cpuRW);
 	
 	assign _memoryUDS = cpuBusControl ? _cpuUDS : 1'b0;
 	assign _memoryLDS = cpuBusControl ? _cpuLDS : 1'b0;
@@ -147,11 +166,6 @@ module addrController_top(
 									rom_access ? 1'b0 : 								   // force A21 to 0 for ROM access
 									addrMux[21]; 
 	
-	// allocate memory slots in the extra cycle
-	reg [2:0] extra_slot_count;
-	always @(posedge clk8)
-		if(busCycle == 2'b11) 
-			extra_slot_count <= extra_slot_count + 2'd1;
 			
 	// floppy emulation gets extra slots 0 and 1
 	assign dskReadAckInt = (extraBusControl == 1'b1) && (extra_slot_count == 0);
@@ -165,49 +179,16 @@ module addrController_top(
 		macAddr;
 
 	// address decoding
-	wire selectSCCByAddress;
-	wire selectIWMByAddress;
-	wire selectVIAByAddress;
 	addrDecoder ad(
 		.address(cpuAddr),
-		.enable(!videoBusControl),
-		._cpuAS(_cpuAS),
 		.memoryOverlayOn(memoryOverlayOn),
 		.selectRAM(selectRAM),
 		.selectROM(selectROM),
-		.selectSCC(selectSCCByAddress),
-		.selectIWM(selectIWMByAddress),
-		.selectVIA(selectVIAByAddress));
-		
-	/* TH: The following isn't 100% true anymore but kept for now for documentation purposes ...
-	
-		SCC register access is a mess. Reads and writes can have side-effects that alter the meaning of subsequent reads
-		and writes to the same address. It's not safe to do multiple reads of the same address, or multiple writes of the
-		same value to the same address. So we need to be sure we only perform one read or write per 4-clock CPU bus cycle.
-		
-		To complicate things, the CPU latches read data half-way through the last clock of the cycle, then deasserts the
-		address, address strobe, and data for the remainder of the cycle (although RW remains valid). This behavior may
-		be specified to TG68 and not shared by the real 68000.
-		
-		For writes to the SCC, we enable SCC only on clock 2, to guarantee one write per bus cycle.
-		
-		For reads, it's more difficult. If we enable SCC only on clock 2, then it won't be enabled during clock 3 when the 
-		CPU latches the data, so the read will fail. If we enable it only on clock 3, then the AS won't be asserted all
-		the way to the end of the clock, so the read side-effect will fail. If we enable it on clock 2 and 3, then the 
-		CPU will read the post-side-effect value instead of the pre-side-effect value.
-		
-		The solution used here is to enable reads on clock 2 (when the side-effect is performed), and for the first half
-		of clock 3, and to apply a one cycle delay to CPU data reads from the SCC. Reads only enable for the first half
-		of clock 3 in case a later 68000 variant continues to assert AS all the way to the end of the clock, to ensure
-		side-effects are not applied again.
-		
-		Another solution would be to create a custom clock for the SCC, whose positive edge is the negative edge of
-		clock 3 of the bus cycle.
-	*/
-	assign selectSCC = selectSCCByAddress && cpuBusControl;
-	assign selectIWM = selectIWMByAddress && cpuBusControl;
-	assign selectVIA = selectVIAByAddress && cpuBusControl;
-	
+		.selectSCSI(selectSCSI),
+		.selectSCC(selectSCC),
+		.selectIWM(selectIWM),
+		.selectVIA(selectVIA));
+
 	// video
 	videoTimer vt(
 		.clk8(clk8), 

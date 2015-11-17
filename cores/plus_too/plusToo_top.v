@@ -152,8 +152,6 @@ wire mouseData;
 wire keyClk;
 wire keyData;
 	
-assign SDRAM_CLK = !clk64;
-	
 	// synthesize a 32.5 MHz clock
 	wire clk64;
 	wire pll_locked;
@@ -165,6 +163,7 @@ assign SDRAM_CLK = !clk64;
 	pll cs0(
 		.inclk0	( CLOCK_27[0]	),
 		.c0		( clk64			), 	
+		.c1	   ( SDRAM_CLK    ),
 		.locked	( pll_locked	)
 	);
 	
@@ -178,11 +177,11 @@ assign SDRAM_CLK = !clk64;
 	localparam serialIn = 1'b0,
 				  configROMSize = 1'b1;  // 128K ROM
 
-	wire [1:0] configRAMSize = status[3]?2'b11:2'b10; // 1MB/4MB
+	wire [1:0] configRAMSize = status_mem?2'b11:2'b10; // 1MB/4MB
 				  
 	// interconnects
 	// CPU
-	wire clk8, _cpuReset, _cpuAS, _cpuUDS, _cpuLDS, _cpuRW, _cpuDTACK;
+	wire clk8, _cpuReset, _cpuUDS, _cpuLDS, _cpuRW;
 	wire [2:0] _cpuIPL;
 	wire [7:0] cpuAddrHi;
 	wire [23:0] cpuAddr;
@@ -194,12 +193,13 @@ assign SDRAM_CLK = !clk64;
 	wire _memoryUDS, _memoryLDS;
 	wire videoBusControl;
 	wire dioBusControl;
+	wire cpuBusControl;
 	wire [21:0] memoryAddr;
 	wire [15:0] memoryDataOut;
 	
 	// peripherals
 	wire loadPixels, pixelOut, _hblank, _vblank;
-	wire memoryOverlayOn, selectSCC, selectIWM, selectVIA;	 
+	wire memoryOverlayOn, selectSCSI, selectSCC, selectIWM, selectVIA;	 
 	wire [15:0] dataControllerDataOut;
 	
 	// audio
@@ -223,39 +223,63 @@ assign SDRAM_CLK = !clk64;
         "PLUS_TOO;;",
         "F1,DSK;",
         "F2,DSK;",
-		  "O3,Memory,1MB,4MB;",
-        "T4,Reset"
+		  "S3,IMG;",
+		  "O4,Memory,1MB,4MB;",
+        "T5,Reset"
 	};
 	
-	parameter CONF_STR_LEN = 10+7+7+18+8;
+	wire status_mem = status[4];
+	wire status_reset = status[5];
+	
+	parameter CONF_STR_LEN = 10+7+7+7+18+8;
 
 	// the status register is controlled by the on screen display (OSD)
 	wire [7:0] status;
 	wire [1:0] buttons;
 
+	wire [31:0] io_lba;
+	wire io_rd;
+	wire io_wr;
+	wire io_ack;
+	wire [7:0] io_din;
+	wire io_din_strobe;
+	wire [7:0] io_dout;
+	wire io_dout_strobe;
+ 
 	// include user_io module for arm controller communication
 	user_io #(.STRLEN(CONF_STR_LEN)) user_io ( 
-		.conf_str   	( CONF_STR   	),
+		.conf_str   	( CONF_STR   	  ),
 
-		.SPI_CLK    	( SPI_SCK    	),	
-		.SPI_SS_IO  	( CONF_DATA0 	),
-		.SPI_MISO   	( SPI_DO     	),
-		.SPI_MOSI   	( SPI_DI     	),
+		.SPI_CLK    	( SPI_SCK    	  ),	
+		.SPI_SS_IO  	( CONF_DATA0 	  ),
+		.SPI_MISO   	( SPI_DO     	  ),
+		.SPI_MOSI   	( SPI_DI     	  ),
 
-      .status     	( status     	),
-      .buttons    	( buttons     	),
+      .status     	( status     	  ),
+      .buttons    	( buttons     	  ),
                  
       // ps2 interface
-      .ps2_clk    	( ps2_clk     	),
-      .ps2_kbd_clk	( keyClk      	),
-      .ps2_kbd_data	( keyData 		),
-		.ps2_mouse_clk ( mouseClk		),
-      .ps2_mouse_data( mouseData	   )
+      .ps2_clk    	( ps2_clk     	  ),
+      .ps2_kbd_clk	( keyClk      	  ),
+      .ps2_kbd_data	( keyData 		  ),
+		.ps2_mouse_clk ( mouseClk		  ),
+      .ps2_mouse_data( mouseData	     ),
+
+		// SD/block device interface
+		.sd_lba        ( io_lba         ),
+		.sd_rd         ( io_rd          ),
+      .sd_wr         ( io_wr          ),
+      .sd_ack        ( io_ack         ),
+      .sd_conf       ( 1'b0           ),
+      .sd_sdhc       ( 1'b1           ),
+      .sd_dout       ( io_din         ),
+      .sd_dout_strobe( io_din_strobe  ),
+      .sd_din        ( io_dout        ),
+      .sd_din_strobe ( io_dout_strobe )
 	);
 
-   assign _cpuAS = !(cpu_busstate != 2'b01);
 	wire [1:0] cpu_busstate;
-	wire cpu_clkena = (!_cpuDTACK) || (cpu_busstate == 2'b01);
+	wire cpu_clkena = cpuBusControl || (cpu_busstate == 2'b01);
 	TG68KdotC_Kernel #(0,0,0,0,0,0) m68k (
         .clk            ( clk8           ),
         .nReset         ( _cpuReset      ),
@@ -280,11 +304,9 @@ assign SDRAM_CLK = !clk64;
 	addrController_top ac0(
 		.clk8(clk8), 
 		.cpuAddr(cpuAddr), 
-		._cpuAS(_cpuAS), 
 		._cpuUDS(_cpuUDS),
 		._cpuLDS(_cpuLDS),
 		._cpuRW(_cpuRW), 
-		._cpuDTACK(_cpuDTACK), 
 		.configROMSize(configROMSize), 
 		.configRAMSize(configRAMSize), 
 		.memoryAddr(memoryAddr),			
@@ -295,6 +317,8 @@ assign SDRAM_CLK = !clk64;
 		._ramWE(_ramWE),
 		.videoBusControl(videoBusControl),	
 		.dioBusControl(dioBusControl),	
+		.cpuBusControl(cpuBusControl),	
+		.selectSCSI(selectSCSI),
 		.selectSCC(selectSCC),
 		.selectIWM(selectIWM),
 		.selectVIA(selectVIA),
@@ -322,11 +346,11 @@ assign SDRAM_CLK = !clk64;
 	reg [15:0] rst_cnt;
 	reg last_mem_config;
 	always @(posedge clk8) begin
-		last_mem_config <= status[3];
+		last_mem_config <= status_mem;
 	
 		// various source can reset the mac
-		if(!pll_locked || status[0] || status[4] || buttons[1] || 
-			rom_download || (last_mem_config != status[3])) 
+		if(!pll_locked || status[0] || status_reset || buttons[1] || 
+			rom_download || (last_mem_config != status_mem)) 
 			rst_cnt <= 16'd65535;
 		else if(rst_cnt != 0)
 			rst_cnt <= rst_cnt - 16'd1;
@@ -335,8 +359,8 @@ assign SDRAM_CLK = !clk64;
 	wire [10:0] audio;
 	sigma_delta_dac dac (
 		.clk ( clk32 ),
-		.ldatasum ( { audio, 3'h0 } ),
-		.rdatasum ( { audio, 3'h0 } ),
+		.ldatasum ( { audio, 4'h0 } ),
+		.rdatasum ( { audio, 4'h0 } ),
 		.left ( AUDIO_L ),
 		.right ( AUDIO_R )
 	);
@@ -353,10 +377,13 @@ assign SDRAM_CLK = !clk64;
 		.cpuDataIn(cpuDataOut),
 		.cpuDataOut(dataControllerDataOut), 	
 		.cpuAddrRegHi(cpuAddr[12:9]),
+		.cpuAddrRegMid(cpuAddr[6:4]),  // for SCSI
 		.cpuAddrRegLo(cpuAddr[2:1]),		
+		.selectSCSI(selectSCSI),
 		.selectSCC(selectSCC),
 		.selectIWM(selectIWM),
 		.selectVIA(selectVIA),
+		.cpuBusControl(cpuBusControl),
 		.videoBusControl(videoBusControl),
 		.memoryDataOut(memoryDataOut),
 		.memoryDataIn(sdram_do),
@@ -387,8 +414,18 @@ assign SDRAM_CLK = !clk64;
 		.dskReadAddrInt(dskReadAddrInt),
 		.dskReadAckInt(dskReadAckInt),
 		.dskReadAddrExt(dskReadAddrExt),
-		.dskReadAckExt(dskReadAckExt)
-		);
+		.dskReadAckExt(dskReadAckExt),
+
+		// block device interface for scsi disk
+		.io_lba 			( io_lba 			),
+		.io_rd 			( io_rd 				),
+		.io_wr 			( io_wr 				),
+		.io_ack 			( io_ack				),
+		.io_din 			( io_din				),
+		.io_din_strobe ( io_din_strobe	),
+		.io_dout 		( io_dout			),
+		.io_dout_strobe( io_dout_strobe	)
+	);
 		
 // sdram used for ram/rom maps directly into 68k address space
 wire download_cycle = dio_download && dioBusControl;

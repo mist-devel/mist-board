@@ -152,9 +152,6 @@ assign addr =
 	      (count == 2)?8'had:
 	      sony_to_disk_byte;
   
-   wire [7:0] odata_dsum =
-	      sony_to_disk_byte;
-
    wire [7:0] odata_dtrl =
 	      (count == 0)?8'hde:
 	      (count == 1)?8'haa:

@@ -115,12 +115,7 @@ module floppy(
 	always @(posedge clk8)
 		if(dskReadAckD)
 			dskReadDataLatch <= dskReadData;
-	
-	// generate glitch free data clock
-	reg data_clock;
-	always @(posedge clk8)
-		data_clock <= (diskDataByteTimer == 0);
-	
+		
 	wire [7:0] dskReadDataEnc;
 	
 	// include track encoder
@@ -207,8 +202,7 @@ module floppy(
 		
 	wire lstrbEdge = lstrb == 1'b0 && lstrbPrev == 1'b1;
 	
-	assign readData = _enable == 1'b1 ? 8'hZZ :
-							(driveReadAddr == `DRIVE_REG_RDDATA0 || driveReadAddr == `DRIVE_REG_RDDATA1) ? diskDataIn :
+	assign readData = (driveReadAddr == `DRIVE_REG_RDDATA0 || driveReadAddr == `DRIVE_REG_RDDATA1) ? diskDataIn :
 							{ driveRegsAsRead[driveReadAddr], 7'h00 };
 		
 	// write drive registers

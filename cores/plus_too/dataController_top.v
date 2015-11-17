@@ -13,6 +13,7 @@ module dataController_top(
 	// 68000 CPU memory interface:
 	input [15:0] cpuDataIn,
 	input [3:0] cpuAddrRegHi, // A12-A9
+	input [2:0] cpuAddrRegMid, // A6-A4
 	input [1:0] cpuAddrRegLo, // A2-A1
 	input _cpuUDS,
 	input _cpuLDS,	
@@ -20,25 +21,27 @@ module dataController_top(
 	output [15:0] cpuDataOut,
 	
 	// peripherals:
+	input selectSCSI,
 	input selectSCC,
 	input selectIWM,
 	input selectVIA,
 	
 	// RAM/ROM:
 	input videoBusControl,	
+	input cpuBusControl,	
 	input [15:0] memoryDataIn,
 	output [15:0] memoryDataOut,
 	
 	// keyboard:
-	input keyClk, 					// need pull-up
-	input keyData, 				// need pull-up
+	input keyClk, 
+	input keyData, 
 	 
 	// mouse:
-	input mouseClk, 				// need pull-up
-	input mouseData, 				// need pull-up
+	input mouseClk, 
+	input mouseData,
 	
 	// serial:
-	input serialIn, 				// need pull-up
+	input serialIn, 
 	output serialOut,	
 	
 	// video:
@@ -61,7 +64,17 @@ module dataController_top(
 	output [21:0] dskReadAddrInt,
 	input dskReadAckInt,
 	output [21:0] dskReadAddrExt,
-	input dskReadAckExt
+	input dskReadAckExt,
+
+	// connections to io controller
+   output [31:0] io_lba,
+   output 	     io_rd,
+   output 	     io_wr,
+   input 	     io_ack,
+   input [7:0]   io_din,
+   input 	     io_din_strobe,
+   output [7:0]  io_dout,
+   input 	     io_dout_strobe
 );
 	
 	// add binary volume levels according to volume setting
@@ -70,27 +83,28 @@ module dataController_top(
 		(snd_vol[1]?audio_x2:11'd0) +
 		(snd_vol[2]?audio_x4:11'd0);
 
-	// three binary volume levels *1, *2 and *4
-	wire [10:0] audio_x1 = { 3'b000, audio_latch };
-	wire [10:0] audio_x2 = { 2'b00, audio_latch, 1'b0 };
-	wire [10:0] audio_x4 = { 1'b0, audio_latch, 2'b00};
+	// three binary volume levels *1, *2 and *4, sign expanded
+	wire [10:0] audio_x1 = { {3{audio_latch[7]}}, audio_latch };
+	wire [10:0] audio_x2 = { {2{audio_latch[7]}}, audio_latch, 1'b0 };
+	wire [10:0] audio_x4 = {    audio_latch[7]  , audio_latch, 2'b00};
 	
 	reg loadSoundD;
 	always @(negedge clk8)
 		loadSoundD <= loadSound;
 
+	// read audio data and convert to signed for further volume adjustment
 	reg [7:0] audio_latch;
 	always @(posedge clk8) begin
 		if(loadSoundD) begin
-			if(snd_ena) audio_latch <= 8'h80;
-			else  	 	audio_latch <= memoryDataIn[15:8];
+			if(snd_ena) audio_latch <= 8'h00;
+			else  	 	audio_latch <= memoryDataIn[15:8] - 8'd128;
 		end
 	end
 	
 	// divide 32.5 MHz clock by four to get CPU clock
 	reg [1:0] clkPhase;
 	always @(posedge clk32)
-		clkPhase <= clkPhase + 1'b1;
+		clkPhase <= clkPhase + 2'd1;
 	assign clk8 = clkPhase[1];
 	
 	// CPU reset generation
@@ -119,6 +133,7 @@ module dataController_top(
 	wire [15:0] viaDataOut;
 	wire [15:0] iwmDataOut;
 	wire [7:0] sccDataOut;
+	wire [7:0] scsiDataOut;
 	wire mouseX1, mouseX2, mouseY1, mouseY2, mouseButton;
 	
 	// interrupt control
@@ -134,20 +149,43 @@ module dataController_top(
 	assign cpuDataOut = selectIWM ? iwmDataOut :
 							  selectVIA ? viaDataOut :
 							  selectSCC ? { sccDataOut, 8'hEF } :
+							  selectSCSI ? { scsiDataOut, 8'hEF } :
 							  memoryDataIn;	
 	
 	// Memory-side
 	assign memoryDataOut = cpuDataIn;
 	
+	// SCSI
+	ncr5380 scsi(
+		.sysclk(clk8),
+      .reset(!_cpuReset),
+      .bus_cs(selectSCSI && cpuBusControl),
+      .bus_we(!_cpuRW),
+      .bus_rs(cpuAddrRegMid),
+      .dack(cpuAddrRegHi[0]),   // A9
+      .wdata(cpuDataIn[15:8]),
+      .rdata(scsiDataOut),
+
+		// connections to io controller
+		.io_lba ( io_lba ),
+		.io_rd ( io_rd ),
+		.io_wr ( io_wr ),
+		.io_ack ( io_ack ),
+		.io_din ( io_din ),
+		.io_din_strobe ( io_din_strobe ),
+		.io_dout ( io_dout ),
+		.io_dout_strobe ( io_dout_strobe )
+	);
+
 	
+	// VIA
 	wire [2:0] snd_vol;
 	wire snd_ena;
 	
-	// VIA
 	via v(
 		.clk8(clk8),
 		._reset(_cpuReset),
-		.selectVIA(selectVIA),
+		.selectVIA(selectVIA && cpuBusControl),
 		._cpuRW(_cpuRW),
 		._cpuUDS(_cpuUDS),	
 		.dataIn(cpuDataIn),
@@ -177,7 +215,7 @@ module dataController_top(
 	iwm i(
 		.clk8(clk8),
 		._reset(_cpuReset),
-		.selectIWM(selectIWM),
+		.selectIWM(selectIWM && cpuBusControl),
 		._cpuRW(_cpuRW),
 		._cpuLDS(_cpuLDS),
 		.dataIn(cpuDataIn),
@@ -199,7 +237,7 @@ module dataController_top(
 	scc s(
 		.sysclk(clk8),
 	   .reset_hw(~_cpuReset),
-	   .cs(selectSCC && (_cpuLDS == 1'b0 || _cpuUDS == 1'b0)),
+	   .cs(selectSCC && (_cpuLDS == 1'b0 || _cpuUDS == 1'b0) && cpuBusControl),
 	   .we(!_cpuRW),
 	   .rs(cpuAddrRegLo), 
 	   .wdata(cpuDataIn[15:8]),
