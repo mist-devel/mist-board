@@ -30,5 +30,6 @@ Functional changes:
 - various timing simplifications
 - fix mouse counter wrapping
 - Basic sound support
+- SCSI interface + SCSI hdd support
 
 Binaries are available at the [binaries repository](https://github.com/mist-devel/mist-binaries/tree/master/cores/plus_too).

@@ -109,6 +109,7 @@ module scsi(input       sysclk,
 	      cmd_read?buffer_dout:
 	      cmd_inquiry?inquiry_dout:
 	      cmd_read_capacity?read_capacity_dout:
+	      cmd_mode_sense?mode_sense_dout:
 	      8'h00;
    
    // output of inquiry command, identify as "SEAGATE ST225N"
@@ -131,13 +132,22 @@ module scsi(input       sysclk,
 	      8'h00;
 
    // output of read capacity command
-   wire [31:0] capacity = 32'd41055;   // 40960 + 96 blocks = 20MB
+   wire [31:0] capacity = 32'd41056;   // 40960 + 96 blocks = 20MB
+   wire [31:0] capacity_m1 = capacity - 32'd1;
    wire [7:0] read_capacity_dout =
-	      (data_cnt == 32'd0 )?capacity[31:24]:
-	      (data_cnt == 32'd1 )?capacity[23:16]:
-	      (data_cnt == 32'd2 )?capacity[15:8]:
-	      (data_cnt == 32'd3 )?capacity[7:0]:
+	      (data_cnt == 32'd0 )?capacity_m1[31:24]:
+	      (data_cnt == 32'd1 )?capacity_m1[23:16]:
+	      (data_cnt == 32'd2 )?capacity_m1[15:8]:
+	      (data_cnt == 32'd3 )?capacity_m1[7:0]:
 	      (data_cnt == 32'd6 )?8'd2:             // 512 bytes per sector
+	      8'h00;
+
+   wire [7:0] mode_sense_dout =
+	      (data_cnt == 32'd3 )?8'd8:
+	      (data_cnt == 32'd5 )?capacity[23:16]:
+	      (data_cnt == 32'd6 )?capacity[15:8]:
+	      (data_cnt == 32'd7 )?capacity[7:0]:
+	      (data_cnt == 32'd10 )?8'd2:
 	      8'h00;
 
    // clock data out of buffer to allow for embedded ram
@@ -278,12 +288,13 @@ module scsi(input       sysclk,
    wire       cmd_inquiry = (op_code == 8'h12);
    wire       cmd_format = (op_code == 8'h04);
    wire       cmd_mode_select = (op_code == 8'h15);
+   wire       cmd_mode_sense = (op_code == 8'h1a);
    wire       cmd_test_unit_ready = (op_code == 8'h00);
    wire       cmd_read_capacity = (op_code == 8'h25);
 
    // valid command in buffer? TODO: check for valid command parameters
    wire       cmd_ok = cmd_read || cmd_write || cmd_inquiry || cmd_test_unit_ready || 
-	        cmd_read_capacity || cmd_mode_select || cmd_format;
+	        cmd_read_capacity || cmd_mode_select || cmd_format || cmd_mode_sense;
      
    // latch parameters once command is complete
    reg [31:0] lba;
@@ -332,7 +343,7 @@ module scsi(input       sysclk,
 						// continue according to command
 
 					        // these commands return data
-					        if(cmd_read || cmd_inquiry || cmd_read_capacity)
+					        if(cmd_read || cmd_inquiry || cmd_read_capacity || cmd_mode_sense)
 						  phase <= `PHASE_DATA_OUT;
 					        // these commands receive dataa
 					        else if(cmd_write || cmd_mode_select)

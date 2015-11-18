@@ -67,7 +67,7 @@ module user_io #(parameter STRLEN=0) (
 reg [6:0]         sbuf;
 reg [7:0]         cmd;
 reg [2:0] 	      bit_cnt;    // counts bits 0-7 0-7 ...
-reg [7:0]         byte_cnt;   // counts bytes
+reg [9:0]         byte_cnt;   // counts bytes
 reg [5:0]         joystick0;
 reg [5:0]         joystick1;
 reg [3:0] 	      but_sw;
@@ -310,7 +310,7 @@ always@(posedge spi_sck or posedge SPI_SS_IO) begin
 
 	if(SPI_SS_IO == 1) begin
 	   bit_cnt <= 3'd0;
-	   byte_cnt <= 8'd0;
+	   byte_cnt <= 10'd0;
 		sd_ack <= 1'b0;
 		sd_dout_strobe <= 1'b0;
 		sd_din_strobe <= 1'b0;
@@ -322,8 +322,8 @@ always@(posedge spi_sck or posedge SPI_SS_IO) begin
 			sbuf[6:0] <= { sbuf[5:0], SPI_MOSI };
 			
 		bit_cnt <= bit_cnt + 3'd1;
-		if((bit_cnt == 7)&&(byte_cnt != 8'd255)) 
-			byte_cnt <= byte_cnt + 8'd1;
+		if((bit_cnt == 7)&&(byte_cnt != 10'd1023)) 
+			byte_cnt <= byte_cnt + 10'd1;
 
 		// finished reading command byte
       if(bit_cnt == 7) begin
@@ -367,18 +367,16 @@ always@(posedge spi_sck or posedge SPI_SS_IO) begin
 				// send sector IO -> FPGA
 				if(cmd == 8'h17) begin
 					// flag that download begins
-//					sd_dout <= { sbuf, SPI_MOSI};
 					sd_dout_strobe <= 1'b1;
 				end
 				
 				// send sector FPGA -> IO
-				if(cmd == 8'h18)
+				if((cmd == 8'h18) && (byte_cnt < 512))
 					sd_din_strobe <= 1'b1;
 				
 				// send SD config IO -> FPGA
 				if(cmd == 8'h19) begin
 					// flag that download begins
-//					sd_dout <= { sbuf, SPI_MOSI};
 					// sd card knows data is config if sd_dout_strobe is asserted
 					// with sd_ack still being inactive (low)
 					sd_dout_strobe <= 1'b1;
