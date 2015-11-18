@@ -1,0 +1,53 @@
+[*]
+[*] GTKWave Analyzer v3.3.64 (w)1999-2014 BSI
+[*] Tue Oct 20 19:24:21 2015
+[*]
+[dumpfile] "/home/harbaum/projekte/mist/mac/floppy_track_encoder/floppy_track_encoder.vcd"
+[dumpfile_mtime] "Tue Oct 20 19:24:06 2015"
+[dumpfile_size] 1089986
+[savefile] "/home/harbaum/projekte/mist/mac/floppy_track_encoder/floppy_track_encoder.sav"
+[timestart] 0
+[size] 1187 600
+[pos] 1295 176
+*-13.000000 9 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+[treeopen] TOP.
+[sst_width] 208
+[signals_width] 158
+[sst_expanded] 1
+[sst_vpaned_height] 152
+@28
+TOP.v.rst
+TOP.v.clk
+@24
+TOP.v.track[6:0]
+@25
+TOP.v.sector[3:0]
+@24
+TOP.v.soff[9:0]
+@22
+TOP.v.state[3:0]
+@24
+[color] 3
+TOP.v.byte_count[15:0]
+@22
+[color] 1
+TOP.v.odata[7:0]
+@24
+TOP.v.count[9:0]
+@22
+TOP.v.nib_out[5:0]
+TOP.v.c1[7:0]
+TOP.v.c2[7:0]
+TOP.v.c3[7:0]
+TOP.v.nib_in[7:0]
+TOP.v.nib_xor_0[7:0]
+TOP.v.nib_xor_1[7:0]
+TOP.v.nib_xor_2[7:0]
+@28
+TOP.v.strobe
+@22
+TOP.v.idata[7:0]
+@28
+TOP.v.cnt[1:0]
+[pattern_trace] 1
+[pattern_trace] 0

@@ -1,0 +1,90 @@
+[*]
+[*] GTKWave Analyzer v3.3.58 (w)1999-2014 BSI
+[*] Wed Nov 18 11:09:41 2015
+[*]
+[dumpfile] "/home/tharbaum/tmp/mist/mac/minivmac-3.3.3-lx64/ncr5380.vcd"
+[dumpfile_mtime] "Wed Nov 18 10:33:13 2015"
+[dumpfile_size] 209258709
+[savefile] "/home/tharbaum/tmp/mist/mac/minivmac-3.3.3-lx64/ncr5380.sav"
+[timestart] 8144667
+[size] 1141 919
+[pos] 54 80
+*-8.000000 8145093 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+[treeopen] TOP.
+[treeopen] TOP.v.
+[sst_width] 208
+[signals_width] 190
+[sst_expanded] 1
+[sst_vpaned_height] 275
+@28
+TOP.v.sysclk
+TOP.v.reset
+TOP.v.bus_cs
+TOP.v.bus_we
+@22
+TOP.v.bus_rs[2:0]
+@28
+TOP.v.dack
+TOP.v.dma_rd
+TOP.v.dphase
+TOP.v.dma_ack
+TOP.v.scsi2.cmd_wr_x
+@22
+TOP.v.wdata[7:0]
+TOP.v.rdata[7:0]
+@28
+TOP.v.scsi_bsy
+TOP.v.scsi_msg
+TOP.v.scsi_cd
+TOP.v.scsi_io
+TOP.v.scsi_req
+TOP.v.scsi_ack
+TOP.v.scsi_sel
+@22
+TOP.v.scsi2.din[7:0]
+@28
+TOP.v.bsr_pmatch
+TOP.v.scsi2.cmd_cpl
+@22
+TOP.v.scsi2.cmd(0)[7:0]
+@28
+TOP.v.scsi2.cmd_write
+TOP.v.scsi2.cmd_read
+TOP.v.scsi2.cmd_inquiry
+TOP.v.scsi2.cmd_write
+@24
+TOP.v.scsi2.lba[31:0]
+@25
+[color] 2
+TOP.v.scsi2.tlen[15:0]
+@28
+TOP.v.scsi2.status_sent
+@22
+TOP.v.scsi2.dout[7:0]
+@24
+TOP.v.scsi2.data_cnt[31:0]
+@28
+TOP.v.scsi2.data_complete
+@24
+TOP.v.io_lba[31:0]
+@28
+TOP.v.io_rd
+TOP.v.scsi2.req_io_wr
+TOP.v.scsi2.io_wr
+TOP.v.io_ack
+@22
+TOP.v.scsi2.buffer_out_rptr[8:0]
+@28
+TOP.v.scsi2.io_dout_strobe
+@820
+TOP.v.scsi2.io_dout[7:0]
+@28
+TOP.v.scsi2.io_din_strobe
+@22
+TOP.v.scsi2.io_din[7:0]
+@24
+TOP.v.scsi2.phase[2:0]
+@22
+TOP.v.scsi2.cmd(0)[7:0]
+[pattern_trace] 1
+[pattern_trace] 0
