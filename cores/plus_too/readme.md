@@ -31,5 +31,6 @@ Functional changes:
 - fix mouse counter wrapping
 - Basic sound support
 - SCSI interface + SCSI hdd support
+- CPU Turbo mode (ca factor 2.5)
 
 Binaries are available at the [binaries repository](https://github.com/mist-devel/mist-binaries/tree/master/cores/plus_too).

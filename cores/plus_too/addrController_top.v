@@ -3,6 +3,7 @@ module addrController_top(
 	input clk8,						// 8.125 MHz CPU clock
 	
 	// system config:
+	input turbo,               // 0 = normal, 1 = faster
 	input configROMSize,			// 0 = 64K ROM, 1 = 128K ROM
 	input [1:0] configRAMSize,	// 0 = 128K, 1 = 512K, 2 = 1MB, 3 = 4MB RAM
 
@@ -117,9 +118,11 @@ module addrController_top(
 	// video controls memory bus during the first clock of the four-clock cycle
 	assign videoBusControl = (busCycle == 2'b00);
 	// cpu controls memory bus during the third clock of the four-clock cycle
-	assign cpuBusControl = (busCycle == 2'b10) && (subCycle != 2'd2);
-	//
-	wire extraBusControl = (busCycle == 2'b01);
+	assign cpuBusControl = turbo?cpuBusControl_fast:cpuBusControl_normal;
+	wire cpuBusControl_normal = (busCycle == 2'b01) && (subCycle != 2'd2);
+	wire cpuBusControl_fast = (busCycle == 2'b01) || (busCycle == 2'b11);
+
+	wire extraBusControl = (busCycle == 2'b10);
 		
 	// interconnects
 	wire selectRAM, selectROM;

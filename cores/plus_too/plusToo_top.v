@@ -107,7 +107,7 @@ always @(negedge dio_download or posedge diskEject[1]) begin
 		dsk_ext_ds <= 1'b0;
 		dsk_ext_ss <= 1'b0;
 	end else if(dio_index == 2) begin
-		dsk_ext_ds <= (dio_addr == 409599);   // double sides disk, addr counts words, not bytes
+		dsk_ext_ds <= (dio_addr == 409599);   // double sided disk, addr counts words, not bytes
 		dsk_ext_ss <= (dio_addr == 204799);   // single sided disk
 	end
 end
@@ -225,13 +225,15 @@ wire keyData;
         "F2,DSK;",
 		  "S3,IMG;",
 		  "O4,Memory,1MB,4MB;",
-        "T5,Reset"
+		  "O5,Speed,Normal,Turbo;",
+        "T6,Reset"
 	};
 	
 	wire status_mem = status[4];
-	wire status_reset = status[5];
+	wire status_turbo = status[5];
+	wire status_reset = status[6];
 	
-	parameter CONF_STR_LEN = 10+7+7+7+18+8;
+	parameter CONF_STR_LEN = 10+7+7+7+18+22+8;
 
 	// the status register is controlled by the on screen display (OSD)
 	wire [7:0] status;
@@ -307,6 +309,7 @@ wire keyData;
 		._cpuUDS(_cpuUDS),
 		._cpuLDS(_cpuLDS),
 		._cpuRW(_cpuRW), 
+		.turbo (status_turbo),
 		.configROMSize(configROMSize), 
 		.configRAMSize(configRAMSize), 
 		.memoryAddr(memoryAddr),			
@@ -348,7 +351,7 @@ wire keyData;
 	always @(posedge clk8) begin
 		last_mem_config <= status_mem;
 	
-		// various source can reset the mac
+		// various sources can reset the mac
 		if(!pll_locked || status[0] || status_reset || buttons[1] || 
 			rom_download || (last_mem_config != status_mem)) 
 			rst_cnt <= 16'd65535;
