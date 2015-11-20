@@ -33,4 +33,10 @@ Functional changes:
 - SCSI interface + SCSI hdd support
 - CPU Turbo mode (ca factor 2.5)
 
+Usage
+-----
+
+The Alt key is mapped to the Mac's command key, and the Windows key is mapped to the Mac's option key.
+
+
 Binaries are available at the [binaries repository](https://github.com/mist-devel/mist-binaries/tree/master/cores/plus_too).
