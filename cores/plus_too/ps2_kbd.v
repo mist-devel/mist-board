@@ -285,10 +285,10 @@ module ps2_kbd(	input			sysclk,
 			  9'h00e:		keymac[8:0] <= 9'h065;	//~ (`)
 			  9'h00f:		keymac[8:0] <= 9'h07b;
 			  9'h010:		keymac[8:0] <= 9'h07b;
-			  9'h011:		keymac[8:0] <= 9'h075;	//LEFT ALT (option)
+			  9'h011:		keymac[8:0] <= 9'h06f;	//LEFT ALT (command)
 			  9'h012:		keymac[8:0] <= 9'h071;	//LEFT SHIFT
 			  9'h013:		keymac[8:0] <= 9'h07b;
-			  9'h014:		keymac[8:0] <= 9'h06f;	//CTRL (command)
+			  9'h014:		keymac[8:0] <= 9'h07b;	//CTRL (not mapped)
 			  9'h015:		keymac[8:0] <= 9'h019;	//q
 			  9'h016:		keymac[8:0] <= 9'h025;	//1
 			  9'h017:		keymac[8:0] <= 9'h07b;
@@ -541,7 +541,7 @@ module ps2_kbd(	input			sysclk,
 			  9'h10e:		keymac[8:0] <= 9'h07b;
 			  9'h10f:		keymac[8:0] <= 9'h07b;
 			  9'h110:		keymac[8:0] <= 9'h07b;
-			  9'h111:		keymac[8:0] <= 9'h075;	//RIGHT ALT
+			  9'h111:		keymac[8:0] <= 9'h06f;	//RIGHT ALT (command)
 			  9'h112:		keymac[8:0] <= 9'h07b;
 			  9'h113:		keymac[8:0] <= 9'h07b;
 			  9'h114:		keymac[8:0] <= 9'h07b;
@@ -555,7 +555,7 @@ module ps2_kbd(	input			sysclk,
 			  9'h11c:		keymac[8:0] <= 9'h07b;
 			  9'h11d:		keymac[8:0] <= 9'h07b;
 			  9'h11e:		keymac[8:0] <= 9'h07b;
-			  9'h11f:		keymac[8:0] <= 9'h06f;	//LEFT COMMAND (LEFT GUI)
+			  9'h11f:		keymac[8:0] <= 9'h075;	//WINDOWS OR APPLICATION KEY (option)
 			  9'h120:		keymac[8:0] <= 9'h07b;
 			  9'h121:		keymac[8:0] <= 9'h07b;
 			  9'h122:		keymac[8:0] <= 9'h07b;
@@ -563,7 +563,7 @@ module ps2_kbd(	input			sysclk,
 			  9'h124:		keymac[8:0] <= 9'h07b;
 			  9'h125:		keymac[8:0] <= 9'h07b;
 			  9'h126:		keymac[8:0] <= 9'h07b;
-			  9'h127:		keymac[8:0] <= 9'h06f;	//RIGHT AMIGA (RIGHT GUI)
+			  9'h127:		keymac[8:0] <= 9'h07b;
 			  9'h128:		keymac[8:0] <= 9'h07b;
 			  9'h129:		keymac[8:0] <= 9'h07b;
 			  9'h12a:		keymac[8:0] <= 9'h07b;
@@ -571,7 +571,7 @@ module ps2_kbd(	input			sysclk,
 			  9'h12c:		keymac[8:0] <= 9'h07b;
 			  9'h12d:		keymac[8:0] <= 9'h07b;
 			  9'h12e:		keymac[8:0] <= 9'h07b;
-			  9'h12f:		keymac[8:0] <= 9'h06f;	//RIGHT AMIGA (APPS)
+			  9'h12f:		keymac[8:0] <= 9'h07b;	
 			  9'h130:		keymac[8:0] <= 9'h07b;
 			  9'h131:		keymac[8:0] <= 9'h07b;
 			  9'h132:		keymac[8:0] <= 9'h07b;
