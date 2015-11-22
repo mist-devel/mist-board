@@ -1660,7 +1660,7 @@ PROCESS (clk, cpu, OP1out, OP2out, opcode, exe_condition, nextpass, micro_state,
 							trapmake <= '1';
 						END IF;
 					ELSE                                                                --chk
-						IF opcode(7)='1' THEN
+						IF opcode(7)='1' AND opcode(5 downto 0) /= "111111" THEN
 							datatype <= "01";   --Word
 								set(trap_chk) <= '1';
 							IF (c_out(1)='0' OR OP1out(15)='1' OR OP2out(15)='1') AND exec(opcCHK)='1' THEN
