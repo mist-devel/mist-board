@@ -77,7 +77,7 @@ The ROM has been generated using Quartus' Megafunction wizard. It allows
 to specify a intel hex file as the data source for the ROM.
 
 Files required on SD card: 
-      - soc.rbf renamed to core.rbf
+ - soc.rbf renamed to core.rbf
 
 Lesson 3: Z80 CPU and RAM
 -------------------------
@@ -125,11 +125,11 @@ demo shows that ROM as well as RAM are working as well as the video
 memory, of course.
 
 Links:
-      - https://de.wikipedia.org/wiki/Zilog_Z80
-      - http://sdcc.sourceforge.net/
+ - https://de.wikipedia.org/wiki/Zilog_Z80
+ - http://sdcc.sourceforge.net/
 
 Files required on SD card: 
-      - soc.rbf renamed to core.rbf
+ - soc.rbf renamed to core.rbf
 
 Lesson 4: SDRAM
 ---------------
@@ -212,7 +212,7 @@ these signals need to be connected in a way that they have a minimum
 delay.
 
 Files required on SD card: 
-      - soc.rbf renamed to core.rbf
+ - soc.rbf renamed to core.rbf
 
 Lesson 5: OSD and User_IO
 -------------------------
@@ -269,7 +269,7 @@ The status[1] signal is fed into the vga controller to enable or
 disable the scanlines effect.
 
 Files required on SD card: 
-      - soc.rbf renamed to core.rbf
+ - soc.rbf renamed to core.rbf
 
 Lesson 6: ROM upload, IRQs
 --------------------------
@@ -332,8 +332,8 @@ feature to upload cassette tape images which are then replayed through
 the audio circuitry internally after upload.
 
 Files required on SD card: 
-      - soc.rbf renamed to core.rbf
-      - z80_soc.rom
+ - soc.rbf renamed to core.rbf
+ - z80_soc.rom
 
 Lesson 7a: SD card 
 ------------------
@@ -375,9 +375,9 @@ As a result the z80_soc.rom is able to access the SD card and list
 it's contents.
 
 Files required on SD card: 
-      - soc.rbf renamed to core.rbf
-      - z80_soc.rom
-      - other files to show up in the directly listing
+ - soc.rbf renamed to core.rbf
+ - z80_soc.rom
+ - other files to show up in the directory listing
 
 Lesson 7b: Hardware SPI
 -----------------------
@@ -404,9 +404,9 @@ accesses and further increases speed. The resulting setup has a
 sufficient performance to be useful.
 
 Files required on SD card: 
-      - soc.rbf renamed to core.rbf
-      - z80_soc.rom
-      - other files to show up in the directly listing
+ - soc.rbf renamed to core.rbf
+ - z80_soc.rom
+ - other files to show up in the directory listing
 
 Lesson 8: Audio
 ---------------
@@ -453,12 +453,12 @@ connects the Z80's interrupt input to a counter which generates a 50Hz
 signal from the 4 Mhz CPU clock by dividing it by 160000.
 
 Links:
-      - http://www.ym2149.com/ym2149.pdf
+ - http://www.ym2149.com/ym2149.pdf
 
 Files required on SD card: 
-      - soc.rbf renamed to core.rbf
-      - z80_soc.rom
-      - song.ym
+ - soc.rbf renamed to core.rbf
+ - z80_soc.rom
+ - song.ym
 
 Lesson 9: Keyboard & Mouse
 --------------------------
