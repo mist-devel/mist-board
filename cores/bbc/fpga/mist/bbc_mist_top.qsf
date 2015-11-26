@@ -158,6 +158,7 @@ set_location_assignment PIN_7 -to LED
 set_global_assignment -name ADV_NETLIST_OPT_SYNTH_WYSIWYG_REMAP ON
 
 set_global_assignment -name STRATIX_DEVICE_IO_STANDARD "2.5 V"
+set_global_assignment -name VERILOG_FILE ../../rtl/adc.v
 set_global_assignment -name VERILOG_FILE sdram.v
 set_global_assignment -name VERILOG_FILE ../../rtl/cpu.v
 set_global_assignment -name VERILOG_FILE ../../rtl/ALU.v
