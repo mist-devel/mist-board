@@ -134,8 +134,6 @@ Files required on SD card:
 Lesson 4: SDRAM
 ---------------
 
-![Lesson 4](images/lesson4.png)
-
 So far we've been using FPGA internal embedded RAM. This is very easy
 to implement and use and incredibly fast. Unfortunately there's only a
 little more than 70 Kilobytes of embedded memory available inside the
