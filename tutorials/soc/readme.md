@@ -50,13 +50,15 @@ possible. E.g. the Amiga AGA core does that. This demo however just
 displays a black'n white checkerboard.
 
 Links:
-      - https://eewiki.net/pages/viewpage.action?pageId=15925278
+ - https://eewiki.net/pages/viewpage.action?pageId=15925278
 
 Files required on SD card: 
-      - soc.rbf renamed to core.rbf
+ - soc.rbf renamed to core.rbf
 
 Lesson 2: Video memory and embedded ROM
 ---------------------------------------
+
+![Lesson 2](images/lesson2.png)
 
 The VGA controller is now being equipped with 16000 bytes of embedded
 FPGA RAM as video memory (VMEM/VRAM). The resulting video controller
@@ -79,6 +81,8 @@ Files required on SD card:
 
 Lesson 3: Z80 CPU and RAM
 -------------------------
+
+![Lesson 3](images/lesson3.png)
 
 The T80 Z80 CPU core is being added. 4 kilobytes of RAM are added for
 the CPU as well as 4 kilobytes of ROM. ROM and VRAM share the same
@@ -129,6 +133,8 @@ Files required on SD card:
 
 Lesson 4: SDRAM
 ---------------
+
+![Lesson 4](images/lesson4.png)
 
 So far we've been using FPGA internal embedded RAM. This is very easy
 to implement and use and incredibly fast. Unfortunately there's only a
@@ -211,6 +217,8 @@ Files required on SD card:
 Lesson 5: OSD and User_IO
 -------------------------
 
+![Lesson 5](images/lesson5.png)
+
 The MiST comes with a separate ARM microcontroller (IO
 controller). The main purpose of this controller is to load the FPGA
 config from SD card at power on and to configure the FPGA with
@@ -265,6 +273,8 @@ Files required on SD card:
 
 Lesson 6: ROM upload, IRQs
 --------------------------
+
+![Lesson 6](images/lesson6.png)
 
 Storing ROM contents inside the Core also consumes a lot of internal
 FPGA memory. It also requires the whole core to be rebuilt for every
@@ -327,6 +337,8 @@ Files required on SD card:
 
 Lesson 7a: SD card 
 ------------------
+
+![Lesson 7](images/lesson7.png)
 
 Many retro systems use mass storage devices like floppies and tapes.
 These aren't available on the MiST. Instead the MiST comes with an SD
@@ -399,6 +411,8 @@ Files required on SD card:
 Lesson 8: Audio
 ---------------
 
+![Lesson 8](images/lesson8.png)
+
 The MiST has two single bit audio channels. This can be used to output
 some simple square wave by just switching the outputs on and off at the
 desired frequency. A better sound can be achieved by using PWM
@@ -448,6 +462,8 @@ Files required on SD card:
 
 Lesson 9: Keyboard & Mouse
 --------------------------
+
+![Lesson 9](images/lesson9.png)
 
 The MiST uses USB to connect mice and keyboards. USB is a rather
 complex protocol and requires a lot of communication and message
@@ -502,6 +518,6 @@ supported. This way of offloading CPU intense tasks into the hardware
 can reduce the CPU load significantly.
 
 
-Files required on SD card: 
-      - soc.rbf renamed to core.rbf
-      - z80_soc.rom
+Files required on SD card:
+ - soc.rbf renamed to core.rbf
+ - z80_soc.rom
