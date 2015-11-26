@@ -12,3 +12,8 @@ Pong
 
 A very simple implementation of the pong. Demonstrates the generation
 of VGA video signals and the usage of joysticks.
+
+SoC
+---
+
+A Z80 based System on a Chip (SoC) domonstrating all major components and concepts used on the MIST board. 
