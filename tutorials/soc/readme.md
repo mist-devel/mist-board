@@ -1,6 +1,8 @@
 What is this?
 -------------
 
+This part of the tutorial was presented in [issue 26 '15 of the c't magazine](http://www.heise.de/ct/ausgabe/2015-26-Mit-FPGAs-Retro-Chips-implementieren-Teil-3-3010854.html).
+
 Each lesson presented here explains a single aspect of the MiST
 board. The lessons are not VHDL or Verilog tutorials. Instead the
 lessons include all files required to build demo setups for the MiST
