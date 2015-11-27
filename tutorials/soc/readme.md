@@ -25,10 +25,10 @@ comes under GPL or simimlar license and may e.g. not be used closed
 source projects or the like. Please have a closer look at the files
 you intend to re-use for your project
 
-Lesson 1: A VGA controller
+(Lesson 1)[https://github.com/mist-devel/mist-board/tree/master/tutorials/soc/lesson1] A VGA controller
 --------------------------
 
-![Lesson 1](images/lesson1.png)
+![Lesson 1: VGA checkerboard](lesson1/lesson1.png)
 
 A 160x100 pixel VGA controller based on the 640x400@70Hz VGA mode. A
 simple b/w checkerboard is being displayed. The Video clock of 25.175
@@ -54,11 +54,12 @@ Links:
 
 Files required on SD card: 
  - soc.rbf renamed to core.rbf
+ - [soc.rbf](https://github.com/mist-devel/mist-board/raw/master/tutorials/soc/lesson1/soc.rbf) renamed to 'core.rbf'
 
 Lesson 2: Video memory and embedded ROM
 ---------------------------------------
 
-![Lesson 2](images/lesson2.png)
+![Lesson 2: VGA image](lesson2/lesson2.png)
 
 The VGA controller is now being equipped with 16000 bytes of embedded
 FPGA RAM as video memory (VMEM/VRAM). The resulting video controller
@@ -82,7 +83,7 @@ Files required on SD card:
 Lesson 3: Z80 CPU and RAM
 -------------------------
 
-![Lesson 3](images/lesson3.png)
+![Lesson 3: CPU](lesson3/lesson3.png)
 
 The T80 Z80 CPU core is being added. 4 kilobytes of RAM are added for
 the CPU as well as 4 kilobytes of ROM. ROM and VRAM share the same
@@ -210,12 +211,12 @@ these signals need to be connected in a way that they have a minimum
 delay.
 
 Files required on SD card: 
- - soc.rbf renamed to core.rbf
+ - soc.rbf renamed to 'core.rbf'
 
 Lesson 5: OSD and User_IO
 -------------------------
 
-![Lesson 5](images/lesson5.png)
+![Lesson 5: OSD](lesson5/lesson5.png)
 
 The MiST comes with a separate ARM microcontroller (IO
 controller). The main purpose of this controller is to load the FPGA
@@ -272,7 +273,7 @@ Files required on SD card:
 Lesson 6: ROM upload, IRQs
 --------------------------
 
-![Lesson 6](images/lesson6.png)
+![Lesson 6: ROM Upload](lesson6/lesson6.png)
 
 Storing ROM contents inside the Core also consumes a lot of internal
 FPGA memory. It also requires the whole core to be rebuilt for every
@@ -336,7 +337,7 @@ Files required on SD card:
 Lesson 7a: SD card 
 ------------------
 
-![Lesson 7](images/lesson7.png)
+![Lesson 7: SD card](lesson7a/lesson7.png)
 
 Many retro systems use mass storage devices like floppies and tapes.
 These aren't available on the MiST. Instead the MiST comes with an SD
@@ -409,7 +410,7 @@ Files required on SD card:
 Lesson 8: Audio
 ---------------
 
-![Lesson 8](images/lesson8.png)
+![Lesson 8: Audio](lesson8/lesson8.png)
 
 The MiST has two single bit audio channels. This can be used to output
 some simple square wave by just switching the outputs on and off at the
@@ -461,7 +462,7 @@ Files required on SD card:
 Lesson 9: Keyboard & Mouse
 --------------------------
 
-![Lesson 9](images/lesson9.png)
+![Lesson 9: Keyboard and mouse](lesson9/lesson9.png)
 
 The MiST uses USB to connect mice and keyboards. USB is a rather
 complex protocol and requires a lot of communication and message
