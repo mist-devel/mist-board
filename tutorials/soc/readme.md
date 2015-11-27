@@ -25,7 +25,7 @@ comes under GPL or simimlar license and may e.g. not be used closed
 source projects or the like. Please have a closer look at the files
 you intend to re-use for your project
 
-(Lesson 1)[https://github.com/mist-devel/mist-board/tree/master/tutorials/soc/lesson1] A VGA controller
+[Lesson 1](https://github.com/mist-devel/mist-board/tree/master/tutorials/soc/lesson1): A VGA controller
 --------------------------
 
 ![Lesson 1: VGA checkerboard](lesson1/lesson1.png)
@@ -53,10 +53,9 @@ Links:
  - https://eewiki.net/pages/viewpage.action?pageId=15925278
 
 Files required on SD card: 
- - soc.rbf renamed to core.rbf
- - [soc.rbf](https://github.com/mist-devel/mist-board/raw/master/tutorials/soc/lesson1/soc.rbf) renamed to 'core.rbf'
+ - [`soc.rbf`](https://github.com/mist-devel/mist-board/raw/master/tutorials/soc/lesson1/soc.rbf) renamed to `core.rbf`
 
-Lesson 2: Video memory and embedded ROM
+[Lesson 2](https://github.com/mist-devel/mist-board/tree/master/tutorials/soc/lesson2): Video memory and embedded ROM
 ---------------------------------------
 
 ![Lesson 2: VGA image](lesson2/lesson2.png)
@@ -78,9 +77,9 @@ The ROM has been generated using Quartus' Megafunction wizard. It allows
 to specify a intel hex file as the data source for the ROM.
 
 Files required on SD card: 
- - soc.rbf renamed to core.rbf
+ - [`soc.rbf`](https://github.com/mist-devel/mist-board/raw/master/tutorials/soc/lesson2/soc.rbf) renamed to `core.rbf`
 
-Lesson 3: Z80 CPU and RAM
+[Lesson 3](https://github.com/mist-devel/mist-board/tree/master/tutorials/soc/lesson3): Z80 CPU and RAM
 -------------------------
 
 ![Lesson 3: CPU](lesson3/lesson3.png)
@@ -132,7 +131,7 @@ Links:
 Files required on SD card: 
  - soc.rbf renamed to core.rbf
 
-Lesson 4: SDRAM
+[Lesson 4](https://github.com/mist-devel/mist-board/tree/master/tutorials/soc/lesson4): SDRAM
 ---------------
 
 So far we've been using FPGA internal embedded RAM. This is very easy
@@ -213,7 +212,7 @@ delay.
 Files required on SD card: 
  - soc.rbf renamed to 'core.rbf'
 
-Lesson 5: OSD and User_IO
+[Lesson 5](https://github.com/mist-devel/mist-board/tree/master/tutorials/soc/lesson5): OSD and User_IO
 -------------------------
 
 ![Lesson 5: OSD](lesson5/lesson5.png)
@@ -270,7 +269,7 @@ disable the scanlines effect.
 Files required on SD card: 
  - soc.rbf renamed to core.rbf
 
-Lesson 6: ROM upload, IRQs
+[Lesson 6](https://github.com/mist-devel/mist-board/tree/master/tutorials/soc/lesson6): ROM upload, IRQs
 --------------------------
 
 ![Lesson 6: ROM Upload](lesson6/lesson6.png)
@@ -334,7 +333,7 @@ Files required on SD card:
  - soc.rbf renamed to core.rbf
  - z80_soc.rom
 
-Lesson 7a: SD card 
+[Lesson 7a](https://github.com/mist-devel/mist-board/tree/master/tutorials/soc/lesson7a): SD card 
 ------------------
 
 ![Lesson 7: SD card](lesson7a/lesson7.png)
@@ -378,7 +377,7 @@ Files required on SD card:
  - z80_soc.rom
  - other files to show up in the directory listing
 
-Lesson 7b: Hardware SPI
+[Lesson 7b](https://github.com/mist-devel/mist-board/tree/master/tutorials/soc/lesson7b): Hardware SPI
 -----------------------
 
 The previous SD card integration used "bit banging" to let the Z80
@@ -407,7 +406,7 @@ Files required on SD card:
  - z80_soc.rom
  - other files to show up in the directory listing
 
-Lesson 8: Audio
+[Lesson 8](https://github.com/mist-devel/mist-board/tree/master/tutorials/soc/lesson8): Audio
 ---------------
 
 ![Lesson 8: Audio](lesson8/lesson8.png)
@@ -459,7 +458,7 @@ Files required on SD card:
  - z80_soc.rom
  - song.ym
 
-Lesson 9: Keyboard & Mouse
+[Lesson 9](https://github.com/mist-devel/mist-board/tree/master/tutorials/soc/lesson9): Keyboard & Mouse
 --------------------------
 
 ![Lesson 9: Keyboard and mouse](lesson9/lesson9.png)
