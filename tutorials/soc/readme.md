@@ -282,7 +282,7 @@ The MiSTs IO controller provides a simple helper mechanism for
 this. Whenever it uploads a new core it will read the cores config
 string incl. the cores name. It will then add ".rom" to this name and
 check whether it finds a file with that name on SD card. In case of
-the Z80 SoC it searches for a file named [`z80_soc.rom`](https://github.com/mist-devel/mist-board/tree/master/tutorials/soc/lesson6/z80_soc.rom). If it finds
+the Z80 SoC it searches for a file named [`z80_soc.rom`](https://github.com/mist-devel/mist-board/raw/master/tutorials/soc/lesson6/z80_soc.rom). If it finds
 one it sends it via SPI to the FPGA. On FPGA side the file [`data_io.v`](https://github.com/mist-devel/mist-board/tree/master/tutorials/soc/lesson6/data_io.v)
 takes care of this. It activates a signal named "downloading" and
 delivers all bytes received from the IO controller one by one. It also
@@ -391,12 +391,12 @@ is required. But it's too slow to be useful.
 
 Since we can easily implement support hardware in the FPGA it's
 possible to implement a hardware SPI master peripheral that can then
-be used by the Z80. [`spi.v`](https://github.com/mist-devel/mist-board/raw/master/tutorials/soc/lesson7b/spi.v) implements this. The file [`mmc.c`](https://github.com/mist-devel/mist-board/raw/master/tutorials/soc/lesson7b/mmc.c) also needs
+be used by the Z80. [`spi.v`](https://github.com/mist-devel/mist-board/tree/master/tutorials/soc/lesson7b/spi.v) implements this. The file [`mmc.c`](https://github.com/mist-devel/mist-board/tree/master/tutorials/soc/lesson7b/mmc.c) also needs
 to be modified to make use of the new hardware. Sending a byte to the
 SD card now requires only one Z80 instruction. As a result accessing
 the SD card got significantly faster. 
 
-An additional sector buffer inside [`mmc.c`](https://github.com/mist-devel/mist-board/raw/master/tutorials/soc/lesson7b/mmc.c) reduces the number of SD card
+An additional sector buffer inside [`mmc.c`](https://github.com/mist-devel/mist-board/tree/master/tutorials/soc/lesson7b/mmc.c) reduces the number of SD card
 accesses and further increases speed. The resulting setup has a
 sufficient performance to be useful.
 
@@ -429,7 +429,7 @@ that is rather inconvenient for streaming as whole file is compressed
 and the bytes inside the files have been reordered to achieve better
 compression. For our simple SoC setup we need the files uncompressed
 and in linear order. Any YM file from the internet can be uncompressed
-using the LHA program. Additionally the tool [`ym_deint.c`](https://github.com/mist-devel/mist-board/raw/master/tutorials/soc/lesson8/ym_deint.c) included
+using the LHA program. Additionally the tool [`ym_deint.c`](https://github.com/mist-devel/mist-board/tree/master/tutorials/soc/lesson8/ym_deint.c) included
 with this lesson can undo any byte reordering. A ready decoded file
 [`song.ym`](https://github.com/mist-devel/mist-board/raw/master/tutorials/soc/lesson8/song.ym) is also included with the lesson.
 
@@ -477,7 +477,7 @@ FPGA development boards on which they were initially developed. These
 boards typically bring a PS2 keyboard and/or mouse
 connector. Therefore most existing FPGA projects expect to directly
 connect to a PS2 mouse or PS2 keyboard. To ease porting of such
-projects the MiST boards [`user_io.v`](https://github.com/mist-devel/mist-board/raw/master/tutorials/soc/lesson9/user_io.v) implements two PS2 interfaces of
+projects the MiST boards [`user_io.v`](https://github.com/mist-devel/mist-board/tree/master/tutorials/soc/lesson9/user_io.v) implements two PS2 interfaces of
 which one behaves like a mouse and one behaves like a keyboard.
 
 This lesson uses a PS2 protocol decoder taken from Mike Sterlings ZX
@@ -486,10 +486,10 @@ decoder re-assembles the [PS2 bitstream](http://computer-engineering.org/ps2prot
 parsed either by a [PS2 mouse parser](http://www.computer-engineering.org/ps2mouse/) or by a [PS2 keyboard parser](http://computer-engineering.org/ps2keyboard/).
 
 Two keys (SPACE and 'C') are decoded and detected in hardware in
-[`keyboard.v`](https://github.com/mist-devel/mist-board/raw/master/tutorials/soc/lesson9/keyboard.v). The resulting two bits are made available to the Z80 CPU
+[`keyboard.v`](https://github.com/mist-devel/mist-board/tree/master/tutorials/soc/lesson9/keyboard.v). The resulting two bits are made available to the Z80 CPU
 via a IO port.
 
-The mouse movement is decoded in [`mouse.v`](https://github.com/mist-devel/mist-board/raw/master/tutorials/soc/lesson9/mouse.v). The movement is accumulated
+The mouse movement is decoded in [`mouse.v`](https://github.com/mist-devel/mist-board/tree/master/tutorials/soc/lesson9/mouse.v). The movement is accumulated
 in two other IO registers and made available to the Z80 CPU. Whenever
 the CPU reads these registers the hardware counters are cleared to
 restart accumulating new movement information.
