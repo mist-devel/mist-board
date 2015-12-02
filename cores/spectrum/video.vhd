@@ -69,13 +69,7 @@ port(
 	nHSYNC		:	out std_logic;
 	nCSYNC		:	out	std_logic;
 	nHCSYNC		:	out std_logic;
-	IS_BORDER	: 	out std_logic;
-	IS_VALID	:	out std_logic;
-	
-	-- Clock outputs, might be useful
-	PIXCLK		:	out std_logic;
-	FLASHCLK	: 	out std_logic;
-	
+		
 	-- Interrupt to CPU (asserted for 32 T-states, 64 ticks)
 	nIRQ		:	out	std_logic
 );
@@ -114,13 +108,6 @@ begin
 	-- The first 256 pixels of each line are valid picture
 	picture <= hpicture and vpicture;
 	blanking <= hblanking or vblanking;
-
-	-- Generate clocks and enables from internal signals
-	FLASHCLK <= flashcounter(4);
-	IS_VALID <= not blanking;
-	IS_BORDER <= not picture;
-	-- FIXME: This needs to be halved for PAL mode
-	PIXCLK <= CLK and CLKEN and nRESET;
 	
 	-- Output syncs
 	-- drive VSYNC to 1 in PAL mode for Minimig VGA cable
@@ -238,7 +225,6 @@ begin
 			attr <= (others => '0');
 		elsif rising_edge(CLK) and CLKEN = '1' then
 
-			-- TH
 			-- activate nVID_RD in advance of pixel and attribute read so data
 			-- is present in time. This is needed for the SDRAM which is operated at
 			-- much lower speed than the orignal SRAM in the DE1/DE2
@@ -269,14 +255,7 @@ begin
 					-- 0010 PICTURE STORE
 					-- 0100 ATTR LOAD
 					-- 0110 ATTR STORE				
-					if hcounter(1) = '0' then
-						-- LOAD
-						-- Assert the read strobe during the active picture in the
-						-- first and third pixel of every 8.  This splits a picture/attribute
-						-- fetch pair across two CPU cycles in PAL mode, or both in one cycle
-						-- in VGA mode
---TH						nVID_RD <= '0';
-					else
+					if hcounter(1) = '1' then
 						-- STORE
 						if hcounter(2) = '0' then
 							-- PICTURE
@@ -285,8 +264,6 @@ begin
 							-- ATTR
 							attr <= VID_D_IN;
 						end if;
-												
---	TH					nVID_RD <= '1';
 					end if;	
 				end if;				
 	

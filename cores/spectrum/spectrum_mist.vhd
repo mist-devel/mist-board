@@ -103,9 +103,9 @@ architecture rtl of spectrum_mist is
 
 --------------------------------
 -- PLL
--- 24 MHz input
--- 120 MHz sdram controller clock
--- 120 MHz sdram clock (-2.5 ns phase shifted)
+-- 27 MHz input
+-- 56 MHz sdram controller clock
+-- 56 MHz sdram clock (-2.5 ns phase shifted)
 --------------------------------
 
 component pll_main IS
@@ -424,12 +424,6 @@ port(
 	nHSYNC		:	out std_logic;
 	nCSYNC		:	out	std_logic;
 	nHCSYNC		:	out std_logic;
-	IS_BORDER	: 	out std_logic;
-	IS_VALID	:	out std_logic;
-	
-	-- Clock outputs, might be useful
-	PIXCLK		:	out std_logic;
-	FLASHCLK	: 	out std_logic;
 	
 	-- Interrupt to CPU (asserted for 32 T-states, 64 ticks)
 	nIRQ		:	out	std_logic
@@ -629,13 +623,13 @@ signal ula_enable		:	std_logic; -- all even IO addresses
 signal rom_enable		:	std_logic; -- 0x0000-0x3FFF
 signal ram_enable		:	std_logic; -- 0x4000-0xFFFF
 -- 128K extensions
-signal page_enable		:	std_logic; -- all odd IO addresses with A15 and A1 clear (and A14 set in +3 mode)
+signal page_enable	:	std_logic; -- all odd IO addresses with A15 and A1 clear (and A14 set in +3 mode)
 signal psg_enable		:	std_logic; -- all odd IO addresses with A15 set and A1 clear
 -- +3 extensions
-signal plus3_enable		:	std_logic; -- A15, A14, A13, A1 clear, A12 set.
+signal plus3_enable	:	std_logic; -- A15, A14, A13, A1 clear, A12 set.
 -- MMC
-signal divmmc_enable		:	std_logic; -- A7-A4 = "1110"
-signal kempston_enable	:	std_logic; -- A7-A0 = "00011111"
+signal divmmc_enable	:	std_logic; -- A7-A4 = "1110"
+signal kempston_enable: std_logic; -- A7-A0 = "00011111"
 
 -- 128K paging register (with default values for systems that don't have it)
 signal page_reg_disable	:	std_logic := '1'; -- bit 5
@@ -651,12 +645,6 @@ signal plus3_special	:	std_logic := '0'; -- bit 0
 
 -- RAM bank actually being accessed
 signal ram_page			:	std_logic_vector(2 downto 0);
-
--- Debugger connections
-signal debug_cpu_clken	:	std_logic;
-signal debug_irq_in_n	:	std_logic;
-signal debug_fetch		:	std_logic;
-signal debug_aux		:	std_logic_vector(15 downto 0);
 
 -- CPU signals
 signal cpu_wait_n	:	std_logic;
@@ -696,10 +684,6 @@ signal vid_vsync_n	:	std_logic;
 signal vid_hsync_n	:	std_logic;
 signal vid_csync_n	:	std_logic;
 signal vid_hcsync_n	:	std_logic;
-signal vid_is_border	:	std_logic;
-signal vid_is_valid	:	std_logic;
-signal vid_pixclk	:	std_logic;
-signal vid_flashclk	:	std_logic;
 signal vid_irq_n	:	std_logic;
 
 -- Keyboard
@@ -741,7 +725,7 @@ begin
 	clken: clocks port map (
 		clock,
 		pll_locked,
-		not cpu_mreq_n,
+		not cpu_mreq_n or not cpu_ioreq_n,
 		psg_clken,
 		cpu_clken,
 		mem_clken,
@@ -947,7 +931,7 @@ begin
 	ula: ula_port port map (
 		clock, reset_n,
 		cpu_do, ula_do,
-		ula_enable, cpu_wr_n,
+		ula_enable and psg_clken, cpu_wr_n,
 		ula_border,
 		ula_ear_out, ula_mic_out,
 		keyb,
@@ -956,15 +940,15 @@ begin
 		
 	-- ULA video
 	vid: video port map (
-		clock, vid_clken, pll_locked, -- reset_n,
+		-- use pll_locked to make the hcounter run synchronous to the 
+		-- clocks counter
+		clock, vid_clken, pll_locked, -- reset_n
 		not scandoubler_disable,
 		vid_a, sdram_do, vid_rd_n, vid_wait_n,
 		ula_border,
 		vid_r_out, vid_g_out, vid_b_out,
 		vid_vsync_n, vid_hsync_n,
 		vid_csync_n, vid_hcsync_n,
-		vid_is_border, vid_is_valid,
-		vid_pixclk, vid_flashclk,
 		vid_irq_n
 		);
 		
@@ -1010,7 +994,7 @@ begin
 		
 	-- DIVMMC interface
 	dmmc: divmmc port map (
-		clock, reset_n, cpu_clken,
+		clock, reset_n, psg_clken,
 		divmmc_enable, cpu_a,
 		cpu_wr_n, cpu_rd_n, cpu_mreq_n, cpu_m1_n, 
 		cpu_do, divmmc_do,
@@ -1034,9 +1018,9 @@ begin
 				reset_cnt := reset_cnt - 1;
 			end if;
 		end if;
-
+ 
 		-- make sure cpu runs synchronous to bus state machine
-		if rising_edge(mem_clken) then
+		if rising_edge(clock) and cpu_clken = '1' then
 			if reset_cnt = 0 then
 				reset_n <= '1';
 			else 
@@ -1258,7 +1242,7 @@ begin
 				page_rom_sel <= '0';
 				page_shadow_scr <= '0';
 				page_ram_sel <= (others => '0');
-			elsif rising_edge(clock) then
+			elsif rising_edge(clock) and psg_clken = '1' then
 				if page_enable = '1' and page_reg_disable = '0' and cpu_wr_n = '0' then
 					page_reg_disable <= cpu_do(5);
 					page_rom_sel <= cpu_do(4);

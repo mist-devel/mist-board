@@ -65,7 +65,6 @@ end clocks;
 
 architecture clocks_arch of clocks is
 signal counter	:	unsigned(3 downto 0);
-signal mreq_D	:	std_logic;
 begin
 	process(CLK) begin
 		if rising_edge(CLK) then
@@ -82,7 +81,6 @@ begin
 			counter <= (others => '0');
 		elsif falling_edge(CLK) then
 			counter <= counter + 1;
-			mreq_D <= MREQ;
 
 			if counter(0) = '1' then 
 				CLKEN_VID <= '1';
@@ -90,7 +88,7 @@ begin
 				CLKEN_VID <= '0';
 			end if;
 				
-			if (counter = "1000") then --1111/1000
+			if (counter = "1000") then
 				CLKEN_PSG <= '1';
 			else
 				CLKEN_PSG <= '0';
@@ -109,7 +107,6 @@ begin
 			end if;
 				
 			if ((counter = "0111") and (MREQ = '0')) or (counter = "1111") then 
---			if ( counter = "1111" ) then 
 				CLKEN_CPU <= '1';
 			else
 				CLKEN_CPU <= '0';
