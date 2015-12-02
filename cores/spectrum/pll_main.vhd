@@ -150,12 +150,12 @@ BEGIN
 		bandwidth_type => "AUTO",
 		clk0_divide_by => 27,
 		clk0_duty_cycle => 50,
-		clk0_multiply_by => 112,
+		clk0_multiply_by => 56,
 		clk0_phase_shift => "0",
 		clk1_divide_by => 27,
 		clk1_duty_cycle => 50,
-		clk1_multiply_by => 112,
-		clk1_phase_shift => "-1500",
+		clk1_multiply_by => 56,
+		clk1_phase_shift => "-2500",
 		compensate_clock => "CLK0",
 		inclk0_input_frequency => 37037,
 		intended_device_family => "Cyclone III",
@@ -241,8 +241,8 @@ END SYN;
 -- Retrieval info: PRIVATE: DIV_FACTOR1 NUMERIC "9"
 -- Retrieval info: PRIVATE: DUTY_CYCLE0 STRING "50.00000000"
 -- Retrieval info: PRIVATE: DUTY_CYCLE1 STRING "50.00000000"
--- Retrieval info: PRIVATE: EFF_OUTPUT_FREQ_VALUE0 STRING "112.000000"
--- Retrieval info: PRIVATE: EFF_OUTPUT_FREQ_VALUE1 STRING "112.000000"
+-- Retrieval info: PRIVATE: EFF_OUTPUT_FREQ_VALUE0 STRING "56.000000"
+-- Retrieval info: PRIVATE: EFF_OUTPUT_FREQ_VALUE1 STRING "56.000000"
 -- Retrieval info: PRIVATE: EXPLICIT_SWITCHOVER_COUNTER STRING "0"
 -- Retrieval info: PRIVATE: EXT_FEEDBACK_RADIO STRING "0"
 -- Retrieval info: PRIVATE: GLOCKED_COUNTER_EDIT_CHANGED STRING "1"
@@ -270,8 +270,8 @@ END SYN;
 -- Retrieval info: PRIVATE: MULT_FACTOR0 NUMERIC "40"
 -- Retrieval info: PRIVATE: MULT_FACTOR1 NUMERIC "40"
 -- Retrieval info: PRIVATE: NORMAL_MODE_RADIO STRING "1"
--- Retrieval info: PRIVATE: OUTPUT_FREQ0 STRING "112.00000000"
--- Retrieval info: PRIVATE: OUTPUT_FREQ1 STRING "112.00000000"
+-- Retrieval info: PRIVATE: OUTPUT_FREQ0 STRING "56.00000000"
+-- Retrieval info: PRIVATE: OUTPUT_FREQ1 STRING "56.00000000"
 -- Retrieval info: PRIVATE: OUTPUT_FREQ_MODE0 STRING "1"
 -- Retrieval info: PRIVATE: OUTPUT_FREQ_MODE1 STRING "1"
 -- Retrieval info: PRIVATE: OUTPUT_FREQ_UNIT0 STRING "MHz"
@@ -279,7 +279,7 @@ END SYN;
 -- Retrieval info: PRIVATE: PHASE_RECONFIG_FEATURE_ENABLED STRING "1"
 -- Retrieval info: PRIVATE: PHASE_RECONFIG_INPUTS_CHECK STRING "0"
 -- Retrieval info: PRIVATE: PHASE_SHIFT0 STRING "0.00000000"
--- Retrieval info: PRIVATE: PHASE_SHIFT1 STRING "-1500.00000000"
+-- Retrieval info: PRIVATE: PHASE_SHIFT1 STRING "-2500.00000000"
 -- Retrieval info: PRIVATE: PHASE_SHIFT_STEP_ENABLED_CHECK STRING "0"
 -- Retrieval info: PRIVATE: PHASE_SHIFT_UNIT0 STRING "deg"
 -- Retrieval info: PRIVATE: PHASE_SHIFT_UNIT1 STRING "ps"
@@ -301,7 +301,7 @@ END SYN;
 -- Retrieval info: PRIVATE: SPREAD_FEATURE_ENABLED STRING "0"
 -- Retrieval info: PRIVATE: SPREAD_FREQ STRING "50.000"
 -- Retrieval info: PRIVATE: SPREAD_FREQ_UNIT STRING "KHz"
--- Retrieval info: PRIVATE: SPREAD_PERCENT STRING "0.500"
+-- Retrieval info: PRIVATE: SPREAD_PERCENT STRING "0.000"
 -- Retrieval info: PRIVATE: SPREAD_USE STRING "0"
 -- Retrieval info: PRIVATE: SRC_SYNCH_COMP_RADIO STRING "0"
 -- Retrieval info: PRIVATE: STICKY_CLK0 STRING "1"
@@ -319,12 +319,12 @@ END SYN;
 -- Retrieval info: CONSTANT: BANDWIDTH_TYPE STRING "AUTO"
 -- Retrieval info: CONSTANT: CLK0_DIVIDE_BY NUMERIC "27"
 -- Retrieval info: CONSTANT: CLK0_DUTY_CYCLE NUMERIC "50"
--- Retrieval info: CONSTANT: CLK0_MULTIPLY_BY NUMERIC "112"
+-- Retrieval info: CONSTANT: CLK0_MULTIPLY_BY NUMERIC "56"
 -- Retrieval info: CONSTANT: CLK0_PHASE_SHIFT STRING "0"
 -- Retrieval info: CONSTANT: CLK1_DIVIDE_BY NUMERIC "27"
 -- Retrieval info: CONSTANT: CLK1_DUTY_CYCLE NUMERIC "50"
--- Retrieval info: CONSTANT: CLK1_MULTIPLY_BY NUMERIC "112"
--- Retrieval info: CONSTANT: CLK1_PHASE_SHIFT STRING "-1500"
+-- Retrieval info: CONSTANT: CLK1_MULTIPLY_BY NUMERIC "56"
+-- Retrieval info: CONSTANT: CLK1_PHASE_SHIFT STRING "-2500"
 -- Retrieval info: CONSTANT: COMPENSATE_CLOCK STRING "CLK0"
 -- Retrieval info: CONSTANT: INCLK0_INPUT_FREQUENCY NUMERIC "37037"
 -- Retrieval info: CONSTANT: INTENDED_DEVICE_FAMILY STRING "Cyclone III"
@@ -391,7 +391,7 @@ END SYN;
 -- Retrieval info: GEN_FILE: TYPE_NORMAL pll_main.ppf TRUE
 -- Retrieval info: GEN_FILE: TYPE_NORMAL pll_main.inc FALSE
 -- Retrieval info: GEN_FILE: TYPE_NORMAL pll_main.cmp FALSE
--- Retrieval info: GEN_FILE: TYPE_NORMAL pll_main.bsf TRUE
+-- Retrieval info: GEN_FILE: TYPE_NORMAL pll_main.bsf FALSE
 -- Retrieval info: GEN_FILE: TYPE_NORMAL pll_main_inst.vhd FALSE
 -- Retrieval info: LIB_FILE: altera_mf
 -- Retrieval info: CBX_MODULE_PREFIX: ON

@@ -57,39 +57,64 @@ port (
 	-- 1.75 MHz clock enable (1 in 8) for data_io
 	CLKEN_DIO		:	out std_logic;
 	-- 14 MHz clock enable (out of phase with CPU)
-	CLKEN_VID		:	out std_logic
+	CLKEN_VID		:	out std_logic;
+	-- clock reference for sdram to sync onto
+	CLK_REF			:	out std_logic
 	);
 end clocks;
-
--- Clock enables for uncontended VRAM access
--- 0    1    2    3    4    5    6    7    8    9    10   11   12   13   14   15
--- CPU  VID       VID       VID       VID  CPU  VID       VID       VID       VID
---                                         DIO       MEM                      PSG
 
 architecture clocks_arch of clocks is
 signal counter	:	unsigned(3 downto 0);
 signal mreq_D	:	std_logic;
 begin
-	-- X000
-	-- CPU may used 1000 state only if it doesn't use the memory bus
-	CLKEN_CPU <= '1' when (counter = "1000" and mreq_D = '0') 
-		or counter = "0000" else '0';
-	-- 1000
-	CLKEN_DIO <= '1' when counter = "1101" else '0';
-	-- 1001
-	CLKEN_MEM    <= '1' when counter = "1001" else '0';
-	-- XXX1
-	CLKEN_VID    <= '1' when counter(0) = '1' else '0';
-	-- 1111
-	CLKEN_PSG    <= '1' when counter = "1111" else '0';
+	process(CLK) begin
+		if rising_edge(CLK) then
+			if counter(1) = '1' then
+				CLK_REF <= '1';
+			else
+				CLK_REF <= '0';
+			end if;
+		end if;
+	end process;
 	
-	process(nRESET,CLK)
-	begin
+	process(nRESET,CLK) begin
 		if nRESET = '0' then
 			counter <= (others => '0');
 		elsif falling_edge(CLK) then
 			counter <= counter + 1;
 			mreq_D <= MREQ;
+
+			if counter(0) = '1' then 
+				CLKEN_VID <= '1';
+			else
+				CLKEN_VID <= '0';
+			end if;
+				
+			if (counter = "1000") then --1111/1000
+				CLKEN_PSG <= '1';
+			else
+				CLKEN_PSG <= '0';
+			end if;
+
+			if (counter = "1011") or (counter = "1100") or(counter = "1101") then
+				CLKEN_DIO <= '1';
+			else
+				CLKEN_DIO <= '0';
+			end if;
+
+			if (counter = "0111") or (counter = "1000") or (counter = "1001") then
+				CLKEN_MEM <= '1';
+			else
+				CLKEN_MEM <= '0';
+			end if;
+				
+			if ((counter = "0111") and (MREQ = '0')) or (counter = "1111") then 
+--			if ( counter = "1111" ) then 
+				CLKEN_CPU <= '1';
+			else
+				CLKEN_CPU <= '0';
+			end if;
+
 		end if;
 	end process;
 end clocks_arch;

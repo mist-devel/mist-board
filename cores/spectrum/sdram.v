@@ -24,9 +24,9 @@ module sdram (
 
 	// interface to the MT48LC16M16 chip
 	inout [15:0]  		sd_data,    // 16 bit bidirectional data bus
-	output [12:0]		sd_addr,    // 13 bit multiplexed address bus
-	output [1:0] 		sd_dqm,     // two byte masks
-	output [1:0] 		sd_ba,      // two banks
+	output reg [12:0]	sd_addr,    // 13 bit multiplexed address bus
+	output reg [1:0] 	sd_dqm,     // two byte masks
+	output reg [1:0] 	sd_ba,      // two banks
 	output 				sd_cs,      // a single chip select
 	output 				sd_we,      // write enable
 	output 				sd_ras,     // row address select
@@ -38,7 +38,7 @@ module sdram (
 	input					clkref,		// reference clock to sync to
 	
 	input [7:0]  		din,			// data input from chipset/cpu
-	output [7:0]      dout,			// data output to chipset/cpu
+	output [7:0]  dout,				// data output to chipset/cpu
 	input [24:0]   	addr,       // 25 bit byte address
 	input 		 		oe,         // cpu/chipset requests read
 	input 		 		we          // cpu/chipset requests write
@@ -47,7 +47,7 @@ module sdram (
 // falling edge on oe/we/rfsh starts state machine
 
 // no burst configured
-localparam RASCAS_DELAY   = 3'd3;   // tRCD=20ns -> 3 cycles@128MHz
+localparam RASCAS_DELAY   = 3'd3;   // tRCD=20ns -> 2 cycles@56MHz
 localparam BURST_LENGTH   = 3'b000; // 000=1, 001=2, 010=4, 011=8
 localparam ACCESS_TYPE    = 1'b0;   // 0=sequential, 1=interleaved
 localparam CAS_LATENCY    = 3'd3;   // 2/3 allowed
@@ -62,18 +62,18 @@ localparam MODE = { 3'b000, NO_WRITE_BURST, OP_MODE, CAS_LATENCY, ACCESS_TYPE, B
 // ---------------------------------------------------------------------
 
 localparam STATE_IDLE      = 3'd0;   // first state in cycle
-localparam STATE_CMD_START = 3'd1;   // state in which a new command can be started
+localparam STATE_CMD_START = 3'd0;   // state in which a new command can be started
 localparam STATE_CMD_CONT  = STATE_CMD_START  + RASCAS_DELAY; // 4 command can be continued
 localparam STATE_LAST      = 3'd7;   // last state in cycle
 
 reg [2:0] q /* synthesis noprune */;
 always @(posedge clk) begin
-	// 112Mhz counter synchronous to 14 Mhz clock
+	// 56Mhz counter synchronous to 7 Mhz clkref
    // force counter to pass state 5->6 exactly after the rising edge of clkref
 	// since clkref is two clocks early
-   if(((q == 5) && ( clkref == 0)) ||
-		((q == 6) && ( clkref == 1)) ||
-      ((q != 5) && (q != 6)))
+   if(((q == 0) && ( clkref == 0)) ||
+		((q == 7) && ( clkref == 1)) ||
+      ((q != 0) && (q != 7)))
 			q <= q + 3'd1;
 end
 
@@ -105,7 +105,7 @@ localparam CMD_PRECHARGE       = 4'b0010;
 localparam CMD_AUTO_REFRESH    = 4'b0001;
 localparam CMD_LOAD_MODE       = 4'b0000;
 
-wire [3:0] sd_cmd;   // current command sent to sd ram
+reg [3:0] sd_cmd;   // current command sent to sd ram
 
 // drive control signals according to current command
 assign sd_cs  = sd_cmd[3];
@@ -119,37 +119,54 @@ assign sd_we  = sd_cmd[0];
 // at a time when writing
 assign sd_data = we?{din, din}:16'bZZZZZZZZZZZZZZZZ;
 
-//reg addr0;
-//always @(posedge clk)
-//	if((q == 1) && oe) addr0 <= addr[0];
-
-//assign dout = addr0?sd_data[7:0]:sd_data[15:8];
+// assign dout = addr[0]?sd_data[7:0]:sd_data[15:8];
 assign dout = sd_data[7:0];
 
-wire [3:0] reset_cmd = 
-	((q == STATE_CMD_START) && (reset == 13))?CMD_PRECHARGE:
-	((q == STATE_CMD_START) && (reset ==  2))?CMD_LOAD_MODE:
-	CMD_INHIBIT;
-
-wire [3:0] run_cmd =
-	((we || oe) && (q == STATE_CMD_START))?CMD_ACTIVE:
-	(we && 			(q == STATE_CMD_CONT ))?CMD_WRITE:
-	(!we &&  oe &&	(q == STATE_CMD_CONT ))?CMD_READ:
-	(!we && !oe && (q == STATE_CMD_START))?CMD_AUTO_REFRESH:
-	CMD_INHIBIT;
+always @(posedge clk) begin
+	sd_cmd <= CMD_INHIBIT;  // default: idle
 	
-assign sd_cmd = (reset != 0)?reset_cmd:run_cmd;
+	if(reset != 0) begin
+		// initialization takes place at the end of the reset phase
+		if(q == STATE_CMD_START) begin
 
-wire [12:0] reset_addr = (reset == 13)?13'b0010000000000:MODE;
+			if(reset == 13) begin
+				sd_cmd <= CMD_PRECHARGE;
+				sd_addr[10] <= 1'b1;      // precharge all banks
+			end
+				
+			if(reset == 2) begin
+				sd_cmd <= CMD_LOAD_MODE;
+				sd_addr <= MODE;
+			end
+			
+		end
+	end else begin
+		// normal operation
+		
+		// -------------------  cpu/chipset read/write ----------------------
+		if(we || oe) begin
 	
-wire [12:0] run_addr = 
-	(q == STATE_CMD_START)?addr[20:8]:{ 4'b0010, addr[23], addr[7:0]};
-
-assign sd_addr = (reset != 0)?reset_addr:run_addr;
-
-assign sd_ba = addr[22:21];
-
-//assign sd_dqm = we?{ addr[0], ~addr[0] }:2'b00;
-assign sd_dqm = 2'b00;
+			// RAS phase
+			if(q == STATE_CMD_START) begin
+				sd_cmd <= CMD_ACTIVE;
+				sd_addr <= addr[21:9];
+				sd_ba <= addr[23:22];
+				sd_dqm <= 2'b00;
+			end
+				
+			// CAS phase 
+			if(q == STATE_CMD_CONT) begin
+				sd_cmd <= we?CMD_WRITE:CMD_READ;
+				sd_addr <= { 4'b0010, addr[8:0] };  // auto precharge
+			end
+		end
+		
+		// ------------------------ no access --------------------------
+		else begin
+			if(q == STATE_CMD_START)
+				sd_cmd <= CMD_AUTO_REFRESH;
+		end
+	end
+end
 
 endmodule

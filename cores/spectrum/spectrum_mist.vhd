@@ -141,7 +141,9 @@ port (
 	-- 1.75 MHz clock enable (1 in 8)
 	CLKEN_DIO		:	out std_logic;
 	-- 14 MHz clock enable (out of phase with CPU)
-	CLKEN_VID		:	out std_logic
+	CLKEN_VID		:	out std_logic;
+	-- SDRAM reference clock to sync onto
+	CLK_REF		   :	out std_logic
 	);
 end component;
 
@@ -606,8 +608,7 @@ signal divmmc_conmem   : std_logic;
 signal key_f11         : std_logic;
 
 -- Master clock - 28 MHz
-signal clk112      	:	std_logic;
-signal clk_div			: 	unsigned(1 downto 0);
+signal clk56      	:	std_logic;
 signal pll_locked		:	std_logic;
 signal clock			:	std_logic;
 signal audio_clock	:	std_logic;
@@ -621,6 +622,7 @@ signal cpu_clken		:	std_logic;
 signal mem_clken		:	std_logic;
 signal dio_clken		:	std_logic;
 signal vid_clken		:	std_logic;
+signal clk_ref			:	std_logic;
 
 -- Address decoding
 signal ula_enable		:	std_logic; -- all even IO addresses
@@ -685,7 +687,6 @@ signal ula_ram_page	:	std_logic_vector(2 downto 0);
 
 -- ULA video signals
 signal vid_a		:	std_logic_vector(12 downto 0);
-signal vid_di		:	std_logic_vector(7 downto 0);
 signal vid_rd_n		:	std_logic;
 signal vid_wait_n	:	std_logic;
 signal vid_r_out	:	std_logic_vector(3 downto 0);
@@ -723,19 +724,17 @@ begin
 	pll: pll_main port map (
 		'0',
 		CLOCK_27(0),
-		clk112,
+		clk56,
 		SDRAM_CLK,
 		pll_locked
 		);
 		
-	-- generate 28Mhz system clock from 112MHz main clock by dividing it by 4
-	process(clk112)
+	-- generate 28Mhz system clock from 56MHz main clock by dividing it by 2
+	process(clk56)
 	begin
-		if rising_edge(clk112) then
-			clk_div <= clk_div + 1;
+		if rising_edge(clk56) then
+			clock <= not clock;
 		end if;
-		
-		clock <= clk_div(1);
 	end process;	
 	
 	-- Clock enable logic
@@ -747,7 +746,8 @@ begin
 		cpu_clken,
 		mem_clken,
 		dio_clken,
-		vid_clken
+		vid_clken,
+		clk_ref
 		);
 		
 	-- SDRAM
@@ -757,7 +757,7 @@ begin
 		SDRAM_nCS, SDRAM_BA, SDRAM_nWE, SDRAM_NRAS, SDRAM_nCAS,
 		
 		-- System
-		clk112, vid_clken, not pll_locked,
+		clk56, clk_ref, not pll_locked,
 		
 		-- cpu interface
 		sdram_di, sdram_do,
@@ -771,7 +771,7 @@ begin
 	-- embedded rom
 	rom: rom128 port map (
 		rom_addr(14 downto 0),
-		mem_clken,
+		psg_clken,    -- psg_clken is in the middle of a cpu cycle
 		rom_do
 	);
 	
@@ -831,7 +831,7 @@ begin
 	process(clock)
 	begin
 		if rising_edge(clock) then
-			if dio_clken = '1' then
+			if dio_clken = '1' and ioctl_cycle = '0' then
 				if ioctl_ram_wr = '1' then
 					ioctl_ram_wr <= '0';
 					ioctl_used <= '1';
@@ -1036,7 +1036,7 @@ begin
 		end if;
 
 		-- make sure cpu runs synchronous to bus state machine
-		if rising_edge(psg_clken) then
+		if rising_edge(mem_clken) then
 			if reset_cnt = 0 then
 				reset_n <= '1';
 			else 
@@ -1073,7 +1073,8 @@ begin
 	-- ROM is enabled between 0x0000 and 0x3fff except in +3 special mode
 	rom_enable <= (not cpu_mreq_n) and not (plus3_special or cpu_a(15) or cpu_a(14));
 	-- RAM is enabled for any memory request when ROM isn't enabled
-	ram_enable <= not (cpu_mreq_n or rom_enable);
+	ram_enable <= (not cpu_mreq_n and not rom_enable);
+	
 	ram_page_128k: if model /= 2 generate
 		-- 128K has pageable RAM at 0xc000
 		ram_page <=
@@ -1131,6 +1132,7 @@ begin
 			-- Otherwise access the internal ROM
 			"000000" & cpu_a(13 downto 0);
 	end generate;
+	
 	rom_128k: if model = 1 generate
 		-- DIVMMC low mapping (0x0000 - 0x1fff)
 		divmmc_lo_addr <= "000000" & cpu_a(12 downto 0) when
@@ -1150,6 +1152,7 @@ begin
 			-- Otherwise access the internal ROMs
 			"00000" & page_rom_sel & cpu_a(13 downto 0);
 	end generate;
+	
 	rom_plus3: if model = 2 generate
 		-- DIVMMC low mapping (0x0000 - 0x1fff)
 		divmmc_lo_addr <= "000000" & cpu_a(12 downto 0) when
@@ -1171,9 +1174,6 @@ begin
 			"0000" & plus3_page(1) & page_rom_sel & cpu_a(13 downto 0);
 	end generate;
 
-	-- SRAM bus
-	vid_di <= sdram_do;
-	
 	-- first 1MB of sdram are used as ram, second 1MB sdram are used as rom
 	-- and after that starts tape buffer
 	cpu_addr <= "0" & ram_addr when ram_enable = '1' else "1" & rom_addr;
@@ -1295,7 +1295,9 @@ begin
 	zx_green <= vid_g_out & "00";
 	zx_blue <= vid_b_out & "00";
 	VGA_HS <= vid_hcsync_n;
-	VGA_VS <= vid_vsync_n;
+	-- when scandoubler is disabled a csync is fed into hsync and 
+   -- vsync is used as a rgb switch signal
+   VGA_VS <= '1' when scandoubler_disable = '1' else vid_vsync_n;
 
 	-- route video through osd
 	osd_d : osd

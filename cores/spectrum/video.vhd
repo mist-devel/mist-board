@@ -124,7 +124,7 @@ begin
 	
 	-- Output syncs
 	-- drive VSYNC to 1 in PAL mode for Minimig VGA cable
-	nVSYNC <= '1' when VGA = '0' else not vsync;
+	nVSYNC <= not vsync;
 	nHSYNC <= not hsync;
 	nCSYNC <= not (vsync xor hsync);
 	-- Combined HSYNC/CSYNC.  Feeds HSYNC to VGA HSYNC in VGA mode,
@@ -237,6 +237,21 @@ begin
 			pixels <= (others => '0');
 			attr <= (others => '0');
 		elsif rising_edge(CLK) and CLKEN = '1' then
+
+			-- TH
+			-- activate nVID_RD in advance of pixel and attribute read so data
+			-- is present in time. This is needed for the SDRAM which is operated at
+			-- much lower speed than the orignal SRAM in the DE1/DE2
+			if blanking='0' and 
+					((hcounter(3 downto 1) = "111") or
+					 (hcounter(3 downto 1) = "000") or
+					 (hcounter(3 downto 1) = "001") or
+					 (hcounter(3 downto 1) = "010")) then
+				nVID_RD <= '0';
+			else
+				nVID_RD <= '1';
+			end if;
+		
 			-- Most functions are only performed when hcounter(0) is clear.
 			-- This is the 'half' bit inserted to allow for scan-doubled VGA output.
 			-- In VGA mode the counter will be stepped through the even values only,
@@ -260,7 +275,7 @@ begin
 						-- first and third pixel of every 8.  This splits a picture/attribute
 						-- fetch pair across two CPU cycles in PAL mode, or both in one cycle
 						-- in VGA mode
-						nVID_RD <= '0';
+--TH						nVID_RD <= '0';
 					else
 						-- STORE
 						if hcounter(2) = '0' then
@@ -271,10 +286,10 @@ begin
 							attr <= VID_D_IN;
 						end if;
 												
-						nVID_RD <= '1';
-					end if;
+--	TH					nVID_RD <= '1';
+					end if;	
 				end if;				
-				
+	
 				-- Delay horizontal picture enable until the end of the first fetch cycle
 				-- This also allows for the re-registration of the outputs
 				if hcounter(9) = '0' and hcounter(2 downto 1) = "11" then
