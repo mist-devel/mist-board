@@ -142,6 +142,8 @@ port (
 	CLKEN_DIO		:	out std_logic;
 	-- 14 MHz clock enable (out of phase with CPU)
 	CLKEN_VID		:	out std_logic;
+	-- reference signal to sync video memory access to
+	VID_MEM_SYNC	:	out std_logic;
 	-- SDRAM reference clock to sync onto
 	CLK_REF		   :	out std_logic
 	);
@@ -401,6 +403,8 @@ port(
 	CLK			:	in std_logic;
 	-- Video domain clock enable (14 MHz)
 	CLKEN		:	in std_logic;
+   -- Video memory cycle
+	MEM_CYC	:	in std_logic;
 	-- Master reset
 	nRESET 		: 	in std_logic;
 
@@ -617,6 +621,7 @@ signal mem_clken		:	std_logic;
 signal dio_clken		:	std_logic;
 signal vid_clken		:	std_logic;
 signal clk_ref			:	std_logic;
+signal vid_mem_sync	:	std_logic;
 
 -- Address decoding
 signal ula_enable		:	std_logic; -- all even IO addresses
@@ -731,6 +736,7 @@ begin
 		mem_clken,
 		dio_clken,
 		vid_clken,
+		vid_mem_sync,
 		clk_ref
 		);
 		
@@ -942,7 +948,7 @@ begin
 	vid: video port map (
 		-- use pll_locked to make the hcounter run synchronous to the 
 		-- clocks counter
-		clock, vid_clken, pll_locked, -- reset_n
+		clock, vid_clken, vid_mem_sync, reset_n,
 		not scandoubler_disable,
 		vid_a, sdram_do, vid_rd_n, vid_wait_n,
 		ula_border,
@@ -1170,11 +1176,6 @@ begin
 
 	-- io address is driven by io controller on upload or by tape during replay
 	io_addr <= ioctl_ram_addr when ioctl_used='1' else tape_addr;
-					
-	-- map video controller address to sdram when video is active, else cpu
--- 	sdram_addr(24 downto 20) <= io_addr(24 downto 20) when ioctl_cycle ='1' else "00000";  -- only 1 of 32 MB used
-	sdram_addr <= io_addr when ioctl_cycle = '1' else
-		("000000" & vid_addr) when vid_rd_n = '0' else ("0000" & cpu_addr);
 
 	-- Synchronous outputs to SRAM
 	process(clock,reset_n)
@@ -1183,7 +1184,7 @@ begin
 	variable divmmc_write : std_logic;
 	variable ext_ram_write : std_logic; -- External RAM
 	variable int_ram_write : std_logic; -- Internal RAM
-	variable sram_write : std_logic;
+	variable ram_write : std_logic;
 	begin
 		-- never write to lower 8k
 		divmmc_lo_write := '0';
@@ -1199,7 +1200,7 @@ begin
 		
 		ext_ram_write := (rom_enable and esxdos_downloaded and divmmc_paged_in and divmmc_write) and not cpu_wr_n;
 		int_ram_write := ram_enable and not cpu_wr_n;
-		sram_write := int_ram_write or ext_ram_write;
+		ram_write := int_ram_write or ext_ram_write;
 	
 		if rising_edge(clock) then
 			-- synchonize cpu memory access to video memory access
@@ -1217,19 +1218,23 @@ begin
 			end if;
 		end if;
 		
+		-- share SDRAM between CPU, Video and the io controller (ROM and tape upload)
 		if cpu_cycle = '1' then
 			sdram_oe <= not cpu_mreq_n and not cpu_rd_n;  -- any cpu read enables ram
-			sdram_we <= sram_write;    -- cpu_wr_n incl.  -- write only for memory used as ram
+			sdram_we <= ram_write;                        -- write only for memory used as ram
 			sdram_di <= cpu_do;
+			sdram_addr <= "0000" & cpu_addr;
 		elsif ioctl_cycle = '1' then
 			sdram_oe <= tape_rd;
 			sdram_we <= ioctl_used;
 			sdram_di <= ioctl_ram_data;
+			sdram_addr <= io_addr;
 		else
 			-- no cpu sccess. Thus do video access
 			sdram_oe <=  not vid_rd_n;
 			sdram_we <= '0';    -- video never writes
 			sdram_di <= "00000000";
+			sdram_addr <= "000000" & vid_addr;
 		end if;
 	end process;
 	

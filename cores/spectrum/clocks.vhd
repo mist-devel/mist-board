@@ -58,6 +58,8 @@ port (
 	CLKEN_DIO		:	out std_logic;
 	-- 14 MHz clock enable (out of phase with CPU)
 	CLKEN_VID		:	out std_logic;
+	-- reference to sync video memory access to
+	VID_MEM_SYNC	:	out std_logic;
 	-- clock reference for sdram to sync onto
 	CLK_REF			:	out std_logic
 	);
@@ -106,6 +108,12 @@ begin
 				CLKEN_MEM <= '0';
 			end if;
 				
+			if (counter = "1111") then
+				VID_MEM_SYNC <= '1';
+			else
+				VID_MEM_SYNC <= '0';
+			end if;
+
 			if ((counter = "0111") and (MREQ = '0')) or (counter = "1111") then 
 				CLKEN_CPU <= '1';
 			else

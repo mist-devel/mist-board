@@ -46,6 +46,8 @@ port(
 	CLK			:	in std_logic;
 	-- Video domain clock enable (14 MHz)
 	CLKEN		:	in std_logic;
+	--
+	MEM_CYC : in std_logic;
 	-- Master reset
 	nRESET 		: 	in std_logic;
 
@@ -78,6 +80,11 @@ end video;
 architecture video_arch of video is
 signal		pixels	:	std_logic_vector(9 downto 0);
 signal		attr	:	std_logic_vector(7 downto 0);
+
+-- additional buffer used in non-VGA mode (TV) to store the pixels/attr a little
+-- bit ahead of time to not interfere with cpu ram access
+signal		pixels_tv	:	std_logic_vector(7 downto 0);
+signal		attr_tv	:	std_logic_vector(7 downto 0);
 
 -- Video logic runs at 14 MHz so hcounter has an additonal LSb which is
 -- skipped if running in VGA scan-doubled mode.  The value of this
@@ -195,7 +202,7 @@ begin
 	VID_A(12 downto 0) <=
 		-- Picture
 		vcounter(8 downto 7) & vcounter(3 downto 1) & vcounter(6 downto 4) & hcounter(8 downto 4)
-		when hcounter(2) = '0' else
+		when (VGA = '1' and hcounter(2) = '0') or (VGA = '0' and hcounter(1) = '0') else
 		-- Attribute
 		"110" & vcounter(8 downto 7) & vcounter(6 downto 4) & hcounter(8 downto 4);
 	
@@ -242,11 +249,23 @@ begin
 			-- This is the 'half' bit inserted to allow for scan-doubled VGA output.
 			-- In VGA mode the counter will be stepped through the even values only,
 			-- so the rest of the logic remains the same.
-			if vpicture = '1' and hcounter(0) = '0' then
+			if vpicture = '1' and hcounter(0) = '1' then
 				-- Pump pixel shift register - this is two pixels longer
 				-- than a byte to delay the pixels back into alignment with
 				-- the attribute byte, stored two ticks later
 				pixels(9 downto 1) <= pixels(8 downto 0);
+				
+				-- in TV mode everything happens a little slower. Fetch data ahead of
+				-- time to have the same memory timing as VGA
+				if hcounter(9) = '0' and hcounter(3) = '0' then
+					if hcounter(2) = '0' then
+						if hcounter(1) = '0' then
+							pixels_tv <= VID_D_IN;
+						else
+							attr_tv <= VID_D_IN;
+						end if;
+					end if;
+				end if;
 				
 				if hcounter(9) = '0' and hcounter(3) = '0' then
 					-- Handle the fetch cycle
@@ -259,10 +278,18 @@ begin
 						-- STORE
 						if hcounter(2) = '0' then
 							-- PICTURE
-							pixels(7 downto 0) <= VID_D_IN;
+							if(VGA = '1') then
+								pixels(7 downto 0) <= VID_D_IN;
+							else
+								pixels(7 downto 0) <= pixels_tv;
+							end if;
 						else
 							-- ATTR
-							attr <= VID_D_IN;
+							if(VGA = '1') then
+								attr <= VID_D_IN;
+							else
+								attr <= attr_tv;
+							end if;
 						end if;
 					end if;	
 				end if;				
@@ -280,24 +307,29 @@ begin
 			-- Step the horizontal counter and check for wrap
 			if VGA = '1' then				
 				-- Counter wraps after 894 in VGA mode
-				if hcounter = "1101111110" then
-					hcounter <= (others => '0');
-					-- Increment vertical counter by ones for VGA so that
-					-- lines are double-scanned
-					vcounter <= vcounter + '1';
+				if hcounter = "1101111111" then
+					if MEM_CYC = '1' then
+						hcounter <= (others => '0');
+						-- Increment vertical counter by ones for VGA so that
+						-- lines are double-scanned
+						vcounter <= vcounter + '1';
+					end if;
 				else
 					-- Increment horizontal counter
 					-- Even values only for VGA mode
 					hcounter <= hcounter + "10";
-					hcounter(0) <= '0';
 				end if;
+				
+				hcounter(0) <= '1';
 			else			
 				-- Counter wraps after 895 in PAL mode
 				if hcounter = "1101111111" then
-					hcounter <= (others => '0');
-					-- Increment vertical counter by even values for PAL
-					vcounter <= vcounter + "10";
-					vcounter(0) <= '0';
+					if MEM_CYC = '1' then
+						hcounter <= (others => '0');
+						-- Increment vertical counter by even values for PAL
+						vcounter <= vcounter + "10";
+						vcounter(0) <= '0';
+					end if;
 				else
 					-- Increment horizontal counter
 					-- All values for PAL mode
@@ -364,7 +396,7 @@ begin
 			-- Wrap vertical counter at line 312-1,
 			-- Top counter value is 623 for VGA, 622 for PAL
 			if vcounter(9 downto 1) = "100110111" then
-				if ((VGA = '1' and vcounter(0) = '1' and hcounter = "1101111110") or
+				if ((VGA = '1' and vcounter(0) = '1' and hcounter = "1101111111") or
 					 (VGA = '0' and                       hcounter = "1101111111")) then
 					-- Start of picture area
 					vcounter <= (others => '0');
