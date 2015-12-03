@@ -162,9 +162,10 @@ module ps2_kbd(	input			sysclk,
 	    obyte <= nbyte;
 
 	assign got_key = (state == ps2k_state_wait) && istrobe;
-	assign got_break = { ibyte[7:1], 1'b0 } == 8'hf0;
-	assign got_extend = { ibyte[7:1], 1'b0 } == 8'he0;
-
+	assign got_break = { ibyte[7:1], 1'b0 } == 8'hf0; 
+	assign got_extend = { ibyte[7:1], 1'b0 } == 8'he0; 
+	assign ignore_capslock = {extended,ibyte} == 9'h058 && capslock;
+	
 	/* Latch key info from PS2, handle capslock state */
 	always@(posedge sysclk or posedge reset)
 	  if (reset) begin
@@ -185,7 +186,7 @@ module ps2_kbd(	input			sysclk,
 			    capslock <= ~capslock;
 		  end
 	  end
-
+	
 	/* --- Mac side --- */
 
 	/* Latch commands from Mac */
@@ -253,11 +254,11 @@ module ps2_kbd(	input			sysclk,
 	  else begin
 		  if (pop_key | cmd_model | cmd_test)
 		    key_pending <= 0;		 
-		  else if (!key_pending & got_key && !got_break && !got_extend)
+		  else if (!key_pending & got_key && !got_break && !got_extend && !ignore_capslock)
 		    key_pending <= 1;
 	  end
 
-	/* Data to Mac ... XXX: Handle keypad and special case capslock */
+	/* Data to Mac ... XXX: Handle keypad */
 	assign data_in = cmd_test 	? 8'h7d :
 			 cmd_model	? 8'h03 :
 			 (key_pending && !keymac[8]) ? keymac[7:0] : 8'h7b;	
@@ -386,7 +387,7 @@ module ps2_kbd(	input			sysclk,
 			  9'h073:		keymac[8:0] <= 9'h12f;	//KP 5
 			  9'h074:		keymac[8:0] <= 9'h131;	//KP 6
 			  9'h075:		keymac[8:0] <= 9'h137;	//KP 8
-			  9'h076:		keymac[8:0] <= 9'b000;	//ESCAPE
+			  9'h076:		keymac[8:0] <= 9'h07b;	//ESCAPE
 			  9'h077:		keymac[8:0] <= 9'h07b;	//NUMLOCK
 			  9'h078:		keymac[8:0] <= 9'h07b;	//F11 <OSD>
 			  9'h079:		keymac[8:0] <= 9'h07b;	//KP +
