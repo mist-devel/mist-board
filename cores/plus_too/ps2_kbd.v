@@ -247,21 +247,33 @@ module ps2_kbd(	input			sysclk,
 	/* Reply to Mac */
 	assign strobe_in = ((cmd_model | cmd_test) & tick_short) | pop_key;	
 
-	/* Latch key_pending */
+	/* Handle key_pending, and multi-byte keypad responses */
+	reg keypad_byte2;
 	always @(posedge sysclk or posedge reset)
-	  if (reset)
+	  if (reset) begin
 	    key_pending <= 0;
-	  else begin
-		  if (pop_key | cmd_model | cmd_test)
-		    key_pending <= 0;		 
-		  else if (!key_pending & got_key && !got_break && !got_extend && !ignore_capslock)
-		    key_pending <= 1;
+		 keypad_byte2 <= 0;
 	  end
-
-	/* Data to Mac ... XXX: Handle keypad */
+	  else begin
+		  if (cmd_model | cmd_test)
+				key_pending <= 0;		 
+		  else if (pop_key) begin
+		    if (keymac[8] & !keypad_byte2)
+				keypad_byte2 <= 1;
+		    else begin
+				key_pending <= 0;	
+				keypad_byte2 <= 0;
+		    end				
+		  end			 
+		  else if (!key_pending & got_key && !got_break && !got_extend && !ignore_capslock)
+		    key_pending <= 1;			 
+	  end
+	
+	/* Data to Mac */
 	assign data_in = cmd_test 	? 8'h7d :
 			 cmd_model	? 8'h03 :
-			 (key_pending && !keymac[8]) ? keymac[7:0] : 8'h7b;	
+			 key_pending ? ((keymac[8] & !keypad_byte2) ? 8'h79 : keymac[7:0]) :
+			 8'h7b;	
 
 	/* Keymap. XXX add option to assign ctrl/alt/windows to cmd/option
 	 * differently
@@ -388,12 +400,12 @@ module ps2_kbd(	input			sysclk,
 			  9'h074:		keymac[8:0] <= 9'h131;	//KP 6
 			  9'h075:		keymac[8:0] <= 9'h137;	//KP 8
 			  9'h076:		keymac[8:0] <= 9'h07b;	//ESCAPE
-			  9'h077:		keymac[8:0] <= 9'h07b;	//NUMLOCK
+			  9'h077:		keymac[8:0] <= 9'h07b;	//NUMLOCK (Mac keypad clear?)
 			  9'h078:		keymac[8:0] <= 9'h07b;	//F11 <OSD>
-			  9'h079:		keymac[8:0] <= 9'h07b;	//KP +
+			  9'h079:		keymac[8:0] <= 9'h10d;	//KP +
 			  9'h07a:		keymac[8:0] <= 9'h12b;	//KP 3
 			  9'h07b:		keymac[8:0] <= 9'h11d;	//KP -
-			  9'h07c:		keymac[8:0] <= 9'h07b;	//KP *
+			  9'h07c:		keymac[8:0] <= 9'h105;	//KP *
 			  9'h07d:		keymac[8:0] <= 9'h139;	//KP 9
 			  9'h07e:		keymac[8:0] <= 9'h07b;	//SCROLL LOCK / KP )
 			  9'h07f:		keymac[8:0] <= 9'h07b;
@@ -599,7 +611,7 @@ module ps2_kbd(	input			sysclk,
 			  9'h147:		keymac[8:0] <= 9'h07b;
 			  9'h148:		keymac[8:0] <= 9'h07b;
 			  9'h149:		keymac[8:0] <= 9'h07b;
-			  9'h14a:		keymac[8:0] <= 9'h07b;	//KP /
+			  9'h14a:		keymac[8:0] <= 9'h11b;	//KP /
 			  9'h14b:		keymac[8:0] <= 9'h07b;
 			  9'h14c:		keymac[8:0] <= 9'h07b;
 			  9'h14d:		keymac[8:0] <= 9'h07b;
@@ -638,7 +650,7 @@ module ps2_kbd(	input			sysclk,
 			  9'h16e:		keymac[8:0] <= 9'h07b;
 			  9'h16f:		keymac[8:0] <= 9'h07b;
 			  9'h170:		keymac[8:0] <= 9'h07b;	//INSERT = HELP
-			  9'h171:		keymac[8:0] <= 9'h10f;	//DELETE
+			  9'h171:		keymac[8:0] <= 9'h10f;	//DELETE (KP clear?)
 			  9'h172:		keymac[8:0] <= 9'h111;	//ARROW DOWN
 			  9'h173:		keymac[8:0] <= 9'h07b;
 			  9'h174:		keymac[8:0] <= 9'h105;	//ARROW RIGHT
