@@ -1013,12 +1013,11 @@ begin
 
 	-- delay reset so sdram can be initialized etc. especially clearing the
 	-- divmmc ram after esxdos upload needs some time (9.3ms)
-	-- counting to 280000 at 28Mhz is 10ms
 	process(clock, pll_locked, status, buttons)
-		variable reset_cnt : integer range 0 to 280000;
+		variable reset_cnt : integer range 0 to 28000000;
 	begin
 		if pll_locked = '0' or status(0) = '1' or status(1) = '1' or buttons(1) = '1' then
-			reset_cnt := 280000;
+			reset_cnt := 28000000;
 		elsif rising_edge(clock) then
 			if reset_cnt /= 0 then
 				reset_cnt := reset_cnt - 1;
