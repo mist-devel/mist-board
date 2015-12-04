@@ -71,6 +71,7 @@ port(
 	nHSYNC		:	out std_logic;
 	nCSYNC		:	out	std_logic;
 	nHCSYNC		:	out std_logic;
+	SCANLINE    :  out std_logic;
 		
 	-- Interrupt to CPU (asserted for 32 T-states, 64 ticks)
 	nIRQ		:	out	std_logic
@@ -125,6 +126,7 @@ begin
 	-- or CSYNC to the same pin in PAL mode
 	nHCSYNC <= not (vsync xor hsync) when VGA = '0' else
 		not hsync;
+	SCANLINE <= vcounter(0);
 	
 	-- Determine the pixel colour
 	dot <= pixels(9) xor (flashcounter(4) and attr(7)); -- Combine delayed pixel with FLASH attr and clock state

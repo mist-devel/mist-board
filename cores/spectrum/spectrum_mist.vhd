@@ -196,7 +196,7 @@ end component;
 ---------
 
 -- config string used by the io controller to fill the OSD
-constant CONF_STR : string := "SPECTRUM;CSW;T1,Reset;T2,Trigger NMI";
+constant CONF_STR : string := "SPECTRUM;CSW;T1,Reset;T2,Trigger NMI;O3,Scanlines,Off,On";
 
 -- convert string to std_logic_vector to be given to user_io
 function to_slv(s: string) return std_logic_vector is 
@@ -424,10 +424,11 @@ port(
 	R			:	out	std_logic_vector(3 downto 0);
 	G			:	out	std_logic_vector(3 downto 0);
 	B			:	out	std_logic_vector(3 downto 0);
-	nVSYNC		:	out std_logic;
-	nHSYNC		:	out std_logic;
-	nCSYNC		:	out	std_logic;
-	nHCSYNC		:	out std_logic;
+	nVSYNC	:	out std_logic;
+	nHSYNC	:	out std_logic;
+	nCSYNC	:	out std_logic;
+	nHCSYNC	:	out std_logic;
+	SCANLINE	:	out std_logic;
 	
 	-- Interrupt to CPU (asserted for 32 T-states, 64 ticks)
 	nIRQ		:	out	std_logic
@@ -690,6 +691,7 @@ signal vid_hsync_n	:	std_logic;
 signal vid_csync_n	:	std_logic;
 signal vid_hcsync_n	:	std_logic;
 signal vid_irq_n	:	std_logic;
+signal vid_scanline : std_logic;
 
 -- Keyboard
 signal keyb			:	std_logic_vector(4 downto 0);
@@ -955,6 +957,7 @@ begin
 		vid_r_out, vid_g_out, vid_b_out,
 		vid_vsync_n, vid_hsync_n,
 		vid_csync_n, vid_hcsync_n,
+		vid_scanline,
 		vid_irq_n
 		);
 		
@@ -1014,10 +1017,13 @@ begin
 	-- delay reset so sdram can be initialized etc. especially clearing the
 	-- divmmc ram after esxdos upload needs some time (9.3ms)
 	process(clock, pll_locked, status, buttons)
-		variable reset_cnt : integer range 0 to 28000000;
+		variable reset_cnt : integer range 0 to 32000000 := 32000000;
 	begin
 		if pll_locked = '0' or status(0) = '1' or status(1) = '1' or buttons(1) = '1' then
-			reset_cnt := 28000000;
+			-- don't clear core coldboot reset time
+			if reset_cnt < 280000 then 
+				reset_cnt := 280000;
+			end if;
 		elsif rising_edge(clock) then
 			if reset_cnt /= 0 then
 				reset_cnt := reset_cnt - 1;
@@ -1279,9 +1285,9 @@ begin
 	end generate;
 	
 	-- Connect ULA to video output
-	zx_red <= vid_r_out & "00";
-	zx_green <= vid_g_out & "00";
-	zx_blue <= vid_b_out & "00";
+	zx_red <= '0' & vid_r_out & '0' when vid_scanline = '1' and status(3) = '1' else vid_r_out & "00";
+	zx_green <= '0' & vid_g_out & '0' when vid_scanline = '1' and status(3) = '1' else vid_g_out & "00";
+	zx_blue <= '0' & vid_b_out & '0' when vid_scanline = '1' and status(3) = '1' else vid_b_out & "00";
 	VGA_HS <= vid_hcsync_n;
 	-- when scandoubler is disabled a csync is fed into hsync and 
    -- vsync is used as a rgb switch signal
