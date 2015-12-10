@@ -54,7 +54,7 @@ port (
 	-- Column outputs to ULA
 	KEYB		:	out	std_logic_vector(4 downto 0);
 
-	F11		:	out	std_logic
+	F11		:	out	std_logic := '0'
 	);
 end keyboard;
 
@@ -122,6 +122,7 @@ begin
 			keys(5) <= (others => '1');
 			keys(6) <= (others => '1');
 			keys(7) <= (others => '1');
+			F11 <= '0';
 		elsif rising_edge(CLK) then
 			if keyb_valid = '1' then
 				if keyb_data = X"e0" then
@@ -206,7 +207,7 @@ begin
 					when X"76" =>	keys(0)(0) <= release; -- Escape (CAPS SPACE)
 									keys(7)(0) <= release;
 					
-					when X"78" =>	F11 <= release;        -- F11 key
+					when X"78" =>	F11 <= not release;        -- F11 key
 
 					when others =>
 						null;
