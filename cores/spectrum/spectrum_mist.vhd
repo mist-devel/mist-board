@@ -589,7 +589,7 @@ signal tape_download : std_logic;
 signal io_addr			:  std_logic_vector(24 downto 0);
 signal audio			:  std_logic;
 signal scandoubler_disable	: std_logic;
-signal esxdos_downloaded : std_logic := '0';
+signal esxdos_downloaded : std_logic_vector(1 downto 0) := "00";
 signal sd_lba 			: std_logic_vector(31 downto 0);
 signal sd_rd 			: std_logic;
 signal sd_wr 			: std_logic;
@@ -710,6 +710,8 @@ signal divmmc_mosi	:	std_logic;
 signal divmmc_miso	:	std_logic;
 signal divmmc_cs		:	std_logic;
 
+signal esx_request 	:	std_logic := '0';
+
 begin
 	-- 28 MHz master clock
 	pll: pll_main port map (
@@ -791,7 +793,7 @@ begin
 	begin
 		if rising_edge(ioctl_download) then
 			if(ioctl_index = "00000") then
-				esxdos_downloaded <= '1';
+				esxdos_downloaded(0) <= '1';
 			end if;
 		end if;
 	end process;	
@@ -909,6 +911,8 @@ begin
          sd_sdi => divmmc_mosi,
          sd_sdo => divmmc_miso
     );
+	 
+	 esx_request <= '1' when key_f11 = '1' or status(2) = '1'  or joystickA(7) = '1' or joystickB(7) = '1' else '0';
 
 	-- CPU
 	cpu: T80se port map (
@@ -925,7 +929,7 @@ begin
 	-- Unused CPU input signals
 	cpu_wait_n <= '1';
 	-- trigger nmi either with F11, the OSD or with the joystick
-	cpu_nmi_n <= '0' when key_f11 = '1' or status(2) = '1' or joystickA(7) = '1' or joystickB(7) = '1' else '1';
+	cpu_nmi_n <= '0' when (esx_request = '1') and (esxdos_downloaded(1) = '1') else '1';
 	cpu_busreq_n <= '1';
 		
 	-- Keyboard
@@ -1016,10 +1020,12 @@ begin
 
 	-- delay reset so sdram can be initialized etc. especially clearing the
 	-- divmmc ram after esxdos upload needs some time (9.3ms)
-	process(clock, pll_locked, status, buttons)
+	process(clock, pll_locked, status, buttons, esx_request)
 		variable reset_cnt : integer range 0 to 32000000 := 32000000;
 	begin
-		if pll_locked = '0' or status(0) = '1' or status(1) = '1' or buttons(1) = '1' then
+		if (pll_locked = '0' or status(0) = '1' or status(1) = '1' or buttons(1) = '1') or 
+			((esx_request = '1') and (esxdos_downloaded = "01"))
+		then
 			-- don't clear core coldboot reset time
 			if reset_cnt < 280000 then 
 				reset_cnt := 280000;
@@ -1039,6 +1045,13 @@ begin
 			end if;
 		end if;
 	end process;
+
+	process(esx_request)
+	begin
+		if rising_edge(esx_request) then
+			esxdos_downloaded <= esxdos_downloaded(0) & esxdos_downloaded(0);
+		end if;
+	end process;
 	
 	-- Address decoding.  Z80 has separate IO and memory address space
 	-- IO ports (nominal addresses - incompletely decoded):
@@ -1055,7 +1068,7 @@ begin
 	ula_enable <= (not cpu_ioreq_n) and cpu_m1_n and not cpu_a(0); -- all even IO addresses
 	psg_enable <= (not cpu_ioreq_n) and cpu_m1_n and cpu_a(0) and cpu_a(15) and not cpu_a(1);
 	kempston_enable <= (not cpu_ioreq_n) and cpu_m1_n and not cpu_a(7) and not cpu_a(6) and not cpu_a(5) and cpu_a(4) and cpu_a(3) and cpu_a(2) and cpu_a(1) and cpu_a(0);
-	divmmc_enable <= esxdos_downloaded and (not cpu_ioreq_n) and cpu_m1_n and cpu_a(7) and cpu_a(6) and cpu_a(5) and not cpu_a(4) and cpu_a(0);
+	divmmc_enable <= esxdos_downloaded(1) and (not cpu_ioreq_n) and cpu_m1_n and cpu_a(7) and cpu_a(6) and cpu_a(5) and not cpu_a(4) and cpu_a(0);
 	addr_decode_128k: if model /= 2 generate
 		page_enable <= (not cpu_ioreq_n) and cpu_m1_n and cpu_a(0) and not (cpu_a(15) or cpu_a(1));
 	end generate;
@@ -1108,7 +1121,7 @@ begin
 		-- System RAM
 		mem_do when ram_enable = '1'  else
 		-- DIVMMC memory mapped into ROM area
-		mem_do when rom_enable = '1' and divmmc_paged_in = '1' and esxdos_downloaded = '1' else
+		mem_do when (rom_enable = '1') and (divmmc_paged_in = '1') and (esxdos_downloaded(1) = '1') else
 		-- Internal ROM
 		rom_do when rom_enable = '1' else
 		-- IO ports
@@ -1143,7 +1156,7 @@ begin
 		rom_addr <= 
 			-- all DIVMMC mapping (even ram) happens in the ROM
 			-- address space (0x0000-0x3fff)
-			"1" & divmmc_addr when esxdos_downloaded = '1' and divmmc_paged_in = '1' else
+			"1" & divmmc_addr when (esxdos_downloaded(1) = '1') and divmmc_paged_in = '1' else
 			-- Otherwise access the internal ROMs
 			"00000" & page_rom_sel & cpu_a(13 downto 0);
 	end generate;
@@ -1163,7 +1176,7 @@ begin
 		rom_addr <= 
 			-- all DIVMMC mapping (even ram) happens in the ROM
 			-- address space (0x0000-0x3fff)
-			"1" & divmmc_addr when esxdos_downloaded = '1' and divmmc_paged_in = '1' else
+			"1" & divmmc_addr when (esxdos_downloaded(1) = '1') and divmmc_paged_in = '1' else
 		
 			-- Otherwise access the internal ROMs		
 			"0000" & plus3_page(1) & page_rom_sel & cpu_a(13 downto 0);
@@ -1203,7 +1216,7 @@ begin
 		divmmc_write := (not cpu_a(13) and divmmc_lo_write) or 
 							 (    cpu_a(13) and divmmc_hi_write);
 		
-		ext_ram_write := (rom_enable and esxdos_downloaded and divmmc_paged_in and divmmc_write) and not cpu_wr_n;
+		ext_ram_write := (rom_enable and esxdos_downloaded(1) and divmmc_paged_in and divmmc_write) and not cpu_wr_n;
 		int_ram_write := ram_enable and not cpu_wr_n;
 		ram_write := int_ram_write or ext_ram_write;
 	
