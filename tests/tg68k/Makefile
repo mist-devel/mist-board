@@ -4,7 +4,7 @@ M68K_RUN = m68k_run
 SRCS = TG68K_ALU.vhd TG68K_Pack.vhd TG68KdotC_Kernel.vhd $(TG68K_RUN).vhd mem_if.vhd
 OBJS = $(SRCS:.vhd=.o) mem_if_c.o mem.o
 GHW  = $(TG68K_RUN).ghw
-TOOLS=../../tools
+TOOLS=../../../tools
 ZIP = tg68k_run.zip
 PATCH = tg68k.patch
 M68K_RUN_OBJS = $(M68K_RUN).o mem.o m68kcpu.o m68kops.o m68kopnz.o m68kopac.o m68kopdm.o 
@@ -33,7 +33,7 @@ Musashi/m68kopnz.c: Musashi/m68kops.h
 Musashi/m68kopdm.c: Musashi/m68kops.h
 Musashi/m68kopac.c: Musashi/m68kops.h
 
-$(CODE).bin: $(CODE).s tests/bcd.s  tests/bfxxx.s  tests/cmpi_d16_pc.s
+$(CODE).bin: $(CODE).s tests/bcd.s tests/bfxxx.s tests/cmpi_d16_pc.s tests/pack.s tests/trace.s tests/magic.s 
 
 Musashi/m68kops.h: Musashi/m68kmake Musashi/m68k_in.c
 	cd Musashi; ./m68kmake
@@ -44,8 +44,8 @@ $(M68K_RUN): $(M68K_RUN_OBJS)
 test: $(M68K_RUN) $(CODE).bin
 	./$(M68K_RUN) $(CODE).bin
 
-vtest: tg68k_run $(CODE).bin
-	ghdl -r tg68k_run --ieee-asserts=disable --stop-time=20000ns --wave=$(GHW)
+vtest: $(TG68K_RUN) $(CODE).bin
+	ghdl -r $(TG68K_RUN) --ieee-asserts=disable --stop-time=2000000ns --wave=$(GHW)
 
 clean::
 	rm -f work-obj93.cf *.o Musashi/m68kop* $(CODE).bin *~ *.lst *.ghw $(TG68K_RUN) ghwreplay Musashi/m68kmake $(M68K_RUN)
@@ -54,8 +54,8 @@ $(GHW): $(TG68K_RUN) Makefile
 	ghdl -r $< --ieee-asserts=disable --stop-time=20000ns --wave=$@
 
 disasm: $(CODE).bin
-#	$(TOOLS)/tools/m68kdis/m68kdis -020 $(CODE).bin
-	cat $(CODE).bin.s
+	$(TOOLS)/m68kdis/m68kdis -020 $(CODE).bin
+	cat `basename $(CODE).bin.s`
 
 view: $(GHW)
 	gtkwave $< $(TG68K_RUN).sav

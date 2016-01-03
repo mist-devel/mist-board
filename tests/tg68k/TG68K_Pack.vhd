@@ -28,7 +28,7 @@ package TG68K_Pack is
 						  ld_229_1, ld_229_2, ld_229_3, ld_229_4, st_229_1, st_229_2, st_229_3, st_229_4,
 						  st_AnXn1, st_AnXn2, bra1, bsr1, bsr2, nopnop, dbcc1, movem1, movem2, movem3,
 						  andi, op_AxAy, cmpm, link1, link2, unlink1, unlink2, int1, int2, int3, int4, rte1,
-                                                  rte2, rte3, rte4, rte5, trap00, trap0, trap1, trap2, trap3,
+						  rte2, rte3, rte4, rte5, trap00, trap0, trap1, trap2, trap3,
 						  trap4, trap5, trap6, movec1, movep1, movep2, movep3, movep4, movep5, rota1, bf1,
 						  mul1, mul2, mul_end1,  mul_end2, div1, div2, div3, div4, div_end1, div_end2, pack1, pack2, pack3);
 
@@ -39,7 +39,7 @@ package TG68K_Pack is
 	constant opcADDQ        : integer := 4; --
 	constant opcOR          : integer := 5; --
 	constant opcAND         : integer := 6; --
-	constant opcEOR         : integer := 7;     --
+	constant opcEOR         : integer := 7; --
 	constant opcCMP         : integer := 8; --
 	constant opcROT         : integer := 9; --
 	constant opcCPMAW       : integer := 10;
@@ -109,16 +109,7 @@ package TG68K_Pack is
 	constant opcRESET       : integer := 74; --
 	constant opcBF          : integer := 75; --
 	constant opcBFwb        : integer := 76; --
-	constant s2nd_hbits     : integer := 77; --
-  constant opcPACK        : integer := 77; --
--- constant s2nd_hbits     : integer := 77; --
-
-
---      constant    : integer := 75; --
---      constant         : integer := 76; --
---      constant         : integer := 7; --
---      constant         : integer := 7; --
---      constant         : integer := 7; --
+	constant opcPACK        : integer := 77; --
 
 	constant lastOpcBit     : integer := 77;
 
@@ -200,7 +191,7 @@ package TG68K_Pack is
 	   opcRESET       : bit;
 	   opcBF          : bit;
 	   opcBFwb        : bit;
-	   s2nd_hbits     : bit;
+	   --s2nd_hbits     : bit;
 	end record;
 
 	component TG68K_ALU
@@ -209,42 +200,42 @@ package TG68K_Pack is
 		DIV_Mode : integer := 0            --0=>16Bit,  1=>32Bit,  2=>switchable with CPU(1),  3=>no DIV,
 		);
 	port(
-		clk                     : in std_logic;
-		Reset                   : in std_logic;
-		clkena_lw               : in std_logic:='1';
-		execOPC                 : in bit;
-		exe_condition           : in std_logic;
-		exec_tas                        : in std_logic;
-		long_start                      : in bit;
-		movem_presub            : in bit;
-		set_stop                        : in bit;
-		Z_error                 : in bit;
-		rot_bits                : in std_logic_vector(1 downto 0);
-		exec                : in bit_vector(lastOpcBit downto 0);
-		OP1out                  : in std_logic_vector(31 downto 0);
-		OP2out                  : in std_logic_vector(31 downto 0);
-		reg_QA                  : in std_logic_vector(31 downto 0);
-		reg_QB                  : in std_logic_vector(31 downto 0);
-		opcode                  : in std_logic_vector(15 downto 0);
-		datatype                : in std_logic_vector(1 downto 0);
-		exe_opcode              : in std_logic_vector(15 downto 0);
-		exe_datatype            : in std_logic_vector(1 downto 0);
-		sndOPC                  : in std_logic_vector(15 downto 0);
-		last_data_read          : in std_logic_vector(15 downto 0);
-		data_read                       : in std_logic_vector(15 downto 0);
-		FlagsSR                 : in std_logic_vector(7 downto 0);
-		micro_state                     : in micro_states;
-		bf_ext_in               : in std_logic_vector(7 downto 0);
+		clk                     : in  std_logic;
+		Reset                   : in  std_logic;
+		clkena_lw               : in  std_logic:='1';
+		execOPC                 : in  bit;
+		exe_condition           : in  std_logic;
+		exec_tas                : in  std_logic;
+		long_start              : in  bit;
+		non_aligned             : in  std_logic;
+		movem_presub            : in  bit;
+		set_stop                : in  bit;
+		Z_error                 : in  bit;
+		rot_bits                : in  std_logic_vector(1 downto 0);
+		exec                    : in  bit_vector(lastOpcBit downto 0);
+		OP1out                  : in  std_logic_vector(31 downto 0);
+		OP2out                  : in  std_logic_vector(31 downto 0);
+		reg_QA                  : in  std_logic_vector(31 downto 0);
+		reg_QB                  : in  std_logic_vector(31 downto 0);
+		opcode                  : in  std_logic_vector(15 downto 0);
+		datatype                : in  std_logic_vector(1 downto 0);
+		exe_opcode              : in  std_logic_vector(15 downto 0);
+		exe_datatype            : in  std_logic_vector(1 downto 0);
+		sndOPC                  : in  std_logic_vector(15 downto 0);
+		last_data_read          : in  std_logic_vector(15 downto 0);
+		data_read               : in  std_logic_vector(15 downto 0);
+		FlagsSR                 : in  std_logic_vector(7 downto 0);
+		micro_state             : in  micro_states;
+		bf_ext_in               : in  std_logic_vector(7 downto 0);
 		bf_ext_out              : out std_logic_vector(7 downto 0);
-		bf_shift                : in std_logic_vector(5 downto 0);
-		bf_width                : in std_logic_vector(5 downto 0);
-		bf_loffset              : in std_logic_vector(4 downto 0);
-                bf_offset               : in std_logic_vector(5 downto 0);
-
-		set_V_Flag              : buffer bit;
-		Flags                   : buffer std_logic_vector(7 downto 0);
-		c_out                   : buffer std_logic_vector(2 downto 0);
-		addsub_q                : buffer std_logic_vector(31 downto 0);
+		bf_shift                : in  std_logic_vector(5 downto 0);
+		bf_width                : in  std_logic_vector(5 downto 0);
+		bf_loffset              : in  std_logic_vector(4 downto 0);
+		bf_offset               : in  std_logic_vector(5 downto 0);
+		set_V_Flag_out          : out bit;
+		Flags_out               : out std_logic_vector(7 downto 0);
+		c_out_out               : out std_logic_vector(2 downto 0);
+		addsub_q_out            : out std_logic_vector(31 downto 0);
 		ALUout                  : out std_logic_vector(31 downto 0)
 	);
 	end component;

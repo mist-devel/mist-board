@@ -32,8 +32,8 @@ generic(
         IPL_autovector          : in std_logic;
         berr                    : in std_logic;   -- only 68000 sp dummy
         CPU                     : in std_logic_vector(1 downto 0);
-        addr                    : buffer std_logic_vector(31 downto 0);
-        data_write              : buffer std_logic_vector(15 downto 0);
+        addr_out                : out std_logic_vector(31 downto 0);
+        data_write              : out std_logic_vector(15 downto 0);
         nWr                     : out std_logic;
         nUDS, nLDS              : out std_logic;
         busstate                : out std_logic_vector(1 downto 0);
@@ -42,7 +42,7 @@ generic(
         clr_berr                : out std_logic;
         -- for debug
         skipFetch               : out std_logic;
-        regin                   : buffer std_logic_vector(31 downto 0)
+        regin_out               : out std_logic_vector(31 downto 0)
    );
 end component ;
 
@@ -69,7 +69,7 @@ begin
       IPL_autovector => '0',
       berr => '0',
       CPU => "11",  -- 00=68000, 11=68020
-      addr => addr,
+      addr_out => addr,
       nUDS => uds_n,
       nLDS => lds_n,
       busstate => busstate

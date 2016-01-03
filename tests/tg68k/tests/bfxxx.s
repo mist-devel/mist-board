@@ -80,9 +80,13 @@
 	bne  	fail
 
 	;; bfins
+	or.w    #$13,sr                 ; set x,v and c flag
  	move.l  #$12345678,testword3
 	move    #$affe,d4
 	bfins	d4,testword3{4:16}
+	bvs	fail		        ; v flag must have been cleared
+	bcs	fail		        ; c flag must have been cleared
+	
 	beq	fail 			; inserted value is not 0
 	cmp.l	#$1affe678,testword3
 	bne	fail
@@ -96,6 +100,23 @@
  	move.l  #$12345678,testword3
 	bfffo	testword3{20:10},d6
 	cmp	#21,d6
+	bne	fail
+
+	;; test from MikeJ
+	clr.w   testword3
+	bfffo	testword3+1{0:8},d2
+	cmp	#8,d2
+	bne	fail
+
+	move.l	#$4e63860e,testword3
+	bfffo 	testword3{0:15},d3
+	cmp	#1,d3
+	bne	fail
+
+	;; and another one from MikeJ
+	move.l	#$4e63860e,d6
+	bfffo 	d6{0:15},d3
+	cmp	#1,d3
 	bne	fail
 	
 	;; test some of the 68020 addressing modes

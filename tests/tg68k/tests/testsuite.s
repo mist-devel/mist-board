@@ -3,7 +3,7 @@
 	dc.l   start
 
 	org $24
-	dc.l	trace_trap	; disable this if tests/trace is not included
+;	dc.l	trace_trap	; disable this if tests/trace is not included
 	
 testword3 equ $10100
 testword4 equ $10104
@@ -11,10 +11,11 @@ testword4 equ $10104
 	org $100
 start:
 ;	include	"tests/cmpi_d16_pc.s"
-;	include	"tests/bfxxx.s"
+	include	"tests/bfxxx.s"
 ;	include	"tests/bcd.s"
 ;	include	"tests/pack.s"
-	include "tests/trace.s"
+;	include "tests/trace.s"
+;	include "tests/magic.s"
 	
 	;; if all tests pass the code will arrive here
 	move.b	#0,$beefed	; exit with result 0
