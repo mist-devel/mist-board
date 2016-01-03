@@ -4,7 +4,7 @@ M68K_RUN = m68k_run
 SRCS = TG68K_ALU.vhd TG68K_Pack.vhd TG68KdotC_Kernel.vhd $(TG68K_RUN).vhd mem_if.vhd
 OBJS = $(SRCS:.vhd=.o) mem_if_c.o mem.o
 GHW  = $(TG68K_RUN).ghw
-TOOLS=../../../tools
+TOOLS=../../tools
 ZIP = tg68k_run.zip
 PATCH = tg68k.patch
 M68K_RUN_OBJS = $(M68K_RUN).o mem.o m68kcpu.o m68kops.o m68kopnz.o m68kopac.o m68kopdm.o 
