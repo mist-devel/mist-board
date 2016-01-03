@@ -22,7 +22,7 @@
 ------------------------------------------------------------------------------
 
 -- optimize Register file
- 
+
 -- to do 68010:
 -- (MOVEC)
 -- BKPT
@@ -176,7 +176,7 @@ architecture logic of TG68KdotC_Kernel is
   signal endOPC                 : bit;
   signal setendOPC              : bit;
   signal Flags                  : std_logic_vector(7 downto 0); -- ...XNZVC
-  signal FlagsSR                : std_logic_vector(7 downto 0); -- T.S..III
+  signal FlagsSR                : std_logic_vector(7 downto 0) := (others => '0'); -- T.S..III
   signal SRin                   : std_logic_vector(7 downto 0);
   signal exec_DIRECT            : bit;
   signal exec_tas               : std_logic;
@@ -290,9 +290,6 @@ architecture logic of TG68KdotC_Kernel is
   signal next_micro_state       : micro_states;
 
   signal regin                  : std_logic_vector(31 downto 0);
-
-  signal test         : bit;
-  signal test2         : bit;
 
 begin
 
@@ -948,7 +945,7 @@ PROCESS (clk, IPL, setstate, state, exec_write_back, set_direct_data, next_micro
 	setinterrupt <= '0';
 	if setstate = "00" and next_micro_state = idle and setnextpass = '0' and (exec_write_back = '0' or state = "11") and set_rot_cnt = "000001" and set_exec(opcCHK) = '0' then
 	  setendOPC <= '1';
-			IF FlagsSR(2 downto 0)<IPL_nr or IPL_nr="111"  or make_trace='1'  or make_berr='1' THEN
+	  if FlagsSR(2 downto 0)<IPL_nr or IPL_nr="111"  or make_trace='1'  or make_berr='1' then
 		setinterrupt <= '1';
 	  elsif stop = '0' then
 		setopcode <= '1';
@@ -1253,10 +1250,10 @@ PROCESS (clk, IPL, setstate, state, exec_write_back, set_direct_data, next_micro
 	if rising_edge(clk) then
 	  if Reset = '1' then
 		FlagsSR(5) <= '1';
+		FlagsSR(2 downto 0) <= "111";
 		FC(2) <= '1';
 		SVmode <= '1';
 		preSVmode <= '1';
-		FlagsSR(2 downto 0) <= "111";
 		make_trace <= '0';
 	  elsif clkena_lw = '1' then
 		if setopcode = '1' then
@@ -1359,9 +1356,6 @@ PROCESS (clk, IPL, setstate, state, exec_write_back, set_direct_data, next_micro
 	set_Suppress_Base  <= '0';
 	set_PCbase         <= '0';
 
-        test <= '0';
-        test2 <= '0';
-        
 	if rot_cnt /= "000001" then
 	  set_rot_cnt <= rot_cnt - 1;
 	end if;
@@ -1788,8 +1782,9 @@ PROCESS (clk, IPL, setstate, state, exec_write_back, set_direct_data, next_micro
 			  if opcode(7 downto 6) = "11" then --move from CCR 68010
 				if SR_Read = 1 or (cpu(0) = '1' and SR_Read = 2) then
 				  ea_build_now <= '1';
-				  set_exec(opcMOVESR) <= '1';
-				  datatype <= "00";
+				  set_exec(opcMOVECCR) <= '1';
+				  --datatype <= "00"; -- WRONG, should be WORD zero extended.
+				  datatype <= "01"; -- WRONG, should be WORD zero extended.
 				  write_back <= '1'; -- im 68000 wird auch erst gelesen
 				  if opcode(5 downto 4) = "00" then
 					set_exec(Regwrena) <= '1';
@@ -2541,12 +2536,10 @@ PROCESS (clk, IPL, setstate, state, exec_write_back, set_direct_data, next_micro
 			  set_exec(opcBF) <= '1';
 
 			  if opcode(10) = '1' or opcode(8) = '0' then
-                                set_exec(opcBFwb) <= '1';
-                            test <= '1';
+				set_exec(opcBFwb) <= '1';
 				if opcode(10 downto 8)/="111" and opcode(4 downto 3) /= "00" THEN
                                   --not bfins and not on register -- TEMP FIX2
 				  set_exec(ea_data_OP2) <= '1'; -- for the flags
-                                  test2 <= '1';
 				end if;
 				set_exec(ea_data_OP1) <= '1';
 			  end if;
@@ -2557,10 +2550,9 @@ PROCESS (clk, IPL, setstate, state, exec_write_back, set_direct_data, next_micro
 			  ea_only <= '1';
 														-- BFEXTU, BFEXTS, BFFFO
 			  if opcode(10 downto 8) = "001" or opcode(10 downto 8) = "011" or opcode(10 downto 8) = "101" then
-                            set_exec(Regwrena) <= '1';
+				set_exec(Regwrena) <= '1';
 			  end if;
-
-                          -- register destination
+														-- register destination
 			  if opcode(4 downto 3) = "00" then
 				set_exec(Regwrena) <= '1';
 				if exec(ea_build) = '1' then
@@ -2590,7 +2582,7 @@ PROCESS (clk, IPL, setstate, state, exec_write_back, set_direct_data, next_micro
 				if opcode(10 downto 8) = "111" then --BFINS
 				  source_2ndHbits <= '1';
 				elsif opcode(10 downto 8)="001" or opcode(10 downto 8)="011" or opcode(10 downto 8)="101" THEN  --BFEXT,BFFFO
---				else -- TEMP FIX1
+				--else -- TEMP FIX1
 				  source_lowbits <= '1';
 				  dest_2ndHbits <= '1';
 				end if;
@@ -3435,6 +3427,7 @@ PROCESS (clk, IPL, setstate, state, exec_write_back, set_direct_data, next_micro
   exec_d.opcMOVE        <= exec(opcMOVE);
   exec_d.opcMOVEQ       <= exec(opcMOVEQ);
   exec_d.opcMOVESR      <= exec(opcMOVESR);
+  exec_d.opcMOVECCR     <= exec(opcMOVECCR);
   exec_d.opcADD         <= exec(opcADD);
   exec_d.opcADDQ        <= exec(opcADDQ);
   exec_d.opcor          <= exec(opcor);
@@ -3509,7 +3502,7 @@ PROCESS (clk, IPL, setstate, state, exec_write_back, set_direct_data, next_micro
   exec_d.opcRESET       <= exec(opcRESET);
   exec_d.opcBF          <= exec(opcBF);
   exec_d.opcBFwb        <= exec(opcBFwb);
-
+  exec_d.opcPACK        <= exec(opcPACK);
   --when the instruction has completed, the decremented address
   --register contains the address of the last operand stored. For
   --the MC68020, MC68030, and MC68040, if the addressing

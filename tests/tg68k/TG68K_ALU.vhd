@@ -19,7 +19,7 @@
 -- --
 ------------------------------------------------------------------------------
 ------------------------------------------------------------------------------
- 
+
 library ieee;
 use ieee.std_logic_1164.ALL;
 use ieee.std_logic_unsigned.ALL;
@@ -183,7 +183,6 @@ architecture logic of TG68K_ALU IS
   signal index        : std_logic_vector(4 downto 0);
 
   signal set_V_Flag   : BIT;
-  signal alutest   : BIT;
   signal Flags        : std_logic_vector(7 downto 0);
   signal c_out        : std_logic_vector(2 downto 0);
   signal addsub_q     : std_logic_vector(31 downto 0);
@@ -196,11 +195,9 @@ begin
 		   pack_out, bcd_a, bcd_s, result_mulu, result_div, exe_condition, bf_shift, bf_offset, bf_width,
 		   Flags, FlagsSR, bits_out, exec_tas, rot_out, exe_opcode, result, bf_fffo, bf_firstbit, bf_datareg)
   begin
-        alutest <= '0';
 	ALUout <= OP1in;
 	ALUout(7) <= OP1in(7) OR exec_tas;
 	if exec(opcBFwb) = '1' then
-          alutest <= '1';
 	  ALUout <= result(31 downto 0);
 	  if bf_fffo = '1' then
 		ALUout <= (others => '0');
@@ -253,13 +250,12 @@ begin
 	  OP1in <= bits_out;
 	elsif exec(opcBF) = '1' then
 	  OP1in <= bf_datareg;
+	elsif exec(opcMOVECCR) = '1' then
+	  OP1in(15 downto 8) <= "00000000";
+	  OP1in( 7 downto 0) <= Flags;
 	elsif exec(opcMOVESR) = '1' then
-	  OP1in(7 downto 0) <= Flags;
-	  if exe_datatype = "00" then
-		OP1in(15 downto 8) <= "00000000";
-	  else
-		OP1in(15 downto 8) <= FlagsSR;
-	  end if;
+	  OP1in(15 downto 8) <= FlagsSR;
+	  OP1in( 7 downto 0) <= Flags;
 	elsif exec(opcPACK) = '1' then
 	  OP1in(15 downto 0) <= pack_out;
 	end if;
@@ -587,18 +583,19 @@ process (clk, mux, mask, bitnr, bf_ins, bf_bchg, bf_bset, bf_exts, bf_shift, inm
 	  mux <= mask(31 downto 28);
 	end if;
 
-        -- 000x->00, 001x->01, 01xx->10, else 11
 	if mux(3 downto 2) = "00" then
 	  bitnr(1) <= '0';
 	  if mux(1) = '0' then
 		bitnr(0) <= '0';
+	  -- TH: special case: no 1 at all
+		if mux(0)='0' then
+		end if;
 	  end if;
 	else
 	  if mux(3) = '0' then
 		bitnr(0) <= '0';
 	  end if;
 	end if;
-        
   end process;
 
   -----------------------------------------------------------------------------
