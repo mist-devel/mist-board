@@ -160,6 +160,7 @@ architecture logic of TG68K_ALU IS
   signal inmux1       : std_logic_vector(39 downto 0);
   signal inmux2       : std_logic_vector(39 downto 0);
   signal inmux3       : std_logic_vector(31 downto 0);
+  signal copymuxd32   : std_logic_vector(39 downto 0);
   signal copymux0     : std_logic_vector(39 downto 0);
   signal copymux1     : std_logic_vector(39 downto 0);
   signal copymux2     : std_logic_vector(39 downto 0);
@@ -494,12 +495,20 @@ process (clk, mux, mask, bitnr, bf_ins, bf_bchg, bf_bset, bf_exts, bf_shift, inm
 	else
 	  copymux0 <= copymux1;
 	end if;
-	if bf_loffset(0) = '1' then
-	  copy <= copymux0(38 downto 0) & copymux0(39);
+
+        if bf_loffset(0) = '1' then
+          copymuxd32 <= copymux0(38 downto 0) & copymux0(39);
 	else
-	  copy <= copymux0;
+	  copymuxd32 <= copymux0;
 	end if;
 
+        --TH demux properly for 32 bit registers (bf_d32)
+        if bf_d32='1' then
+          copy <= "11111111" & copymuxd32(31 downto 8) & (copymuxd32(7 downto 0) and copymuxd32(39 downto 32));
+        else
+          copy <= copymuxd32;
+        end if;
+        
 	result_tmp <= bf_ext_in & OP1out;
 	if bf_ins = '1' then
 	  datareg <= reg_QB;
@@ -587,9 +596,6 @@ process (clk, mux, mask, bitnr, bf_ins, bf_bchg, bf_bset, bf_exts, bf_shift, inm
 	  bitnr(1) <= '0';
 	  if mux(1) = '0' then
 		bitnr(0) <= '0';
-	  -- TH: special case: no 1 at all
-		if mux(0)='0' then
-		end if;
 	  end if;
 	else
 	  if mux(3) = '0' then
