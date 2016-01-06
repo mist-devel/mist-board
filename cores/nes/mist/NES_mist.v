@@ -141,28 +141,29 @@ parameter CONF_STR = {
 parameter CONF_STR_LEN = 8+25+9+10+9;
 wire [7:0] status;
 wire scandoubler_disable;
+wire ps2_kbd_clk, ps2_kbd_data;
 
 user_io #(.STRLEN(CONF_STR_LEN)) user_io(
-   .conf_str      ( CONF_STR        ),
+   .conf_str(CONF_STR),
    // the spi interface
 
-   .SPI_CLK     	(SPI_SCK          ),
-   .SPI_SS_IO     (CONF_DATA0       ),
-   .SPI_MISO      (SPI_DO           ),   // tristate handling inside user_io
-   .SPI_MOSI      (SPI_DI           ),
+   .SPI_SCK(SPI_SCK),
+   .CONF_DATA0(CONF_DATA0),
+   .SPI_DO(SPI_DO),   // tristate handling inside user_io
+   .SPI_DI(SPI_DI),
 
-   .SWITCHES      (switches         ),
-   .BUTTONS       (buttons          ),
+   .switches(switches),
+   .buttons(buttons),
    .scandoubler_disable(scandoubler_disable),
 
-   .JOY0          (joyA             ),
-   .JOY1          (joyB             ),
+   .joystick_0(joyA),
+   .joystick_1(joyB),
 
-   .status        (status           ),
+   .status(status),
 
-   .clk           (1'b0             ),   // should be 10-16kHz for ps2 clock
-   .ps2_data      (                 ),
-   .ps2_clk       (                 )
+   .ps2_clk(ps2_clk),   // should be 10-16kHz for ps2 clock
+   .ps2_kbd_clk(ps2_kbd_clk),
+   .ps2_kbd_data(ps2_kbd_data)
 );
 
 // if "Start" or "Select" are selected from the menu keep them set for half a second 
@@ -186,10 +187,10 @@ wire strt = (start_cnt != 0);
 wire sel = (select_cnt != 0);
 
 wire [7:0] nes_joy_A = { joyB[0], joyB[1], joyB[2], joyB[3], 
-								 joyB[7] | strt, joyB[6] | sel, joyB[5], joyB[4] };
+								 joyB[7] | strt, joyB[6] | sel, joyB[5], joyB[4] } | kbd_joy0;
 wire [7:0] nes_joy_B = { joyA[0], joyA[1], joyA[2], joyA[3], 
-							    joyA[7], joyA[6], joyA[5], joyA[4] };
-			  
+							    joyA[7], joyA[6], joyA[5], joyA[4] } | kbd_joy1;
+
   wire clock_locked;
   wire clk85;
   clk clock_21mhz(.inclk0(CLOCK_27[0]), .c0(clk85), .c1(SDRAM_CLK), .locked(clock_locked));
@@ -213,10 +214,11 @@ wire [7:0] nes_joy_B = { joyA[0], joyA[1], joyA[2], joyA[3],
 		init_reset <= 1'b0;
   end
   
-  reg [1:0] clkcnt;
+  reg [12:0] clkcnt;
   always @(posedge clk85)
 	clkcnt <= clkcnt + 2'd1;
   wire clk = clkcnt[1];
+  wire ps2_clk = clkcnt[12];
   
 
   // Loader
@@ -391,5 +393,18 @@ assign VGA_VS = scandoubler_disable ? 1'b1 : nes_vs;
 	);
 
 assign LED = ~downloading;
+
+wire [7:0] kbd_joy0;
+wire [7:0] kbd_joy1;
+
+keyboard keyboard (
+	.clk(clk),
+	.reset(reset_nes),
+	.ps2_kbd_clk(ps2_kbd_clk),
+	.ps2_kbd_data(ps2_kbd_data),
+
+	.joystick_0(kbd_joy0),
+	.joystick_1(kbd_joy1)
+);
 			
 endmodule

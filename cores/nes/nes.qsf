@@ -284,6 +284,8 @@ set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to SDRAM_nCS
 set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to SDRAM_CKE
 set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to SDRAM_CLK
 set_instance_assignment -name GLOBAL_SIGNAL "GLOBAL CLOCK" -to clk_32
+set_global_assignment -name VERILOG_FILE mist/ps2_intf.v
+set_global_assignment -name VERILOG_FILE mist/keyboard.v
 set_global_assignment -name VERILOG_FILE mist/sigma_delta_dac.v
 set_global_assignment -name VERILOG_FILE mist/data_io.v
 set_global_assignment -name VERILOG_FILE mist/sdram.v
