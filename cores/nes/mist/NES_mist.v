@@ -366,7 +366,7 @@ VgaDriver vga(
 		.sck(SPI_SCK),
 		.ss(SPI_SS3),
 		.color(color),
-		.sync_frame(scanline[8]),
+		.nes_scanline(scanline),
 		.sync_line((cycle[8:3] == 42)),
 		.mode(scandoubler_disable),
 		.vga_smooth(!status[1]),

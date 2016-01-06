@@ -4,7 +4,7 @@
 module VgaDriver(
 	input  clk,
 	input [5:0] color,        // Pixel for current cycle.
-	input sync_frame,
+	input [8:0] nes_scanline,
 	input sync_line,
 	input mode,
 	input vga_smooth,
@@ -38,17 +38,17 @@ wire vsync_on  = hsync_on && (v == (mode ? 240 + 5  : 480 + 10)); // Vsync ON, 1
 wire vsync_off = hsync_on && (v == (mode ? 240 + 14 : 480 + 12)); // Vsync OFF, 2 lines sync signal
 wire vend = (v == (523 >> mode));                       // End of picture, 524 lines. (Should really be 525 according to NTSC spec)
 wire inpicture = hpicture && vpicture;
-wire [9:0] new_h = (hend || (mode ? sync_frame : doubler_sync)) ? 10'd0 : h + 10'd1;
+wire [9:0] new_h = (hend || doubler_sync) ? 10'd0 : h + 10'd1;
 
 wire [14:0] doubler_pixel;
 wire doubler_sync;
 
 Hq2x hq2x(clk, pixel, vga_smooth, // enabled 
-            sync_frame,       // reset_frame
-            sync_line, 			// reset_line
+            nes_scanline[8],      // reset_frame
+            sync_line, 			    // reset_line
             {doubler_sync ? 1'b0 : hend ? !v[0] : v[0], new_h[8:0]},  // 0-511 for line 1, or 512-1023 for line 2.
-            doubler_sync,     // new frame has just started
-            doubler_pixel);   // pixel is outputted
+            doubler_sync,         // new frame has just started
+            doubler_pixel);       // pixel is outputted
 
 reg clk2 = 1'b0;
 always @(posedge clk) clk2 <= ~clk2;
@@ -76,8 +76,10 @@ reg [4:0] vga_r;
 reg [4:0] vga_g;
 reg [4:0] vga_b;
 
+reg [8:0] old_scanline;
+wire sync_frame = (old_scanline == 9'd511) && (nes_scanline == 9'd0);
 always @(posedge clkv) begin
-  h <= new_h;
+  h <= (hend || (mode ? sync_frame : doubler_sync)) ? 10'd0 : h + 10'd1;
   if(mode ? sync_frame : doubler_sync) begin
     vga_v <= 1;
     vga_h <= 1;
@@ -101,5 +103,6 @@ always @(posedge clkv) begin
       vga_b <= 4'b0000;
     end
   end
+  old_scanline <= nes_scanline;
 end
 endmodule
