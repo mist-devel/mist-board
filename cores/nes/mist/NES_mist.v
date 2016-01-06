@@ -390,11 +390,6 @@ assign VGA_VS = scandoubler_disable ? 1'b1 : nes_vs;
         .RESET          (reset_nes)
 	);
 
-	// let the LED fade using a small 8 bit pwm
-	reg [24:0] led_cnt;
-	always @(posedge clk)
-		led_cnt <= led_cnt + 25'd1;
-
-	assign LED = (led_cnt[24])?(led_cnt[23:16]>led_cnt[7:0]):(led_cnt[23:16]<led_cnt[7:0]);
+assign LED = ~downloading;
 			
 endmodule
