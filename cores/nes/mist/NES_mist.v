@@ -132,14 +132,15 @@ wire [1:0] switches;
 // it to control the menu on the OSD 
 parameter CONF_STR = {
         "NES;NES;",
-        "O1,HQ2X,OFF,ON;",
+        "O1,HQ2X(VGA-Only),OFF,ON;",
         "T2,Start;",
         "T3,Select;",
         "T4,Reset;"
 };
 
-parameter CONF_STR_LEN = 8+15+9+10+9;
+parameter CONF_STR_LEN = 8+25+9+10+9;
 wire [7:0] status;
+wire scandoubler_disable;
 
 user_io #(.STRLEN(CONF_STR_LEN)) user_io(
    .conf_str      ( CONF_STR        ),
@@ -152,6 +153,7 @@ user_io #(.STRLEN(CONF_STR_LEN)) user_io(
 
    .SWITCHES      (switches         ),
    .BUTTONS       (buttons          ),
+   .scandoubler_disable(scandoubler_disable),
 
    .JOY0          (joyA             ),
    .JOY1          (joyB             ),
@@ -162,12 +164,6 @@ user_io #(.STRLEN(CONF_STR_LEN)) user_io(
    .ps2_data      (                 ),
    .ps2_clk       (                 )
 );
-
-wire [4:0] nes_r;
-wire [4:0] nes_g;
-wire [4:0] nes_b;
-wire nes_hs;
-wire nes_vs;
 
 // if "Start" or "Select" are selected from the menu keep them set for half a second 
 // status 2 and 3 are start and select from the OSD
@@ -193,29 +189,7 @@ wire [7:0] nes_joy_A = { joyB[0], joyB[1], joyB[2], joyB[3],
 								 joyB[7] | strt, joyB[6] | sel, joyB[5], joyB[4] };
 wire [7:0] nes_joy_B = { joyA[0], joyA[1], joyA[2], joyA[3], 
 							    joyA[7], joyA[6], joyA[5], joyA[4] };
-
-osd #(0,0,4) osd (
-   .pclk       ( clk          ),
-
-   // spi for OSD
-   .sdi        ( SPI_DI       ),
-   .sck        ( SPI_SCK      ),
-   .ss         ( SPI_SS3      ),
-
-   .red_in     ( { nes_r, 1'b0} ),
-   .green_in   ( { nes_g, 1'b0} ),
-   .blue_in    ( { nes_b, 1'b0} ),
-   .hs_in      ( nes_hs       ),
-   .vs_in      ( nes_vs       ),
-
-   .red_out    ( VGA_R        ),
-   .green_out  ( VGA_G        ),
-   .blue_out   ( VGA_B        ),
-   .hs_out     ( VGA_HS       ),
-   .vs_out     ( VGA_VS       )
-);
 			  
-					  
   wire clock_locked;
   wire clk85;
   clk clock_21mhz(.inclk0(CLOCK_27[0]), .c0(clk85), .c1(SDRAM_CLK), .locked(clock_locked));
@@ -249,10 +223,6 @@ osd #(0,0,4) osd (
   wire [7:0] loader_input;
   wire       loader_clk;
   reg  [7:0] loader_btn, loader_btn_2;
-
-  // NES Palette -> RGB332 conversion
-  reg [14:0] pallut[0:63];
-  initial $readmemh("../src/nes_palette.txt", pallut);
 
   wire [8:0] cycle;
   wire [8:0] scanline;
@@ -385,20 +355,30 @@ data_io data_io (
 	.d					( loader_input 	)
 );
 
-  wire [14:0] doubler_pixel;
-  wire doubler_sync;
-  wire [9:0] vga_hcounter, doubler_x;
-  wire [9:0] vga_vcounter;
-  
-  VgaDriver vga(clk, nes_hs, nes_vs, nes_r, nes_g, nes_b, vga_hcounter, vga_vcounter, doubler_x, doubler_pixel, doubler_sync, 1'b0);
-  
-  wire [14:0] pixel_in = pallut[color];
-  Hq2x hq2x(clk, pixel_in, !status[1], // enabled 
-            scanline[8],        // reset_frame
-            (cycle[8:3] == 42), // reset_line
-            doubler_x,          // 0-511 for line 1, or 512-1023 for line 2.
-            doubler_sync,       // new frame has just started
-            doubler_pixel);     // pixel is outputted
+wire nes_hs;
+wire nes_vs;
+
+VgaDriver vga(
+		.clk(clk),
+		.sdi(SPI_DI),
+		.sck(SPI_SCK),
+		.ss(SPI_SS3),
+		.color(color),
+		.sync_frame(scanline[8]),
+		.sync_line((cycle[8:3] == 42)),
+		.mode(scandoubler_disable),
+		.vga_smooth(!status[1]),
+		.border(1'b0),
+
+		.vga_h(nes_hs),
+		.vga_v(nes_vs),
+		.VGA_R(VGA_R),
+		.VGA_G(VGA_G),
+		.VGA_B(VGA_B)
+);
+
+assign VGA_HS = scandoubler_disable ? ~(nes_hs ^ nes_vs) : nes_hs;
+assign VGA_VS = scandoubler_disable ? 1'b1 : nes_vs;
 
 	assign AUDIO_R = audio;
 	assign AUDIO_L = audio;
