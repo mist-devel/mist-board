@@ -2536,7 +2536,9 @@ PROCESS (clk, IPL, setstate, state, exec_write_back, set_direct_data, next_micro
 			  set_exec(opcBF) <= '1';
 
 			  if opcode(10) = '1' or opcode(8) = '0' then
-				set_exec(opcBFwb) <= '1';
+                              set_exec(opcBFwb) <= '1';
+                              --TH: TODO: Make sure the following is still needed
+                              -- it seems by now only bfffo needs it when the 
 				if opcode(10 downto 8)/="111" and opcode(4 downto 3) /= "00" THEN
                                   --not bfins and not on register -- TEMP FIX2
 				  set_exec(ea_data_OP2) <= '1'; -- for the flags

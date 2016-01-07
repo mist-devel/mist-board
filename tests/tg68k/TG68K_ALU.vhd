@@ -180,8 +180,9 @@ architecture logic of TG68K_ALU IS
   signal bf_exts      : std_logic;
   signal bf_fffo      : std_logic;
   signal bf_d32       : std_logic;
-  signal bf_s32       : std_logic;
   signal index        : std_logic_vector(4 downto 0);
+  signal bf_flag_z    : std_logic;
+  signal bf_flag_n    : std_logic;
 
   signal set_V_Flag   : BIT;
   signal Flags        : std_logic_vector(7 downto 0);
@@ -411,8 +412,48 @@ begin
   -----------------------------------------------------------------------------
   -- Bit Field
   -----------------------------------------------------------------------------
+
+  -- Bitfields can have up to four (register) operands, e.g. bfins d0,d1{d2,d3}
+  -- the width an offset operands are evaluated while the second opcode word is
+  -- evaluated. These values are latched, so the two other registers can be read
+  -- in the next cycle while the ALU is working since the tg68k can only read
+  -- from two registers at once.
+  --
+  -- The destination operand is transfered via op1out and bf_ext into the ALU.
+  --
+  -- bfset, bfclr and bfchg
+  -------------------------
+  -- bfset, bfclr and bfchg work very similar. A "sign" vector is generated
+  -- having "width" right aligned 0-bits and the rest ones. 
+  -- A "copy" vector is generated from this by shifting through copymux so
+  -- this contains a 1 for all bits in bf_ext_in & op1out that will not be
+  -- affected by the operation.
+  -- The result vector is either all 1's (bfset), all 0's(bfclr) or the inverse
+  -- of bf_ext_in & op1out. Those bits in result that have a 1 in the copy
+  -- vector are overwritten with the original value from bf_ext_in & op1out
+  -- The result is returned through bf_ext_out and ALUout
+  --
+  -- These instructions only calculate the Z and N flags. Both are derived
+  -- directly from bf_ext_in & op1out with the help of the copy vector and
+  -- the offset/width fields. Thus Z and N are set from the previous contents
+  -- of the bitfield.
+  --
+  -- bfins
+  --------
+  -- bfins reuses most of the functionality of bfset, bfclr and bfchg. But it
+  -- has another 32 bit parameter that's being used for the source. This is passed
+  -- to the ALU via op2out. This is moved to the shift register, bits 39-32 of
+  -- the shift register mirror bits 7-0. This is then shifted bf_shift bits to
+  -- the right.
+  -- The input valus is also store in datareg and the lowest "width" bits
+  -- are masked. This is then forwarded to op1in which in turn uses the normal
+  -- mechanisms to generate the flags. A special bf_NFlag is also generated
+  -- from this. Z and N are set from these and not from the previous bitfield
+  -- contents as with bfset, bfclr or bfchg
+  
+  
 process (clk, mux, mask, bitnr, bf_ins, bf_bchg, bf_bset, bf_exts, bf_shift, inmux0, inmux1, inmux2, inmux3, bf_set2, OP1out, OP2out, result_tmp, bf_ext_in,
-  shift, datareg, bf_NFlag, result, reg_QB, sign, bf_d32, bf_s32, copy, bf_loffset, copymux0, copymux1, copymux2, copymux3, bf_width)
+  shift, datareg, bf_NFlag, result, reg_QB, sign, bf_d32, copy, bf_loffset, copymux0, copymux1, copymux2, copymux3, bf_width)
   begin
 	if rising_edge(clk) then
 	  if clkena_lw = '1' then
@@ -422,7 +463,6 @@ process (clk, mux, mask, bitnr, bf_ins, bf_bchg, bf_bset, bf_exts, bf_shift, inm
 		bf_exts <= '0';
 		bf_fffo <= '0';
 		bf_d32 <= '0';
-		bf_s32 <= '0';
 		case opcode(10 downto 8) IS
 		  when "010" => bf_bchg <= '1'; --BFCHG
 		  when "011" => bf_exts <= '1'; --BFEXTS
@@ -430,7 +470,6 @@ process (clk, mux, mask, bitnr, bf_ins, bf_bchg, bf_bset, bf_exts, bf_shift, inm
 		  when "101" => bf_fffo <= '1'; --BFFFO
 		  when "110" => bf_bset <= '1'; --BFSET
 		  when "111" => bf_ins <= '1'; --BFinS
-			bf_s32 <= '1';
 		  when others => NULL;
 		end case;
 		if opcode(4 downto 3) = "00" then
@@ -439,11 +478,11 @@ process (clk, mux, mask, bitnr, bf_ins, bf_bchg, bf_bset, bf_exts, bf_shift, inm
 		bf_ext_out <= result(39 downto 32);
 	  end if;
 	end if;
-	shift <= bf_ext_in & OP2out;
-	if bf_s32 = '1' then
-	  shift(39 downto 32) <= OP2out(7 downto 0);
-	end if;
 
+        shift <= bf_ext_in & OP2out;
+        if bf_ins = '1' then
+          shift(39 downto 32) <= OP2out(7 downto 0);
+        end if;
 	if bf_shift(0) = '1' then
 	  inmux0 <= shift(0) & shift(39 downto 1);
 	else
@@ -480,11 +519,17 @@ process (clk, mux, mask, bitnr, bf_ins, bf_bchg, bf_bset, bf_exts, bf_shift, inm
 	else
 	  copymux2(31 downto 0) <= copymux3;
 	end if;
+        
+        --TH: Is the following really useful/needed here? I had to add some more
+        -- processing later to make this really work. But i assume this
+        -- code here should then not be needed anymore.
+        -- But tests say it is :-( Need to understand why!
 	if bf_d32 = '1' then
 	  copymux2(39 downto 32) <= copymux3(7 downto 0);
 	else
 	  copymux2(39 downto 32) <= "11111111";
 	end if;
+        
 	if bf_loffset(2) = '1' then
 	  copymux1 <= copymux2(35 downto 0) & copymux2(39 downto 36);
 	else
@@ -509,27 +554,27 @@ process (clk, mux, mask, bitnr, bf_ins, bf_bchg, bf_bset, bf_exts, bf_shift, inm
           copy <= copymuxd32;
         end if;
         
-	result_tmp <= bf_ext_in & OP1out;
 	if bf_ins = '1' then
 	  datareg <= reg_QB;
 	else
 	  datareg <= bf_set2;
 	end if;
+
+        -- do the bitfield operation itself
 	if bf_ins = '1' then
 	  result(31 downto 0) <= bf_set2;
 	  result(39 downto 32) <= bf_set2(7 downto 0);
 	elsif bf_bchg = '1' then
 	  result(31 downto 0) <= not OP1out;
 	  result(39 downto 32) <= not bf_ext_in;
+	elsif bf_bset = '1' then
+	  result <= (others => '1');
 	else
 	  result <= (others => '0');
 	end if;
-	if bf_bset = '1' then
-	  result <= (others => '1');
-	end if;
 
 	sign <= (others => '0');
-	bf_NFlag <= datareg(to_integer(unsigned(bf_width)));
+	bf_NFlag <= datareg(to_integer(unsigned(bf_width(4 downto 0))));
 	for i in 0 TO 31 loop
 	  if i > bf_width(4 downto 0) then
 		datareg(i) <= '0';
@@ -537,9 +582,19 @@ process (clk, mux, mask, bitnr, bf_ins, bf_bchg, bf_bset, bf_exts, bf_shift, inm
 	  end if;
 	end loop;
 
+	result_tmp <= bf_ext_in & OP1out;
+        bf_flag_z <= '1';
+        if bf_d32 = '0' then
+          bf_flag_n <= result_tmp(to_integer(unsigned('0' & bf_loffset)+unsigned(bf_width)));
+        else
+          --TH: TODO: check if this really does what it's supposed to
+          bf_flag_n <= result_tmp(to_integer(unsigned(bf_loffset)+unsigned(bf_width(4 downto 0))));
+        end if;
 	for i in 0 TO 39 loop
 	  if copy(i) = '1' then
-		result(i) <= result_tmp(i);
+            result(i) <= result_tmp(i);
+          elsif result_tmp(i) = '1' then
+            bf_flag_z <= '0';
 	  end if;
 	end loop;
 
@@ -761,6 +816,14 @@ process (clk, Reset, exe_opcode, exe_datatype, Flags, last_data_read, OP2out, fl
 			Flags(3 downto 2) <= set_flags(3 downto 2);
 			if exec(opcBF) = '1' then
 			  Flags(3) <= bf_NFlag;
+
+                          --TH TODO: check flag handling of fffo and exts
+
+                          -- "normal" flags are taken from 
+                          if bf_fffo = '0' and bf_exts='0' and bf_ins='0' then
+                            Flags(2) <= bf_flag_z;
+                            Flags(3) <= bf_flag_n;
+                          end if;
 			end if;
 		  elsif exec(opcROT) = '1' then
 			Flags(3 downto 2) <= set_flags(3 downto 2);
