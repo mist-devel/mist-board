@@ -7,9 +7,9 @@ module osd (
 	input 			pclk,
 
 	// SPI interface
-	input         sck,
-	input         ss,
-	input         sdi,
+	input          sck,
+	input          ss,
+	input          sdi,
 
 	// VGA signals coming from core
 	input [5:0]  	red_in,
@@ -21,9 +21,7 @@ module osd (
 	// VGA signals going to video connector
 	output [5:0]  	red_out,
 	output [5:0]  	green_out,
-	output [5:0]  	blue_out,
-	output			hs_out,
-	output			vs_out
+	output [5:0]  	blue_out
 );
 
 parameter OSD_X_OFFSET = 10'd0;
@@ -89,8 +87,14 @@ reg [9:0] h_cnt;
 reg hsD, hsD2;
 reg [9:0] hs_low, hs_high;
 wire hs_pol = hs_high < hs_low;
-wire [9:0] h_dsp_width = hs_pol?hs_low:hs_high;
-wire [9:0] h_dsp_ctr = { 1'b0, h_dsp_width[9:1] };
+wire [9:0] dsp_width = hs_pol?hs_low:hs_high;
+
+// vertical counter
+reg [9:0] v_cnt;
+reg vsD, vsD2;
+reg [9:0] vs_low, vs_high;
+wire vs_pol = vs_high < vs_low;
+wire [9:0] dsp_height = vs_pol?vs_low:vs_high;
 
 always @(posedge pclk) begin
 	// bring hsync into local clock domain
@@ -107,22 +111,13 @@ always @(posedge pclk) begin
 	else if(hsD && !hsD2) begin	
 		h_cnt <= 10'd0;
 		hs_low <= h_cnt;
+
+		v_cnt <= v_cnt + 10'd1;
 	end 
 	
 	else
 		h_cnt <= h_cnt + 10'd1;
-end
 
-// vertical counter
-reg [9:0] v_cnt;
-reg vsD, vsD2;
-reg [9:0] vs_low, vs_high;
-wire vs_pol = vs_high < vs_low;
-wire [9:0] v_dsp_width = vs_pol?vs_low:vs_high;
-wire [9:0] v_dsp_ctr = { 1'b0, v_dsp_width[9:1] };
-
-always @(posedge hs_in) begin
-	// bring vsync into local clock domain
 	vsD <= vs_in;
 	vsD2 <= vsD;
 
@@ -137,46 +132,28 @@ always @(posedge hs_in) begin
 		v_cnt <= 10'd0;
 		vs_low <= v_cnt;
 	end 
-	
-	else
-		v_cnt <= v_cnt + 10'd1;
 end
 
 // area in which OSD is being displayed
-wire [9:0] h_osd_start = h_dsp_ctr + OSD_X_OFFSET - (OSD_WIDTH >> 1);
-wire [9:0] h_osd_end   = h_dsp_ctr + OSD_X_OFFSET + (OSD_WIDTH >> 1) - 1;
-wire [9:0] v_osd_start = v_dsp_ctr + OSD_Y_OFFSET - (OSD_HEIGHT >> 1);
-wire [9:0] v_osd_end   = v_dsp_ctr + OSD_Y_OFFSET + (OSD_HEIGHT >> 1) - 1;
+wire [9:0] h_osd_start = ((dsp_width - OSD_WIDTH)>> 1) + OSD_X_OFFSET;
+wire [9:0] h_osd_end   = h_osd_start + OSD_WIDTH;
+wire [9:0] v_osd_start = ((dsp_height- OSD_HEIGHT)>> 1) + OSD_Y_OFFSET;
+wire [9:0] v_osd_end   = v_osd_start + OSD_HEIGHT;
+wire [9:0] osd_hcnt    = h_cnt - h_osd_start + 7'd1;  // one pixel offset for osd_byte register
+wire [9:0] osd_vcnt    = v_cnt - v_osd_start;
 
-reg h_osd_active, v_osd_active;
-always @(posedge pclk) begin
-	if(hs_in != hs_pol) begin
-		if(h_cnt == h_osd_start) h_osd_active <= 1'b1;
-		if(h_cnt == h_osd_end)   h_osd_active <= 1'b0;
-	end
-	if(vs_in != vs_pol) begin
-		if(v_cnt == v_osd_start) v_osd_active <= 1'b1;
-		if(v_cnt == v_osd_end)   v_osd_active <= 1'b0;
-	end
-end
+wire osd_de = osd_enable && 
+              (hs_in != hs_pol) && (h_cnt >= h_osd_start) && (h_cnt < h_osd_end) &&
+              (vs_in != vs_pol) && (v_cnt >= v_osd_start) && (v_cnt < v_osd_end);
 
-wire osd_de = osd_enable && h_osd_active && v_osd_active;
-
-wire [7:0] osd_hcnt = h_cnt - h_osd_start + 7'd1;  // one pixel offset for osd_byte register
-wire [6:0] osd_vcnt = v_cnt - v_osd_start;
+reg  [7:0] osd_byte; 
+always @(posedge pclk) osd_byte <= osd_buffer[{osd_vcnt[6:4], osd_hcnt[7:0]}];
 
 wire osd_pixel = osd_byte[osd_vcnt[3:1]];
-
-reg [7:0] osd_byte; 
-always @(posedge pclk)
-  osd_byte <= osd_buffer[{osd_vcnt[6:4], osd_hcnt}];
-
 wire [2:0] osd_color = OSD_COLOR;
-assign red_out   = !osd_de?red_in:  {osd_pixel, osd_pixel, osd_color[2], red_in[5:3]  };
-assign green_out = !osd_de?green_in:{osd_pixel, osd_pixel, osd_color[1], green_in[5:3]};
-assign blue_out  = !osd_de?blue_in: {osd_pixel, osd_pixel, osd_color[0], blue_in[5:3] };
 
-assign hs_out = hs_in;
-assign vs_out = vs_in;
+assign red_out   = !osd_de ? red_in   : {osd_pixel, osd_pixel, osd_color[2], red_in[5:3]  };
+assign green_out = !osd_de ? green_in : {osd_pixel, osd_pixel, osd_color[1], green_in[5:3]};
+assign blue_out  = !osd_de ? blue_in  : {osd_pixel, osd_pixel, osd_color[0], blue_in[5:3] };
 
 endmodule
