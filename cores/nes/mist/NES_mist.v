@@ -357,40 +357,34 @@ data_io data_io (
 	.d					( loader_input 	)
 );
 
-wire nes_hs;
-wire nes_vs;
+video video (
+	.clk(clk),
+	.sdi(SPI_DI),
+	.sck(SPI_SCK),
+	.ss(SPI_SS3),
+		
+	.color(color),
+	.count_v(scanline),
+	.count_h(cycle),
+	.mode(scandoubler_disable),
+	.smoothing(!status[1]),
 
-VgaDriver vga(
-		.clk(clk),
-		.sdi(SPI_DI),
-		.sck(SPI_SCK),
-		.ss(SPI_SS3),
-		.color(color),
-		.nes_scanline(scanline),
-		.sync_line((cycle[8:3] == 42)),
-		.mode(scandoubler_disable),
-		.vga_smooth(!status[1]),
-		.border(1'b0),
-
-		.vga_h(nes_hs),
-		.vga_v(nes_vs),
-		.VGA_R(VGA_R),
-		.VGA_G(VGA_G),
-		.VGA_B(VGA_B)
+	.VGA_HS(VGA_HS),
+	.VGA_VS(VGA_VS),
+	.VGA_R(VGA_R),
+	.VGA_G(VGA_G),
+	.VGA_B(VGA_B)
 );
 
-assign VGA_HS = scandoubler_disable ? ~(nes_hs ^ nes_vs) : nes_hs;
-assign VGA_VS = scandoubler_disable ? 1'b1 : nes_vs;
-
-	assign AUDIO_R = audio;
-	assign AUDIO_L = audio;
-   wire audio;
-	sigma_delta_dac sigma_delta_dac (
-        .DACout         (audio),
-        .DACin          (sample[15:8]),
-        .CLK            (clk),
-        .RESET          (reset_nes)
-	);
+assign AUDIO_R = audio;
+assign AUDIO_L = audio;
+wire audio;
+sigma_delta_dac sigma_delta_dac (
+	.DACout(audio),
+	.DACin(sample[15:8]),
+	.CLK(clk),
+	.RESET(reset_nes)
+);
 
 assign LED = ~downloading;
 
