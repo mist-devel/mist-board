@@ -407,7 +407,7 @@ Files required on SD card:
  - [`z80_soc.rom`](https://github.com/mist-devel/mist-board/raw/master/tutorials/soc/lesson7b/z80_soc.rom)
  - other files to show up in the directory listing
 
-[Lesson 7c](https://github.com/mist-devel/mist-board/tree/master/tutorials/soc/lesson7c): Minimal block IO
+[Lesson 7c](https://github.com/mist-devel/mist-board/tree/master/tutorials/soc/lesson7c): Simple block IO
 -----------------------
 
 The fake SD card implementation in the previous two lessons used is
