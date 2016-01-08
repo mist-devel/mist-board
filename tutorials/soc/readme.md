@@ -410,24 +410,24 @@ Files required on SD card:
 [Lesson 7c](https://github.com/mist-devel/mist-board/tree/master/tutorials/soc/lesson7c): Simple block IO
 -----------------------
 
-The fake SD card implementation in the previous two lessons used is
+The fake SD card implementation used in the previous two lessons is
 useful for cores that already come with full SD card support or for
 cores which are supposed to be ported from the MIST to boards that
 have an SD card directly connected to the FPGA.
 
-If this is not the case and you only want to get simple and direct
+If this is not the case and if you only want to get simple and direct
 access to the SD cards contents and don't plan to run your core on
 anything else than the MIST board then it's possible to bypass all the
 complexity of SD card handling and just request sector data from the
 IO controller.
 
 This lesson implements such a simple interface. All SD card and SPI
-handling is removed from the core as well as the code running on the
-Z80. Thus the files `sd_card.v` and `spi.v` have been removed from the
-core and the file `mmc.c` has been removed from the Z80 source
-code. Intead the files `block_io.v` and `block_io.c` now provide the
-same functionality in a much simpler way and without going through the
-fake SD card.
+handling is removed from the core as well as from the code running on
+the Z80. Thus the files `sd_card.v` and `spi.v` have been removed from
+the core and the file `mmc.c` has been removed from the Z80 source
+code. Instead the new files `block_io.v` and `block_io.c` now provide
+the same functionality in a much simpler way and without going through
+the fake SD card.
 
 Files required on SD card: 
  - [`soc.rbf`](https://github.com/mist-devel/mist-board/raw/master/tutorials/soc/lesson7c/soc.rbf) renamed to `core.rbf`
