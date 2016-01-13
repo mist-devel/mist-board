@@ -51,10 +51,8 @@ wire [14:0] pixel = pallut[color][14:0];
 reg [9:0] h, v;
 wire hpicture  = (h < 512);             // 512 lines of picture
 wire hend = (h == 681);                 // End of line, 682 pixels.
-
 wire vpicture = (v < (480 >> mode));    // 480 lines of picture
 wire vend = (v == (523 >> mode));       // End of picture, 524 lines. (Should really be 525 according to NTSC spec)
-wire [9:0] new_h = (hend || doubler_sync) ? 10'd0 : h + 10'd1;
 
 wire [14:0] doubler_pixel;
 wire doubler_sync;
@@ -62,7 +60,7 @@ wire doubler_sync;
 Hq2x hq2x(clk, pixel, smoothing,        // enabled 
             count_v[8],                 // reset_frame
             (count_h[8:3] == 42),       // reset_line
-            {doubler_sync ? 1'b0 : hend ? !v[0] : v[0], new_h[8:0]},  // 0-511 for line 1, or 512-1023 for line 2.
+            {v[0], h[9] ? 9'd0 : h[8:0] + 9'd1}, // 0-511 for line 1, or 512-1023 for line 2.
             doubler_sync,               // new frame has just started
             doubler_pixel);             // pixel is outputted
 
