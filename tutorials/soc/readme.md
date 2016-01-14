@@ -554,12 +554,13 @@ Files required on SD card:
 
 ![Lesson 10: Ethernet](lesson10/lesson10.png)
 
-Only few computers of the homecomputer era came with some kind of network interface included. But for many
-there were add-ons like the [C64](http://dunkels.com/adam/tfe/), the 
-[Atari ST](http://hardware.atari.org/ether/) and some Amigas could use PCMCIA ethernet cards.
+Only few devices of the homecomputer era came with some kind of network interface included. But for many
+existed add-ons like the [TFE for the C64](http://dunkels.com/adam/tfe/), the 
+[Etherncx for the Atari ST](http://hardware.atari.org/ether/) and some Amigas could use PCMCIA ethernet cards.
 
-The MiST can use certain USB to ethernet interfaces based on the Asix
-chip to connect to an ethernet. One such adapter is the [D-Link
+The MiST is able use certain USB-to-ethernet adaptors based on certain
+[Asix chips](http://www.asix.com.tw/products.php?op=pItemdetail&PItemID=86;71;101&PLine=71)
+to connect to an ethernet. One such adapter is the [D-Link
 DUB-E100](http://www.dlink.com/de/de/support/product/dub-e100-high-speed-usb-2-fast-ethernet-adapter). Similar
 to the mouse and the keyboard the IO controller again hides all the
 USB complexity from the core. The core just needs to implement a
@@ -568,44 +569,45 @@ network packets. The IO controllers firmware will care for the rest.
 
 The conection to the IO controller is again handled inside
 [`user_io.v`](https://github.com/mist-devel/mist-board/tree/master/tutorials/soc/lesson10/core/user_io.v). Since
-only few cores implement ethernet most `user_io.v` files don't
-implement this. So you have to make sure to start with a `user_io.v`
-including ethernet features if you intend to implement
-ethernet. `user_io.v` only deals with the communication with the IO
-controller and e.g. doesn't buffer any packets. This has to be
-implemented depending on the demands of each core. For this tutorial
-the Z80 just needed a simple network interface. This has been
-implemented in
+only few cores make used of ethernet most `user_io.v` files don't
+include the necessary parts. You have to make sure to start with a
+`user_io.v` including ethernet features if you intend to implement a
+network interface. `user_io.v` provides an ethernet related
+communication channel to the IO controller. But it e.g. doesn't buffer
+any packets. This has to be implemented depending on the demands of
+the core. For this tutorial the Z80 just needed a simple custom
+network interface which has been implemented in
 [`eth.v`](https://github.com/mist-devel/mist-board/tree/master/tutorials/soc/lesson10/core/eth.v).
-The files `eth.v` interfaces between the Z80 CPU and the connections
-to the IO controller provided by `user_io.v`. Send and receive buffers
+The file `eth.v` interfaces between the Z80 CPU and the connection to
+the IO controller provided by `user_io.v`. Send and receive buffers
 inside `eth.v` make sure that ethernet packets can easily be exchanged
-between the IO controller and the SoCs Z80 CPU. If you intend ethernet
-for an retro machine you might want to implement `eth.v` in a way that
-it is compatible to one of the original interfaces so that the
-original driver software can be used. E.g. the Atari ST core
-implements an [ethernec compatible
-interface](http://hardware.atari.org/ether/) this way and thus doesn't
-need any drivers to be newly written.
+without data loss between the IO controller and the SoCs Z80 CPU. If
+you intend to implement ethernet for a retro machine you might want to
+implement `eth.v` in a way that it resembles one of the original
+interfaces so that the original driver software can be used. E.g. the
+Atari ST core implements an [ethernec compatible
+interface](http://hardware.atari.org/ether/) and thus doesn't need any
+new drivers but used the original drivers written for the ethernec.
 
-Since there's no existing software for our little Z80 SoC we have to
-implement it our own network stack and drivers. For full network
+Since there is no existing software for our little Z80 SoC we have to
+implement our own network stack and drivers. For full network
 connectivity this requires a full blown TCP/IP stack. Such kind of
-software is rather complex and is close to the limits what a small
-homecomputer of the 80ies can handle. For this totorial we selected
+software is rather complex and is close to the limits of what a small
+homecomputer of the 80ies can handle. For this totorial we choose
 [Adam Dunkels UIP stack](https://github.com/adamdunkels/uip) to
 provide the necessary network stack. It turned out that this stack has
 some issues with the SDCC compiler we are using. I ironed out the most
-critical problems until i had it working as a web server. When running
-the
+critical problems until i had it somewhat working as a web
+server. When running the
 [`z80_soc.rom`](https://github.com/mist-devel/mist-board/raw/master/tutorials/soc/lesson10/boot_rom/z80_soc.rom)
-you'll be presented with the MAC address of your Ethernet USB dongle
-and the hard coded IP addresses on a VGA screen connected to the MIST.
-If you the message `Wait for ETH` doesn't disappear then the MIST
-doesn't recognize your USB ethernet dongle or you don't have one
-connected at all. Once you see the IP confuguration being displayed
-you can ping the MIST under IP `192.168.0.2` from a PC or you can
-access the embedded webserver from a PC under `http://192.168.0.2`.
+you'll be presented with the MAC address of your Ethernet USB adapter
+and the preset IP addresses are displayed on a VGA screen connected to
+the MIST.  If the message `Wait for ETH` doesn't disappear then the
+MIST doesn't recognize your USB ethernet dongle or you don't have one
+connected at all. Once you see the IP configuration being displayed
+you should be able to `ping` the MIST under IP `192.168.0.2` from a PC
+and you should be able to access UIPs embedded webserver from a PC
+under `http://192.168.0.2`.
 
 Please be aware that the whole setup is not a high performance network
 device and the transmission is neither fast nor very reliable. Also
@@ -616,17 +618,16 @@ the limited performance of an 8 bit Z80 system. With a total of
 30kBytes code this very basic network setup is already close to the
 32kBytes code limit of our small SoC.
 
-To reduce the load on the core a little bit the IO controller does
-some network filtering. It will only forward packets to the core which
-are directly addressed to its MAC address and which are ARP
-broadcasts. All other (broadcast/multicast) traffic is not forwarded
-to the core to reduce the load on the core a little bit and to protect
-it from all those modern protocols causing lots of background noise in
-a typcial home network of today. This may affect fancy auto conf
-network setups trying to run on the MIST. If you encounter problems
-with this filtering, then please get in touch with us and we will find
-a way to solve the problem. But ordinary IP traffic is supposed to
-work.
+To reduce the load on the target system a little bit the IO controller
+does some network filtering. It will only forward packets which are
+directly addressed to its MAC address or which are ARP broadcasts. All
+other (broadcast/multicast) traffic is not forwarded to the core to
+reduce the load a little bit and to protect it from all
+those modern protocols causing lots of background noise in a typcial
+home network of today. This may affect fancy auto conf network setups
+trying to run on the MIST. If you encounter problems with this
+filtering, then please get in touch with us and we will find a way to
+solve the problem. But ordinary IP traffic is supposed to work.
 
 Links:
  - [UIP 1.0 on github](https://github.com/adamdunkels/uip)
