@@ -260,15 +260,15 @@ spi spi (
 // Audio replay is supposed to run at 50Hz. Vsync is 60 Hz, so
 // we generate.
 reg clk50hz;
-reg [16:0] count_50hz;
+reg [15:0] count_50hz;
 always @(posedge cpu_clock) begin
 	if(cpu_reset)
-		count_50hz <= 17'd0;
+		count_50hz <= 16'd0;
 	else begin
-		if(count_50hz < 16'd159999)
-			count_50hz <= count_50hz + 17'd1;
+		if(count_50hz < 16'd39999)
+			count_50hz <= count_50hz + 16'd1;
 		else begin
-			count_50hz <= 17'd0;
+			count_50hz <= 16'd0;
 			clk50hz <= !clk50hz;
 		end
 	end
@@ -343,15 +343,14 @@ YM2149 ym2149 (
    .CLK8    ( cpu_clock               )       // 4 MHz CPU bus clock
 );
 
-assign AUDIO_L = audio_out;
-assign AUDIO_R = audio_out;
-wire audio_out;
+wire [14:0] audio_data = { psg_audio_out, 7'h00 } - 15'h4000;
 
 sigma_delta_dac sigma_delta_dac (
-	.DACout	( audio_out     ),
-   .DACin   ( psg_audio_out ),
-   .CLK     ( ram_clock     ),
-   .RESET   ( cpu_reset     )
+   .clk      ( ram_clock     ),
+	.left     ( AUDIO_L       ),
+	.right    ( AUDIO_R       ),
+	.ldatasum ( audio_data    ),
+	.rdatasum ( audio_data    )
 );
 
 // divide 32Mhz sdram clock down to 2MHz

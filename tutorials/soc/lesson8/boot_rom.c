@@ -22,24 +22,40 @@ __sfr __at 0x11 PsgDataPort;
 
 // YM replay is happening in the interrupt
 void isr(void) __interrupt {
-  BYTE i;
+  BYTE i, *p;
 
   if(frames) {
     frames--;
 
-    // write all 16 psg registers
-    for(i=0;i<16;i++) {
-      PsgAddrPort = i;
-      PsgDataPort = ym_buffer[rsec][rptr++];
+    // write all 14 psg sound registers
+    p = ym_buffer[rsec] + rptr;
 
-      // one whole sector processed?
-      if(rptr == 512) {
-	rsec++;
-	rptr=0;
-	
-	if(rsec == BUFFERS)
-	  rsec = 0;
-      }
+    // unrolled loop for min delay between register writes
+    PsgAddrPort = 0; PsgDataPort = *p++;
+    PsgAddrPort = 1; PsgDataPort = *p++;
+    PsgAddrPort = 2; PsgDataPort = *p++;
+    PsgAddrPort = 3; PsgDataPort = *p++;
+    PsgAddrPort = 4; PsgDataPort = *p++;
+    PsgAddrPort = 5; PsgDataPort = *p++;
+    PsgAddrPort = 6; PsgDataPort = *p++;
+    PsgAddrPort = 7; PsgDataPort = *p++;
+    PsgAddrPort = 8; PsgDataPort = *p++;
+    PsgAddrPort = 9; PsgDataPort = *p++;
+    PsgAddrPort = 10; PsgDataPort = *p++;
+    PsgAddrPort = 11; PsgDataPort = *p++;
+    PsgAddrPort = 12; PsgDataPort = *p++;
+    PsgAddrPort = 13;
+    if(*p != 255) PsgDataPort = *p++;
+
+    rptr += 16;
+
+    // one whole sector processed?
+    if(rptr == 512) {
+      rsec++;
+      rptr=0;
+      
+      if(rsec == BUFFERS)
+	rsec = 0;
     }
   } else {
     // not playing? mute all channels
@@ -127,7 +143,7 @@ void main() {
   FATFS fatfs;                    /* File system object */
   FRESULT rc;
   UINT bytes_read;
-  BYTE wsec = 0;
+  BYTE i, wsec = 0;
 
   ei();
   cls();
@@ -135,6 +151,12 @@ void main() {
   puts("    << Z80 SoC >>");
 
   printf("Mounting SD card...\n");
+
+  // not playing? mute all channels
+  for(i=0;i<16;i++) {
+    PsgAddrPort = i;
+    PsgDataPort = 0;
+  }
 
   rc = pf_mount(&fatfs);
   if (rc) die(rc);

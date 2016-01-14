@@ -14,7 +14,7 @@ font.part: font.fnt
 	dd if=$< of=$@ bs=1 count=768 skip=256
 
 font.c: font.part bin2c
-	./bin2c font.part font.c "unsigned char font[]"
+	./bin2c font.part font.c "const unsigned char font[]"
 
 irqvec.rel: irqvec.s
 	sdasz80 -o $@ $<
@@ -57,6 +57,13 @@ run: $(ROM)
 	timeout 1s cp $(TTY) /dev/null || /bin/true
 	echo "x $< `stat -c%s $<`" > $(TTY)
 	sx $< <$(TTY) >$(TTY)
+	echo "r" > $(TTY)
+
+core_update:
+	stty -F $(TTY) speed 115200 raw -echo
+	timeout 1s cp $(TTY) /dev/null || /bin/true
+	echo "x core.rbf `stat -c%s soc.rbf`" > $(TTY)
+	sx soc.rbf <$(TTY) >$(TTY)
 	echo "r" > $(TTY)
 
 reset:
