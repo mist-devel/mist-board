@@ -26,7 +26,7 @@ __sfr __at 0x00 DataPort;
 // SPI control port is a single write only port bit used for spi select (ss)
 __sfr __at 0x01 ControlPort;
 
-void dly_us(unsigned char n) {
+void dly_us(unsigned int n) {
   while(n--) { }
 }
 
