@@ -2,12 +2,13 @@
 	; http://oldwww.nvg.ntnu.no/amiga/MC680x0_Sections/bfset.HTML
 	; http://oldwww.nvg.ntnu.no/amiga/MC680x0_Sections/bfchg.HTML
 	; http://oldwww.nvg.ntnu.no/amiga/MC680x0_Sections/bfclr.HTML
-
+	; http://68k.hax.com/BFSET
+	
 	;; test register wrapping
 	;; this test failed in tg68 since the target register always
 	;; was d0
 	move.l  #$11223344,d2
-	bfset	d2{24:16}
+	bfset	d2{24:15}
 	bmi	fail			; msb ($44) was not set
 	cmp.l 	#$ff2233ff,d2
 	bne	fail
@@ -24,6 +25,15 @@
    	bne     fail
   	cmp.l 	#$fff67bcd,testword1+4
  	bne     fail
+
+;	move.l  #$abc00000,testword1
+;	move.l  #$00067bcd,testword1+4
+;	move.l  #testword1,a0
+;	bfset	(a0){12:32}
+;	cmp.l 	#$abcfffff,testword1
+;   	bne     fail
+;  	cmp.l 	#$fff67bcd,testword1+4
+; 	bne     fail
 
  	move.l  #$a0010bcd,testword1
  	bfset	testword1{4:16}
@@ -119,6 +129,19 @@
 	cmp	#1,d3
 	bne	fail
 	
+	;; mikej report 16.1.16
+	moveq	#-1,d0
+	bftst	d0{0:18}
+	cmp.l	#-1,d0
+	bne.s	fail 			; tk68k modified the register
+	
+	;; mikej report 16.1.16
+	moveq	#-1,d0
+	moveq	#-1,d1
+	bfchg	d0{0:18}
+	cmp.l	#$3fff,d0
+	bne.s	fail 
+
 	;; test some of the 68020 addressing modes
 	move.l  #$12345678,testword3
  	move.l  #$89abcdef,testword3+4

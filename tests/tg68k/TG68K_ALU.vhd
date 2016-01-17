@@ -164,7 +164,7 @@ architecture logic of TG68K_ALU IS
   signal copymux0     : std_logic_vector(39 downto 0);
   signal copymux1     : std_logic_vector(39 downto 0);
   signal copymux2     : std_logic_vector(39 downto 0);
-  signal copymux3     : std_logic_vector(31 downto 0);
+  signal copymux3     : std_logic_vector(39 downto 0);
   signal bf_set2      : std_logic_vector(31 downto 0);
   signal shift        : std_logic_vector(39 downto 0);
   signal copy         : std_logic_vector(39 downto 0);
@@ -509,38 +509,36 @@ process (clk, mux, mask, bitnr, bf_ins, bf_bchg, bf_bset, bf_exts, bf_shift, inm
 	  bf_set2(31 downto 0) <= inmux3;
 	end if;
 
+        -- shift 16 bits left if required while expanding sign from 32 bits to 40 bits
+        --TH: Check if it's possible to shift 1 bits in from lsb instead of wrapping
 	if bf_loffset(4) = '1' then
-	  copymux3 <= sign(15 downto 0) & sign(31 downto 16);
+	  copymux3 <= sign(23 downto 0) & "11111111" & sign(31 downto 24);
 	else
-	  copymux3 <= sign;
+	  copymux3 <= "11111111" & sign;
 	end if;
+        
+        -- shift 8 bits left if required
 	if bf_loffset(3) = '1' then
-	  copymux2(31 downto 0) <= copymux3(23 downto 0) & copymux3(31 downto 24);
+	  copymux2 <= copymux3(31 downto 0) & copymux3(39 downto 32);
 	else
-	  copymux2(31 downto 0) <= copymux3;
+	  copymux2 <= copymux3;
 	end if;
-        
-        --TH: Is the following really useful/needed here? I had to add some more
-        -- processing later to make this really work. But i assume this
-        -- code here should then not be needed anymore.
-        -- But tests say it is :-( Need to understand why!
-	if bf_d32 = '1' then
-	  copymux2(39 downto 32) <= copymux3(7 downto 0);
-	else
-	  copymux2(39 downto 32) <= "11111111";
-	end if;
-        
+
+        -- shift 4 bits left if required
 	if bf_loffset(2) = '1' then
 	  copymux1 <= copymux2(35 downto 0) & copymux2(39 downto 36);
 	else
 	  copymux1 <= copymux2;
 	end if;
+        
+        -- shift 2 bits left if required
 	if bf_loffset(1) = '1' then
 	  copymux0 <= copymux1(37 downto 0) & copymux1(39 downto 38);
 	else
 	  copymux0 <= copymux1;
 	end if;
 
+        -- shift 1 bit left if required
         if bf_loffset(0) = '1' then
           copymuxd32 <= copymux0(38 downto 0) & copymux0(39);
 	else
