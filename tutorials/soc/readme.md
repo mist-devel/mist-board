@@ -635,4 +635,94 @@ Links:
 Files required on SD card:
  - [`soc.rbf`](https://github.com/mist-devel/mist-board/raw/master/tutorials/soc/lesson10/core/soc.rbf) renamed to `core.rbf`
  - [`z80_soc.rom`](https://github.com/mist-devel/mist-board/raw/master/tutorials/soc/lesson10/boot_rom/z80_soc.rom)
+
+[Lesson 11](https://github.com/mist-devel/mist-board/tree/master/tutorials/soc/lesson11): TV PAL/NTSC video
+--------------------------
+
+![Lesson 11: TV](lesson11/lesson11.png)
+
+All tutorial so far have used the VGA output to generate a [VGA
+compatible video
+signal](https://en.wikipedia.org/wiki/Video_Graphics_Array). But one
+of the big advantages of an FPGA is it's ability to generate all kinds
+of signals. The VGA output is thus not limited to VGA signals. Its
+three analog outputs could actually even be used to generate three
+audio channels or to transmit and RF signal.
+
+But a more obvious usage is the generation of TV signals. Even today
+many TVs accept standard definition (SD) TV signals in form of a [RGB component video signal](https://en.wikipedia.org/wiki/Component_video#RGB_analog_component_video)
+via e.g. their [SCART](https://en.wikipedia.org/wiki/SCART)
+inputs. Many machines of the homecomputer era generated such signals
+so it makes sense to generate these with the MIST as well for the
+perfect retro game experience.
+
+The main timing difference between TV and VGA signals lies in the line
+frequency and the number of lines displayed per image. While VGA
+screens display at least 31000 lines per second a TV signal only
+consists of 15625 lines per second. Furthermore the European PAL TV
+signal only draws 50 frames per second (50 Hz) while VGA draws at
+least 56 frames per second (56 Hz). American NTSC TV draws 60 frames
+per second (60 Hz).
+
+A TV input thus doesn't cope with VGA signals and vice versa. The
+easiest method to make a TV signal somehow VGA compliant is to draw
+every line twice. This is called scan doubling and makes an NTSC TV
+signal compatible with most VGA screens. Scan doubling a 50 Hz PAL
+signal results in a VGA signal with 50Hz frame refresh rate. Many VGA
+screens cope with this but not all. Especially TVs often don't accept
+these not-100%-VGA signals on their VGA inputs. Most cores contain
+such scan doublers since the machines they implement orignally were
+connected to TVs and thus generate TV video signals while the primary
+use case of the MIST board is with VGA screens.
+
+It is possible to connect the VGA output of the MIST with a TVs RGBS
+input like e.g. its SCART connector. Since the TV expects TV signals
+on this input the MIST must in turn be programmed to generate such
+signals.  Furthermore TVs expect a composite synchronization signal
+where VGA screens expect seperate horizontal and vertical sync
+signals. And SCART finally needs another static "high" signal to
+indicate that a RGBS signal is being received. The solution to this
+was introduced with the first
+[Minimig](https://en.wikipedia.org/wiki/Minimig). The so called
+[Minimig SCART
+cables](https://github.com/mist-devel/mist-board/wiki/ScartCable)
+connect the VGAs hsync output with the SCARTs composite sync and use
+the VGAs vertical sync output as the RGBS switch signal.
+
+In order to make use of such a cable a MIST core has to disable its
+scandoublers and it must output a composite sync signal on the VGAs
+hsync output and a static high voltage on the VGAs vsync output. Using
+the OSD to switch between these two modes would be rather useless
+since with the wrong setting the OSD is invisible. The MISTs firmware
+thus accepts a [`scandoubler_disable` option in the `mist.ini`
+file](https://github.com/mist-devel/mist-board/wiki/DocIni#scandoubler_disable)
+to globally force cores supporting this feature into disabling their
+scan doublers.
+
+This tutorial includes a retro video unit
+[video.v](https://github.com/mist-devel/mist-board/raw/master/tutorials/soc/lesson11/video.v). This
+can either output a PAL like video signal or an NTSC like video
+signal. The mode can be changed via the OSD. The resulting video
+signal is the converted into a VGA signal by
+[scandoubler.v](https://github.com/mist-devel/mist-board/raw/master/tutorials/soc/lesson11/scandoubler.v). This
+scan doubler can be disabled via the [`scandoubler_disable` option in
+the `mist.ini`
+file](https://github.com/mist-devel/mist-board/wiki/DocIni#scandoubler_disable)
+which is reported to the core via the apropriate output of
+[user_io.v](https://github.com/mist-devel/mist-board/raw/master/tutorials/soc/lesson11/user_io.v).
+
+The resulting core will generate a 50 or 60 Hz VGA signal without a
+`mist.ini` file disabling the scan doubler. If the
+`disable_scandoubler` option is set to 1 then the core will output a
+TV compatible PAL (50 Hz) or NTSC (60 Hz) signal for direct connection
+to a TVs RGBS input. Many old CRTs also support this.
+
+Links: - [MIST Scart
+cable](https://github.com/mist-devel/mist-board/wiki/ScartCable) -
+[Disabling scandoubler in MIST .ini
+file](https://github.com/mist-devel/mist-board/wiki/DocIni#scandoubler_disable)
+- [Buy a cable](http://lotharek.pl/product.php?pid=168)
+
+Files required on SD card:
+ - [`soc.rbf`](https://github.com/mist-devel/mist-board/raw/master/tutorials/soc/lesson11/soc.rbf) renamed to `core.rbf`
   
