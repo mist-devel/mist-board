@@ -178,6 +178,7 @@ architecture logic of TG68K_ALU IS
   signal bf_bchg      : std_logic;
   signal bf_ins       : std_logic;
   signal bf_exts      : std_logic;
+  signal bf_extu      : std_logic;
   signal bf_fffo      : std_logic;
   signal bf_d32       : std_logic;
   signal index        : std_logic_vector(4 downto 0);
@@ -452,7 +453,7 @@ begin
   -- contents as with bfset, bfclr or bfchg
   
   
-process (clk, mux, mask, bitnr, bf_ins, bf_bchg, bf_bset, bf_exts, bf_shift, inmux0, inmux1, inmux2, inmux3, bf_set2, OP1out, OP2out, result_tmp, bf_ext_in,
+process (clk, mux, mask, bitnr, bf_ins, bf_bchg, bf_bset, bf_exts, bf_extu, bf_shift, inmux0, inmux1, inmux2, inmux3, bf_set2, OP1out, OP2out, result_tmp, bf_ext_in,
   shift, datareg, bf_NFlag, result, reg_QB, sign, bf_d32, copy, bf_loffset, copymux0, copymux1, copymux2, copymux3, bf_width)
   begin
 	if rising_edge(clk) then
@@ -461,11 +462,13 @@ process (clk, mux, mask, bitnr, bf_ins, bf_bchg, bf_bset, bf_exts, bf_shift, inm
 		bf_bchg <= '0';
 		bf_ins <= '0';
 		bf_exts <= '0';
+		bf_extu <= '0';
 		bf_fffo <= '0';
 		bf_d32 <= '0';
 		case opcode(10 downto 8) IS
 		  when "010" => bf_bchg <= '1'; --BFCHG
 		  when "011" => bf_exts <= '1'; --BFEXTS
+		  when "001" => bf_extu <= '1'; --BFEXTU
 			-- when "100" => insert <= (others =>'0'); --BFCLR
 		  when "101" => bf_fffo <= '1'; --BFFFO
 		  when "110" => bf_bset <= '1'; --BFSET
@@ -813,12 +816,13 @@ process (clk, Reset, exe_opcode, exe_datatype, Flags, last_data_read, OP2out, fl
 			Flags(1 downto 0) <= "00";
 			Flags(3 downto 2) <= set_flags(3 downto 2);
 			if exec(opcBF) = '1' then
+                          -- flags(2) has correctly been set from set_flags
 			  Flags(3) <= bf_NFlag;
 
-                          --TH TODO: check flag handling of fffo and exts
+                          --TH TODO: check flag handling of fffo
 
-                          -- "normal" flags are taken from 
-                          if bf_fffo = '0' and bf_exts='0' and bf_ins='0' then
+                          -- "normal" flags are taken from op2in
+                          if bf_fffo = '0' and bf_extu='0' and bf_exts='0' and bf_ins='0' then
                             Flags(2) <= bf_flag_z;
                             Flags(3) <= bf_flag_n;
                           end if;
