@@ -636,7 +636,7 @@ Files required on SD card:
  - [`soc.rbf`](https://github.com/mist-devel/mist-board/raw/master/tutorials/soc/lesson10/core/soc.rbf) renamed to `core.rbf`
  - [`z80_soc.rom`](https://github.com/mist-devel/mist-board/raw/master/tutorials/soc/lesson10/boot_rom/z80_soc.rom)
 
-[Lesson 11](https://github.com/mist-devel/mist-board/tree/master/tutorials/soc/lesson11): TV PAL/NTSC video
+[Lesson 11](https://github.com/mist-devel/mist-board/tree/master/tutorials/soc/lesson11): 15kHz TV video
 --------------------------
 
 ![Lesson 11: TV](lesson11/lesson11.png)
@@ -702,7 +702,7 @@ can either output a PAL like video signal or an NTSC like video
 signal. The mode can be changed via the OSD. The resulting video
 signal is then converted into a VGA signal by
 [scandoubler.v](https://github.com/mist-devel/mist-board/raw/master/tutorials/soc/lesson11/scandoubler.v). The
-scan doubler can be disabled via the [`scandoubler_disable` option in
+scan doubler can be bypassed via the [`scandoubler_disable` option in
 the `mist.ini`
 file](https://github.com/mist-devel/mist-board/wiki/DocIni#scandoubler_disable)
 which is reported to the core via the apropriate output of
