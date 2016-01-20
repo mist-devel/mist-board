@@ -159,7 +159,7 @@ architecture logic of TG68K_ALU IS
   signal inmux0       : std_logic_vector(39 downto 0);
   signal inmux1       : std_logic_vector(39 downto 0);
   signal inmux2       : std_logic_vector(39 downto 0);
-  signal inmux3       : std_logic_vector(31 downto 0);
+  signal inmux3       : std_logic_vector(39 downto 0);
   signal copymuxd32   : std_logic_vector(39 downto 0);
   signal copymux0     : std_logic_vector(39 downto 0);
   signal copymux1     : std_logic_vector(39 downto 0);
@@ -475,6 +475,8 @@ process (clk, mux, mask, bitnr, bf_ins, bf_bchg, bf_bset, bf_exts, bf_extu, bf_s
 		  when "111" => bf_ins <= '1'; --BFinS
 		  when others => NULL;
 		end case;
+
+                -- ea is a register
 		if opcode(4 downto 3) = "00" then
 		  bf_d32 <= '1';
 		end if;
@@ -483,33 +485,69 @@ process (clk, mux, mask, bitnr, bf_ins, bf_bchg, bf_bset, bf_exts, bf_extu, bf_s
 	end if;
 
         shift <= bf_ext_in & OP2out;
+
+        -- source of bfins is always a register, thus we need to set
+        -- bits 39:32 to mirror 7:0
         if bf_ins = '1' then
           shift(39 downto 32) <= OP2out(7 downto 0);
         end if;
+
+        -- Rotate right by bf_shift bits. Rotate through 32 bits when using
+        -- register (bf_d32 = 1), through 40 bits else.
+
+        -- rotate 1 bit right if required
 	if bf_shift(0) = '1' then
-	  inmux0 <= shift(0) & shift(39 downto 1);
+          if bf_d32 = '1' then 
+            inmux0(31 downto 0) <= shift(0) & shift(31 downto 1);
+          else
+            inmux0 <= shift(0) & shift(39 downto 1);
+          end if;
 	else
 	  inmux0 <= shift;
 	end if;
+        
+        -- rotate 2 bits right if required
 	if bf_shift(1) = '1' then
-	  inmux1 <= inmux0(1 downto 0) & inmux0(39 downto 2);
+          if bf_d32 = '1' then 
+            inmux1(31 downto 0) <= inmux0(1 downto 0) & inmux0(31 downto 2);
+          else
+            inmux1 <= inmux0(1 downto 0) & inmux0(39 downto 2);
+          end if;
 	else
 	  inmux1 <= inmux0;
 	end if;
+        
+        -- rotate 4 bits right if required
 	if bf_shift(2) = '1' then
-	  inmux2 <= inmux1(3 downto 0) & inmux1(39 downto 4);
+          if bf_d32 = '1' then 
+            inmux2(31 downto 0) <= inmux1(3 downto 0) & inmux1(31 downto 4);
+          else
+            inmux2 <= inmux1(3 downto 0) & inmux1(39 downto 4);
+          end if;
 	else
 	  inmux2 <= inmux1;
 	end if;
+        
+        -- rotate 8 bits right if required
 	if bf_shift(3) = '1' then
-	  inmux3 <= inmux2(7 downto 0) & inmux2(31 downto 8);
+          if bf_d32 = '1' then 
+            inmux3(31 downto 0) <= inmux2(7 downto 0) & inmux2(31 downto 8);
+          else
+            inmux3 <= inmux2(7 downto 0) & inmux2(39 downto 8);
+          end if;
 	else
-	  inmux3 <= inmux2(31 downto 0);
+	  inmux3 <= inmux2(39 downto 0);
 	end if;
+          
+        -- rotate 16 bits right if required
 	if bf_shift(4) = '1' then
-	  bf_set2(31 downto 0) <= inmux3(15 downto 0) & inmux3(31 downto 16);
+          if bf_d32 = '1' then 
+            bf_set2 <= inmux3(15 downto 0) & inmux3(31 downto 16);
+          else
+            bf_set2 <= inmux3(15 downto 0) & inmux3(39 downto 24);
+          end if;
 	else
-	  bf_set2(31 downto 0) <= inmux3;
+	  bf_set2 <= inmux3(31 downto 0);
 	end if;
 
         -- shift 16 bits left if required while expanding sign from 32 bits to 40 bits
@@ -585,8 +623,17 @@ process (clk, mux, mask, bitnr, bf_ins, bf_bchg, bf_bset, bf_exts, bf_extu, bf_s
 
 	result_tmp <= bf_ext_in & OP1out;
         bf_flag_z <= '1';
+        --TH XYZ
+        
         if bf_d32 = '0' then
-          bf_flag_n <= result_tmp(to_integer(unsigned('0' & bf_loffset)+unsigned(bf_width)));
+          -- The test for this overflow shouldn't be needed. But GHDL complains
+          -- otherwise.
+--          bf_flag_n_idx <= to_integer(unsigned('0' & bf_loffset)+unsigned(bf_width));
+          if(to_integer(unsigned('0' & bf_loffset)+unsigned(bf_width)) > 39) then
+            bf_flag_n <= result_tmp(39);
+          else
+            bf_flag_n <= result_tmp(to_integer(unsigned('0' & bf_loffset)+unsigned(bf_width)));
+          end if;
         else
           --TH: TODO: check if this really does what it's supposed to
           bf_flag_n <= result_tmp(to_integer(unsigned(bf_loffset)+unsigned(bf_width(4 downto 0))));

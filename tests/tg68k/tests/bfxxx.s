@@ -133,14 +133,17 @@
 	moveq	#-1,d0
 	bftst	d0{0:18}
 	cmp.l	#-1,d0
-	bne.s	fail 			; tk68k modified the register
+	bne	fail 			; tk68k modified the register
 	
 	;; mikej report 16.1.16
 	moveq	#-1,d0
 	moveq	#-1,d1
 	bfchg	d0{0:18}
 	cmp.l	#$3fff,d0
-	bne.s	fail 
+	bne	fail 
+
+	;; the following triggers an GHDL exception
+	bfexts   d0{20:15},d4
 
 	;; test some of the 68020 addressing modes
 	move.l  #$12345678,testword3
