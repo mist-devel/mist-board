@@ -63,7 +63,7 @@ entity TG68K_ALU is
 	bf_shift       : in  std_logic_vector(5 downto 0);
 	bf_width       : in  std_logic_vector(5 downto 0);
 	bf_loffset     : in  std_logic_vector(4 downto 0);
-	bf_offset      : in  std_logic_vector(5 downto 0);
+	bf_offset      : in  std_logic_vector(31 downto 0);
 	set_V_Flag_out : out bit;
 	Flags_out      : out std_logic_vector(7 downto 0);
 	c_out_out      : out std_logic_vector(2 downto 0);
@@ -160,12 +160,12 @@ architecture logic of TG68K_ALU IS
   signal inmux1       : std_logic_vector(39 downto 0);
   signal inmux2       : std_logic_vector(39 downto 0);
   signal inmux3       : std_logic_vector(39 downto 0);
-  signal copymuxd32   : std_logic_vector(39 downto 0);
+  signal inmux4       : std_logic_vector(39 downto 0);
   signal copymux0     : std_logic_vector(39 downto 0);
   signal copymux1     : std_logic_vector(39 downto 0);
   signal copymux2     : std_logic_vector(39 downto 0);
   signal copymux3     : std_logic_vector(39 downto 0);
-  signal bf_set2      : std_logic_vector(31 downto 0);
+  signal bf_set2      : std_logic_vector(39 downto 0);
   signal shift        : std_logic_vector(39 downto 0);
   signal copy         : std_logic_vector(39 downto 0);
 
@@ -205,9 +205,9 @@ begin
 	  if bf_fffo = '1' then
 		ALUout <= (others => '0');
 		if mux = "0000" then
-		  ALUout(5 downto 0) <= bf_offset + bf_width + 1;
+		  ALUout <= bf_offset + bf_width + 1;
 		else
-		  ALUout(5 downto 0) <= bf_offset + bf_width - bf_firstbit;
+		  ALUout <= bf_offset + bf_width - bf_firstbit;
 		end if;
 	  end if;
 	end if;
@@ -453,7 +453,7 @@ begin
   -- contents as with bfset, bfclr or bfchg
   
   
-process (clk, mux, mask, bitnr, bf_ins, bf_bchg, bf_bset, bf_exts, bf_extu, bf_shift, inmux0, inmux1, inmux2, inmux3, bf_set2, OP1out, OP2out, result_tmp, bf_ext_in,
+process (clk, mux, mask, bitnr, bf_ins, bf_bchg, bf_bset, bf_exts, bf_extu, bf_shift, inmux0, inmux1, inmux2, inmux3, inmux4, bf_set2, OP1out, OP2out, result_tmp, bf_ext_in,
   shift, datareg, bf_NFlag, result, reg_QB, sign, bf_d32, copy, bf_loffset, copymux0, copymux1, copymux2, copymux3, bf_width)
   begin
 	if rising_edge(clk) then
@@ -480,20 +480,15 @@ process (clk, mux, mask, bitnr, bf_ins, bf_bchg, bf_bset, bf_exts, bf_extu, bf_s
 		if opcode(4 downto 3) = "00" then
 		  bf_d32 <= '1';
 		end if;
+
 		bf_ext_out <= result(39 downto 32);
 	  end if;
 	end if;
 
         shift <= bf_ext_in & OP2out;
 
-        -- source of bfins is always a register, thus we need to set
-        -- bits 39:32 to mirror 7:0
-        if bf_ins = '1' then
-          shift(39 downto 32) <= OP2out(7 downto 0);
-        end if;
-
-        -- Rotate right by bf_shift bits. Rotate through 32 bits when using
-        -- register (bf_d32 = 1), through 40 bits else.
+        -- Rotate right by bf_shift bits. Rotate through 32 bits when
+        -- operating on a register (bf_d32 = 1), through 40 bits else.
 
         -- rotate 1 bit right if required
 	if bf_shift(0) = '1' then
@@ -542,67 +537,94 @@ process (clk, mux, mask, bitnr, bf_ins, bf_bchg, bf_bset, bf_exts, bf_extu, bf_s
         -- rotate 16 bits right if required
 	if bf_shift(4) = '1' then
           if bf_d32 = '1' then 
-            bf_set2 <= inmux3(15 downto 0) & inmux3(31 downto 16);
+            inmux4(31 downto 0) <= inmux3(15 downto 0) & inmux3(31 downto 16);
           else
-            bf_set2 <= inmux3(15 downto 0) & inmux3(39 downto 24);
+            inmux4 <= inmux3(15 downto 0) & inmux3(39 downto 16);
           end if;
 	else
-	  bf_set2 <= inmux3(31 downto 0);
+	  inmux4 <= inmux3;
+	end if;
+
+        -- rotate 32 bits right if required
+	if bf_shift(5) = '1' then
+          if bf_d32 = '1' then 
+            bf_set2(31 downto 0) <= inmux4(31 downto 0);
+          else
+            bf_set2 <= inmux4(31 downto 0) & inmux3(39 downto 32);
+          end if;
+	else
+	  bf_set2 <= inmux4;
 	end if;
 
         -- shift 16 bits left if required while expanding sign from 32 bits to 40 bits
         --TH: Check if it's possible to shift 1 bits in from lsb instead of wrapping
 	if bf_loffset(4) = '1' then
-	  copymux3 <= sign(23 downto 0) & "11111111" & sign(31 downto 24);
+          if bf_d32 = '1' then
+            -- _ABCD -> _CDAB
+            copymux3(31 downto 0) <= sign(15 downto 0) & sign(31 downto 16);
+          else
+            -- _ABCD -> BCD1A
+            copymux3 <= sign(23 downto 0) & "11111111" & sign(31 downto 24);
+          end if;
 	else
-	  copymux3 <= "11111111" & sign;
+          copymux3 <= "11111111" & sign;
 	end if;
         
         -- shift 8 bits left if required
 	if bf_loffset(3) = '1' then
-	  copymux2 <= copymux3(31 downto 0) & copymux3(39 downto 32);
+          if bf_d32 = '1' then
+            -- _ABCD -> _BCDA
+            copymux2(31 downto 0) <= copymux3(23 downto 0) & copymux3(31 downto 24);
+          else
+            -- ABCDE -> BCDEA
+            copymux2 <= copymux3(31 downto 0) & copymux3(39 downto 32);
+          end if;
 	else
 	  copymux2 <= copymux3;
 	end if;
 
         -- shift 4 bits left if required
 	if bf_loffset(2) = '1' then
-	  copymux1 <= copymux2(35 downto 0) & copymux2(39 downto 36);
+          if bf_d32 = '1' then
+            copymux1(31 downto 0) <= copymux2(27 downto 0) & copymux2(31 downto 28);
+          else
+            copymux1 <= copymux2(35 downto 0) & copymux2(39 downto 36);
+          end if;
 	else
 	  copymux1 <= copymux2;
 	end if;
         
         -- shift 2 bits left if required
 	if bf_loffset(1) = '1' then
-	  copymux0 <= copymux1(37 downto 0) & copymux1(39 downto 38);
+          if bf_d32 = '1' then
+            copymux0(31 downto 0) <= copymux1(29 downto 0) & copymux1(31 downto 30);
+          else
+            copymux0 <= copymux1(37 downto 0) & copymux1(39 downto 38);
+          end if;
 	else
 	  copymux0 <= copymux1;
 	end if;
 
         -- shift 1 bit left if required
         if bf_loffset(0) = '1' then
-          copymuxd32 <= copymux0(38 downto 0) & copymux0(39);
+          if bf_d32 = '1' then
+            copy(31 downto 0) <= copymux0(30 downto 0) & copymux0(31);
+          else
+            copy <= copymux0(38 downto 0) & copymux0(39);
+          end if;
 	else
-	  copymuxd32 <= copymux0;
+	  copy <= copymux0;
 	end if;
 
-        --TH demux properly for 32 bit registers (bf_d32)
-        if bf_d32='1' then
-          copy <= "11111111" & copymuxd32(31 downto 8) & (copymuxd32(7 downto 0) and copymuxd32(39 downto 32));
-        else
-          copy <= copymuxd32;
-        end if;
-        
 	if bf_ins = '1' then
 	  datareg <= reg_QB;
 	else
-	  datareg <= bf_set2;
+	  datareg <= bf_set2(31 downto 0);
 	end if;
 
         -- do the bitfield operation itself
 	if bf_ins = '1' then
-	  result(31 downto 0) <= bf_set2;
-	  result(39 downto 32) <= bf_set2(7 downto 0);
+	  result <= bf_set2;
 	elsif bf_bchg = '1' then
 	  result(31 downto 0) <= not OP1out;
 	  result(39 downto 32) <= not bf_ext_in;
@@ -621,14 +643,19 @@ process (clk, mux, mask, bitnr, bf_ins, bf_bchg, bf_bset, bf_exts, bf_extu, bf_s
 	  end if;
 	end loop;
 
-	result_tmp <= bf_ext_in & OP1out;
+        -- Set bits 32..39 to 0 if operating on register to make sure
+        -- zero flag calculation over all 40 bits works correctly
+	result_tmp(31 downto 0) <= OP1out;
+        if bf_d32 = '1' then
+           result_tmp(39 downto 32) <= "00000000";
+        else
+           result_tmp(39 downto 32) <= bf_ext_in;
+        end if;
+          
         bf_flag_z <= '1';
-        --TH XYZ
-        
         if bf_d32 = '0' then
           -- The test for this overflow shouldn't be needed. But GHDL complains
           -- otherwise.
---          bf_flag_n_idx <= to_integer(unsigned('0' & bf_loffset)+unsigned(bf_width));
           if(to_integer(unsigned('0' & bf_loffset)+unsigned(bf_width)) > 39) then
             bf_flag_n <= result_tmp(39);
           else
@@ -651,8 +678,7 @@ process (clk, mux, mask, bitnr, bf_ins, bf_bchg, bf_bset, bf_exts, bf_extu, bf_s
 	else
 	  bf_datareg <= datareg;
 	end if;
-	-- bf_datareg <= copy(31 downto 0);
-	-- result(31 downto 0)<=datareg;
+        
 	--BFFFO
 	mask <= datareg;
 	bf_firstbit <= '0' & bitnr;

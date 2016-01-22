@@ -265,7 +265,7 @@ architecture logic of TG68KdotC_Kernel is
   signal last_data_read         : std_logic_vector(31 downto 0);
   signal last_data_in           : std_logic_vector(31 downto 0);
 
-  signal alu_bf_offset          : std_logic_vector(5 downto 0);
+  signal alu_bf_offset          : std_logic_vector(31 downto 0);
   signal bf_offset              : std_logic_vector(5 downto 0);
   signal bf_width               : std_logic_vector(5 downto 0);
   signal bf_bhits               : std_logic_vector(5 downto 0);
@@ -1174,12 +1174,14 @@ PROCESS (clk, IPL, setstate, state, exec_write_back, set_direct_data, next_micro
   ------------------------------------------------------------------------------
   process (clk, Reset, sndOPC, reg_QA, reg_QB, bf_width, bf_offset, bf_bhits, opcode, setstate, bf_shift)
   begin
+        -- the ALU needs the full real offset to return the correct result for
+        -- bfffo
 	if sndOPC(11) = '1' then
-	  alu_bf_offset <= '0'&reg_QA(4 downto 0);
+	  alu_bf_offset <= reg_QA;
 	else
-	  alu_bf_offset <= '0'&sndOPC(10 downto 6);
+	  alu_bf_offset <= "000000000000000000000000000" & sndOPC(10 downto 6);
 	end if;
-	bf_offset <= alu_bf_offset;
+	bf_offset <= '0' & alu_bf_offset(4 downto 0);
 
 	bf_width(5) <= '0';
 	if sndOPC(5) = '1' then
@@ -1190,28 +1192,28 @@ PROCESS (clk, IPL, setstate, state, exec_write_back, set_direct_data, next_micro
 	bf_bhits <= bf_width + bf_offset;
 	set_oddout <= not bf_bhits(3);
 
-	if opcode(10 downto 8) = "111" then --INS
-	  bf_loffset <= 32 - bf_shift;
-	else
-	  bf_loffset <= bf_shift;
-	end if;
-	bf_loffset(5) <= '0';
-
-	if opcode(4 downto 3) = "00" then
+	if opcode(4 downto 3) = "00" then     -- register target
 	  if opcode(10 downto 8) = "111" then --INS
-		bf_shift <= bf_bhits + 1;
+		bf_shift <= bf_bhits + 1;   -- bf_shift = offset + width
 	  else
-		bf_shift <= 31 - bf_bhits;
+		bf_shift <= 31 - bf_bhits;  -- bf_shift = 32 - (offset + width);
 	  end if;
+          bf_loffset <= 31 - bf_bhits;
 	  bf_shift(5) <= '0';
 	else
-	  if opcode(10 downto 8) = "111" then --INS
-		bf_shift <= "011" & ("001" + bf_bhits(2 downto 0));
+          -- memory target
+	  if opcode(10 downto 8) = "111" then  --INS
+             -- bf_shift = 40 - (7 - (bf_bhits & 7))
+             bf_shift <= 40 - ("000" & ("111" - bf_bhits(2 downto 0)));
 	  else
-		bf_shift <= "000" & ("111" - bf_bhits(2 downto 0));
+             -- bf_shift = 7 - (bf_bhits & 7)
+            bf_shift <= "000" & ("111" - bf_bhits(2 downto 0));
 	  end if;
+          -- bf_loffset = 7 - (bf_bhits & 7)
+          bf_loffset <= "000" & ("111" - bf_bhits(2 downto 0));
 	  bf_offset(4 downto 3) <= "00";
 	end if;
+	bf_loffset(5) <= '0';
 
 	case bf_bhits(5 downto 3) is
 	  when "000" =>
@@ -2534,26 +2536,31 @@ PROCESS (clk, IPL, setstate, state, exec_write_back, set_direct_data, next_micro
 			  end if;
 			  set_exec(opcBF) <= '1';
 
+                          -- BFCLR, BFSET, BFINS, BFCHG, BFFFO, BFTST
 			  if opcode(10) = '1' or opcode(8) = '0' then
-                              set_exec(opcBFwb) <= '1';
+                              set_exec(opcBFwb) <= '1'; --TH: really? for bfffo?
                               --TH: TODO: Make sure the following is still needed
                               -- it seems by now only bfffo needs it when the 
-				if opcode(10 downto 8)/="111" and opcode(4 downto 3) /= "00" THEN
-                                  --not bfins and not on register -- TEMP FIX2
-				  set_exec(ea_data_OP2) <= '1'; -- for the flags
-				end if;
-				set_exec(ea_data_OP1) <= '1';
-			  end if;
-														-- BFCHG, BFCLR, BFSET, BFINS
-			  if opcode(10 downto 8) = "010" or opcode(10 downto 8) = "100" or opcode(10 downto 8) = "110" or opcode(10 downto 8) = "111" then
-				write_back <= '1';
+                              if opcode(10 downto 8)/="111" and opcode(4 downto 3) /= "00" THEN
+                                --not bfins and not on register -- TEMP FIX2
+                                set_exec(ea_data_OP2) <= '1'; -- for the flags
+                              end if;
+                              set_exec(ea_data_OP1) <= '1';
+                          end if;
+                          
+                          -- BFCHG, BFCLR, BFSET, BFINS
+			  if opcode(10 downto 8) = "010" or opcode(10 downto 8) = "100" or
+                             opcode(10 downto 8) = "110" or opcode(10 downto 8) = "111" then
+                            write_back <= '1';
 			  end if;
 			  ea_only <= '1';
-														-- BFEXTU, BFEXTS, BFFFO
-			  if opcode(10 downto 8) = "001" or opcode(10 downto 8) = "011" or opcode(10 downto 8) = "101" then
-				set_exec(Regwrena) <= '1';
+                          -- BFEXTU, BFEXTS, BFFFO
+			  if opcode(10 downto 8) = "001" or opcode(10 downto 8) = "011" or
+                             opcode(10 downto 8) = "101" then
+                            set_exec(Regwrena) <= '1';
 			  end if;
-														-- register destination
+                          
+                          -- register destination
 			  if opcode(4 downto 3) = "00" then
                                 -- bftst doesn't write
                                 if opcode(10 downto 8) /= "000" then

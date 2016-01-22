@@ -233,7 +233,7 @@ package TG68K_Pack is
 		bf_shift                : in  std_logic_vector(5 downto 0);
 		bf_width                : in  std_logic_vector(5 downto 0);
 		bf_loffset              : in  std_logic_vector(4 downto 0);
-		bf_offset               : in  std_logic_vector(5 downto 0);
+		bf_offset               : in  std_logic_vector(31 downto 0);
 		set_V_Flag_out          : out bit;
 		Flags_out               : out std_logic_vector(7 downto 0);
 		c_out_out               : out std_logic_vector(2 downto 0);
