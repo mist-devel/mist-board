@@ -11,6 +11,8 @@
 
 #define VERBOSE
 
+FILE *result = NULL;
+
 // this should be the same as the VHDL counterpart
 unsigned char code[ROMSIZE];
 unsigned char ram[RAMSIZE];
@@ -23,6 +25,16 @@ void mem_init(char *name) {
   printf("loaded %d bytes code\n", r);
 
   fclose(f);
+
+  // try to open the result file
+  char *p;
+  if((p=getenv("RESULT"))) {
+    printf("Writing restult to file %s\n", p);
+    result = fopen(p, "w");
+
+    if(!result)
+      perror("");
+  }
 }
 
 unsigned char *addr_ptr(unsigned int address) {
@@ -37,14 +49,14 @@ unsigned char *addr_ptr(unsigned int address) {
 
 // ignore ds when reading
 unsigned int mem_read(unsigned int addr, int ds) {
+#ifdef VERBOSE
+  printf("mem_read(0x%08x,%d) = ", addr, ds);
+#endif
+
   if(addr == 0xbeefed) {
     printf("beefed read??\n");
     return 0;
   }
-
-#ifdef VERBOSE
-  printf("mem_read(0x%08x,%d) = ", addr, ds);
-#endif
 
   unsigned char *a = addr_ptr(addr & 0xffffffe);
   if(!a) { 
@@ -61,15 +73,28 @@ unsigned int mem_read(unsigned int addr, int ds) {
 
 // ignore ds when reading
 void mem_write(unsigned int addr, unsigned int data, int ds) {
+#ifdef VERBOSE
+  printf("mem_write(0x%08x,%d) = %04x\n", addr, ds, data);
+#endif
+
+  // dump area used to export hex numbers 
+  if(result && (addr >= 0xc0ffee42) && (addr < 0xc0ffee42+32*4)) {
+    char *name[] = { "D", "A", "X", "." };
+    int reg = (addr - 0xc0ffee42)/2;
+    if(reg == 32) {
+      fprintf(result, "SR %04x XNZVC\n", data);
+
+    } else 
+      fprintf(result, "%s%d.%c:%04x\n",
+	      name[reg>>4],(reg>>1)&7, (reg&1)?'l':'h', data);
+    return;
+  }
+    
   if(addr == 0xbeefed) {
     if(!data) printf("Program terminated successful\n");
     else      printf("Program terminated with error code %d\n", data);
     exit(data);
   }
-
-#ifdef VERBOSE
-  printf("mem_write(0x%08x,%d) = %04x\n", addr, ds, data);
-#endif
 
   unsigned char *a = addr_ptr(addr & 0xffffffe);
   if(!a) { 

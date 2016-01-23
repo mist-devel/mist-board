@@ -194,7 +194,7 @@ begin
   -----------------------------------------------------------------------------
   -- set OP1in
   -----------------------------------------------------------------------------
-  process (OP2out, reg_QB, opcode, OP1out, OP1in, exe_datatype, addsub_q, execOPC, exec,
+  process (OP2out, reg_QB, opcode, OP1out, OP1in, exe_datatype, addsub_q, execOPC, exec, mux,
 		   pack_out, bcd_a, bcd_s, result_mulu, result_div, exe_condition, bf_shift, bf_offset, bf_width,
 		   Flags, FlagsSR, bits_out, exec_tas, rot_out, exe_opcode, result, bf_fffo, bf_firstbit, bf_datareg)
   begin
@@ -203,12 +203,13 @@ begin
 	if exec(opcBFwb) = '1' then
 	  ALUout <= result(31 downto 0);
 	  if bf_fffo = '1' then
-		ALUout <= (others => '0');
-		if mux = "0000" then
-		  ALUout <= bf_offset + bf_width + 1;
-		else
-		  ALUout <= bf_offset + bf_width - bf_firstbit;
-		end if;
+            ALUout <= (others => '0');
+            -- mux = 0 means no bit was found at all
+            if mux = "0000" then
+              ALUout <= bf_offset + bf_width + 1;
+            else
+              ALUout <= bf_offset + bf_width - bf_firstbit;
+            end if;
 	  end if;
 	end if;
 

@@ -37,8 +37,18 @@ void mem_if_c(char clk, char bs[2], char ds[2], char addr[32], char din[16], cha
   if(busstate == 1)
     return;
 
-  if(!init) mem_init("tests/testsuite.bin"),init=1;
-
+  if(!init) {
+    // check if a file name was given
+    if(getenv("TG68K_BIN"))
+      mem_init(getenv("TG68K_BIN"));
+    else {
+      fprintf(stderr, "Please specify a bin file via TG68K_BIN\n");
+      exit(-1);
+    }
+    
+    init=1;
+  }
+    
   // only do something if clock changes
   if(clk == last_clk) 
     return;

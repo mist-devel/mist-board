@@ -8,8 +8,9 @@ TOOLS=../../tools
 ZIP = tg68k_run.zip
 PATCH = tg68k.patch
 M68K_RUN_OBJS = $(M68K_RUN).o mem.o m68kcpu.o m68kops.o m68kopnz.o m68kopac.o m68kopdm.o 
+RND = randomize
 
-all: $(M68K_RUN) $(TG68K_RUN)
+all: $(M68K_RUN) $(TG68K_RUN) $(RND)
 
 TG68KdotC_Kernel.o: TG68K_Pack.o
 TG68K_ALU.o: TG68K_Pack.o
@@ -45,7 +46,7 @@ test: $(M68K_RUN) $(CODE).bin
 	./$(M68K_RUN) $(CODE).bin
 
 vtest: $(TG68K_RUN) $(CODE).bin
-	ghdl -r $(TG68K_RUN) --ieee-asserts=disable --stop-time=2000000ns --wave=$(GHW)
+	TG68K_BIN=$(CODE).bin ./$(TG68K_RUN) --ieee-asserts=disable --wave=$(GHW)
 
 clean::
 	rm -f work-obj93.cf *.o Musashi/m68kop* $(CODE).bin *~ *.lst *.ghw $(TG68K_RUN) ghwreplay Musashi/m68kmake $(M68K_RUN)
@@ -57,11 +58,24 @@ disasm: $(CODE).bin
 	$(TOOLS)/m68kdis/m68kdis -020 $(CODE).bin
 	cat `basename $(CODE).bin.s`
 
+%.tg68k.result: %.bin $(TG68K_RUN)
+	RESULT=$@ TG68K_BIN=$< ./$(TG68K_RUN) --ieee-asserts=disable --wave=$(GHW)
+
+%.musashi.result: %.bin $(M68K_RUN)
+	RESULT=$@ ./$(M68K_RUN) $<
+
+%.compare: %.tg68k.result %.musashi.result
+	diff $*.tg68k.result $*.musashi.result
+
+%.disasm: %.bin
+	$(TOOLS)/m68kdis/m68kdis -020 $<
+	cat `basename $<.s`
+
 view: $(GHW)
 	gtkwave $< $(TG68K_RUN).sav
 
 %.bin: %.s
-	$(TOOLS)/vasm/vasmm68k_mot -m68020 -Fbin -o $@ -L $(CODE).lst -nosym $<
+	$(TOOLS)/vasm/vasmm68k_mot -m68020 -Fbin -no-opt -o $@ -L $(CODE).lst -nosym $<
 	hexdump -C $@
 
 zip::
