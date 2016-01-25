@@ -230,8 +230,7 @@ package TG68K_Pack is
 		micro_state             : in  micro_states;
 		bf_ext_in               : in  std_logic_vector(7 downto 0);
 		bf_ext_out              : out std_logic_vector(7 downto 0);
-		bf_shift                : in  std_logic_vector(5 downto 0);
-		bf_width                : in  std_logic_vector(5 downto 0);
+		bf_width                : in  std_logic_vector(4 downto 0);
 		bf_loffset              : in  std_logic_vector(4 downto 0);
 		bf_offset               : in  std_logic_vector(31 downto 0);
 		set_V_Flag_out          : out bit;
