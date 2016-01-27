@@ -189,6 +189,8 @@ architecture logic of TG68KdotC_Kernel is
   signal dest_hbits             : bit;
   signal rot_bits               : std_logic_vector(1 downto 0);
   signal set_rot_bits           : std_logic_vector(1 downto 0);
+  signal alu_rot_cnt            : std_logic_vector(5 downto 0);
+  signal set_alu_rot_cnt        : std_logic_vector(5 downto 0);
   signal rot_cnt                : std_logic_vector(5 downto 0);
   signal set_rot_cnt            : std_logic_vector(5 downto 0);
   signal movem_actiond          : bit;
@@ -309,6 +311,7 @@ begin
 	set_stop       => set_stop,         --: in bit;
 	Z_error        => Z_error,          --: in bit;
 	rot_bits       => rot_bits,         --: in std_logic_vector(1 downto 0);
+        rot_cnt        => alu_rot_cnt,      --: in std_logic_vector(5 downto 0);
 	exec           => exec,             --: in bit_vector(lastOpcBit downto 0);
 	OP1out         => OP1out,           --: in std_logic_vector(31 downto 0);
 	OP2out         => OP2out,           --: in std_logic_vector(31 downto 0);
@@ -896,7 +899,7 @@ begin
   -----------------------------------------------------------------------------
   -- PC Calc + fetch opcode
   -----------------------------------------------------------------------------
-PROCESS (clk, IPL, setstate, state, exec_write_back, set_direct_data, next_micro_state, stop, make_trace, make_berr, IPL_nr, FlagsSR, set_rot_cnt, opcode, writePCbig, set_exec, exec,
+PROCESS (clk, IPL, setstate, state, exec_write_back, set_direct_data, next_micro_state, stop, make_trace, make_berr, IPL_nr, FlagsSR, set_rot_cnt, set_alu_rot_cnt, opcode, writePCbig, set_exec, exec,
 		 PC_dataa, PC_datab, setnextpass, last_data_read, TG68_PC_brw, TG68_PC_word, Z_error, trap_trap, trap_trapv, interrupt, tmp_TG68_PC, TG68_PC)
   begin
 	PC_dataa <= TG68_PC;
@@ -1099,7 +1102,11 @@ PROCESS (clk, IPL, setstate, state, exec_write_back, set_direct_data, next_micro
 		  if decodeOPC = '1' or exec(ld_rot_cnt) = '1' or rot_cnt /= "000001" then
 			rot_cnt <= set_rot_cnt;
 		  end if;
-		  if setstate(1) = '1' and set_datatype = "00" then
+		  if decodeOPC = '1' or exec(ld_rot_cnt) = '1' then
+                        alu_rot_cnt <= set_alu_rot_cnt;
+                  end if;
+
+                  if setstate(1) = '1' and set_datatype = "00" then
 			byte <= '1';
 		  end if;
 
@@ -1342,6 +1349,7 @@ PROCESS (clk, IPL, setstate, state, exec_write_back, set_direct_data, next_micro
 	set_Suppress_Base  <= '0';
 	set_PCbase         <= '0';
 
+        -- decrement xyz
 	if rot_cnt /= "000001" then
 	  set_rot_cnt <= rot_cnt - 1;
 	end if;
@@ -2583,22 +2591,37 @@ PROCESS (clk, IPL, setstate, state, exec_write_back, set_direct_data, next_micro
 			end if;
 		  end if;
 		else
+                  -- register rotation/shift 
 		  set_exec(opcROT) <= '1';
 		  set_rot_bits <= opcode(4 downto 3);
 		  data_is_source <= '1';
 		  set_exec(Regwrena) <= '1';
 		  if decodeOPC = '1' then
 			if opcode(5) = '1' then
+                          -- load rotation count from register
 			  next_micro_state <= rota1;
 			  set(ld_rot_cnt) <= '1';
 			  setstate <= "01";
-			else
+			else -- xyz
+                          set_alu_rot_cnt <= (others => '0');
+                          set_alu_rot_cnt(2 downto 0) <= opcode(11 downto 9);
+			  if opcode(11 downto 9) = "000" then set_alu_rot_cnt(3) <= '1';
+			  else 			              set_alu_rot_cnt(3) <= '0';
+			  end if;
+
+                          -- take rotation count from opcode
 			  set_rot_cnt(2 downto 0) <= opcode(11 downto 9);
 			  if opcode(11 downto 9) = "000" then
 				set_rot_cnt(3) <= '1';
 			  else
 				set_rot_cnt(3) <= '0';
 			  end if;
+          
+                          -- lsr or lsl use a barrel shifter and are done immediately
+                          if opcode(4 downto 3) = "01" then
+                            set_rot_cnt <= "000001";
+                          end if;
+                          
 			end if;
 		  end if;
 		end if;
@@ -3241,10 +3264,15 @@ PROCESS (clk, IPL, setstate, state, exec_write_back, set_direct_data, next_micro
 		set(opcDIVU) <= '1';
 
 	  when rota1 =>
-		if OP2out(5 downto 0) /= "000000" then
-		  set_rot_cnt <= OP2out(5 downto 0);
-		else
-		  set_exec(rot_nop) <= '1';
+                -- load rot_cnt from register
+                if opcode(4 downto 3) = "01" then  -- lsl/lsr uses barrel shifter
+                  set_alu_rot_cnt <= OP2out(5 downto 0);
+                else 
+                  if OP2out(5 downto 0) /= "000000" then
+                    set_rot_cnt <= OP2out(5 downto 0);
+                  else
+                    set_exec(rot_nop) <= '1';
+                  end if;
 		end if;
 
 	  when bf1 =>

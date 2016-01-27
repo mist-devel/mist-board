@@ -44,6 +44,7 @@ entity TG68K_ALU is
 	set_stop       : in  bit;
 	Z_error        : in  bit;
 	rot_bits       : in  std_logic_vector(1 downto 0);
+	rot_cnt        : in  std_logic_vector(5 downto 0);
 	exec           : in  bit_vector(lastOpcBit downto 0);
 	OP1out         : in  std_logic_vector(31 downto 0);
 	OP2out         : in  std_logic_vector(31 downto 0);
@@ -170,6 +171,10 @@ architecture logic of TG68K_ALU IS
   signal index        : std_logic_vector(4 downto 0);
   signal bf_flag_z    : std_logic;
   signal bf_flag_n    : std_logic;
+
+  -- barrel shifter
+  signal bs_data      : std_logic_vector(31 downto 0);
+  signal bs_msb       : std_logic_vector(4 downto 0);
 
   signal set_V_Flag   : BIT;
   signal Flags        : std_logic_vector(7 downto 0);
@@ -616,7 +621,7 @@ begin
   -----------------------------------------------------------------------------
   -- Rotation
   -----------------------------------------------------------------------------
-  process (exe_opcode, OP1out, Flags, rot_bits, rot_msb, rot_lsb, rot_rot, exec)
+  process (exe_opcode, OP1out, Flags, rot_bits, rot_msb, rot_lsb, rot_cnt, rot_out, rot_rot, bs_data, bs_msb, exec)
   begin
 	case exe_opcode(7 downto 6) IS
 	  when "00" => --Byte
@@ -670,6 +675,51 @@ begin
 		end case;
 	  end if;
 	end if;
+
+        -- -------- barrel shifter ------------
+        if rot_bits = "01" and exe_opcode(7 downto 6) /= "11" then
+          -- currently only and LSL/LSR use the barrel shifter
+
+          bs_data <= OP1out;
+          bs_msb <= "11111";
+
+          -- word size
+          if exe_opcode(7 downto 6)="01" then
+            bs_msb <= "01111";
+            bs_data(31 downto 16) <= "0000000000000000";
+          end if;
+            
+          -- byte size
+          if exe_opcode(7 downto 6)="00" then
+            bs_msb <= "00111";
+            bs_data(31 downto 8) <= "000000000000000000000000";
+          end if;     
+            
+          if exe_opcode(8) = '1' then
+            -- left
+            rot_out <= std_logic_vector(unsigned(bs_data) sll to_integer(unsigned(rot_cnt)));
+            rot_X <= OP1out(to_integer(unsigned("00001" - rot_cnt(4 downto 0) + bs_msb)));
+            rot_C <= OP1out(to_integer(unsigned("00001" - rot_cnt(4 downto 0) + bs_msb)));
+          else
+            -- right
+            rot_out <= std_logic_vector(unsigned(bs_data) srl to_integer(unsigned(rot_cnt)));
+            rot_X <= OP1out(to_integer(unsigned(rot_cnt(4 downto 0) - "00001")));
+            rot_C <= OP1out(to_integer(unsigned(rot_cnt(4 downto 0) - "00001")));
+          end if;     
+
+          -- not shifting at all or shifting more than the whole byte/word/long
+          if(rot_cnt = 0) then
+            rot_X <= Flags(4);
+            rot_C <= '0';
+          else
+            if(rot_cnt - 1 > bs_msb) then
+              rot_X <= '0';
+              rot_C <= '0';
+            end if;
+          end if;
+            
+        end if;
+        
   end process;
 
   ------------------------------------------------------------------------------

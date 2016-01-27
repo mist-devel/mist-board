@@ -1,7 +1,7 @@
 /********************************************/
 /*                                          */
 /********************************************/
- 
+
 module mist_top ( 
   // clock inputs	
   input wire [ 2-1:0] 	CLOCK_27, // 27 MHz
@@ -856,7 +856,7 @@ TG68KdotC_Kernel #(2,2,2,2,2,2) tg68k (
 	.berr         	(tg68_berr     ),
 	.clr_berr     	(tg68_clr_berr ),
 	.CPU           (system_ctrl[5:4] ),  // 00=68000
-   .addr         	(tg68_adr_S    ),
+   .addr_out     	(tg68_adr_S    ),
 	.data_write   	(tg68_dat_out_S),
 	.nUDS          (tg68_uds_S    ),
 	.nLDS          (tg68_lds_S    ),

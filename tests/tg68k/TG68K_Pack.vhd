@@ -214,6 +214,7 @@ package TG68K_Pack is
 		set_stop                : in  bit;
 		Z_error                 : in  bit;
 		rot_bits                : in  std_logic_vector(1 downto 0);
+		rot_cnt                 : in  std_logic_vector(5 downto 0);
 		exec                    : in  bit_vector(lastOpcBit downto 0);
 		OP1out                  : in  std_logic_vector(31 downto 0);
 		OP2out                  : in  std_logic_vector(31 downto 0);
