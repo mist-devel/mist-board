@@ -846,7 +846,7 @@ wire [15:0] cache_data_out = data_cache_hit?data_cache_data_out:inst_cache_data_
 wire [15:0] cpu_data_in = cacheRead?cache_data_out:system_data_out;
 
 
-TG68KdotC_Kernel #(2,2,2,2,2,2) tg68k (
+TG68KdotC_Kernel #(2,2,2,2,2,2,2) tg68k (
 	.clk          	(clk_32 			),
 	.nReset       	(~reset			),
 	.clkena_in		(clkena			), 

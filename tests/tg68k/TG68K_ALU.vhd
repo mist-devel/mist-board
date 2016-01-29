@@ -29,11 +29,13 @@ use work.TG68K_Pack.ALL;
 entity TG68K_ALU is
   generic (
 	MUL_Mode : integer := 0; --0=>16Bit, 1=>32Bit, 2=>switchable with CPU(1), 3=>no MUL,
-	DIV_Mode : integer := 0  --0=>16Bit, 1=>32Bit, 2=>switchable with CPU(1), 3=>no DIV,
+	DIV_Mode : integer := 0;  --0=>16Bit, 1=>32Bit, 2=>switchable with CPU(1), 3=>no DIV,
+	BarrelShifter  : integer := 0  --0=>no,    1=>yes,   2=>switchable with CPU(1)
   );
   port (
 	clk            : in  std_logic;
 	Reset          : in  std_logic;
+        cpu            : in  std_logic_vector(1 downto 0);
 	clkena_lw      : in  std_logic := '1';
 	execOPC        : in  bit;
 	exe_condition  : in  std_logic;
@@ -171,12 +173,15 @@ architecture logic of TG68K_ALU IS
   signal index        : std_logic_vector(4 downto 0);
   signal bf_flag_z    : std_logic;
   signal bf_flag_n    : std_logic;
+  signal set_V_Flag   : BIT;
 
   -- barrel shifter
+  signal bs_rox       : std_logic_vector(32 downto 0);
+  signal bs_mask      : std_logic_vector(31 downto 0);
   signal bs_data      : std_logic_vector(31 downto 0);
   signal bs_msb       : std_logic_vector(4 downto 0);
+  signal bs_V         : std_logic;
 
-  signal set_V_Flag   : BIT;
   signal Flags        : std_logic_vector(7 downto 0);
   signal c_out        : std_logic_vector(2 downto 0);
   signal addsub_q     : std_logic_vector(31 downto 0);
@@ -458,7 +463,7 @@ begin
   -- the extracted data it determines the highest bit setin the result
   
   process (clk, bf_ins, bf_bchg, bf_bset, bf_exts, bf_extu, bf_set2, OP1out, OP2out, result_tmp, bf_ext_in,
-           datareg, bf_NFlag, result, reg_QB, sign, bf_d32, copy, bf_loffset, bf_width)
+           datareg, bf_NFlag, result, reg_QB, sign, bf_d32, copy, bf_loffset, bf_width, bf_loff_dir, exe_opcode)
   begin
 	if rising_edge(clk) then
 	  if clkena_lw = '1' then
@@ -621,7 +626,7 @@ begin
   -----------------------------------------------------------------------------
   -- Rotation
   -----------------------------------------------------------------------------
-  process (exe_opcode, OP1out, Flags, rot_bits, rot_msb, rot_lsb, rot_cnt, rot_out, rot_rot, bs_data, bs_msb, exec)
+  process (exe_opcode, OP1out, Flags, rot_bits, rot_msb, rot_lsb, rot_cnt, rot_out, rot_rot, bs_data, bs_mask, bs_msb, bs_rox, exec)
   begin
 	case exe_opcode(7 downto 6) IS
 	  when "00" => --Byte
@@ -676,48 +681,202 @@ begin
 	  end if;
 	end if;
 
-        -- -------- barrel shifter ------------
-        if rot_bits = "01" and exe_opcode(7 downto 6) /= "11" then
-          -- currently only and LSL/LSR use the barrel shifter
+        ---------------------------------------------------------------------------
+        --------------------------- 68020 barrel shifter --------------------------
+        ---------------------------------------------------------------------------
+	  
+        bs_mask <= (others => '-');
+        bs_rox <= (others => '-');
+        -- default: long word size
+        bs_data <= OP1out;
+        bs_msb <= "11111";  -- 31
+        bs_V <= '0';        -- overflow flag for asr/asl
+        
+        -- the <ea> version doesn't use the barrel shifter as it can only shift 1 bit anyway
+        if (BarrelShifter = 1 or (cpu(1) = '1' and BarrelShifter = 2)) then
+           if exe_opcode(7 downto 6) /= "11" then
+          -- create a mask of rot_cnt left aligned 1 bits according to operation size
+          -- this is required for the arithmetic shifts to handle the V bit and the sign
+          bs_mask <= (others => '0');
+          for i in 0 TO 31 loop
+            if rot_cnt > bs_msb-i and i <= bs_msb then
+		bs_mask(i) <= '1';
+            end if;
+          end loop;
 
-          bs_data <= OP1out;
-          bs_msb <= "11111";
+          -- check if msb would change during shifts
+          -- in left shift either msb is 1 and remaining mask bits are not 11111...
+          if OP1out(to_integer(unsigned(bs_msb))) = '1' and exe_opcode(8) = '1' then
+            if (OP1out and ('0' & bs_mask(31 downto 1))) /= ('0' & bs_mask(31 downto 1)) then
+              bs_V <= '1';
+            end if;
 
-          -- word size
-          if exe_opcode(7 downto 6)="01" then
-            bs_msb <= "01111";
-            bs_data(31 downto 16) <= "0000000000000000";
+            -- when shifting left more than 31/15/7 times a '0' will sure appear in the msb 
+            if(rot_cnt > bs_msb) then
+              bs_V <= '1';
+            end if;
           end if;
-            
-          -- byte size
-          if exe_opcode(7 downto 6)="00" then
-            bs_msb <= "00111";
-            bs_data(31 downto 8) <= "000000000000000000000000";
-          end if;     
+
+          -- ... or msb is 0 and remaining mask bits are not 00000...
+          if OP1out(to_integer(unsigned(bs_msb))) = '0' and exe_opcode(8) = '1' then
+            if (OP1out and ('0' & bs_mask(31 downto 1))) /= x"00000000" then
+              bs_V <= '1';
+            end if;
+          end if;
+
+          -- TODO: move to asr/asl only
+          -- word or byte size
+          if exe_opcode(7) = '0' then
+            bs_msb(4) <= '0'; -- 15
+            bs_data(31 downto 16) <= "0000000000000000";
+
+            -- byte size
+            if exe_opcode(6) = '0' then
+              bs_msb(3) <= '0'; -- 7
+              bs_data(15 downto 8) <= "00000000";
+            end if;     
+          end if;
             
           if exe_opcode(8) = '1' then
             -- left
-            rot_out <= std_logic_vector(unsigned(bs_data) sll to_integer(unsigned(rot_cnt)));
-            rot_X <= OP1out(to_integer(unsigned("00001" - rot_cnt(4 downto 0) + bs_msb)));
-            rot_C <= OP1out(to_integer(unsigned("00001" - rot_cnt(4 downto 0) + bs_msb)));
+            if rot_bits = "10" then
+              --====================== ROXL =====================
+              if exe_opcode(7 downto 6) = "00" then
+                -- roxl.b
+                bs_rox <= "------------------------" &
+                        std_logic_vector(unsigned(Flags(4) & bs_data(7 downto 0)) rol
+                                         to_integer(unsigned(rot_cnt)));
+                rot_X <= bs_rox(8);
+                rot_C <= bs_rox(8);
+              elsif exe_opcode(7 downto 6) = "01" then
+                -- roxl.w
+                bs_rox <= "----------------" &
+                        std_logic_vector(unsigned(Flags(4) & bs_data(15 downto 0)) rol
+                                         to_integer(unsigned(rot_cnt)));
+                rot_X <= bs_rox(16);
+                rot_C <= bs_rox(16);
+              else
+                -- roxl.l
+                bs_rox <= std_logic_vector(unsigned(Flags(4) & bs_data) rol
+                                           to_integer(unsigned(rot_cnt)));
+                rot_X <= bs_rox(32);
+                rot_C <= bs_rox(32);
+              end if;
+              rot_out <= bs_rox(31 downto 0);
+            elsif rot_bits = "11" then
+              --====================== ROL =====================
+              if exe_opcode(7 downto 6) = "00" then
+                -- rol.b
+                rot_out <= "------------------------" &
+                           std_logic_vector(unsigned(bs_data(7 downto 0)) rol
+                                to_integer(unsigned(rot_cnt(2 downto 0))));
+                rot_C <= OP1out(to_integer(unsigned("001" - rot_cnt(2 downto 0) + bs_msb(2 downto 0))));
+              elsif exe_opcode(7 downto 6) = "01" then
+                -- rol.w
+                rot_out <= "----------------" &
+                           std_logic_vector(unsigned(bs_data(15 downto 0)) rol
+                                to_integer(unsigned(rot_cnt(3 downto 0))));
+                rot_C <= OP1out(to_integer(unsigned("0001" - rot_cnt(3 downto 0) + bs_msb(3 downto 0))));
+              else
+                -- rol.l
+                rot_out <= std_logic_vector(unsigned(bs_data) rol
+                                          to_integer(unsigned(rot_cnt(4 downto 0))));
+                rot_C <= OP1out(to_integer(unsigned("00001" - rot_cnt(4 downto 0) + bs_msb)));
+              end if;
+              rot_X <= Flags(4); -- keep X flag
+            else
+              --====================== LSL/ASL =====================
+              -- shifting left is the same for arithmetic and logic
+              rot_out <= std_logic_vector(unsigned(bs_data) sll to_integer(unsigned(rot_cnt)));
+              rot_X <= OP1out(to_integer(unsigned("00001" - rot_cnt(4 downto 0) + bs_msb)));
+              rot_C <= OP1out(to_integer(unsigned("00001" - rot_cnt(4 downto 0) + bs_msb)));
+            end if;
+            
           else
             -- right
-            rot_out <= std_logic_vector(unsigned(bs_data) srl to_integer(unsigned(rot_cnt)));
-            rot_X <= OP1out(to_integer(unsigned(rot_cnt(4 downto 0) - "00001")));
-            rot_C <= OP1out(to_integer(unsigned(rot_cnt(4 downto 0) - "00001")));
+            if rot_bits = "10" then
+              --====================== ROXR =====================
+              if exe_opcode(7 downto 6) = "00" then
+                -- roxr.b
+                bs_rox <= "------------------------" &
+                        std_logic_vector(unsigned(bs_data(7 downto 0) & Flags(4)) ror
+                                         to_integer(unsigned(rot_cnt)));
+              elsif  exe_opcode(7 downto 6) = "01" then
+                -- roxr.w
+                bs_rox <= "----------------" &
+                        std_logic_vector(unsigned(bs_data(15 downto 0) & Flags(4)) ror
+                                         to_integer(unsigned(rot_cnt)));
+              else
+                -- roxr.l
+                bs_rox <= std_logic_vector(unsigned(bs_data & Flags(4)) ror
+                                          to_integer(unsigned(rot_cnt)));
+              end if;
+                
+              rot_out <= bs_rox(32 downto 1);
+              rot_C <= bs_rox(0);
+              rot_X <= bs_rox(0);
+            elsif rot_bits = "11" then
+              --====================== ROR =====================
+              if exe_opcode(7 downto 6) = "00" then
+                -- ror.b
+                rot_out <= "------------------------" &
+                           std_logic_vector(unsigned(bs_data(7 downto 0)) ror
+                                            to_integer(unsigned(rot_cnt(2 downto 0))));
+                rot_C <= OP1out(to_integer(unsigned(rot_cnt(2 downto 0) - "001")));
+              elsif exe_opcode(7 downto 6) = "01" then
+                -- ror.w
+                rot_out <= "----------------" &
+                           std_logic_vector(unsigned(bs_data(15 downto 0)) ror
+                                            to_integer(unsigned(rot_cnt(3 downto 0))));
+                rot_C <= OP1out(to_integer(unsigned(rot_cnt(3 downto 0) - "0001")));
+              else
+                -- ror.l
+                rot_out <= std_logic_vector(unsigned(bs_data) ror
+                                            to_integer(unsigned(rot_cnt(4 downto 0))));
+                rot_C <= OP1out(to_integer(unsigned(rot_cnt(4 downto 0) - "00001")));
+              end if;
+              rot_X <= Flags(4); -- keep X flag
+            else
+              --====================== LSR/ASR =====================
+              rot_out <= std_logic_vector(unsigned(bs_data) srl to_integer(unsigned(rot_cnt)));
+              rot_X <= OP1out(to_integer(unsigned(rot_cnt(4 downto 0) - "00001")));
+              rot_C <= OP1out(to_integer(unsigned(rot_cnt(4 downto 0) - "00001")));
+              
+              -- arithmetic shift right with msb being 1? then make sure all
+              -- newly shifted in bits are set to 1
+              if rot_bits = "00" and OP1out(to_integer(unsigned(bs_msb))) = '1' then
+                rot_out <= bs_mask or std_logic_vector(unsigned(bs_data) srl
+                                                   to_integer(unsigned(rot_cnt)));
+              end if;   
+            end if;
           end if;     
 
           -- not shifting at all or shifting more than the whole byte/word/long
           if(rot_cnt = 0) then
+            -- rox returns X in C bit with rotate of zero. all other clear it
+            if rot_bits = "10" then
+              rot_C <= Flags(4);
+            else
+              rot_C <= '0';
+            end if;
             rot_X <= Flags(4);
-            rot_C <= '0';
           else
-            if(rot_cnt - 1 > bs_msb) then
+            -- asX/lsX shifting more than the total operand width
+            if rot_bits(1) = '0' and rot_cnt - 1 > bs_msb then
               rot_X <= '0';
               rot_C <= '0';
+
+              -- arithmetic shift right with msb set? Then the sign '1's will
+              -- be shifted out
+              if rot_bits = "00" and exe_opcode(8) = '0' and
+                 OP1out(to_integer(unsigned(bs_msb))) = '1' then
+                rot_X <= '1';
+                rot_C <= '1';
+              end if;
             end if;
           end if;
             
+        end if;
         end if;
         
   end process;
@@ -838,6 +997,12 @@ process (clk, Reset, exe_opcode, exe_datatype, Flags, last_data_read, OP2out, fl
 			else
 			  Flags(1) <= '0';
 			end if;
+                        if BarrelShifter = 1 or (cpu(1) = '1' and BarrelShifter = 2) then
+                          -- v flag from barrel shifter when doing asl/asr
+                          if rot_bits = "00" and exe_opcode(7 downto 6) /= "11" then
+                            Flags(1) <= bs_V;
+                          end if;
+                        end if;
 		  elsif exec(opcBITS) = '1' then
 			Flags(2) <= not one_bit_in;
 		  elsif exec(opcCHK) = '1' then
