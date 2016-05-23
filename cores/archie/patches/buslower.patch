@@ -1,0 +1,26 @@
+Index: a23_core.v
+===================================================================
+--- a23_core.v	(revision 89)
++++ a23_core.v	(working copy)
+@@ -160,7 +160,7 @@
+ a23_fetch u_fetch (
+     .i_clk                              ( i_clk                             ),
+ 
+-    .i_address                          ( {execute_address[31:2], 2'd0}     ),
++    .i_address                          ( execute_address[31:0]             ),
+     .i_address_valid                    ( execute_address_valid             ), 
+     .i_address_nxt                      ( execute_address_nxt               ),
+     .i_write_data                       ( write_data                        ),
+Index: a23_wishbone.v
+===================================================================
+--- a23_wishbone.v	(revision 89)
++++ a23_wishbone.v	(working copy)
+@@ -234,7 +234,7 @@
+                                         byte_enable == 4'b0011 ? 2'd0 :
+                                         byte_enable == 4'b1100 ? 2'd2 :
+                                        
+-                                                                 2'd0 ;
++                                                                 i_address[1:0];
+                 end
+             end
+                     

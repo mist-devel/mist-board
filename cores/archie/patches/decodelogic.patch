@@ -1,0 +1,38 @@
+Index: a23_decode.v
+===================================================================
+--- a23_decode.v	(revision 89)
++++ a23_decode.v	(working copy)
+@@ -712,7 +712,7 @@
+                 begin
+                 alu_out_sel_nxt  = 4'd1; // Add
+                 alu_cin_sel_nxt  = 2'd2; // carry in from status_bits
+-                use_carry_in_nxt = shift_extend;
++                use_carry_in_nxt = 1'd1;
+                 end
+ 
+             if ( opcode == SUB || opcode == CMP ) // Subtract
+@@ -720,6 +720,8 @@
+                 alu_out_sel_nxt  = 4'd1; // Add
+                 alu_cin_sel_nxt  = 2'd1; // cin = 1
+                 alu_not_sel_nxt  = 1'd1; // invert B
++		use_carry_in_nxt = shift_extend;
++		   
+                 end
+ 
+             // SBC (Subtract with Carry) subtracts the value of its
+@@ -740,6 +742,7 @@
+                 alu_cin_sel_nxt  = 2'd1; // cin = 1
+                 alu_not_sel_nxt  = 1'd1; // invert B
+                 alu_swap_sel_nxt = 1'd1; // swap A and B
++                use_carry_in_nxt = 1'd1;
+                 end
+ 
+             if ( opcode == RSC ) // Reverse Subtract with carry
+@@ -755,6 +758,7 @@
+                 begin
+                 alu_out_sel_nxt  = 4'd8;  // AND
+                 alu_cout_sel_nxt = 1'd1;  // i_barrel_shift_carry
++                use_carry_in_nxt = 1'd1;
+                 end
+ 
+             if ( opcode == EOR || opcode == TEQ ) // Logical Exclusive OR, Test Equivalence (using EOR operator)

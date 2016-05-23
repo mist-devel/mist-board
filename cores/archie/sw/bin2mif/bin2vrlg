@@ -1,0 +1,55 @@
+#!/usr/bin/python
+
+import sys,os,os.path,math
+from struct import unpack
+
+def getSize(filename):
+    st = os.stat(filename)
+    return st.st_size
+
+header = """module %s
+(
+        input\t\tclk,\t// bus clock
+        input [%i:0]\taddress,\t// address in
+        output reg [31:0]\tdata\t// data out
+);
+
+always @(posedge clk) begin
+\tcase (address)
+"""
+
+footer = """\tendcase
+end
+
+endmodule"""
+
+
+fileName = sys.argv[1]
+fileSize = getSize(fileName)
+basename = os.path.basename(fileName)
+modname = os.path.splitext(basename)[0]
+
+loc = 0
+
+f = open(sys.argv[1])
+size = fileSize / 4 # 32 bits means 4 bytes per word
+addrw = int(math.ceil(math.log(size,2)))
+
+newfile = header % (modname,addrw-1,)
+
+
+while True:
+    b2 = f.read(4)
+    if b2 == "" or len(b2) < 4:
+        break
+    n = unpack('<L', b2)   # big endian short
+    u32 = n[0] % 2**32 
+    newfile = newfile + "\t\t%i'd%04d:\tdata\t<=\t32'h%08x;\n" % (addrw,loc, u32)
+    loc = loc +1 
+    
+f.close()
+newfile = newfile + footer
+print newfile
+# 
+
+

@@ -1,0 +1,604 @@
+? .clang
+? .codelite
+? cmos.mif
+? cmos2mif.py
+? instrument.v
+? out
+Index: armdefs.h
+===================================================================
+RCS file: /cvsroot/arcem/arcem/armdefs.h,v
+retrieving revision 1.8
+diff -r1.8 armdefs.h
+225a226
+>    CycleCount NumAccess;      /* Number of cycles */
+Index: armemu.c
+===================================================================
+RCS file: /cvsroot/arcem/arcem/armemu.c,v
+retrieving revision 1.19
+diff -r1.19 armemu.c
+26a27,30
+> #define MYBP 0x3817848
+> //#define LOGPC { if ((PC-8) == MYBP) { printf("%x\n", PC-8, state->Reg[2]); } else { printf("%x\n", PC-8); }}
+> #define LOGPC { if ((PC-8) == MYBP) { printf("%x\n", PC-8 );} else { printf("%x\n", PC-8); } state->NumAccess++;}
+> 
+38a43,81
+> static int TraceMode = 1;
+> 
+> static inline void CheckBP(ARMul_State *state, ARMword addr)
+> {
+> 	ARMword logadr,phys,size;
+> 	int pt;
+> 	addr &= 0x3fffffc;
+> 	
+> 	if ((addr >= 0x3877AC4) && (addr <= 0x3877AC4))
+> 	{
+> 		ARMword interrupt = state->Exception & (Exception_IRQ | Exception_FIQ);
+> 		//printf("interrupt state: %x\n", interrupt);
+> 		//DISPLAYREGS;
+> 			//printf("R2=%08x\n", state->Reg[2]);
+> 		//TraceMode++;
+> 		//printf("Status: 0x%08x\n", ioc.IRQStatus);
+> 		//printf("Mask: 0x%08x\n", ioc.IRQMask);
+> 	}
+> 	
+> 	/*
+> 	if (addr == 0x03807C58)
+> 	{
+> 		printf("GetArea: ");
+> 		int i;
+> 		for (i=0; i<5; i++)
+> 		{
+> 			printf("R%i = 0x%08x ", i, state->Reg[i]);
+> 		}
+> 		
+> 		printf("\n");
+> 	}*/
+> 	
+> 	if (TraceMode > 0)
+> 	{
+> 		//ARMword *phy = FastMap_Log2Phy(FastMap_GetEntry(state,addr),addr&~3);
+> 		//printf("Addr: 0x%08x | SPVD: 0x%08x\n", addr, state->Reg[15] & (R15INTBITS | SVC26MODE));
+> 	}
+> }
+> 
+48a92,93
+>   
+>   CheckBP(state, addr);
+107a153,154
+>   CheckBP(state, addr);
+> 
+488a536,537
+>    
+> 
+503a553
+>   
+559a610
+>  
+572c623,624
+< 
+---
+>  int sel = 1 << (address & 3); 
+>  
+579a632
+> 	printf("ABORTED\n");
+583a637,639
+>  printf("read %x data ", address & 0x3fffffc);
+>  printf("%08x time %x\n", ARMul_LoadWordDebug(state, address), state->NumAccess);
+>   //printf("%02x%02x%02x%02x\n", sel & 8 ? dest & 0xFF : 0x00, sel & 4 ? dest & 0xFF : 0x00, sel & 2 ? dest & 0xFF : 0x00, sel & 1 ? dest & 0xFF : 0x00);
+593a650,653
+> 
+> 	//printf("write %x data %08x\n", address & 0x3fffffc, DEST);
+>  
+> 
+606a667,673
+> #define NIBBINARYPATTERN "%d%d%d%d"
+> #define TOBINARY(byte)  \
+>   (byte & 0x08 ? 1 : 0), \
+>   (byte & 0x04 ? 1 : 0), \
+>   (byte & 0x02 ? 1 : 0), \
+>   (byte & 0x01 ? 1 : 0) 
+> 
+612a680,685
+> 
+>    int sel = 1 << (address & 3); 
+>    
+>    printf("write %x data %02x%02x%02x%02x be %x\n", address & 0x3ffffff, DEST & 0xff, DEST & 0xff, DEST & 0xff, DEST & 0xff, sel);
+>    //printf("write %x data %02x%02x%02x%02x be %x\n", address & 0x3fffffc, DEST & 0xff, DEST & 0xff, DEST & 0xff, DEST & 0xff, sel);
+> 
+653a727
+> 		ARMword tmpaddress = address;
+666a741,742
+> 			  printf("read %x data %08x time %x\n", tmpaddress & 0x3fffffc, *(data), state->NumAccess);
+> 			  tmpaddress+=4;
+700a777
+> 	  
+752a830
+> 		  ARMword tmpaddress = address&~3;
+757a836,837
+> 			  printf("read %x data %08x time %x\n", tmpaddress & 0x3fffffc, *(data), state->NumAccess);
+> 			  tmpaddress+=4;
+794a875
+> 	   
+833a915
+> 	   ARMword tmpaddress = address;
+845a928,929
+> 		  printf("write %x data %08x be f\n", tmpaddress & 0x3ffffff, state->Reg[temp]);
+> 		  tmpaddress+=4;
+853a938,939
+> 			  printf("write %x data %08x be f\n", tmpaddress & 0x3ffffff, state->Reg[temp]);
+> 			  tmpaddress+=4;
+922a1009
+> 		 ARMword tmpaddress = address;
+934a1022,1023
+> 		   printf("write %x data %08x be f\n", tmpaddress & 0x3ffffff, state->Reg[temp]);
+> 		   tmpaddress+=4;
+941a1031,1032
+> 				 printf("write %x data %08x be f\n", tmpaddress & 0x3ffffff, state->Reg[temp]);
+> 				 tmpaddress+=4;
+1088a1180,1182
+> bool delayR15 = false;
+> ARMword lastR15 = 0;
+> 
+1091a1186,1187
+> 
+>   
+1099c1195
+< 
+---
+>   lastR15=state->Reg[15];
+1154,1156c1250,1252
+< #ifdef DEBUG
+<           printf("PC ch pc=0x%x (O 0x%x\n", state->Reg[15], pc);
+< #endif
+---
+> 
+>           
+> 
+1194a1291
+> 		printf("doing interrupt\n");
+1208c1305
+<       /*fprintf(stderr, "exec: pc=0x%08x instr=0x%08x\n", pc, instr);*/
+---
+>       LOGPC;
+1218,1219c1315,1327
+<       ARMword excep, instr;
+<       ARMword r15 = state->Reg[15];
+---
+>       ARMword excep, excepR15, instr;
+> 	  
+> 	  ARMword r15 = state->Reg[15];
+> 	  excepR15 = r15;
+> 	  
+> 	  if (delayR15)
+> 	  {
+> 		  printf("delaying interrupt?: %x, %x\n", r15, lastR15);
+> 		  excepR15 = lastR15;
+> 		  delayR15 = false;
+> 	  }
+> 	  lastR15 = r15;
+> 	  
+1242c1350
+<       excep = state->Exception &~r15;
+---
+>       excep = state->Exception &~excepR15;
+1249,1258c1357,1369
+<         if (excep & Exception_FIQ) {
+<           Prof_BeginFunc(ARMul_Abort);
+<           ARMul_Abort(state, ARMul_FIQV);
+<           Prof_EndFunc(ARMul_Abort);
+<         } else {
+<           Prof_BeginFunc(ARMul_Abort);
+<           ARMul_Abort(state, ARMul_IRQV);
+<           Prof_EndFunc(ARMul_Abort);
+<         }
+<         break;
+---
+> 		
+> 			printf("doing interrupt: %i\n", pipeidx);
+> 			if (excep & Exception_FIQ) {
+> 			  Prof_BeginFunc(ARMul_Abort);
+> 			  ARMul_Abort(state, ARMul_FIQV);
+> 			  Prof_EndFunc(ARMul_Abort);
+> 			} else {
+> 			  Prof_BeginFunc(ARMul_Abort);
+> 			  ARMul_Abort(state, ARMul_IRQV);
+> 			  Prof_EndFunc(ARMul_Abort);
+> 			}
+> 			
+> 			break;
+1261a1373,1374
+> 	  
+> 	  LOGPC;
+1270a1384,1393
+> 	  excepR15 = r15;
+> 	  
+> 	  if (delayR15)
+> 	  {
+> 		  printf("delaying interrupt?: %x, %x\n", r15, lastR15);
+> 		  excepR15 = lastR15;
+> 		  delayR15 = false;
+> 	  }
+> 	  lastR15 = r15;
+> 	  
+1293c1416
+<       excep = state->Exception &~r15;
+---
+>       excep = state->Exception &~excepR15;
+1300,1310c1423,1437
+<         if (excep & Exception_FIQ) {
+<           Prof_BeginFunc(ARMul_Abort);
+<           ARMul_Abort(state, ARMul_FIQV);
+<           Prof_EndFunc(ARMul_Abort);
+<         } else {
+<           Prof_BeginFunc(ARMul_Abort);
+<           ARMul_Abort(state, ARMul_IRQV);
+<           Prof_EndFunc(ARMul_Abort);
+<         }
+<         break;
+<       }
+---
+> 		
+> 			printf("doing interrupt: %i\n", pipeidx);
+> 			if (excep & Exception_FIQ) {
+> 			  Prof_BeginFunc(ARMul_Abort);
+> 			  ARMul_Abort(state, ARMul_FIQV);
+> 			  Prof_EndFunc(ARMul_Abort);
+> 			} else {
+> 			  Prof_BeginFunc(ARMul_Abort);
+> 			  ARMul_Abort(state, ARMul_IRQV);
+> 			  Prof_EndFunc(ARMul_Abort);
+> 			}
+> 			
+> 			break;
+> 		
+> 	  }
+1312a1440,1441
+> 	  LOGPC;
+> 	  
+1321a1451,1460
+> 	  excepR15 = r15;
+> 	  
+> 	  if (delayR15)
+> 	  {
+>           printf("delaying interrupt?: %x, %x\n", r15, lastR15);
+> 		  excepR15 = lastR15;
+> 		  delayR15 = false;
+> 	  }
+> 	  lastR15 = r15;
+> 	  
+1348c1487
+<       excep = state->Exception &~r15;
+---
+>       excep = state->Exception &~excepR15;
+1354a1494
+> 		printf("doing interrupt: %i\n", pipeidx);
+1367a1508
+> 	  LOGPC;
+Index: armemu.h
+===================================================================
+RCS file: /cvsroot/arcem/arcem/armemu.h,v
+retrieving revision 1.6
+diff -r1.6 armemu.h
+204c204,205
+< #define FLUSHPIPE state->NextInstr |= PRIMEPIPE
+---
+> #define DISPLAYREGS { int _register; for (_register=0;_register<14;_register++){printf("r%i %08x,", _register,  state->Reg[_register]); } printf("cc %x\n", (state->Reg[15] & CCBITS) >> 28); }
+> #define FLUSHPIPE {state->NextInstr |= PRIMEPIPE; DISPLAYREGS; }
+Index: armemuinstr.c
+===================================================================
+RCS file: /cvsroot/arcem/arcem/armemuinstr.c,v
+retrieving revision 1.3
+diff -r1.3 armemuinstr.c
+5c5
+<   EMFUNC_CONDTEST
+---
+>   EMFUNC_CONDTEST;
+8a9
+>  
+10a12,13
+> extern bool delayR15;
+> 
+23a27
+> 
+555a560
+>   delayR15 = true;
+565a571
+>   delayR15 = true;
+596a603
+>   delayR15 = true;
+607c614
+< 
+---
+>  delayR15 = true;
+903a911
+> 				delayR15 = true;
+906,907c914,920
+<                 DPSImmRHS; /* TST immed */
+<                 dest = LHS & rhs;
+---
+>                 //DPSImmRHS; /* TST immed */
+>                 temp = BITS(0,11); \
+> 				rhs = ARMul_ImmedTable[temp]; \
+> 				ARMword help = rhs >> 31;
+>                 if (temp > 255) /* there was a shift */ \
+> 					ASSIGNC(help);
+> 				dest = LHS & rhs;
+919a933
+> 				delayR15 = true;
+922,923c936,942
+<                 DPSImmRHS; /* TEQ immed */
+<                 dest = LHS ^ rhs;
+---
+>                 //DPSImmRHS; /* TEQ immed */
+>                 temp = BITS(0,11); \
+> 				rhs = ARMul_ImmedTable[temp]; \
+> 				ARMword help = rhs >> 31;
+>                 if (temp > 255) /* there was a shift */ \
+> 					ASSIGNC((help | (state->Reg[15] & CBIT)));
+> 				dest = LHS ^ rhs;
+924a944
+> 				
+935a956
+> 				delayR15 = true;
+960a982
+> 				delayR15 = true;
+1930a1953
+> 
+Index: arminit.c
+===================================================================
+RCS file: /cvsroot/arcem/arcem/arminit.c,v
+retrieving revision 1.11
+diff -r1.11 arminit.c
+134a135
+>  state->NumAccess = 0;
+Index: armsupp.c
+===================================================================
+RCS file: /cvsroot/arcem/arcem/armsupp.c,v
+retrieving revision 1.5
+diff -r1.5 armsupp.c
+97a98
+> 
+105a107
+>  
+118d119
+< 
+Index: hexcmos
+===================================================================
+RCS file: /cvsroot/arcem/arcem/hexcmos,v
+retrieving revision 1.2
+diff -r1.2 hexcmos
+129c129
+< 60
+---
+> 63
+240c240
+< 69
+---
+> 6c
+Index: arch/archio.c
+===================================================================
+RCS file: /cvsroot/arcem/arcem/arch/archio.c,v
+retrieving revision 1.12
+diff -r1.12 archio.c
+81c81,82
+< 
+---
+>   bool oldstate = state->Exception & Exception_FIQ;
+>  
+86c87,95
+< 
+---
+>   
+>   bool newstate =  tmp & Exception_FIQ;
+>   
+>   if (oldstate != newstate)
+>   {
+> 	
+> 	printf("set firq %i %x\n", newstate ? 1 : 0, state->NumAccess);
+>   }
+>   
+95c104,105
+< 
+---
+>   bool oldstate = state->Exception & Exception_IRQ;
+>   
+98a109
+> 	//printf("Interrupt: %08x, %08x\n", ioc.IRQStatus, ioc.IRQMask);
+100c111,124
+< 
+---
+>   
+>   bool newstate =  tmp & Exception_IRQ;
+>   
+>   if (oldstate != newstate)
+>   {
+> 	ARMword addr = state->Reg[15];
+> 	addr &= 0x3fffffc;
+> 	ARMword offset = 0;
+> 	
+> 	printf("set irq %i %x\n", newstate ? 1 : 0, state->NumAccess);
+> 	
+>   }
+>   
+>   
+149a174
+> extern bool delayR15;
+174a200
+> 	
+290c316
+<       ioc.IRQStatus &= ~IRQB_SRX; /* Clear receive reg full */
+---
+> 	  ioc.IRQStatus &= ~IRQB_SRX; /* Clear receive reg full */
+506c532
+<         return FDC_Read(state, offset);
+---
+>         //return FDC_Read(state, offset);
+529c555
+<           return HDC_Read(state, offset);
+---
+>           //return HDC_Read(state, offset);
+552c578
+<   return 0xffffff; /* was 0 */
+---
+>   return 0x00000000; /* was 0 */
+594c620
+<         FDC_Write(state, offset, data & 0xff, byteNotword);
+---
+>         //FDC_Write(state, offset, data & 0xff, byteNotword);
+619c645
+<           HDC_Write(state, offset, data);
+---
+>           //HDC_Write(state, offset, data);
+Index: arch/armarc.c
+===================================================================
+RCS file: /cvsroot/arcem/arcem/arch/armarc.c,v
+retrieving revision 1.42
+diff -r1.42 armarc.c
+774c774
+< 
+---
+> 	//printf("SetMEMC(32'h%08x);\n", address);
+776c776
+< 
+---
+> 	
+Index: arch/armarc.h
+===================================================================
+RCS file: /cvsroot/arcem/arcem/arch/armarc.h,v
+retrieving revision 1.16
+diff -r1.16 armarc.h
+157a158
+> FASTMAP_PROTO ARMword ARMul_LoadWordDebug(ARMul_State *state,ARMword address);
+Index: arch/cp15.c
+===================================================================
+RCS file: /cvsroot/arcem/arcem/arch/cp15.c,v
+retrieving revision 1.1
+diff -r1.1 cp15.c
+129c129,142
+< 
+---
+>   
+>   switch (uReg) 
+>   {
+> 	case 0: printf ("Read  0x%08x from Co-Pro 15 #0, ID Register\n", (unsigned int) *puValue); break;
+> 	case 2: printf ("Read  0x%08x from Co-Pro 15 #2, Cache control\n", (unsigned int) *puValue); break;
+> 	case 3: printf ("Read  0x%08x from Co-Pro 15 #3, Cacheable area\n", (unsigned int) *puValue); break;
+> 	case 4: printf ("Read  0x%08x from Co-Pro 15 #4, Updateable area\n", (unsigned int) *puValue); break;
+> 	case 5: printf ("Read  0x%08x from Co-Pro 15 #4, Disruptive area\n", (unsigned int) *puValue); break;
+> 	case 6: printf ("Read  0x%08x from Co-Pro 15 #6, Fault Status Register\n", (unsigned int) *puValue); break;
+> 	case 7: printf ("Read  0x%08x from Co-Pro 15 #7, Fault Address Register\n", (unsigned int) *puValue); break;
+> 	default:
+> 		break;
+>   }
+>   
+183c196,206
+< 
+---
+>   
+>   switch (uReg)
+>   {
+> 	case 1:   printf ("Write 0x%08x to   Co-Pro 15 #1, Flush Cache\n", uValue); break;
+> 	case 2:   printf ("Write 0x%08x to   Co-Pro 15 #2, Cache Control\n", uValue); break;
+> 	case 3:   printf ("Write 0x%08x to   Co-Pro 15 #3, Cacheable area\n", uValue); break;
+> 	case 4:   printf ("Write 0x%08x to   Co-Pro 15 #4, Updateable area\n", uValue); break;
+> 	case 5:   printf ("Write 0x%08x to   Co-Pro 15 #5, Disruptive area\n", uValue); break;
+> 	default:
+> 		break;
+>   }
+Index: arch/dbugsys.h
+===================================================================
+RCS file: /cvsroot/arcem/arcem/arch/dbugsys.h,v
+retrieving revision 1.1
+diff -r1.1 dbugsys.h
+15c15
+< #undef DEBUG
+---
+> #define DEBUG
+Index: arch/fastmap.c
+===================================================================
+RCS file: /cvsroot/arcem/arcem/arch/fastmap.c,v
+retrieving revision 1.5
+diff -r1.5 fastmap.c
+6a7,30
+> FASTMAP_FUNC ARMword ARMul_LoadWordDebug(ARMul_State *state,ARMword address)
+> {
+>     FastMapEntry *entry;
+>     FastMapRes res;
+> 
+> 	address &= UINT32_C(0x3ffffff);
+> 
+> 	entry = FastMap_GetEntryNoWrap(state,address);
+> 	res = FastMap_DecodeRead(entry,state->FastMapMode);
+> 
+> 	if(FASTMAP_RESULT_DIRECT(res))
+> 	{
+> 		ARMword result = *(FastMap_Log2Phy(entry,address&~UINT32_C(3)));
+> 		return result;
+> 	}
+> 	else if(FASTMAP_RESULT_FUNC(res))
+> 	{
+> 		ARMword result = FastMap_LoadFunc(entry,state,address);
+> 		return result;
+> 	}
+> 	
+> 	return 0;
+> }
+> 
+23c47
+< 
+---
+> 	printf("read %x data ", address & 0x3fffffc);
+29c53,55
+< 		return *(FastMap_Log2Phy(entry,address&~UINT32_C(3)));
+---
+> 		ARMword result = *(FastMap_Log2Phy(entry,address&~UINT32_C(3)));
+> 		printf("%08x time %x\n", result, state->NumAccess);
+> 		return result;
+33c59,61
+< 		return FastMap_LoadFunc(entry,state,address);
+---
+> 		ARMword result = FastMap_LoadFunc(entry,state,address);
+> 		printf("%08x time %x\n", result, state->NumAccess);
+> 		return result;
+96c124,125
+< 
+---
+> 	
+> 	printf("write %x data %08x be f\n", address & 0x3ffffff, data);
+Index: arch/i2c.c
+===================================================================
+RCS file: /cvsroot/arcem/arcem/arch/i2c.c,v
+retrieving revision 1.16
+diff -r1.16 i2c.c
+117a118,119
+>  	  dbug_i2c("I2C Sending seconds %02x\n", I2C.DataBuffer);
+> 
+120a123
+>   	  dbug_i2c("I2C Sending mins %02x\n", I2C.DataBuffer);
+123a127
+> 	  dbug_i2c("I2C Sending hour %02x\n", I2C.DataBuffer);
+126d129
+< 
+128a132
+> 	  dbug_i2c("I2C Sending year %02x\n", I2C.DataBuffer);
+133a138,139
+>    	  dbug_i2c("I2C Sending week/month %02x\n", I2C.DataBuffer);
+> 
+192a199,209
+> #define BYTETOBINARYPATTERN "%d%d%d%d%d%d%d%d"
+> #define BYTETOBINARY(byte)  \
+>   (byte & 0x80 ? 1 : 0), \
+>   (byte & 0x40 ? 1 : 0), \
+>   (byte & 0x20 ? 1 : 0), \
+>   (byte & 0x10 ? 1 : 0), \
+>   (byte & 0x08 ? 1 : 0), \
+>   (byte & 0x04 ? 1 : 0), \
+>   (byte & 0x02 ? 1 : 0), \
+>   (byte & 0x01 ? 1 : 0) 
+> 
+255a273
+> 		  //printf("next_rxData <= "BYTETOBINARYPATTERN"\n", BYTETOBINARY(I2C.DataBuffer));
+262c280
+<                 "%d\n", (int) I2C.DataBuffer);
+---
+>                 "%d (%x)\n", (int) I2C.DataBuffer, I2C.Data[I2C.DataBuffer]);

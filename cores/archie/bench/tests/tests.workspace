@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CodeLite_Workspace Name="tests" Database="" SWTLW="No">
+  <Project Name="caches" Path="caches/caches.project" Active="No"/>
+  <Project Name="video" Path="video/video.project" Active="Yes"/>
+  <Project Name="sound" Path="sound/sound.project"/>
+  <Project Name="common" Path="common/common.project"/>
+  <BuildMatrix>
+    <WorkspaceConfiguration Name="Debug" Selected="yes">
+      <Project Name="sound" ConfigName="Debug"/>
+      <Project Name="caches" ConfigName="Debug"/>
+      <Project Name="video" ConfigName="Debug"/>
+      <Project Name="sound" ConfigName="Debug"/>
+      <Project Name="common" ConfigName="Debug"/>
+    </WorkspaceConfiguration>
+    <WorkspaceConfiguration Name="Release" Selected="yes">
+      <Project Name="sound" ConfigName="Release"/>
+      <Project Name="caches" ConfigName="Release"/>
+      <Project Name="video" ConfigName="Release"/>
+      <Project Name="sound" ConfigName="Release"/>
+      <Project Name="common" ConfigName="Release"/>
+    </WorkspaceConfiguration>
+  </BuildMatrix>
+</CodeLite_Workspace>
