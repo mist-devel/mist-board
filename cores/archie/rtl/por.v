@@ -1,5 +1,6 @@
 `timescale 1ns / 1ps
-/*
+/* por.v 
+
  Copyright (c) 2012-2014, Stephen J. Leary
  All rights reserved.
  

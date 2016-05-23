@@ -1,5 +1,6 @@
 `timescale 1ns / 1ps
-/*
+/* latches.v
+
  Copyright (c) 2015, Stephen J. Leary
  All rights reserved.
  
