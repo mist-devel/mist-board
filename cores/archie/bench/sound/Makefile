@@ -21,4 +21,4 @@ conv:
 clean:: 
 	rm -rf *.o $(TARGET) llama.ac *.vcd conv mu255
 distclean:: clean
-	rm -rf *~ *.mif *.lu *.ul *.vcd *.txt
+	rm -rf *~ *.mif *.lu *.ul *.vcd *.txt *.orig
