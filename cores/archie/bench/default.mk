@@ -1,5 +1,5 @@
 AMBER=../../rtl/amber
-SUPPORT=../rtl/
+SUPPORT=../support/
 CHIPSET=../../rtl
 I2C=../../rtl/i2cslave
 

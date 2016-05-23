@@ -146,8 +146,6 @@ always @(posedge sd_clk) begin
 		// issued in a 64ms period. Other bus operations 
 		// are stalled during this period.
 		if ((sd_refresh > REFRESH_PERIOD) && (sd_cycle == 4'd0)) begin 
-
-		        $display("auto refresh cycle started: $t", $time);
 		   
 			sd_auto_refresh <= 1'b1;
 			sd_refresh		<= 10'd0;
