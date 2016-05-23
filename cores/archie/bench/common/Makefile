@@ -13,5 +13,6 @@ libdisarm:
 clean: 
 	rm -rf *.o $(TARGET)
 	make -C arm clean
+	make -C libdisarm clean
 distclean: clean
 	rm -rf *~ *.mif *.lu *.ul *.vcd *.txt *.orig

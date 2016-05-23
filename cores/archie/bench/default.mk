@@ -1,7 +1,7 @@
-AMBER=../../../rtl/amber
-SUPPORT=../../rtl/
-CHIPSET=../../../rtl
-I2C=../../../rtl/i2cslave
+AMBER=../../rtl/amber
+SUPPORT=../rtl/
+CHIPSET=../../rtl
+I2C=../../rtl/i2cslave
 
 COMMON_DIR=../common
 COMMON_LDFLAGS=../$(COMMON_DIR)/libcommon.a
