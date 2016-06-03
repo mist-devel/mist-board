@@ -1,0 +1,34 @@
+This is a set of patches to amber SVN to make it work here. 
+
+Patches by name
+
+testbench.patch
+---------------
+
+This patch puts clk_count into the a23_decompile.v so that this gets incremented without having to have it at the toplevel testbench. 
+It also removes the `TB.clk_count stuff and just uses clk_count. The native Amber testbench stuff is a bit annoying IMHO. 
+
+buslower.patch
+--------------
+
+This patch gives us the lower two bits of the address bus which parts of the archimedes MEMC needs but are missing from Amber. 
+
+translate.patch
+---------------
+
+Adds decode logic for an ARM translate pin on Amber. This is implemented as the wb_tga signal. 
+
+data_dabt.patch
+---------------
+
+Adds data abort to the core. Not perfect but enough to run RISC OS 1/2/3.
+
+
+decodelogic.patch
+-----------------
+
+Fixes all the broken carry logic. 
+
+
+
+

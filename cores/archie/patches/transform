@@ -1,0 +1,64 @@
+#!/usr/bin/python
+import os,sys
+
+lines = []
+
+def getSize(line):
+    if line[0] == "[":
+        sizeStr = line[1:line.find("]")]
+        sarray = sizeStr.split(":")
+        return int(sarray[0])- int(sarray[1]) + 1
+    else:
+        return 1
+
+def parseDeclaration(line, lines):
+    if line.find("=") > -1:
+        lines.append(line)
+        eqPos = line.find(" =")
+        cmPos = line.find(",",eqPos)
+        line = line[:eqPos] + line[cmPos:]
+    return line.rstrip()
+
+def insertInitials(lines):
+    for line in lines:
+        l = line.replace("output reg  ","")
+        l = l.replace(",",";")
+        size = getSize(l)
+        if l.find(";") < 0:
+            pos = l.find(" 'd");
+            pos = l.find(" ", pos+1)
+            l = l[:pos] + ";" + l[pos:]
+        l = l.replace(" 'd", " %i'd" % (size,))
+        
+        if size > 1:
+            l = l[l.find("]")+1:]
+        
+        print "    "+l.strip()
+    
+print >> sys.stderr, "Verilog Initial Block Converter"
+if (len(sys.argv) < 2):
+    print >> sys.stderr, "usage",sys.argv[0],"filename.v"
+    sys.exit(-1)
+
+filename = sys.argv[1];
+f = open(filename,"r")
+
+for line in f:
+    if line.find("output reg") > -1:
+        print parseDeclaration(line, lines)
+    elif (line.strip().startswith("initial")) and len(lines) > 0:
+        print line.rstrip()
+        print 
+        insertInitials(lines)
+        lines = []
+    elif (line.find("endmodule") > -1) and len(lines) > 0:
+        print "initial begin"
+        print 
+        insertInitials(lines)
+        print 
+        print "end" 
+        print line.rstrip()
+        lines = []
+    else: # just print everything else
+        sys.stdout.write(line)
+        

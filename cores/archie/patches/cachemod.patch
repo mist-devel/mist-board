@@ -1,0 +1,34 @@
+Index: a23_cache.v
+===================================================================
+--- a23_cache.v	(revision 89)
++++ a23_cache.v	(working copy)
+@@ -210,7 +210,11 @@
+ 
+ assign o_wb_req        = (( read_miss || write_miss ) && c_state == CS_IDLE ) || 
+                           c_state == CS_WRITE_HIT1;
++initial begin 
+ 
++	c_state = CS_IDLE;
++
++end
+      
+ // ======================================
+ // Cache State Machine
+@@ -522,7 +526,7 @@
+         `endif
+ 
+         `ifndef XILINX_FPGA
+-        generic_sram_line_en 
++         sram_line_en 
+         `endif
+ 
+             #(
+@@ -548,7 +552,7 @@
+         `endif
+ 
+         `ifndef XILINX_FPGA
+-        generic_sram_byte_en
++        sram_byte_en
+         `endif
+ 
+             #(

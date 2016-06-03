@@ -1,0 +1,1 @@
+This is a bunch of support scripts that help me debug. I had a bunch of other code in here but that contained bits of the ROOL OS RO5 System. So I had to remove it to distribute.

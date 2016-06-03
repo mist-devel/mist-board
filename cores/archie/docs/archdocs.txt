@@ -1,0 +1,459 @@
+Tom's Archimedes docs
+=====================
+
+Contents :
+
+1. Changes
+2. What's an Archimedes?
+3. What's in an Archimedes?
+4. Memory map
+5. VIDC
+6. IOC
+7. MEMC
+8. Other sources of info
+9. Contact info
+
+
+1. Changes
+----------
+
+23/07/05 - Additions to MEMC section.
+16/07/02 - Some improvements to the IOC section.
+15/07/02 - Filled in a few of the uncertain areas (Sprow)
+12/01/02 - Added pixel format info.
+24/11/01 - Added MEMC page table info. Thanks to Graeme Barnes for telling me
+           how it worked.
+ 1/11/01 - Added some more info to document. Working on layout.
+28/10/01 - First version of document.
+
+
+2. What's an Archimedes?
+------------------------
+
+The Archimedes is a home computer designed by Acorn in 1987, which used the
+ARM processor and chipset, which Acorn had been developing since 1985. The ARM
+processor is very fast, delivering 4 MIPs at 8MHz, and performs at about the
+speed of a 486 in real-world apps. The operating system, RiscOS, is very good,
+having a WIMP interface, multi-tasking, memory protection, etc. However, many
+people viewed the Archimedes as a school's computer, where most Archimedes
+were sold, and so it didn't do very well in the home or business markets. The
+Archimedes range was discontinued around 1994/1995, when Acorn introduced the
+RiscPC range, which was a development of the Archimedes.
+
+
+3. What's in an Archimedes?
+---------------------------
+
+CPU - ARM. Different Archimedes models used different CPUs
+           8MHz ARM2     - A3xx, A4xx, A3000
+           12MHz ARM250  - A3010, A3020, A4000
+           24MHz ARM3    - A4
+           25MHz ARM3    - original A5000
+           33MHz ARM3    - A540, revised A5000
+RAM   - Up to 16MB. The memory controller had a limit of 4MB, so to go above
+        that you had to fit more controllers.
+ROM   - Up to 2MB. Authur and RiscOS 2 had 512k, whilst RiscOS 3 had 2MB.
+Video - VIDC (part of the ARM chipset). This could have a resolution of up to
+        about 1152x896 , and up to 256 colours.
+Sound - VIDC (part of the ARM chipset). 8 channel stereo digital sound.
+IO    - IOC (part of the ARM chipset). This controlled the keyboard, timers,
+        interrupts, and most other chips.
+Disc  - The early Archimedes machines (pre-A5000) used a WD-1772 FDC, and
+        ST-506 and IDE hard disc controllers were add-ons. The later machines
+        used a Cirrus Logic chip, which had most of the components of an
+        IBM-AT motherboard integrated into it.
+Network - A 6854 was used for Econet networking.
+Serial - A 6551 ACIA was used.
+
+
+4. Memory map
+-------------
+
+0-1FFFFFF - logical RAM (32 meg)
+2000000-2FFFFFF - physical RAM (supervisor only - max 16MB - requires quad
+MEMCs)
+3000000 - 33FFFFF - IOC (IO controllers - supervisor only)
+  3310000 - FDC - WD1772
+  33A0000 - Econet - 6854
+  33B0000 - Serial - 6551
+  3240000 - 33FFFFF - internal expansion cards
+    32D0000 - hard disc controller (not IDE) - HD63463
+  3350010 - printer
+  3350018 - latch A
+  3350040 - latch B
+  3270000 - external expansion cards
+
+3400000 - 3FFFFFF - ROM (read - 12 meg - Arthur and RiscOS 2 512k, RiscOS 3 2MB)
+  3400000 - 37FFFFF - Low ROM  (4 meg, I think this is expansion ROMs)
+  3800000 - 3FFFFFF - High ROM (main OS ROM)
+
+3400000 - 35FFFFF - VICD10 (write - supervisor only)
+3600000 - 3FFFFFF - MEMC (write - supervisor only)
+
+Notes :
+
+On machine bootup/reset, OS ROM is mapped into logical RAM. This mapping
+disappears when a read or write is made outside of logical RAM. This is to let
+the ARM boot, as the ARM default startup address is 0.
+
+
+5. VIDC
+-------
+
+When writing, put register number in top byte, and data in lower 3 bytes.
+
+Registers :
+
+0-3C - palette. Format is :
+        bits 0-3 - red
+        bits 4-7 - green
+        bits 8-11 - blue
+        bit 12 - supremacy (a 1 bit alpha channel)
+
+40 - border colour (presume same format)
+44-4C - cursor palette (presume same format)
+50-5C - unused
+60-7C - stereo image channel (panning for sound - apparently channel 7 goes
+        first, then 0-6). Format is :
+      bits 0-2
+        %000 - undefined
+        %001 - 100% left
+        %010 - 83% left
+        %011 - 67% left
+        %100 - centre
+        %101 - 67% right
+        %110 - 83% right
+        %111 - 100% right
+
+80 - horizontal cycle
+84 - horizontal sync width
+88 - horizontal border start
+8C - horizontal display start
+90 - horizontal display end
+94 - horizontal border end
+98 - horizontal cursor start
+9C - horizontal interlace
+A0 - vertical cycle
+A4 - vertical sync width
+A8 - vertical border start
+AC - vertical display start
+B0 - vertical display end
+B4 - vertical border end
+B8 - vertical cursor start
+BC - vertical cursor end
+C0 - sound frequency (all sound channels use same freqency?)
+E0 - control register - format:
+        bits 0-1 - pixel rate (00 - 8MHz (320) 01 - 12MHz (480) 10 - 16MHz (640)
+11 - 34MHz (1280))
+        bits 2-3 - bpp (00 - 1 bpp 01 - 2 bpp 10 - 4 bpp 11 - 8bpp)
+        bits 4-5 - dma end word request (00 - 0,4 01 - 1,5 10 - 2,6 11 - 3,7)
+        bit 6 - interlace
+        bit 7 - composite sync
+
+
+Video pixel format :
+
+Each part describes the layout of a byte, the numbers refer to which pixel the
+bit refers to.
+
+For 1 bpp :
+76543210
+
+For 2 bpp :
+33221100
+
+For 4 bpp :
+11110000
+
+For 8 bpp :
+00000000
+
+All pixel data maps straight into the palette, except for 8 bpp.
+For 8bpp, bits 0-3 select which palette reg to use, and bits 4-7 replace bits
+3,6,7 and 11 of the palette data.
+
+Notes :
+
+VIDC accepts writes anywhere between 3400000 and 35FFFFF.
+VIDC doesn't control any DMA for video or sound, that is controlled by MEMC.
+
+6. IOC
+------
+
+
+IOC registers (All 8 bits wide) :
+
+0 - (rw) Control
+4 - (read) Keyboard receive (write) keyboard send
+
+10 - (read) IRQ status A
+14 - (read) IRQ request A
+14 - (write) IRQ clear (writing a 1 clears the respective interrupt bit)
+18 - (rw) IRQ mask A
+
+20 - (read) IRQ status B
+24 - (read) IRQ request B (unlike IRQA,IRQB is not latched so there is no clear
+register)
+28 - (rw) IRQ mask B
+
+30 - (read) FIQ status
+34 - (read) FIQ request
+38 - (rw) FIQ mask
+
+40 - (read) Timer 0 count low (write) Timer 0 latch low
+44 - (read) Timer 0 count high (write) Timer 0 latch high
+48 - (write) Timer 0 go command
+4C - (write) Timer 0 latch command
+
+50 - (read) Timer 1 count low (write) Timer 1 latch low
+54 - (read) Timer 1 count high (write) Timer 1 latch high
+58 - (write) Timer 1 go command
+5C - (write) Timer 1 latch command
+
+60 - (read) Timer 2 count low (write) Timer 2 latch low
+64 - (read) Timer 2 count high (write) Timer 2 latch high
+68 - (write) Timer 2 go command
+6C - (write) Timer 2 latch command
+
+70 - (read) Timer 3 count low (write) Timer 3 latch low
+74 - (read) Timer 3 count high (write) Timer 3 latch high
+78 - (write) Timer 3 go command
+7C - (write) Timer 3 latch command
+
+
+Control port:
++-+-+-+-+-+-+-+-+
+|7|6|5|4|3|2|1|0|
++-+-+-+-+-+-+-+-+
+ | | | | | | | |
+ | | | | | | | +-I2C data
+ | | | | | | +---I2C clock
+ | | | | | +-----Floppy ready
+ | | | | +-------Reserved
+ | | | +---------Aux IO connector (?)
+ | | +-----------Sound mute
+ | +-------------Printer ack
+ +---------------Vsync
+
+
+IRQs :
+
+Status A:
++-+-+-+-+-+-+-+-+
+|7|6|5|4|3|2|1|0|
++-+-+-+-+-+-+-+-+
+ | | | | | | | |
+ | | | | | | | +-Printer Busy
+ | | | | | | +---Serial ring
+ | | | | | +-----Printer ack
+ | | | | +-------Vsync
+ | | | +---------Power on reset
+ | | +-----------Timer 0
+ | +-------------Timer 1
+ +---------------Force IRQ
+
+Status B:
++-+-+-+-+-+-+-+-+
+|7|6|5|4|3|2|1|0|
++-+-+-+-+-+-+-+-+
+ | | | | | | | |
+ | | | | | | | +-Podule FIQ
+ | | | | | | +---Sound buffer empty
+ | | | | | +-----Serial interrupt
+ | | | | +-------HDD interrupt
+ | | | +---------Disc changed
+ | | +-----------Podule IRQ
+ | +-------------Keyboard transmit buffer empty
+ +---------------Keyboard receive buffer full
+
+FIQ:
++-+-+-+-+-+-+-+-+
+|7|6|5|4|3|2|1|0|
++-+-+-+-+-+-+-+-+
+ | | | | | | | |
+ | | | | | | | +-Floppy data request (what should be DMA)
+ | | | | | | +---Floppy interrupt
+ | | | | | +-----Econet interrupt
+ | | | | +-------\
+ | | | +----------the TRM says `see IOC datasheet'
+ | | +-----------/
+ | +-------------Podule FIQ
+ +---------------Force FIQ
+
+
+Disc interfacing :
+
+The latches attached to IOC are used to control disc stuff (such as drive
+selection, side selection etc) that the 1772 FDC cannot. The lines controlled
+are (all active-low) :
+
+Latch A :
+
++-+-+-+-+-+-+-+-+
+|7|6|5|4|3|2|1|0|
++-+-+-+-+-+-+-+-+
+ | | | | | | | |
+ | | | | | | | +-Drive 0 select
+ | | | | | | +---Drive 1 select
+ | | | | | +-----Drive 2 select
+ | | | | +-------Drive 3 select
+ | | | +---------Side select
+ | | +-----------Motor on/off
+ | +-------------In use control
+ +---------------Not used
+
+Latch B :
++-+-+-+-+-+-+-+-+
+|7|6|5|4|3|2|1|0|
++-+-+-+-+-+-+-+-+
+ | | | | | | | |
+ | | | | | | | +-Not used
+ | | | | | | +---Density select (1=single)
+ | | | | | +-----Not used
+ | | | | +-------Floppy controller reset
+ | | | +---------Printer strobe
+ | | +-----------Not used
+ | +-------------Not used
+ +---------------Not used
+
+
+
+Notes :
+
+Timers tick at 2mhz.
+When a timer hits 0, it causes an interrupt and reloads the counter from the latch.
+Timers 2&3 are used as baud rate counters, and do not cause interrupts.
+
+7. MEMC
+-------
+
+MEMC has two lots of registers - those from 3600000-37FFFFF (address
+registers), and from 3800000-3FFFFFF (page table).
+
+Address registers (addresses in binary) :
+Vinit   - %11011x000dddddddddddddddxx
+Vstart  - %11011x001dddddddddddddddxx
+Vend    - %11011x010dddddddddddddddxx
+Cinit   - %11011x011dddddddddddddddxx
+SstartN - %11011x100dddddddddddddddxx
+SendN   - %11011x101dddddddddddddddxx
+Sptr    - %11011x110xxxxxxxxxxxxxxxxx
+Control - %11011x111xxx0dddddddddddxx
+
+where x=don't care and d=data
+
+Control register format :
+
+bits 2-3 - page size (00 - 4kb  01 - 8kb  10 - 16kb  11 - 32kb)
+bits 4-5 - low ROM access (00 - 450ns  01 - 325ns  10 - 200ns)
+bits 6-7 - high ROM access (00 - 450ns  01 - 325ns  10 - 200ns)
+bits 8-9 - DRAM refresh (00 and 10 - none  01 - during video flyback  11 -
+continous)
+bit0 - video DMA enable
+bit 11 - sound DMA enable
+bit 12 - OS mode (0 - on  1 - off)
+
+Other address registers :
+
+Value in bits 2-16 is physical address divided by 16 - all in lower 512k RAM.
+
+Video uses a circular buffer from Vstart to Vend. Vptr set to Vinit at
+beginning of display.
+
+Cursor reads data from Cinit.
+
+Sound uses SstartN and SendN as start and end of next sound buffer. Sptr is in
+register map, but seemingly doesn't do anything.
+
+
+
+Page table :
+
+Address written (depending on page size) :
+
+4k  page:   111LLLLLLLLLLLLLAAMPPPPPPP
+8k  page:   111LLLLLLLLLLMLLAAMPPPPPPP
+16k page:   111LLLLLLLLLxMLLAAMPPPPPPP
+32k page:   111LLLLLLLLxxMLLAAMPPPPPPP
+
+L - logical page
+P - physical page
+A - access permissions
+M - MEMC number (for machines with multiple MEMCs)
+
+The logical page is encoded with bits 11+10 being the most significant bits
+(in that order), and the rest being bit 22 down.
+
+The physical page is encoded differently depending on the page size :
+
+4k  page:   bits 6-0 being bits 6-0
+8k  page:   bits 6-1 being bits 5-0, bit 0 being bit 6
+16k page:   bits 6-2 being bits 4-0, bits 1-0 being bits 6-5
+32k page:   bits 6-3 being bits 4-0, bit 0 being bit 4, bit 2 being bit 5, bit
+            1 being bit 6
+
+The table is arranged as one logical page for each physical page, if two
+physical pages are pointed to the same logical page, the last one gets mapped
+in.
+
+For the access permissions :
+
+In supervisor mode, all pages are read/write.
+In OS mode, only the pages with bit 9 clear are writable, the others are
+read-only.
+In user mode, if bit 9 is set then you can't read or write that page, and if
+bit 9 is clear but bit 8 is set, the page is read-only.
+
+Any bad accesses (writing to read only, reading from a page you don't have
+access to) triggers an ABORT exception on the ARM.
+
+Dual/Triple/Quad MEMCs:
+
+The MEMC number is formed from the two M bits, with the lower bit being bit 8.
+4k page size doesn't seem to be supported with multiple MEMCs, but RiscOS never
+uses it anyway (512k machines are implemented as 64 8k pages), and possibly isn't
+implemented in hardware. RiscOS relies on the presence of the extra memory in
+2400000-2FFFFFF to detect this setup.
+
+Only the page table seems to differ between MEMCs, the control/address registers
+are only used on the main MEMC.
+
+
+8. Other sources of info
+------------------------
+
+Books :
+
+ARM Architecture Reference Manual :
+
+One of the best ARM references around.
+
+
+VL86010 Risc Family Manual :
+
+This describes the ARM chipset (ARM, VIDC, IOC, MEMC) in detail. I don't have
+this one, which is why some of the info here is vague.
+
+
+Other :
+
+!Stronghelp
+ Stronghelp has a manual on the Archimedes internals, which is where most of
+ this info comes from. It is missing quite a few things however, such as the
+ MEMC pagetable, which isn't mentioned at all.
+
+ARM datasheets:
+
+ You can find datasheets for the ARM60, ARM610, ARM710, ARM7500 and VIDC20 in
+ postscript format at
+
+ftp://ftp.uni-stuttgart.de/pub/systems/acorn/riscos/ftp.acorn.co.uk/documents/ARM/datasheets/postscript/
+
+ The ARM710, ARM7500 and VIDC20 datasheets are also available at
+ http://acorn.riscos.com/documents/ARM/datasheets/postscript/
+
+
+9. Contact info
+---------------
+
+You can email me at tommowalker@hotmail.com (no spam please).

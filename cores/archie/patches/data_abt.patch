@@ -1,0 +1,315 @@
+Index: a23_core.v
+===================================================================
+--- a23_core.v	(revision 86)
++++ a23_core.v	(working copy)
+@@ -78,6 +78,7 @@
+ wire                      cache_flush;          // Flush the cache
+ wire      [31:0]          cacheable_area;
+ 
++wire					  fetch_abort ; 			// asserted when the fetch could not be completed.
+ wire                      fetch_stall;          // when this is asserted all registers in all 3 pipeline 
+                                                 // stages are held
+                                                 // at their current values
+@@ -176,7 +177,8 @@
+ 
+     .i_system_rdy                       ( i_system_rdy                      ),
+     .o_fetch_stall                      ( fetch_stall                       ),
+-    
++	.o_fetch_abort						( fetch_abort						),
++	
+     .o_wb_adr                           ( o_wb_adr                          ),
+     .o_wb_sel                           ( o_wb_sel                          ),
+     .o_wb_we                            ( o_wb_we                           ),
+@@ -197,7 +199,7 @@
+     .i_execute_address                  ( execute_address                   ),
+     .i_adex                             ( adex                              ),
+     .i_iabt                             ( 1'd0                              ),
+-    .i_dabt                             ( 1'd0                              ),
++    .i_dabt                             ( fetch_abort 				        ),
+     .i_abt_status                       ( 8'd0                              ),                                          
+     
+     .o_read_data                        ( read_data_s2                      ),                                          
+@@ -205,7 +207,8 @@
+     
+     .i_irq                              ( i_irq                             ),                                          
+     .i_firq                             ( i_firq                            ),                                          
+-    .i_fetch_stall                      ( fetch_stall                       ),                                          
++    .i_fetch_stall                      ( fetch_stall                       ),  
++	.i_fetch_abort						( fetch_abort						),
+     .i_execute_status_bits              ( execute_status_bits               ),                                          
+     .i_multiply_done                    ( multiply_done                     ),                                          
+     
+@@ -288,7 +291,8 @@
+     .o_status_bits                      ( execute_status_bits               ),
+     .o_multiply_done                    ( multiply_done                     ),
+ 
+-    .i_fetch_stall                      ( fetch_stall                       ),   
++    .i_fetch_stall                      ( fetch_stall                       ),  
++	.i_fetch_abort                      ( fetch_abort                       ),  	
+     .i_status_bits_mode                 ( status_bits_mode                  ),   
+     .i_status_bits_irq_mask             ( status_bits_irq_mask              ),   
+     .i_status_bits_firq_mask            ( status_bits_firq_mask             ),   
+Index: a23_decode.v
+===================================================================
+--- a23_decode.v	(revision 86)
++++ a23_decode.v	(working copy)
+@@ -46,6 +46,7 @@
+ input                       i_clk,
+ input       [31:0]          i_read_data,
+ input                       i_fetch_stall,                  // stall all stages of the cpu at the same time
++input						i_fetch_abort,					// abort the data transfer (instruction or data).
+ input                       i_irq,                          // interrupt request
+ input                       i_firq,                         // Fast interrupt request
+ input                       i_dabt,                         // data abort interrupt request
+@@ -243,7 +244,6 @@
+ 
+ wire                   dabt;
+ reg                    dabt_reg = 'd0;
+-reg                    dabt_reg_d1;
+ reg                    iabt_reg = 'd0;
+ reg                    adex_reg = 'd0;
+ reg     [31:0]         abt_address_reg = 'd0;
+@@ -298,7 +298,7 @@
+ assign o_iabt_address     = instruction_address;
+ assign o_iabt_status      = instruction_iabt_status;
+ 
+-assign o_dabt_trigger     = dabt_reg && !dabt_reg_d1;
++assign o_dabt_trigger     = dabt_reg;
+ assign o_dabt_address     = abt_address_reg;
+ assign o_dabt_status      = abt_status_reg;
+ 
+@@ -541,7 +541,7 @@
+ assign firq_request = firq && !i_execute_status_bits[26];
+ assign irq_request  = irq  && !i_execute_status_bits[27];
+ assign swi_request  = itype == SWI;
+-assign dabt_request = dabt_reg;
++assign dabt_request = dabt_reg || i_dabt;
+ 
+ // copro15 and copro13 only supports reg trans opcodes
+ // all other opcodes involving co-processors cause an 
+@@ -1518,7 +1518,7 @@
+ // Register Update
+ // ========================================================
+ always @ ( posedge i_clk )
+-    if (!i_fetch_stall) 
++    if (!i_fetch_stall | i_fetch_abort) 
+         begin                                                                                                                 
+         o_read_data                 <= i_read_data;
+         o_read_data_alignment       <= {i_execute_address[1:0], 3'd0};  
+@@ -1538,7 +1538,8 @@
+                                         // ensures that status_bits register gets updated correctly
+                                         // Likewise when in middle of multi-cycle instructions
+                                         // execute them unconditionally
+-        condition_r                 <= instruction_valid && !interrupt ? condition_nxt : AL;
++        condition_r                 <= i_fetch_abort ? NV : // dont execute if there was an abort.
++									   instruction_valid && !interrupt ? condition_nxt : AL;
+         o_exclusive_exec            <= exclusive_exec_nxt;
+         o_data_access_exec          <= data_access_exec_nxt;
+         
+@@ -1623,7 +1624,7 @@
+ 
+         
+ always @ ( posedge i_clk )
+-    if ( !i_fetch_stall )
++    if ( !i_fetch_stall | i_dabt )
+         begin
+         irq   <= i_irq;  
+         firq  <= i_firq; 
+@@ -1636,8 +1637,7 @@
+             begin
+             dabt_reg  <= dabt_reg || i_dabt;  
+             end
+-        
+-        dabt_reg_d1  <= dabt_reg;   
++         
+         end  
+ 
+ assign dabt = dabt_reg || i_dabt;
+Index: a23_decompile.v
+===================================================================
+--- a23_decompile.v	(revision 86)
++++ a23_decompile.v	(working copy)
+@@ -399,6 +399,11 @@
+                 3'd5:    $fwrite( decompile_file,"instruction abort" );
+                 default: $fwrite( decompile_file,"unknown type" );
+             endcase
++			
++			$fwrite( decompile_file, "@addr ");
++			tmp_address = get_32bit_signal(2);
++			fwrite_hex_drop_zeros(decompile_file, {tmp_address[31:2], 2'd0} );
++			
+             $fwrite( decompile_file,", return addr " );
+             
+             case ( interrupt_d1 )
+Index: a23_execute.v
+===================================================================
+--- a23_execute.v	(revision 86)
++++ a23_execute.v	(working copy)
+@@ -77,6 +77,7 @@
+ // Control signals from Instruction Decode stage
+ // --------------------------------------------------
+ input                       i_fetch_stall,          // stall all stages of the cpu at the same time
++input                       i_fetch_abort,			// transfer was not possible.         
+ input      [1:0]            i_status_bits_mode,
+ input                       i_status_bits_irq_mask,
+ input                       i_status_bits_firq_mask,
+@@ -315,7 +316,7 @@
+ 
+ // if current instruction does not execute because it does not meet the condition
+ // then address advances to next instruction
+-assign o_address_nxt = (!execute)              ? pc_plus4              : 
++assign o_address_nxt = (!execute)              ? (i_fetch_abort ? pc : pc_plus4 )             :  
+                        (i_address_sel == 4'd0) ? pc_plus4              :
+                        (i_address_sel == 4'd1) ? alu_out_pc_filtered   :
+                        (i_address_sel == 4'd2) ? interrupt_vector      :
+@@ -334,7 +335,7 @@
+ // ========================================================
+ // If current instruction does not execute because it does not meet the condition
+ // then PC advances to next instruction
+-assign pc_nxt = (!execute)       ? pc_plus4              :
++assign pc_nxt = (!execute)       ? i_fetch_abort ? pc : pc_plus4              :
+                 i_pc_sel == 2'd0 ? pc_plus4              :
+                 i_pc_sel == 2'd1 ? alu_out               :
+                                    interrupt_vector      ;
+@@ -395,8 +396,8 @@
+ // ========================================================
+ // Conditional Execution
+ // ========================================================
+-assign execute = conditional_execute ( i_condition, status_bits_flags );
+-            
++assign execute =  conditional_execute ( i_condition, status_bits_flags );
++assign fetch_stall = i_fetch_stall & ~i_fetch_abort;
+ // allow the PC to increment to the next instruction when current
+ // instruction does not execute
+ assign pc_wen       = i_pc_wen || !execute;
+@@ -426,22 +427,22 @@
+ // Register Update
+ // ========================================================
+ 
+-assign translate_update                = !i_fetch_stall && execute;
+-assign priviledged_update              = !i_fetch_stall;       
+-assign data_access_update              = !i_fetch_stall && execute;
+-assign write_enable_update             = !i_fetch_stall;
+-assign write_data_update               = !i_fetch_stall && execute && i_write_data_wen;
+-assign exclusive_update                = !i_fetch_stall && execute;
+-assign address_update                  = !i_fetch_stall;
+-assign byte_enable_update              = !i_fetch_stall && execute && i_write_data_wen;
+-assign copro_write_data_update         = !i_fetch_stall && execute && i_copro_write_data_wen;
++assign translate_update                = !fetch_stall && execute;
++assign priviledged_update              = !fetch_stall;       
++assign data_access_update              = !fetch_stall && execute;
++assign write_enable_update             = !fetch_stall;
++assign write_data_update               = !fetch_stall && execute && i_write_data_wen;
++assign exclusive_update                = !fetch_stall && execute;
++assign address_update                  = !fetch_stall;
++assign byte_enable_update              = !fetch_stall && execute && i_write_data_wen;
++assign copro_write_data_update         = !fetch_stall && execute && i_copro_write_data_wen;
+ 
+-assign base_address_update             = !i_fetch_stall && execute && i_base_address_wen; 
+-assign status_bits_flags_update        = !i_fetch_stall && execute && i_status_bits_flags_wen;
+-assign status_bits_mode_update         = !i_fetch_stall && execute && i_status_bits_mode_wen;
+-assign status_bits_mode_rds_oh_update  = !i_fetch_stall;
+-assign status_bits_irq_mask_update     = !i_fetch_stall && execute && i_status_bits_irq_mask_wen;
+-assign status_bits_firq_mask_update    = !i_fetch_stall && execute && i_status_bits_firq_mask_wen;
++assign base_address_update             = !fetch_stall && execute && i_base_address_wen; 
++assign status_bits_flags_update        = !fetch_stall && execute && i_status_bits_flags_wen;
++assign status_bits_mode_update         = !fetch_stall && execute && i_status_bits_mode_wen;
++assign status_bits_mode_rds_oh_update  = !fetch_stall;
++assign status_bits_irq_mask_update     = !fetch_stall && execute && i_status_bits_irq_mask_wen;
++assign status_bits_firq_mask_update    = !fetch_stall && execute && i_status_bits_firq_mask_wen;
+ 
+ assign status_bits_mode_rds_nr         =  status_bits_mode_rds_oh_update ? status_bits_mode_rds_nxt :
+                                                                            status_bits_mode_rds     ;
+@@ -531,7 +532,7 @@
+ `ifndef A23_RAM_REGISTER_BANK
+ a23_register_bank u_register_bank(
+     .i_clk                   ( i_clk                     ),
+-    .i_fetch_stall           ( i_fetch_stall             ),
++    .i_fetch_stall           ( fetch_stall             ),
+     .i_rm_sel                ( i_rm_sel                  ),
+     .i_rds_sel               ( i_rds_sel                 ),
+     .i_rn_sel                ( i_rn_sel                  ),
+@@ -562,7 +563,7 @@
+ `else
+ a23_ram_register_bank u_register_bank(
+     .i_clk                   ( i_clk                     ),
+-    .i_fetch_stall           ( i_fetch_stall             ),
++    .i_fetch_stall           ( fetch_stall             ),
+     .i_rm_sel                ( i_rm_sel_nxt              ),
+     .i_rds_sel               ( i_rds_sel_nxt             ),
+     .i_rn_sel                ( i_rn_sel_nxt              ),
+Index: a23_fetch.v
+===================================================================
+--- a23_fetch.v	(revision 86)
++++ a23_fetch.v	(working copy)
+@@ -60,6 +60,7 @@
+ input                       i_cache_flush,      // cache flush
+ input       [31:0]          i_cacheable_area,   // each bit corresponds to 2MB address space
+ input                       i_system_rdy,
++output						o_fetch_abort,
+ output                      o_fetch_stall,      // when this is asserted all registers 
+                                                 // in all 3 pipeline stages are held
+                                                 // at their current values
+@@ -107,8 +108,8 @@
+ // when the fetch stage needs more than 1 cycle to return the requested
+ // read data
+ assign o_fetch_stall     = !i_system_rdy || wb_stall || cache_stall;
++assign o_fetch_abort	 =  wb_abort;
+ 
+-
+ // ======================================
+ // L1 Cache (Unified Instruction and Data)
+ // ======================================
+@@ -152,6 +153,7 @@
+     .i_exclusive                ( i_exclusive           ),
+     .i_address                  ( i_address             ),
+     .o_stall                    ( wb_stall              ),
++	.o_abort					( wb_abort				),
+ 
+     // Cache Accesses to Wishbone bus 
+     // L1 Cache enable - used for hprot
+Index: a23_wishbone.v
+===================================================================
+--- a23_wishbone.v	(revision 86)
++++ a23_wishbone.v	(working copy)
+@@ -68,6 +68,7 @@
+ input                       i_exclusive,      // high for read part of swap access
+ input       [31:0]          i_address,
+ output                      o_stall,
++output                      o_abort,
+ 
+ // Cache Accesses to Wishbone bus
+ input                       i_cache_req,
+@@ -113,11 +114,12 @@
+ 
+ 
+ assign read_ack             = !o_wb_we && i_wb_ack;
+-assign o_stall              = ( core_read_request  && !read_ack )       || 
++assign write_ack            =  o_wb_we && i_wb_ack;
++assign o_stall              = ( core_write_request  && !write_ack )       || 
++							  ( core_read_request  && !read_ack )       || 
+                               ( core_read_request  && servicing_cache ) ||
+                               ( core_write_request && servicing_cache ) ||
+-                              ( core_write_request && wishbone_st == WB_WAIT_ACK) ||
+-                              ( cache_write_request && wishbone_st == WB_WAIT_ACK) ||
++							  ( cache_write_request && wishbone_st == WB_WAIT_ACK) ||
+                               wbuf_busy_r;
+ 
+                               // Don't stall on writes
+@@ -271,7 +273,7 @@
+ 
+         // Wait for the wishbone ack to be asserted
+         WB_WAIT_ACK:   
+-            if ( i_wb_ack )
++            if ( i_wb_ack | i_wb_err)
+                 begin
+                 wishbone_st         <= WB_IDLE;
+                 o_wb_stb            <= 1'd0; 
+@@ -283,6 +285,7 @@
+     endcase
+         
+         
++assign o_abort = i_wb_err & o_wb_cyc;
+ 
+ // ========================================================
+ // Debug Wishbone bus - not synthesizable

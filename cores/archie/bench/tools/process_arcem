@@ -1,0 +1,16 @@
+#!/bin/bash
+set -e
+echo "building simulation" 
+make -C ../ archimedes_top_instrumented
+echo "cleaning instrumented signal"
+tail -n +9 $1 | ./cleantrace.py | grep -v I2C | grep -v set | grep -v -i doing | grep -v -i pro | grep -v delaying > arcem_inst 
+echo "producing iodata"
+cat $1 | ./cleantrace.py | ./memory_cpp.py > iodata.txt
+echo "instrumenting simulation"
+cat iodata.txt | ../archimedes_top_instrumented/Varchimedes_top_instrumented "../ROM310"  > out
+echo "processing instrumentation"
+python instrument.py amber.dis  > amber_inst
+echo "tidy up"
+head -`cat amber_inst  | wc -l` arcem_inst  > a1
+tail -50000 a1 > b1
+tail -50000 amber_inst > b2

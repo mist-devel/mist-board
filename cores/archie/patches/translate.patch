@@ -1,0 +1,243 @@
+Index: a23_core.v
+===================================================================
+--- a23_core.v	(revision 89)
++++ a23_core.v	(working copy)
+@@ -58,8 +58,8 @@
+ output                      o_wb_cyc,
+ output                      o_wb_stb,
+ input                       i_wb_ack,
+-input                       i_wb_err
+-
++input                       i_wb_err,
++output                      o_wb_tga
+ );
+ 
+ wire      [31:0]          execute_address;
+@@ -71,6 +71,7 @@
+ wire                      priviledged;
+ wire                      exclusive_exec;
+ wire                      data_access_exec;
++wire                      translate;
+ wire      [3:0]           byte_enable;
+ wire                      data_access;          // high for data petch, low for instruction fetch
+ wire                      exclusive;            // swap access
+@@ -111,7 +112,8 @@
+ wire     [1:0]            multiply_function;       
+ wire     [2:0]            interrupt_vector_sel;    
+ wire     [3:0]            address_sel;             
+-wire     [1:0]            pc_sel;                  
++wire     [1:0]            pc_sel;         
++wire                      writeback_sel;         
+ wire     [1:0]            byte_enable_sel;         
+ wire     [2:0]            status_bits_sel;                
+ wire     [2:0]            reg_write_sel;           
+@@ -167,6 +169,7 @@
+     .i_write_enable                     ( write_enable                      ),
+     .o_read_data                        ( read_data                         ),
+     .i_priviledged                      ( priviledged                       ),
++    .i_translate                        ( translate                         ),
+     .i_byte_enable                      ( byte_enable                       ),
+     .i_data_access                      ( data_access                       ),      
+     .i_exclusive                        ( exclusive                         ),
+@@ -185,7 +188,8 @@
+     .o_wb_cyc                           ( o_wb_cyc                          ),
+     .o_wb_stb                           ( o_wb_stb                          ),
+     .i_wb_ack                           ( i_wb_ack                          ),
+-    .i_wb_err                           ( i_wb_err                          )
++    .i_wb_err                           ( i_wb_err                          ),
++    .o_wb_tga                           ( o_wb_tga                          )
+ );
+ 
+ 
+@@ -233,6 +237,7 @@
+     .o_interrupt_vector_sel             ( interrupt_vector_sel              ),
+     .o_address_sel                      ( address_sel                       ),
+     .o_pc_sel                           ( pc_sel                            ),
++    .o_writeback_sel			( writeback_sel                     ),
+     .o_byte_enable_sel                  ( byte_enable_sel                   ),
+     .o_status_bits_sel                  ( status_bits_sel                   ),
+     .o_reg_write_sel                    ( reg_write_sel                     ),
+@@ -280,6 +285,7 @@
+     .o_address_nxt                      ( execute_address_nxt               ),
+     .o_adex                             ( adex                              ),
+ 
++    .o_translate                        ( translate                         ),
+     .o_byte_enable                      ( byte_enable                       ),
+     .o_data_access                      ( data_access                       ),
+     .o_write_enable                     ( write_enable                      ),
+@@ -312,7 +318,8 @@
+     .i_multiply_function                ( multiply_function                 ),   
+     .i_interrupt_vector_sel             ( interrupt_vector_sel              ),   
+     .i_address_sel                      ( address_sel                       ),   
+-    .i_pc_sel                           ( pc_sel                            ),   
++    .i_pc_sel                           ( pc_sel                            ),
++    .i_writeback_sel                    ( writeback_sel                     ),
+     .i_byte_enable_sel                  ( byte_enable_sel                   ),   
+     .i_status_bits_sel                  ( status_bits_sel                   ),   
+     .i_reg_write_sel                    ( reg_write_sel                     ),   
+Index: a23_decode.v
+===================================================================
+--- a23_decode.v	(revision 89)
++++ a23_decode.v	(working copy)
+@@ -102,6 +102,7 @@
+ output reg                  o_base_address_wen = 'd0,       // save LDM base address register
+                                                             // in case of data abort
+ output wire                 o_pc_wen,
++output reg		    o_writeback_sel = 'd0, // force supervisor mode off for the memory cycle.
+ output reg  [14:0]          o_reg_bank_wen = 'd0,
+ output reg  [3:0]           o_reg_bank_wsel = 'd0,
+ output reg                  o_status_bits_flags_wen = 'd0,
+@@ -212,6 +213,7 @@
+ reg     [1:0]          barrel_shift_data_sel_nxt;
+ reg     [3:0]          address_sel_nxt;
+ reg     [1:0]          pc_sel_nxt;
++reg                    writeback_sel_nxt;
+ reg     [1:0]          byte_enable_sel_nxt;
+ reg     [2:0]          status_bits_sel_nxt;
+ reg     [2:0]          reg_write_sel_nxt;
+@@ -645,6 +647,7 @@
+     multiply_function_nxt           = 'd0;
+     address_sel_nxt                 = 'd0;
+     pc_sel_nxt                      = 'd0;
++    writeback_sel_nxt               = 'd0;
+     byte_enable_sel_nxt             = 'd0;
+     status_bits_sel_nxt             = 'd0;
+     reg_write_sel_nxt               = 'd0;
+@@ -826,6 +829,11 @@
+                     reg_bank_wsel_nxt = o_rn_sel_nxt;
+                 end
+ 
++            // post indexed transfer
++            // set the W bit.
++            if ((itype ==  TRANS) & mem_op_post_indexed) begin
++                writeback_sel_nxt	= instruction[21];
++            end
+                 // if post-indexed, then use Rn rather than ALU output, as address
+             if ( mem_op_post_indexed )
+                address_sel_nxt = 4'd4; // Rn
+@@ -1591,6 +1599,7 @@
+         o_interrupt_vector_sel      <= next_interrupt;
+         address_sel_r               <= address_sel_nxt;
+         pc_sel_r                    <= pc_sel_nxt;
++	o_writeback_sel		    <= writeback_sel_nxt;
+         o_byte_enable_sel           <= byte_enable_sel_nxt;
+         o_status_bits_sel           <= status_bits_sel_nxt;
+         o_reg_write_sel             <= reg_write_sel_nxt;
+Index: a23_execute.v
+===================================================================
+--- a23_execute.v	(revision 89)
++++ a23_execute.v	(working copy)
+@@ -66,6 +66,7 @@
+ output reg                  o_priviledged = 'd0,    // Priviledged access
+ output reg                  o_exclusive = 'd0,      // swap access
+ output reg                  o_write_enable = 'd0,
++output reg                  o_translate = 'd0,
+ output reg  [3:0]           o_byte_enable = 'd0,
+ output reg                  o_data_access = 'd0,    // To Fetch stage. high = data fetch, 
+                                                     // low = instruction fetch
+@@ -101,6 +102,7 @@
+ input      [2:0]            i_interrupt_vector_sel,
+ input      [3:0]            i_address_sel,
+ input      [1:0]            i_pc_sel,
++input      		    i_writeback_sel,
+ input      [1:0]            i_byte_enable_sel,
+ input      [2:0]            i_status_bits_sel,
+ input      [2:0]            i_reg_write_sel,
+@@ -185,6 +187,7 @@
+ wire                base_address_update;
+ wire                write_data_update;
+ wire                copro_write_data_update;
++wire                translate_update;
+ wire                byte_enable_update;
+ wire                data_access_update;
+ wire                write_enable_update;
+@@ -430,6 +433,7 @@
+ // Register Update
+ // ========================================================
+ 
++assign translate_update     	       = !i_fetch_stall && execute;
+ assign priviledged_update              = !i_fetch_stall;       
+ assign data_access_update              = !i_fetch_stall && execute;
+ assign write_enable_update             = !i_fetch_stall;
+@@ -462,6 +466,7 @@
+     address_r               <= address_update                 ? o_address_nxt                : address_r;    
+     o_adex                  <= address_update                 ? adex_nxt                     : o_adex;    
+     o_address_valid         <= address_update                 ? 1'd1                         : o_address_valid;
++    o_translate             <= translate_update		      ? ~i_writeback_sel & (status_bits_mode  != USR) : o_translate;
+     o_byte_enable           <= byte_enable_update             ? byte_enable_nxt              : o_byte_enable;
+     o_copro_write_data      <= copro_write_data_update        ? write_data_nxt               : o_copro_write_data; 
+ 
+Index: a23_fetch.v
+===================================================================
+--- a23_fetch.v	(revision 89)
++++ a23_fetch.v	(working copy)
+@@ -56,6 +56,7 @@
+ input                       i_exclusive,        // high for read part of swap access
+ input       [3:0]           i_byte_enable,
+ input                       i_data_access,      // high for data petch, low for instruction fetch
++input                       i_translate,
+ input                       i_cache_enable,     // cache enable
+ input                       i_cache_flush,      // cache flush
+ input       [31:0]          i_cacheable_area,   // each bit corresponds to 2MB address space
+@@ -72,6 +73,7 @@
+ output      [31:0]          o_wb_dat,
+ output                      o_wb_cyc,
+ output                      o_wb_stb,
++output                      o_wb_tga,
+ input                       i_wb_ack,
+ input                       i_wb_err
+ 
+@@ -150,6 +152,7 @@
+     .i_byte_enable              ( i_byte_enable         ),
+     .i_data_access              ( i_data_access         ),
+     .i_exclusive                ( i_exclusive           ),
++    .i_translate                ( i_translate           ),
+     .i_address                  ( i_address             ),
+     .o_stall                    ( wb_stall              ),
+ 
+@@ -165,7 +168,8 @@
+     .o_wb_cyc                   ( o_wb_cyc              ),
+     .o_wb_stb                   ( o_wb_stb              ),
+     .i_wb_ack                   ( i_wb_ack              ),
+-    .i_wb_err                   ( i_wb_err              )
++    .i_wb_err                   ( i_wb_err              ),
++    .o_wb_tga                   ( o_wb_tga              )
+ );
+ 
+ 
+Index: a23_wishbone.v
+===================================================================
+--- a23_wishbone.v	(revision 89)
++++ a23_wishbone.v	(working copy)
+@@ -67,6 +67,7 @@
+ input                       i_data_access,
+ input                       i_exclusive,      // high for read part of swap access
+ input       [31:0]          i_address,
++input	                    i_translate,      // assert the translate pin from the core.
+ output                      o_stall,
+ 
+ // Cache Accesses to Wishbone bus
+@@ -81,7 +82,8 @@
+ output reg                  o_wb_cyc = 'd0,
+ output reg                  o_wb_stb = 'd0,
+ input                       i_wb_ack,
+-input                       i_wb_err
++input                       i_wb_err,
++output reg                  o_wb_tga = 'd0 // address attributes
+ 
+ );
+ 
+@@ -176,11 +178,12 @@
+                 o_wb_stb            <= 1'd1; 
+                 o_wb_cyc            <= 1'd1; 
+                 o_wb_sel            <= byte_enable;
++		o_wb_tga	    <= i_translate;
+                 end
+             else if ( !wait_write_ack )
+                 begin
+                 o_wb_stb            <= 1'd0;
+-                
++                o_wb_tga	    <= 1'b0;
+                 // Hold cyc high after an exclusive access
+                 // to hold ownership of the wishbone bus
+                 o_wb_cyc            <= exclusive_access;
