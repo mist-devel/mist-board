@@ -1133,13 +1133,15 @@ PROCESS (clk, IPL, setstate, state, exec_write_back, set_direct_data, next_micro
 			end if;
 			nextpass <= '0';
 
-		  elsif setopcode='1' THEN
-			opcode <= X"4E71";		--nop
+--		  elsif setinterrupt = '1' then
+--			opcode(15 downto 12) <= X"7"; --moveq
+--			opcode(8 downto 6) <= "001"; --word
+--			nextpass <= '0';
 			
-		  elsif setinterrupt = '1' then
-			opcode(15 downto 12) <= X"7"; --moveq
-			opcode(8 downto 6) <= "001"; --word
-			nextpass <= '0';
+		  elsif setinterrupt = '1' or setopcode='1' THEN
+			opcode <= X"4E71";		--nop
+			nextpass <= '0'; 
+			
 		  else
 		  
 			-- if setnextpass='1' or (regdirectsource='1' and state="00") then
