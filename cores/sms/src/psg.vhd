@@ -11,7 +11,7 @@ end entity;
 
 architecture rtl of psg is
 
-	signal clk_divide	: unsigned(5 downto 0) := "000000";
+	signal clk_divide	: unsigned(4 downto 0) := "00000";
 	signal clk32		: std_logic;
 	signal regn			: std_logic_vector(2 downto 0);
 	signal tone0		: std_logic_vector(9 downto 0):="0000100000";
@@ -92,7 +92,7 @@ begin
 			clk_divide <= clk_divide+1;
 		end if;
 	end process;
-	clk32 <= std_logic(clk_divide(5));
+	clk32 <= std_logic(clk_divide(4));
 
 	process (clk, WR_n)
 	begin
