@@ -11,4 +11,5 @@ found in various other peoples repositories like:
 
   * [Winfried Soltys' github repository](https://github.com/wsoltys)
   * [Sorgelig's github repository](https://github.com/sorgelig)
-  * [Rok Krajnc's github repository](https://github.com/rkrajnc/)
+  * [Rok Krajnc's github repository](https://github.com/rkrajnc)
+  * [Robinsonb5's github repository](https://github.com/robinsonb5)
