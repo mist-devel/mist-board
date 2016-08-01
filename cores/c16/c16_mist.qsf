@@ -321,6 +321,14 @@ set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to AUDIO_L
 set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to AUDIO_R
 set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to SPI_DO
 set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to CONF_DATA0
+set_global_assignment -name VERILOG_FILE sd_card.v
+set_global_assignment -name VHDL_FILE spi_controller.vhd
+set_global_assignment -name VHDL_FILE rom_C1541.vhd
+set_global_assignment -name VHDL_FILE m6522.vhd
+set_global_assignment -name VHDL_FILE gen_ram.vhd
+set_global_assignment -name VHDL_FILE gcr_floppy.vhd
+set_global_assignment -name VHDL_FILE c1541_sd.vhd
+set_global_assignment -name VHDL_FILE c1541_logic.vhd
 set_global_assignment -name QIP_FILE pll_ntsc.qip
 set_global_assignment -name QIP_FILE pll_pal.qip
 set_global_assignment -name VERILOG_FILE data_io.v

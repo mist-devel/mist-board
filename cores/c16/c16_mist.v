@@ -70,13 +70,14 @@ module c16_mist (
 // it to control the menu on the OSD 
 parameter CONF_STR = {
         "C16;PRG;",
+		  "S1,D64;",
         "O2,Scanlines,Off,On;",
         "O3,Joysticks,Normal,Swapped;",
 		  "O4,Memory,64k,16k;",
         "T5,Reset"
 };
 
-parameter CONF_STR_LEN = 8+20+28+18+8;
+parameter CONF_STR_LEN = 8+7+20+28+18+8;
 
 // the status register is controlled by the on screen display (OSD)
 wire [7:0] status;
@@ -208,6 +209,19 @@ always @(posedge clk28) begin
       reset_cnt <= reset_cnt - 32'd1;
 end
 
+// signals to connect io controller with virtual sd card
+wire [32:0] sd_lba;
+wire sd_rd;
+wire sd_wr;
+wire sd_ack;
+wire sd_conf;
+wire sd_sdhc;
+wire [7:0] sd_dout;
+wire sd_dout_strobe;
+wire [7:0] sd_din;
+wire sd_din_strobe;
+wire sd_change;
+       		
 // include user_io module for arm controller communication
 user_io #(.STRLEN(CONF_STR_LEN)) user_io ( 
       .conf_str       ( CONF_STR       ),
@@ -230,9 +244,47 @@ user_io #(.STRLEN(CONF_STR_LEN)) user_io (
       .ps2_mouse_clk  ( ps2_mouse_clk  ),
       .ps2_mouse_data ( ps2_mouse_data ),
 
+      .sd_lba         ( sd_lba ),
+      .sd_rd          ( sd_rd ),
+      .sd_wr          ( sd_wr ),
+      .sd_ack         ( sd_ack ),
+      .sd_conf        ( sd_conf ),
+      .sd_sdhc        ( sd_sdhc ),
+      .sd_dout        ( sd_dout ),
+      .sd_dout_strobe ( sd_dout_strobe ),
+      .sd_din         ( sd_din ),
+      .sd_din_strobe  ( sd_din_strobe ),
+      .sd_change      ( sd_change ),
+
       .status         ( status         )
 );
 
+wire sd_dat;
+wire sd_dat3;
+wire sd_cmd;
+wire sd_clk;
+
+sd_card sd_card (
+	// connection to io controller
+   .io_lba         ( sd_lba         ),
+   .io_rd          ( sd_rd          ),
+   .io_wr          ( sd_wr          ),
+   .io_ack         ( sd_ack         ),
+   .io_conf        ( sd_conf        ),
+   .io_sdhc        ( sd_sdhc        ),
+   .io_din         ( sd_dout        ),
+   .io_din_strobe  ( sd_dout_strobe ),
+   .io_dout        ( sd_din         ),
+   .io_dout_strobe ( sd_din_strobe  ),
+ 
+   .allow_sdhc     ( 1'b1           ),
+
+   // connection to host
+   .sd_cs          ( sd_dat3        ),
+   .sd_sck         ( sd_clk         ),
+   .sd_sdi         ( sd_cmd         ),
+   .sd_sdo         ( sd_dat         )
+);
 
 // ---------------------------------------------------------------------------------
 // ------------------------------ prg memory injection -----------------------------
@@ -494,18 +546,13 @@ C16 c16 (
 	.kernal_dl_data  ( kernal_dl_data ),
 	.kernal_dl_write ( kernal_dl_wr),
 	
-/*	
 	.IEC_DATAOUT ( c16_iec_data_o ),
-	.IEC_DATAIN  ( c16_iec_data_i ),
+	.IEC_DATAIN  ( !c16_iec_data_i ),
 	.IEC_CLKOUT  ( c16_iec_clk_o ),
-	.IEC_CLKIN   ( c16_iec_clk_i ),
+	.IEC_CLKIN   ( !c16_iec_clk_i ),
 	.IEC_ATNOUT  ( c16_iec_atn_o ),
-	// .IEC_ATNIN,
 	.IEC_RESET   ( ),
-*/
-	.IEC_DATAIN  ( 1'b1 ),
-	.IEC_CLKIN   ( 1'b1 ),
-	
+
 	.AUDIO_L     ( AUDIO_L ),
 	.AUDIO_R     ( AUDIO_R ),
 
@@ -535,10 +582,12 @@ always @(posedge clk28)
 	clk14 <= !clk14;
 
 // A PLL to derive the system clock from the MiSTs 27MHz
+wire clk32;
 wire pll_pal_locked, clk28_pal;
 pll_pal pll_pal (
 	 .inclk0( CLOCK_27        ),
 	 .c0(     clk28_pal       ),
+	 .c1(     clk32           ),
 	 .locked( pll_pal_locked  )
 );
 
@@ -549,9 +598,6 @@ pll_ntsc pll_ntsc (
 	 .locked( pll_ntsc_locked  )
 );
 
-
-
-/*
 // ---------------------------------------------------------------------------------
 // ----------------------------------- floppy 1541 ---------------------------------
 // ---------------------------------------------------------------------------------
@@ -596,13 +642,12 @@ c1541_sd c1541_sd (
 	.iec_data_o ( c1541_iec_data_o ),
 	.iec_clk_o  ( c1541_iec_clk_o  ),
 
-   .sd_dat ( 1'b1 ),
-   .sd_dat3 (),
-   .sd_cmd (),
-   .sd_clk (),
+   .sd_dat  ( sd_dat  ),
+   .sd_dat3 ( sd_dat3 ),
+   .sd_cmd  ( sd_cmd  ),
+   .sd_clk  ( sd_clk  ),
 
    .led ( led_disk )
 );
-*/
 
 endmodule

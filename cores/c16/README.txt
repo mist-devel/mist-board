@@ -10,6 +10,7 @@ port has the follwing changes over the original version:
 - Switchable 16k/64k memory layout
 - builtin kernal can be overloaded (to e.g. switch to NTSC)
 - direct PRG injection into c16 memory
+- floppy 1541 (read only) taken from http://darfpga.blogspot.de/2015/05/fpga64027-with-c1541sd-sources-available.html
 
 -------------------------------------------------------------------------------
 FPGATED v1.0
