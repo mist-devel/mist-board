@@ -72,17 +72,19 @@ parameter CONF_STR = {
         "C16;PRG;",
         "O2,Scanlines,Off,On;",
         "O3,Joysticks,Normal,Swapped;",
-        "T4,Reset"
+		  "O4,Memory,64k,16k;",
+        "T5,Reset"
 };
 
-parameter CONF_STR_LEN = 8+20+28+8;
+parameter CONF_STR_LEN = 8+20+28+18+8;
 
 // the status register is controlled by the on screen display (OSD)
 wire [7:0] status;
 wire tv15khz;
 wire scanlines = status[2];
 wire joystick_swap = status[3];
-wire osd_reset = status[4];
+wire memory_16k = status[4];
+wire osd_reset = status[5];
 wire [1:0] buttons;
 
 wire [7:0] js0, js1;
@@ -121,10 +123,12 @@ wire [15:0] mux_sdram_addr = c16_wait?ioctl_sdram_addr:c16_sdram_addr;
 wire [7:0] mux_sdram_data = c16_wait?ioctl_sdram_data:c16_sdram_data;
 wire mux_sdram_wr = c16_wait?ioctl_sdram_write:c16_sdram_wr;
 wire mux_sdram_oe = c16_wait?1'b0:c16_sdram_oe;
-  
+
 wire [15:0] sdram_din = { mux_sdram_data, mux_sdram_data };
-wire [24:0] sdram_addr = { 10'h00, mux_sdram_addr[15:1] };   // 64k mapping
-// wire [24:0] sdram_addr = { 12'h00, mux_sdram_addr[13:1] };   // 16k mapping
+wire [14:0] sdram_addr_64k = mux_sdram_addr[15:1];   // 64k mapping
+wire [14:0] sdram_addr_16k = { 1'b0, mux_sdram_addr[13:7], 1'b0, mux_sdram_addr[6:1] };   // 16k
+wire [24:0] sdram_addr = { 10'h00, memory_16k?sdram_addr_16k:sdram_addr_64k };
+
 wire sdram_wr = mux_sdram_wr;
 wire sdram_oe = mux_sdram_oe;
 wire [1:0] sdram_ds = { mux_sdram_addr[0], !mux_sdram_addr[0] }; 
@@ -187,15 +191,18 @@ sdram sdram (
 // -------------------------------------- reset ------------------------------------
 // ---------------------------------------------------------------------------------
 
+reg last_mem16k;
 reg [31:0] reset_cnt;
 wire reset = (reset_cnt != 0);
 always @(posedge clk28) begin
+	last_mem16k <= memory_16k;
+
 	// long reset on startup and when io controller reboots
    if(status[0] || !pll_locked)
 		reset_cnt <= 32'd28000000;
 	// short reset on reset button, reset osd or when io controller is
-	// done downloading
-	else if(buttons[1] || osd_reset || rom_download)
+	// done downloading or when memory mapping changes
+	else if(buttons[1] || osd_reset || rom_download || (memory_16k != last_mem16k))
       reset_cnt <= 32'd65536;
    else if(reset_cnt != 0)
       reset_cnt <= reset_cnt - 32'd1;

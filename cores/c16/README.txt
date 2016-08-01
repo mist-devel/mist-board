@@ -1,6 +1,19 @@
+C16 for MIST
+MiST port by Till Harbaum
+
+This is the source code of the MIST port of the FPGATED project. The MIST
+port has the follwing changes over the original version:
+
+- VGA scan doubler (can be disabled through the mist.ini config file)
+- MIST on screen display overlay (OSD)
+- Joystick integration
+- Switchable 16k/64k memory layout
+- builtin kernal can be overloaded (to e.g. switch to NTSC)
+- direct PRG injection into c16 memory
+
+-------------------------------------------------------------------------------
 FPGATED v1.0
 Copyright 2013-2016 Istvan Hegedus
-MiST port by Till Harbaum
 
 FPGATED is a cycle exact FPGA core for the MOS 7360/8360 TED chip written in verilog language.
 MOS 7360/8360 is complex chip providing graphic, sound, bus and memory control for the Commodore 264
