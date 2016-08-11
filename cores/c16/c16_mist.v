@@ -631,7 +631,7 @@ c1541_sd c1541_sd (
 	.c1541rom_data ( 8'h00 ),
 	.c1541rom_wr ( 1'b0 ),
 	
-   .disk_change (), 
+   .disk_change ( sd_change ), 
    .disk_num ( 10'd0 ),        // not seletable by f8 or similar
 
 	.iec_atn_i  ( c1541_iec_atn_i  ),
