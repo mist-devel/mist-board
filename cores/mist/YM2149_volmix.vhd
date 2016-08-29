@@ -529,7 +529,7 @@ begin
             vol_table_in_r(11 downto 8) <= reg(10)(3 downto 0);
           else
             vol_table_in_l(11 downto 8) <= env_vol(4 downto 1);
-            vol_table_in_r(11 downto 8) <= reg(10)(3 downto 0);
+            vol_table_in_r(11 downto 8) <= env_vol(4 downto 1);
           end if;
         end if;
       end if;
