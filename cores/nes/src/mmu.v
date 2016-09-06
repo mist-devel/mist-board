@@ -891,7 +891,7 @@ module Rambo1(input clk, input ce, input reset,
     {chr_bank_0, chr_bank_1} <= 0;
     {chr_bank_2, chr_bank_3, chr_bank_4, chr_bank_5} <= 0;
     {chr_bank_8, chr_bank_9} <= 0;
-    {prg_bank_0, prg_bank_1, prg_bank_2} <= 0;
+    {prg_bank_0, prg_bank_1, prg_bank_2} <= 6'b111111;
     irq_cycle_mode <= 0;
     cycle_counter <= 0;
     irq <= 0;
