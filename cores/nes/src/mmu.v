@@ -212,9 +212,12 @@ module MMC2(input clk, input ce, input reset,
     end
   end
   
-  // Update latches when 0x3D8 or 0x3E8 is accessed.
+// PPU reads $0FD8: latch 0 is set to $FD for subsequent reads
+// PPU reads $0FE8: latch 0 is set to $FE for subsequent reads
+// PPU reads $1FD8 through $1FDF: latch 1 is set to $FD for subsequent reads
+// PPU reads $1FE8 through $1FEF: latch 1 is set to $FE for subsequent reads
   always @(posedge clk) if (ce && chr_read) begin
-    latch_0 <= (chr_ain & 14'h3ff8) == 14'h0fd8 ? 0 : (chr_ain & 14'h3ff8) == 14'h0fe8 ? 1 : latch_0;
+    latch_0 <= (chr_ain & 14'h3fff) == 14'h0fd8 ? 0 : (chr_ain & 14'h3fff) == 14'h0fe8 ? 1 : latch_0;
     latch_1 <= (chr_ain & 14'h3ff8) == 14'h1fd8 ? 0 : (chr_ain & 14'h3ff8) == 14'h1fe8 ? 1 : latch_1;
   end
   
