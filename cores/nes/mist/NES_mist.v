@@ -133,13 +133,22 @@ wire [1:0] switches;
 parameter CONF_STR = {
         "NES;NES;",
         "O1,HQ2X(VGA-Only),OFF,ON;",
-        "T2,Start;",
-        "T3,Select;",
-        "T4,Reset;"
+        "O2,Scanlines,OFF,ON;",
+        "T3,Start;",
+        "T4,Select;",
+        "T5,Reset;"
 };
 
-parameter CONF_STR_LEN = 8+25+9+10+9;
+parameter CONF_STR_LEN = 8+25+20+9+10+9;
 wire [7:0] status;
+
+wire arm_reset = status[0];
+wire smoothing_osd = status[1];
+wire scanlines_osd = status[2];
+wire start_osd = status[3];
+wire select_osd = status[4];
+wire reset_osd = status[5];
+
 wire scandoubler_disable;
 wire ps2_kbd_clk, ps2_kbd_data;
 
@@ -167,7 +176,6 @@ user_io #(.STRLEN(CONF_STR_LEN)) user_io(
 );
 
 // if "Start" or "Select" are selected from the menu keep them set for half a second 
-// status 2 and 3 are start and select from the OSD
 reg [23:0] select_cnt;
 reg [23:0] start_cnt;
 always @(posedge clk) begin
@@ -175,10 +183,10 @@ always @(posedge clk) begin
 		select_cnt <= 24'd0;
 		start_cnt <= 24'd0;
 	end else begin
-		if(status[2]) start_cnt <= 24'd11000000;
+		if(start_osd) start_cnt <= 24'd11000000;
 		else if(start_cnt != 0) start_cnt <= start_cnt - 24'd1;
 	
-		if(status[3]) select_cnt <= 24'd11000000;
+		if(select_osd) select_cnt <= 24'd11000000;
 		else if(select_cnt != 0) select_cnt <= select_cnt - 24'd1;
 	end
 end
@@ -267,7 +275,7 @@ wire [7:0] nes_joy_B = { joyA[0], joyA[1], joyA[2], joyA[3],
                     mapper_flags, loader_done, loader_fail);
 
 //TH  wire reset_nes = (buttons[1] || !loader_done);
-  wire reset_nes = (init_reset || buttons[1] || status[0] || status[4] || downloading);
+  wire reset_nes = (init_reset || buttons[1] || arm_reset || reset_osd || downloading);
   wire run_mem = (nes_ce == 0) && !reset_nes;
   wire run_nes = (nes_ce == 3) && !reset_nes;
 
@@ -367,7 +375,8 @@ video video (
 	.count_v(scanline),
 	.count_h(cycle),
 	.mode(scandoubler_disable),
-	.smoothing(!status[1]),
+	.smoothing(!smoothing_osd),
+	.scanlines(scanlines_osd),
 
 	.VGA_HS(VGA_HS),
 	.VGA_VS(VGA_VS),
