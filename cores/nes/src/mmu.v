@@ -251,7 +251,7 @@ module MMC2(input clk, input ce, input reset,
   assign chr_allow = flags[15];
 endmodule
 
-// This mapper also handles mapper 119 and 47.
+// This mapper also handles mapper 47,118,119 and 206.
 module MMC3(input clk, input ce, input reset,
             input [31:0] flags,
             input [15:0] prg_ain, output [21:0] prg_aout,
@@ -281,6 +281,9 @@ module MMC3(input clk, input ce, input reset,
   // TQROM maps 8kB CHR RAM
   wire TQROM = (flags[7:0] == 119);
   wire TxSROM = (flags[7:0] == 118); // Connects CHR A17 to CIRAM A10
+  wire DxROM = (flags[7:0] == 206);
+  
+  wire four_screen_mirroring = flags[16] | DxROM;
   
   // Mapper 47 is a multicart that has 128k for each game. It has no RAM.
   wire mapper47 = (flags[7:0] == 47);
@@ -384,16 +387,17 @@ module MMC3(input clk, input ce, input reset,
   wire [21:0] prg_aout_tmp = {3'b00_0,  prgsel, prg_ain[12:0]};
 
   assign {chr_allow, chr_aout} = 
-      (TQROM && chrsel[6]) ? {1'b1,      9'b11_1111_111, chrsel[2:0], chr_ain[9:0]} :   // TQROM 8kb CHR-RAM
+      (TQROM && chrsel[6])   ? {1'b1,    9'b11_1111_111, chrsel[2:0], chr_ain[9:0]} :   // TQROM 8kb CHR-RAM
+      (four_screen_mirroring && chr_ain[13]) ? {1'b1,    9'b11_1111_111, chr_ain[13], chr_ain[11:0]} :  // DxROM 8kb CHR-RAM
                              {flags[15], 4'b10_00, chrsel, chr_ain[9:0]};               // Standard MMC3
 
   assign prg_is_ram = prg_ain >= 'h6000 && prg_ain < 'h8000 && ram_enable && !(ram_protect && prg_write);
   assign prg_allow = prg_ain[15] && !prg_write || prg_is_ram && !mapper47;
   wire [21:0] prg_ram = {9'b11_1100_000, prg_ain[12:0]};
-  assign prg_aout = prg_is_ram  && !mapper47 ? prg_ram : prg_aout_tmp;
+  assign prg_aout = prg_is_ram  && !mapper47 && !DxROM ? prg_ram : prg_aout_tmp;
   assign vram_a10 = (TxSROM == 0) ? (mirroring ? chr_ain[11] : chr_ain[10]) :
                                     chrsel[7];
-  assign vram_ce = chr_ain[13];
+  assign vram_ce = chr_ain[13] && !four_screen_mirroring;
 endmodule
 
 // MMC4 mapper chip. PRG ROM: 256kB. Bank Size: 16kB. CHR ROM: 128kB
@@ -1837,6 +1841,7 @@ module MultiMapper(input clk, input ce, input ppu_ce, input reset,
     118, // TxSROM connects A17 to CIRAM A10.
     119, // TQROM  uses the Nintendo MMC3 like other TxROM boards but uses the CHR bank number specially.
     47,  // Mapper 047 is a MMC3 multicart
+	 206, // MMC3 w/o IRQ or WRAM support
     4:  {prg_aout, prg_allow, chr_aout, vram_a10, vram_ce, chr_allow, irq} = {mmc3_prg_addr, mmc3_prg_allow, mmc3_chr_addr, mmc3_vram_a10, mmc3_vram_ce, mmc3_chr_allow, mmc3_irq};
 
     10: {prg_aout, prg_allow, chr_aout, vram_a10, vram_ce, chr_allow}      = {mmc4_prg_addr, mmc4_prg_allow, mmc4_chr_addr, mmc4_vram_a10, mmc4_vram_ce, mmc4_chr_allow};

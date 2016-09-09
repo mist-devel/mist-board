@@ -20,8 +20,9 @@ module GameLoader(input clk, input reset,
   reg [21:0] bytes_left;
   
   assign error = (state == 3);
-  wire [7:0] prgrom = ines[4];
-  wire [7:0] chrrom = ines[5];
+  wire [7:0] prgrom = ines[4];	// Number of 16384 byte program ROM pages
+  wire [7:0] chrrom = ines[5];	// Number of 8192 byte character ROM pages (0 indicates CHR RAM)
+  wire has_chr_ram = (chrrom == 0);
   assign mem_data = indata;
   assign mem_write = (bytes_left != 0) && (state == 1 || state == 2) && indata_clk;
   
@@ -41,9 +42,25 @@ module GameLoader(input clk, input reset,
                         chrrom <= 32 ? 5 : 
                         chrrom <= 64 ? 6 : 7;
   
-  wire [7:0] mapper = {ines[7][7:4], ines[6][7:4]};
-  wire has_chr_ram = (chrrom == 0);
-  assign mapper_flags = {16'b0, has_chr_ram, ines[6][0], chr_size, prg_size, mapper};
+  // detect iNES2.0 compliant header
+  wire is_nes20 = (ines[7][3:2] == 2'b10);
+  // differentiate dirty iNES1.0 headers from proper iNES2.0 ones
+  wire is_dirty = !is_nes20 && ((ines[8]  != 0) 
+									  || (ines[9]  != 0)
+									  || (ines[10] != 0)
+									  || (ines[11] != 0)
+									  || (ines[12] != 0)
+									  || (ines[13] != 0)
+									  || (ines[14] != 0)
+									  || (ines[15] != 0));
+  
+  // Read the mapper number
+  wire [7:0] mapper = {is_dirty ? 4'b0000 : ines[7][7:4], ines[6][7:4]};
+  
+  // ines[6][0] is mirroring
+  // ines[6][3] is 4 screen mode
+  assign mapper_flags = {15'b0, ines[6][3], has_chr_ram, ines[6][0], chr_size, prg_size, mapper};
+  
   always @(posedge clk) begin
     if (reset) begin
       state <= 0;
@@ -58,7 +75,8 @@ module GameLoader(input clk, input reset,
            ines[ctr] <= indata;
            bytes_left <= {prgrom, 14'b0};
            if (ctr == 4'b1111)
-             state <= (ines[0] == 8'h4E) && (ines[1] == 8'h45) && (ines[2] == 8'h53) && (ines[3] == 8'h1A) && !ines[6][2] && !ines[6][3] ? 1 : 3;
+				 // Check the 'NES' header. Also, we don't support trainers.
+             state <= (ines[0] == 8'h4E) && (ines[1] == 8'h45) && (ines[2] == 8'h53) && (ines[3] == 8'h1A) && !ines[6][2] ? 1 : 3;
          end
       1, 2: begin // Read the next |bytes_left| bytes into |mem_addr|
           if (bytes_left != 0) begin
