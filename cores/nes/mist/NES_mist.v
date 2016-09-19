@@ -222,14 +222,14 @@ wire [7:0] nes_joy_B = { joyA[0], joyA[1], joyA[2], joyA[3],
   clk clock_21mhz(.inclk0(CLOCK_27[0]), .c0(clk85), .c1(SDRAM_CLK), .locked(clock_locked));
 
   // initial reset after pll startup
-//  reg [7:0] init_reset_cnt;
-//  wire init_reset = init_reset_cnt != 0;
-//  always @(posedge CLOCK_27[0]) begin
-//	if(!clock_locked)
-//		init_reset_cnt <= 8'd255;
-//	else if(init_reset_cnt != 0)
-//		init_reset_cnt <= init_reset_cnt - 8'd1;
-// end
+  reg [7:0] download_reset_cnt;
+  wire download_reset = download_reset_cnt != 0;
+  always @(posedge CLOCK_27[0]) begin
+	if(downloading)
+		download_reset_cnt <= 8'd255;
+	else if(download_reset_cnt != 0)
+		download_reset_cnt <= download_reset_cnt - 8'd1;
+ end
 
   // hold machine in reset until first download starts
   reg init_reset;
@@ -246,12 +246,6 @@ wire [7:0] nes_joy_B = { joyA[0], joyA[1], joyA[2], joyA[3],
   wire clk = clkcnt[1];
   wire ps2_clk = clkcnt[12];
   
-
-  // Loader
-  wire [7:0] loader_input;
-  wire       loader_clk;
-  reg  [7:0] loader_btn, loader_btn_2;
-
   wire [8:0] cycle;
   wire [8:0] scanline;
   wire [15:0] sample;
@@ -282,9 +276,13 @@ wire [7:0] nes_joy_B = { joyA[0], joyA[1], joyA[2], joyA[3],
     last_joypad_clock <= joypad_clock;
   end
   
+
+  // Loader
+  wire [7:0] loader_input;
+  wire       loader_clk;
   wire [21:0] loader_addr;
   wire [7:0] loader_write_data;
-  wire loader_reset = !downloading; //loader_conf[0];
+  wire loader_reset = !download_reset; //loader_conf[0];
   wire loader_write;
   wire [31:0] mapper_flags;
   wire loader_done, loader_fail;
@@ -292,8 +290,7 @@ wire [7:0] nes_joy_B = { joyA[0], joyA[1], joyA[2], joyA[3],
                     loader_addr, loader_write_data, loader_write,
                     mapper_flags, loader_done, loader_fail);
 
-//TH  wire reset_nes = (buttons[1] || !loader_done);
-  wire reset_nes = (init_reset || buttons[1] || arm_reset || reset_osd || downloading);
+  wire reset_nes = (init_reset || buttons[1] || arm_reset || reset_osd || download_reset);
   wire run_mem = (nes_ce == 0) && !reset_nes;
   wire run_nes = (nes_ce == 3) && !reset_nes;
 
