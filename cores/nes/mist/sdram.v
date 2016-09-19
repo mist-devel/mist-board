@@ -48,7 +48,7 @@ module sdram (
 );
 
 // no burst configured
-localparam RASCAS_DELAY   = 3'd3;   // tRCD=20ns -> 3 cycles@128MHz
+localparam RASCAS_DELAY   = 3'd2;   // tRCD=20ns -> 2 cycles@85MHz
 localparam BURST_LENGTH   = 3'b000; // 000=1, 001=2, 010=4, 011=8
 localparam ACCESS_TYPE    = 1'b0;   // 0=sequential, 1=interleaved
 localparam CAS_LATENCY    = 3'd3;   // 2/3 allowed
@@ -70,7 +70,7 @@ localparam STATE_LAST      = 4'd15;  // last state in cycle
 
 reg [3:0] q;
 always @(posedge clk) begin
-	// SDRAM (state machine) clock is 86MHz. Synchronize this to systems 21.477 Mhz clock
+	// SDRAM (state machine) clock is 85MHz. Synchronize this to systems 21.477 Mhz clock
    // force counter to pass state LAST->FIRST exactly after the rising edge of clkref
    if(((q == STATE_LAST) && ( clkref == 1)) ||
 		((q == STATE_FIRST) && ( clkref == 0)) ||
@@ -82,13 +82,13 @@ end
 // --------------------------- startup/reset ---------------------------
 // ---------------------------------------------------------------------
 
-// wait 1ms (32 8Mhz cycles) after FPGA config is done before going
+// wait 1ms (85000 cycles) after FPGA config is done before going
 // into normal operation. Initialize the ram in the last 16 reset cycles (cycles 15-0)
-reg [4:0] reset;
+reg [16:0] reset;
 always @(posedge clk) begin
-	if(init)	reset <= 5'h1f;
+	if(init)	reset <= 17'h14c08;
 	else if((q == STATE_LAST) && (reset != 0))
-		reset <= reset - 5'd1;
+		reset <= reset - 17'd1;
 end
 
 // ---------------------------------------------------------------------
