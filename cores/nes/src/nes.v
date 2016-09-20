@@ -93,7 +93,7 @@ endmodule
 // Data read by PPU will be available on the next clock cycle.
 // Data read by CPU will be available within at most 2 clock cycles.
 
-module MemoryMultiplex(input clk, input ce,
+module MemoryMultiplex(input clk, input ce, input reset,
                        input [21:0] prg_addr, input prg_read, input prg_write, input [7:0] prg_din,
                        input [21:0] chr_addr, input chr_read, input chr_write, input [7:0] chr_din,
                        // Access signals for the SRAM.
@@ -108,7 +108,10 @@ module MemoryMultiplex(input clk, input ce,
   assign memory_read_ppu = chr_read;
   assign memory_read_cpu = !(chr_read || chr_write) && (prg_read || saved_prg_read);
   assign memory_dout = chr_write ? chr_din : prg_din;
-  always @(posedge clk) if (ce) begin
+  always @(posedge clk) if (reset) begin
+		saved_prg_read <= 0;
+		saved_prg_write <= 0;
+  end else if (ce) begin
     if (chr_read || chr_write) begin
       saved_prg_read <= prg_read || saved_prg_read;
       saved_prg_write <= prg_write || saved_prg_write;
@@ -280,12 +283,14 @@ module NES(input clk, input reset, input ce,
   end
    
   // -- Multiplexes CPU and PPU accesses into one single RAM
-  MemoryMultiplex mem(clk, ce, prg_linaddr, prg_read && prg_allow, prg_write && prg_allow, prg_din, 
+  MemoryMultiplex mem(clk, ce, reset, prg_linaddr, prg_read && prg_allow, prg_write && prg_allow, prg_din, 
                                chr_linaddr, chr_read,              chr_write && (chr_allow || vram_ce), chr_from_ppu,
                                memory_addr, memory_read_cpu, memory_read_ppu, memory_write, memory_dout);
 
   always @* begin
-    if (apu_cs) begin
+    if (reset)
+		from_data_bus <= 0;
+    else if (apu_cs) begin
       if (joypad1_cs)
         from_data_bus = {7'b0100000, joypad_data[0]};
       else if (joypad2_cs)

@@ -212,9 +212,9 @@ end
 wire strt = (start_cnt != 0);
 wire sel = (select_cnt != 0);
 
-wire [7:0] nes_joy_A = { joyB[0], joyB[1], joyB[2], joyB[3], 
+wire [7:0] nes_joy_A = reset_nes ? 8'd0 : { joyB[0], joyB[1], joyB[2], joyB[3], 
 								 joyB[7] | strt, joyB[6] | sel, joyB[5], joyB[4] } | kbd_joy0;
-wire [7:0] nes_joy_B = { joyA[0], joyA[1], joyA[2], joyA[3], 
+wire [7:0] nes_joy_B = reset_nes ? 8'd0 : { joyA[0], joyA[1], joyA[2], joyA[3], 
 							    joyA[7], joyA[6], joyA[5], joyA[4] } | kbd_joy1;
 
   wire clock_locked;
@@ -264,16 +264,22 @@ wire [7:0] nes_joy_B = { joyA[0], joyA[1], joyA[2], joyA[3],
 
   reg [1:0] nes_ce;
 
-  always @(posedge clk) begin
-    if (joypad_strobe) begin
-      joypad_bits <= nes_joy_A;
-      joypad_bits2 <= nes_joy_B;
-    end
-    if (!joypad_clock[0] && last_joypad_clock[0])
-      joypad_bits <= {1'b0, joypad_bits[7:1]};
-    if (!joypad_clock[1] && last_joypad_clock[1])
-      joypad_bits2 <= {1'b0, joypad_bits2[7:1]};
-    last_joypad_clock <= joypad_clock;
+	always @(posedge clk) begin
+		if (reset_nes) begin
+			joypad_bits <= 8'd0;
+			joypad_bits2 <= 8'd0;
+			last_joypad_clock <= 2'b00;
+		end else begin
+			if (joypad_strobe) begin
+				joypad_bits <= nes_joy_A;
+				joypad_bits2 <= nes_joy_B;
+			end
+			if (!joypad_clock[0] && last_joypad_clock[0])
+				joypad_bits <= {1'b0, joypad_bits[7:1]};
+			if (!joypad_clock[1] && last_joypad_clock[1])
+				joypad_bits2 <= {1'b0, joypad_bits2[7:1]};
+			last_joypad_clock <= joypad_clock;
+		end
   end
   
 
@@ -291,7 +297,6 @@ wire [7:0] nes_joy_B = { joyA[0], joyA[1], joyA[2], joyA[3],
                     mapper_flags, loader_done, loader_fail);
 
   wire reset_nes = (init_reset || buttons[1] || arm_reset || reset_osd || download_reset);
-  wire run_mem = (nes_ce == 0) && !reset_nes;
   wire run_nes = (nes_ce == 3) && !reset_nes;
 
   // NES is clocked at every 4th cycle.
