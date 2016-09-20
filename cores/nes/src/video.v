@@ -76,9 +76,10 @@ always @(posedge clkv) begin
 end
 
 wire [14:0] pixel_v = (!hpicture || !vpicture) ? 15'd0 : mode ? pixel : doubler_pixel;
-wire  [4:0]   vga_r = mode ? pixel_v[4:0] : (v[0] & scanlines) ? {1'b0, pixel_v[4:1]} : pixel_v[4:0];
-wire  [4:0]   vga_g = mode ? pixel_v[9:5] : (v[0] & scanlines) ? {1'b0, pixel_v[9:6]} : pixel_v[9:5];
-wire  [4:0]   vga_b = mode ? pixel_v[14:10] : (v[0] & scanlines) ? {1'b0, pixel_v[14:11]} : pixel_v[14:10];
+wire darker = !mode && v[0] && scanlines;
+wire  [4:0]   vga_r = darker ? {1'b0, pixel_v[4:1]} : pixel_v[4:0];
+wire  [4:0]   vga_g = darker ? {1'b0, pixel_v[9:6]} : pixel_v[9:5];
+wire  [4:0]   vga_b = darker ? {1'b0, pixel_v[14:11]} : pixel_v[14:10];
 wire         sync_h = ((h >= (512 + 23 + (mode ? 18 : 35))) && (h < (512 + 23 + (mode ? 18 : 35) + 82)));
 wire         sync_v = ((v >= (mode ? 240 + 5  : 480 + 10))  && (v < (mode ? 240 + 14 : 480 + 12)));
 assign       VGA_HS = mode ? ~(sync_h ^ sync_v) : ~sync_h;

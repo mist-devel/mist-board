@@ -38,8 +38,10 @@ assign joystick_1 = joy_num ? buttons : 7'b0;
 always @(posedge reset or posedge clk) begin
 	
 	if(reset) begin
-		pressed <= 1'b1;
+		pressed <= 1'b0;
 		e0 <= 1'b0;
+		joy_num <= 1'b0;
+		buttons <= 8'd0;
 	end else begin
 		if (keyb_valid) begin
 			if (keyb_data == 8'HE0)
