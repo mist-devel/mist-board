@@ -59,16 +59,26 @@ module MMC1(input clk, input ce, input reset,
 // |++++- Select 16 KB PRG ROM bank (low bit ignored in 32 KB mode)
 // +----- PRG RAM chip enable (0: enabled; 1: disabled; ignored on MMC1A)
   reg [4:0] prg_bank;
+
+  reg delay_ctrl;	// used to delay fast-write to the control register
+  wire [3:0] last_prg_index = 4'b1111;
   
   // Update shift register
   always @(posedge clk) if (reset) begin
-    shift <= 1;
-    control <= 'hC;
+		shift <= 1;
+		control <= 5'b0_11_00;
+		chr_bank_0 <= 0;
+		chr_bank_1 <= 0;
+		prg_bank <= last_prg_index;
+		delay_ctrl <= 0;
   end else if (ce) begin
-    if (prg_write && prg_ain[15]) begin
+    if (delay_ctrl)
+		delay_ctrl <= delay_ctrl - 1'b1;
+    if (prg_write && prg_ain[15] && !delay_ctrl) begin
       if (prg_din[7]) begin
         shift <= 5'b10000;
-        control <= control | 'hC;
+        control <= control | 5'b0_11_00;
+		  delay_ctrl <= 1'b1;
 //        $write("MMC1 RESET!\n");
       end else begin
         if (shift[0]) begin
@@ -88,14 +98,15 @@ module MMC1(input clk, input ce, input reset,
   end
   
   // The PRG bank to load. Each increment here is 16kb. So valid values are 0..15.
-  reg [3:0] prgsel;
+  // prg_ain[14] selects bank0 ($8000) or bank1 ($C000)
+  reg [3:0] prgsel;  
   always @* begin
     casez({control[3:2], prg_ain[14]})
-    3'b0?_?: prgsel = {prg_bank[3:1], prg_ain[14]};
-    3'b10_0: prgsel = 4'b0000;
-    3'b10_1: prgsel = prg_bank[3:0];
-    3'b11_0: prgsel = prg_bank[3:0];
-    3'b11_1: prgsel = 4'b1111;
+    3'b0?_?: prgsel = {prg_bank[3:1], prg_ain[14]};	// Swap 32Kb
+    3'b10_0: prgsel = 4'b0000;								// Swap 16Kb at $C000 with access at $8000, so select page 0 (hardcoded)
+    3'b10_1: prgsel = prg_bank[3:0];						// Swap 16Kb at $C000 with $C000 access, so select page based on prg_bank (register 3)
+    3'b11_0: prgsel = prg_bank[3:0];						// Swap 16Kb at $8000 with $8000 access, so select page based on prg_bank (register 3)
+    3'b11_1: prgsel = last_prg_index;						// Swap 16Kb at $8000 with $C000 access, so select last page (hardcoded)
     endcase
   end
   wire [21:0] prg_aout_tmp = {4'b00_00,  prgsel, prg_ain[13:0]};
@@ -104,7 +115,7 @@ module MMC1(input clk, input ce, input reset,
   reg [4:0] chrsel;
   always @* begin
     casez({control[4], chr_ain[12]})
-    2'b0_?: chrsel = {chr_bank_0[4:1], chr_ain[12]};
+    2'b0_?: chrsel = {1'b0, chr_bank_0[3:1], chr_ain[12]};
     2'b1_0: chrsel = chr_bank_0;
     2'b1_1: chrsel = chr_bank_1;
     endcase
@@ -197,7 +208,7 @@ module MMC2(input clk, input ce, input reset,
   reg mirroring;
   
   reg latch_0, latch_1;
-  
+	
   // Update registers
   always @(posedge clk) if (ce) begin
     if (prg_write && prg_ain[15]) begin
@@ -297,7 +308,7 @@ module MMC3(input clk, input ce, input reset,
     bank_select <= 0;
     prg_rom_bank_mode <= 0;
     chr_a12_invert <= 0;
-    mirroring <= 0;
+    mirroring <= ~flags[14];	// for mapper 206, otherwise it's mapper controlled
     {irq_enable, irq_reload} <= 0;
     {irq_latch, counter} <= 0;
     {ram_enable, ram_protect} <= 0;
@@ -1096,8 +1107,16 @@ module Mapper28(input clk, input ce, input reset,
     
     // Allow writes to 0x5000 only when launching through the proper mapper ID.
     wire [7:0] mapper = flags[7:0];
-    wire allow_select = (mapper == 8'd28);
-        
+    wire allow_select = (mapper == 8'd28); 
+
+	 wire [7:0] prg_size = flags[13:11] == 0 ? 1 :
+							     flags[13:11] == 1 ? 2 :
+							     flags[13:11] == 2 ? 4 :
+							     flags[13:11] == 3 ? 8 :
+							     flags[13:11] == 4 ? 16 :
+							     flags[13:11] == 5 ? 32 :
+							     flags[13:11] == 6 ? 64 : 128;
+	
     always @(posedge clk) if (reset) begin
       mode[5:2] <= 0;         // NROM mode, 32K mode
       outer[5:0] <= 6'h3f;    // last bank
@@ -1109,9 +1128,11 @@ module Mapper28(input clk, input ce, input reset,
         mode[1:0] <= flags[14] ? 2'b10 : 2'b11;
         
       // UNROM #2 - Current bank in $8000-$BFFF and fixed top half of outer bank in $C000-$FFFF
-      if (mapper == 2)
-        mode[5:2] <= 4'b1111;
-        
+      if (mapper == 2) begin
+        mode[5:4] <= (prg_size == 16)? 2'b11 : 2'b10; // Select 128 or 256Kb PRG ROM
+        mode[3:2] <= 2'b11;
+      end
+		
       // CNROM #3 - Fixed PRG bank, switchable CHR bank.
       if (mapper == 3)
         selreg <= 0;
