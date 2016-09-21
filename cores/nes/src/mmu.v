@@ -308,7 +308,7 @@ module MMC3(input clk, input ce, input reset,
     bank_select <= 0;
     prg_rom_bank_mode <= 0;
     chr_a12_invert <= 0;
-    mirroring <= ~flags[14];	// for mapper 206, otherwise it's mapper controlled
+    mirroring <= flags[14];
     {irq_enable, irq_reload} <= 0;
     {irq_latch, counter} <= 0;
     {ram_enable, ram_protect} <= 0;
@@ -406,7 +406,7 @@ module MMC3(input clk, input ce, input reset,
   assign prg_allow = prg_ain[15] && !prg_write || prg_is_ram && !mapper47;
   wire [21:0] prg_ram = {9'b11_1100_000, prg_ain[12:0]};
   assign prg_aout = prg_is_ram  && !mapper47 && !DxROM ? prg_ram : prg_aout_tmp;
-  assign vram_a10 = (TxSROM == 0) ? (mirroring ? chr_ain[11] : chr_ain[10]) :
+  assign vram_a10 = !TxSROM ? (mirroring ? chr_ain[11] : chr_ain[10]) :	// TxSROM do not support mirroring
                                     chrsel[7];
   assign vram_ce = chr_ain[13] && !four_screen_mirroring;
 endmodule
