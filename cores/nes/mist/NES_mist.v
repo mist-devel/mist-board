@@ -8,7 +8,7 @@
 // Done is asserted when the whole game is loaded.
 // This parses iNES headers too.
 module GameLoader(input clk, input reset,
-                  input [7:0] indata, input indata_clk,
+                  input [7:0] indata, input indata_clk, input invert_mirroring,
                   output reg [21:0] mem_addr, output [7:0] mem_data, output mem_write,
                   output [31:0] mapper_flags,
                   output reg done,
@@ -59,7 +59,7 @@ module GameLoader(input clk, input reset,
   
   // ines[6][0] is mirroring
   // ines[6][3] is 4 screen mode
-  assign mapper_flags = {15'b0, ines[6][3], has_chr_ram, ines[6][0], chr_size, prg_size, mapper};
+  assign mapper_flags = {15'b0, ines[6][3], has_chr_ram, ines[6][0] ^ invert_mirroring, chr_size, prg_size, mapper};
   
   always @(posedge clk) begin
     if (reset) begin
@@ -152,20 +152,22 @@ parameter CONF_STR = {
         "NES;NES;",
         "O1,HQ2X(VGA-Only),OFF,ON;",
         "O2,Scanlines,OFF,ON;",
-        "T3,Start;",
-        "T4,Select;",
-        "T5,Reset;"
+        "O3,Invert mirroring,OFF,ON;",
+        "T4,Start;",
+        "T5,Select;",
+        "T6,Reset;"
 };
 
-parameter CONF_STR_LEN = 8+25+20+9+10+9;
+parameter CONF_STR_LEN = 8+25+20+27+9+10+9;
 wire [7:0] status;
 
 wire arm_reset = status[0];
 wire smoothing_osd = status[1];
 wire scanlines_osd = status[2];
-wire start_osd = status[3];
-wire select_osd = status[4];
-wire reset_osd = status[5];
+wire mirroring_osd = status[3];
+wire start_osd = status[4];
+wire select_osd = status[5];
+wire reset_osd = status[6];
 
 wire scandoubler_disable;
 wire ps2_kbd_clk, ps2_kbd_data;
@@ -292,7 +294,7 @@ wire [7:0] nes_joy_B = reset_nes ? 8'd0 : { joyA[0], joyA[1], joyA[2], joyA[3],
   wire loader_write;
   wire [31:0] mapper_flags;
   wire loader_done, loader_fail;
-  GameLoader loader(clk, loader_reset, loader_input, loader_clk,
+  GameLoader loader(clk, loader_reset, loader_input, loader_clk, mirroring_osd,
                     loader_addr, loader_write_data, loader_write,
                     mapper_flags, loader_done, loader_fail);
 
