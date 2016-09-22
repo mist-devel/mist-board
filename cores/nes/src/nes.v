@@ -129,7 +129,7 @@ module NES(input clk, input reset, input ce,
            output [5:0] color,  // pixel generated from PPU
            output joypad_strobe,// Set to 1 to strobe joypads. Then set to zero to keep the value.
            output [1:0] joypad_clock, // Set to 1 for each joypad to clock it.
-           input [1:0] joypad_data, // Data for each joypad.
+           input [3:0] joypad_data, // Data for each joypad + 1 powerpad.
            input [4:0] audio_channels, // Enabled audio channels
 
            
@@ -294,7 +294,7 @@ module NES(input clk, input reset, input ce,
       if (joypad1_cs)
         from_data_bus = {7'b0100000, joypad_data[0]};
       else if (joypad2_cs)
-        from_data_bus = {7'b0100000, joypad_data[1]};
+        from_data_bus = {3'b010, joypad_data[3:2] ,2'b00, joypad_data[1]};
       else
         from_data_bus = apu_dout;
     end else if (ppu_cs) begin

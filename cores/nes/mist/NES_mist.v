@@ -260,6 +260,7 @@ wire [7:0] nes_joy_B = reset_nes ? 8'd0 : { joyA[0], joyA[1], joyA[2], joyA[3],
   wire [7:0] memory_din_cpu, memory_din_ppu;
   wire [7:0] memory_dout;
   reg [7:0] joypad_bits, joypad_bits2;
+  reg [7:0] powerpad_d3, powerpad_d4;
   reg [1:0] last_joypad_clock;
   wire [31:0] dbgadr;
   wire [1:0] dbgctr;
@@ -270,16 +271,24 @@ wire [7:0] nes_joy_B = reset_nes ? 8'd0 : { joyA[0], joyA[1], joyA[2], joyA[3],
 		if (reset_nes) begin
 			joypad_bits <= 8'd0;
 			joypad_bits2 <= 8'd0;
+			powerpad_d3 <= 8'd0;
+			powerpad_d4 <= 8'd0;
 			last_joypad_clock <= 2'b00;
 		end else begin
 			if (joypad_strobe) begin
 				joypad_bits <= nes_joy_A;
 				joypad_bits2 <= nes_joy_B;
+				powerpad_d4 <= {4'b0000, powerpad[7], powerpad[11], powerpad[2], powerpad[3]};
+				powerpad_d3 <= {powerpad[6], powerpad[10], powerpad[9], powerpad[5], powerpad[8], powerpad[4], powerpad[0], powerpad[1]};
 			end
-			if (!joypad_clock[0] && last_joypad_clock[0])
+			if (!joypad_clock[0] && last_joypad_clock[0]) begin
 				joypad_bits <= {1'b0, joypad_bits[7:1]};
-			if (!joypad_clock[1] && last_joypad_clock[1])
+			end	
+			if (!joypad_clock[1] && last_joypad_clock[1]) begin
 				joypad_bits2 <= {1'b0, joypad_bits2[7:1]};
+				powerpad_d4 <= {1'b0, powerpad_d4[7:1]};
+				powerpad_d3 <= {1'b0, powerpad_d3[7:1]};
+			end	
 			last_joypad_clock <= joypad_clock;
 		end
   end
@@ -308,7 +317,7 @@ wire [7:0] nes_joy_B = reset_nes ? 8'd0 : { joyA[0], joyA[1], joyA[2], joyA[3],
   NES nes(clk, reset_nes, run_nes,
           mapper_flags,
           sample, color,
-          joypad_strobe, joypad_clock, {joypad_bits2[0], joypad_bits[0]},
+          joypad_strobe, joypad_clock, {powerpad_d4[0],powerpad_d3[0],joypad_bits2[0],joypad_bits[0]},
           5'b11111,  // enable all channels
           memory_addr,
           memory_read_cpu, memory_din_cpu,
@@ -421,6 +430,7 @@ assign LED = ~downloading;
 
 wire [7:0] kbd_joy0;
 wire [7:0] kbd_joy1;
+wire [11:0] powerpad;
 
 keyboard keyboard (
 	.clk(clk),
@@ -429,7 +439,9 @@ keyboard keyboard (
 	.ps2_kbd_data(ps2_kbd_data),
 
 	.joystick_0(kbd_joy0),
-	.joystick_1(kbd_joy1)
+	.joystick_1(kbd_joy1),
+	
+	.powerpad(powerpad)
 );
 			
 endmodule
