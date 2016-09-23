@@ -61,24 +61,14 @@ module MMC1(input clk, input ce, input reset,
   reg [4:0] prg_bank;
 
   reg delay_ctrl;	// used to prevent fast-write to the control register
-  wire [3:0] last_prg_index = 4'b1111;
-  
-  // used to prevent overflow of the chr_sel
-  wire [4:0] chr_4k_banks_mask = flags[10:8] == 0 ? 5'h01 :				// 8Kb CHR RAM or ROM
-											flags[10:8] == 1 ? 5'h03 :				// 16Kb
-											flags[10:8] == 2 ? 5'h07 :				// 32Kb 
-											flags[10:8] == 3 ? 5'h0f :				// 64Kb
-											flags[10:8] == 4 ? 5'h1f :				// 128Kb
-											flags[10:8] == 5 ? 5'h1f :				// not supported
-											flags[10:8] == 6 ? 5'h1f : 5'h1f;	// not supported
-  
+   
   // Update shift register
   always @(posedge clk) if (reset) begin
 		shift <= 1;
 		control <= 5'b0_11_00;
 		chr_bank_0 <= 0;
 		chr_bank_1 <= 0;
-		prg_bank <= last_prg_index;
+		prg_bank <= 4'b1111;		// might not be the actual last page index but will be masked anyway
 		delay_ctrl <= 0;
   end else if (ce) begin
     if (!prg_write)
@@ -115,7 +105,7 @@ module MMC1(input clk, input ce, input reset,
     3'b10_0: prgsel = 4'b0000;								// Swap 16Kb at $C000 with access at $8000, so select page 0 (hardcoded)
     3'b10_1: prgsel = prg_bank[3:0];						// Swap 16Kb at $C000 with $C000 access, so select page based on prg_bank (register 3)
     3'b11_0: prgsel = prg_bank[3:0];						// Swap 16Kb at $8000 with $8000 access, so select page based on prg_bank (register 3)
-    3'b11_1: prgsel = last_prg_index;						// Swap 16Kb at $8000 with $C000 access, so select last page (hardcoded)
+    3'b11_1: prgsel = 4'b1111;								// Swap 16Kb at $8000 with $C000 access, so select last page (hardcoded)
     endcase
   end
   wire [21:0] prg_aout_tmp = {4'b00_00,  prgsel, prg_ain[13:0]};
