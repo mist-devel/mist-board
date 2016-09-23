@@ -60,8 +60,17 @@ module MMC1(input clk, input ce, input reset,
 // +----- PRG RAM chip enable (0: enabled; 1: disabled; ignored on MMC1A)
   reg [4:0] prg_bank;
 
-  reg delay_ctrl;	// used to delay fast-write to the control register
+  reg delay_ctrl;	// used to prevent fast-write to the control register
   wire [3:0] last_prg_index = 4'b1111;
+  
+  // used to prevent overflow of the chr_sel
+  wire [4:0] chr_4k_banks_mask = flags[10:8] == 0 ? 5'h01 :				// 8Kb CHR RAM or ROM
+											flags[10:8] == 1 ? 5'h03 :				// 16Kb
+											flags[10:8] == 2 ? 5'h07 :				// 32Kb 
+											flags[10:8] == 3 ? 5'h0f :				// 64Kb
+											flags[10:8] == 4 ? 5'h1f :				// 128Kb
+											flags[10:8] == 5 ? 5'h1f :				// not supported
+											flags[10:8] == 6 ? 5'h1f : 5'h1f;	// not supported
   
   // Update shift register
   always @(posedge clk) if (reset) begin
@@ -72,8 +81,8 @@ module MMC1(input clk, input ce, input reset,
 		prg_bank <= last_prg_index;
 		delay_ctrl <= 0;
   end else if (ce) begin
-    if (delay_ctrl)
-		delay_ctrl <= delay_ctrl - 1'b1;
+    if (!prg_write)
+		delay_ctrl <= 1'b0;
     if (prg_write && prg_ain[15] && !delay_ctrl) begin
       if (prg_din[7]) begin
         shift <= 5'b10000;
@@ -115,7 +124,7 @@ module MMC1(input clk, input ce, input reset,
   reg [4:0] chrsel;
   always @* begin
     casez({control[4], chr_ain[12]})
-    2'b0_?: chrsel = {1'b0, chr_bank_0[3:1], chr_ain[12]};
+    2'b0_?: chrsel = {chr_bank_0[4:1], chr_ain[12]};
     2'b1_0: chrsel = chr_bank_0;
     2'b1_1: chrsel = chr_bank_1;
     endcase
@@ -1760,7 +1769,7 @@ endmodule
 // 28 = Working
 // 34 = Working
 // 41 = Working
-// 42 = 
+// 42 = Working
 // 47 = Working
 // 64 = Tons of GFX bugs
 // 66 = Working
