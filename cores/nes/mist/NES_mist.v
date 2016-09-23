@@ -12,14 +12,13 @@ module GameLoader(input clk, input reset,
                   output reg [21:0] mem_addr, output [7:0] mem_data, output mem_write,
                   output [31:0] mapper_flags,
                   output reg done,
-                  output error);
+                  output reg error);
   reg [1:0] state = 0;
   reg [7:0] prgsize;
   reg [3:0] ctr;
   reg [7:0] ines[0:15]; // 16 bytes of iNES header
   reg [21:0] bytes_left;
   
-  assign error = (state == 3);
   wire [7:0] prgrom = ines[4];	// Number of 16384 byte program ROM pages
   wire [7:0] chrrom = ines[5];	// Number of 8192 byte character ROM pages (0 indicates CHR RAM)
   wire has_chr_ram = (chrrom == 0);
@@ -71,6 +70,7 @@ module GameLoader(input clk, input reset,
       case(state)
       // Read 16 bytes of ines header
       0: if (indata_clk) begin
+			  error <= 0;
            ctr <= ctr + 1;
            ines[ctr] <= indata;
            bytes_left <= {prgrom, 14'b0};
@@ -91,7 +91,11 @@ module GameLoader(input clk, input reset,
           end else if (state == 2) begin
             done <= 1;
           end
-        end
+			end
+		3: begin
+            done <= 1;
+				error <= 1;
+         end
       endcase
     end
   end
@@ -223,7 +227,7 @@ wire [7:0] nes_joy_B = reset_nes ? 8'd0 : { joyA[0], joyA[1], joyA[2], joyA[3],
   wire clk85;
   clk clock_21mhz(.inclk0(CLOCK_27[0]), .c0(clk85), .c1(SDRAM_CLK), .locked(clock_locked));
 
-  // initial reset after pll startup
+  // reset after download
   reg [7:0] download_reset_cnt;
   wire download_reset = download_reset_cnt != 0;
   always @(posedge CLOCK_27[0]) begin
@@ -293,7 +297,6 @@ wire [7:0] nes_joy_B = reset_nes ? 8'd0 : { joyA[0], joyA[1], joyA[2], joyA[3],
 		end
   end
   
-
   // Loader
   wire [7:0] loader_input;
   wire       loader_clk;
@@ -301,14 +304,27 @@ wire [7:0] nes_joy_B = reset_nes ? 8'd0 : { joyA[0], joyA[1], joyA[2], joyA[3],
   wire [7:0] loader_write_data;
   wire loader_reset = !download_reset; //loader_conf[0];
   wire loader_write;
-  wire [31:0] mapper_flags;
+  wire [31:0] loader_flags;
+  reg [31:0] mapper_flags;
   wire loader_done, loader_fail;
   GameLoader loader(clk, loader_reset, loader_input, loader_clk, mirroring_osd,
                     loader_addr, loader_write_data, loader_write,
-                    mapper_flags, loader_done, loader_fail);
+                    loader_flags, loader_done, loader_fail);
 
-  wire reset_nes = (init_reset || buttons[1] || arm_reset || reset_osd || download_reset);
-  wire run_nes = (nes_ce == 3) && !reset_nes;
+  always @(posedge clk)
+	if (loader_done)
+    mapper_flags <= loader_flags;
+	 
+	// LED displays loader status
+	reg [12:0] led_blink;	// divide PS2 clock to around 1Hz
+	always @(posedge ps2_clk) begin
+		led_blink <= led_blink + 13'd1;
+	end
+ 
+	assign LED = downloading ? 0 : loader_fail ? led_blink[12] : 1;
+
+  wire reset_nes = (init_reset || buttons[1] || arm_reset || reset_osd || download_reset || loader_fail);
+  wire run_nes = (nes_ce == 3);	// keep running even when reset, so that the reset can actually do its job!
 
   // NES is clocked at every 4th cycle.
   always @(posedge clk)
@@ -425,8 +441,6 @@ sigma_delta_dac sigma_delta_dac (
 	.CLK(clk),
 	.RESET(reset_nes)
 );
-
-assign LED = ~downloading;
 
 wire [7:0] kbd_joy0;
 wire [7:0] kbd_joy1;
