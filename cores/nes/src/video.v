@@ -9,6 +9,7 @@ module video(
 	input mode,
 	input smoothing,
 	input scanlines,
+	input overscan,
 	
 	input sck,
 	input ss,
@@ -77,9 +78,18 @@ end
 
 wire [14:0] pixel_v = (!hpicture || !vpicture) ? 15'd0 : mode ? pixel : doubler_pixel;
 wire darker = !mode && v[0] && scanlines;
-wire  [4:0]   vga_r = darker ? {1'b0, pixel_v[4:1]} : pixel_v[4:0];
-wire  [4:0]   vga_g = darker ? {1'b0, pixel_v[9:6]} : pixel_v[9:5];
-wire  [4:0]   vga_b = darker ? {1'b0, pixel_v[14:11]} : pixel_v[14:10];
+
+// display overlay to hide overscan area
+// based on Mario3, DoubleDragon2, Shadow of the Ninja
+wire ol = overscan && ( (h > 512-16) || 
+								(h < 18) || 
+								(v < 8) || 
+								( v > (mode? 240-10 : 480-20) ) 
+							  );
+
+wire  [4:0]   vga_r = ol ? {4'b0, pixel_v[4:4]}   : (darker ? {1'b0, pixel_v[4:1]} : pixel_v[4:0]);
+wire  [4:0]   vga_g = ol ? {4'b0, pixel_v[9:9]}   : (darker ? {1'b0, pixel_v[9:6]} : pixel_v[9:5]);
+wire  [4:0]   vga_b = ol ? {4'b0, pixel_v[14:14]} : (darker ? {1'b0, pixel_v[14:11]} : pixel_v[14:10]);
 wire         sync_h = ((h >= (512 + 23 + (mode ? 18 : 35))) && (h < (512 + 23 + (mode ? 18 : 35) + 82)));
 wire         sync_v = ((v >= (mode ? 240 + 5  : 480 + 10))  && (v < (mode ? 240 + 14 : 480 + 12)));
 assign       VGA_HS = mode ? ~(sync_h ^ sync_v) : ~sync_h;

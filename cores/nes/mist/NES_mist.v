@@ -153,25 +153,28 @@ wire [1:0] switches;
 // the configuration string is returned to the io controller to allow
 // it to control the menu on the OSD 
 parameter CONF_STR = {
-        "NES;NES;",
-        "O1,HQ2X(VGA-Only),OFF,ON;",
-        "O2,Scanlines,OFF,ON;",
-        "O3,Invert mirroring,OFF,ON;",
-        "T4,Start;",
-        "T5,Select;",
-        "T6,Reset;"
+			"NES;NES;",
+			"O1,HQ2X(VGA-Only),OFF,ON;",
+			"O2,Scanlines,OFF,ON;",
+			"O3,Invert mirroring,OFF,ON;",
+			"O4,Hide overscan,OFF,ON;",
+			"T4,Start;",
+			"T5,Select;",
+			"T6,Reset;",
+			"V,v0.7;"
 };
 
-parameter CONF_STR_LEN = 8+25+20+27+9+10+9;
+parameter CONF_STR_LEN = 8+25+20+27+24+9+10+9+7;
 wire [7:0] status;
 
 wire arm_reset = status[0];
 wire smoothing_osd = status[1];
 wire scanlines_osd = status[2];
 wire mirroring_osd = status[3];
-wire start_osd = status[4];
-wire select_osd = status[5];
-wire reset_osd = status[6];
+wire overscan_osd = status[4];
+wire start_osd = status[5];
+wire select_osd = status[6];
+wire reset_osd = status[7];
 
 wire scandoubler_disable;
 wire ps2_kbd_clk, ps2_kbd_data;
@@ -424,6 +427,7 @@ video video (
 	.mode(scandoubler_disable),
 	.smoothing(!smoothing_osd),
 	.scanlines(scanlines_osd),
+	.overscan(overscan_osd),
 
 	.VGA_HS(VGA_HS),
 	.VGA_VS(VGA_VS),
