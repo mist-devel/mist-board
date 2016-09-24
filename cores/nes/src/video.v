@@ -19,7 +19,9 @@ module video(
 	output       VGA_VS,
 	output [5:0] VGA_R, 
 	output [5:0] VGA_G, 
-	output [5:0] VGA_B
+	output [5:0] VGA_B,
+	
+	output osd_visible
 );
 
 reg clk2 = 1'b0;
@@ -41,7 +43,9 @@ osd #(10'd0, 10'd0, 3'd4) osd (
 
    .red_out(VGA_R),
    .green_out(VGA_G),
-   .blue_out(VGA_B)
+   .blue_out(VGA_B),
+	
+	.osd_enable(osd_visible)
 );
 
 // NES Palette -> RGB555 conversion

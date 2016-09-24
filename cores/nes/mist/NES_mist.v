@@ -221,9 +221,9 @@ end
 wire strt = (start_cnt != 0);
 wire sel = (select_cnt != 0);
 
-wire [7:0] nes_joy_A = reset_nes ? 8'd0 : { joyB[0], joyB[1], joyB[2], joyB[3], 
+wire [7:0] nes_joy_A = (reset_nes || osd_visible) ? 8'd0 : { joyB[0], joyB[1], joyB[2], joyB[3], 
 								 joyB[7] | strt, joyB[6] | sel, joyB[5], joyB[4] } | kbd_joy0;
-wire [7:0] nes_joy_B = reset_nes ? 8'd0 : { joyA[0], joyA[1], joyA[2], joyA[3], 
+wire [7:0] nes_joy_B = (reset_nes || osd_visible) ? 8'd0 : { joyA[0], joyA[1], joyA[2], joyA[3], 
 							    joyA[7], joyA[6], joyA[5], joyA[4] } | kbd_joy1;
 
   wire clock_locked;
@@ -325,6 +325,8 @@ wire [7:0] nes_joy_B = reset_nes ? 8'd0 : { joyA[0], joyA[1], joyA[2], joyA[3],
 	end
  
 	assign LED = downloading ? 0 : loader_fail ? led_blink[12] : 1;
+
+  wire osd_visible;
 
   wire reset_nes = (init_reset || buttons[1] || arm_reset || reset_osd || download_reset || loader_fail);
   wire run_nes = (nes_ce == 3);	// keep running even when reset, so that the reset can actually do its job!
@@ -433,7 +435,9 @@ video video (
 	.VGA_VS(VGA_VS),
 	.VGA_R(VGA_R),
 	.VGA_G(VGA_G),
-	.VGA_B(VGA_B)
+	.VGA_B(VGA_B),
+	
+	.osd_visible(osd_visible)
 );
 
 assign AUDIO_R = audio;

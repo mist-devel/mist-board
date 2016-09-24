@@ -21,7 +21,10 @@ module osd (
 	// VGA signals going to video connector
 	output [5:0]  	red_out,
 	output [5:0]  	green_out,
-	output [5:0]  	blue_out
+	output [5:0]  	blue_out,
+
+	output reg		osd_enable
+
 );
 
 parameter OSD_X_OFFSET = 10'd0;
@@ -41,7 +44,6 @@ reg [7:0]      sbuf;
 reg [7:0]      cmd;
 reg [4:0]      cnt;
 reg [10:0]     bcnt;
-reg    			osd_enable;
 
 reg [7:0] osd_buffer [2047:0];  // the OSD buffer itself
 
