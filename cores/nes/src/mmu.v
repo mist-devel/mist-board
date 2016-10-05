@@ -1108,14 +1108,6 @@ module Mapper28(input clk, input ce, input reset,
     wire [7:0] mapper = flags[7:0];
     wire allow_select = (mapper == 8'd28); 
 
-	 wire [7:0] prg_size = flags[13:11] == 0 ? 1 :
-							     flags[13:11] == 1 ? 2 :
-							     flags[13:11] == 2 ? 4 :
-							     flags[13:11] == 3 ? 8 :
-							     flags[13:11] == 4 ? 16 :
-							     flags[13:11] == 5 ? 32 :
-							     flags[13:11] == 6 ? 64 : 128;
-	
     always @(posedge clk) if (reset) begin
       mode[5:2] <= 0;         // NROM mode, 32K mode
       outer[5:0] <= 6'h3f;    // last bank
@@ -1128,8 +1120,7 @@ module Mapper28(input clk, input ce, input reset,
         
       // UNROM #2 - Current bank in $8000-$BFFF and fixed top half of outer bank in $C000-$FFFF
       if (mapper == 2) begin
-        mode[5:4] <= (prg_size == 16)? 2'b11 : 2'b10; // Select 128 or 256Kb PRG ROM
-        mode[3:2] <= 2'b11;
+        mode[5:2] <= 4'b1111; // 256K banks, UNROM mode
       end
 		
       // CNROM #3 - Fixed PRG bank, switchable CHR bank.
@@ -1140,9 +1131,11 @@ module Mapper28(input clk, input ce, input reset,
       if (mapper == 7) begin
         mode[1:0] <= 2'b00;   // Switchable VRAM page.
         mode[5:2] <= 4'b1100; // 256K banks, (B)NROM mode
+		  outer[5:0] <= 6'h00;
       end
     end else if (ce) begin
-      if ((prg_ain[15:12] == 4'h5) & prg_write && allow_select) selreg <= {prg_din[7], prg_din[0]};        // select register
+      if ((prg_ain[15:12] == 4'h5) & prg_write && allow_select)
+			selreg <= {prg_din[7], prg_din[0]};        // select register
       if (prg_ain[15] & prg_write) begin
         case (selreg)
         2'h0:  {mode[0], a53chr}  <= {(mode[1] ? mode[0] : prg_din[4]), prg_din[1:0]};  // CHR RAM bank
@@ -1743,39 +1736,6 @@ module Mapper234(input clk, input ce, input reset,
   assign vram_ce = chr_ain[13];
 endmodule
 
-
-// Mapper Status:
-// 0 = Working
-// 1 = Working
-// 2 = Working
-// 3 = Working
-// 4 = Working
-// 5 = Not Implemented (MMC5)
-// 7 = Working
-// 9 = Working
-// 11 = Working
-// 13 = Working
-// 15 = Works
-// 28 = Working
-// 34 = Working
-// 41 = Working
-// 42 = Working
-// 47 = Working
-// 64 = Tons of GFX bugs
-// 66 = Working
-// 68 = Working
-// 69 = Working
-// 71 = Working
-// 79 = Working
-// 105 = Working
-// 113 = Working
-// 118 = Working
-// 119 = Working
-// 158 = Tons of GFX bugs
-// 228 = Working
-// 232 = Working
-// 232 = Not Tested
-
 module MultiMapper(input clk, input ce, input ppu_ce, input reset,
                    input [19:0] ppuflags,                           // Misc flags from PPU for MMC5 cheating
                    input [31:0] flags,                              // Misc flags from ines header {prg_size(3), chr_size(3), mapper(8)}
@@ -1931,7 +1891,37 @@ module MultiMapper(input clk, input ce, input ppu_ce, input reset,
     prg_dout = 8'hff;
     has_chr_dout = 0;
     chr_dout = mmc5_chr_dout;
-        
+// 0 = Working
+// 1 = Working
+// 2 = Working
+// 3 = Working
+// 4 = Working
+// 5 = Working
+// 7 = Working
+// 9 = Working
+// 10 = Working
+// 11 = Working
+// 13 = Working
+// 15 = Works
+// 28 = Working
+// 34 = Working
+// 41 = Working
+// 42 = Working
+// 47 = Working
+// 64 = Tons of GFX bugs
+// 66 = Working
+// 68 = Working
+// 69 = Working
+// 71 = Working
+// 79 = Working
+// 105 = Working
+// 113 = Working
+// 118 = Working
+// 119 = Working
+// 158 = Tons of GFX bugs
+// 209 = Not Tested
+// 228 = Working
+// 234 = Not Tested        
     case(flags[7:0])
     1:  {prg_aout, prg_allow, chr_aout, vram_a10, vram_ce, chr_allow}      = {mmc1_prg_addr, mmc1_prg_allow, mmc1_chr_addr, mmc1_vram_a10, mmc1_vram_ce, mmc1_chr_allow};
     9:  {prg_aout, prg_allow, chr_aout, vram_a10, vram_ce, chr_allow}      = {mmc2_prg_addr, mmc2_prg_allow, mmc2_chr_addr, mmc2_vram_a10, mmc2_vram_ce, mmc2_chr_allow};

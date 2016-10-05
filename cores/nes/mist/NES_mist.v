@@ -158,10 +158,10 @@ parameter CONF_STR = {
 			"O2,Scanlines,OFF,ON;",
 			"O3,Invert mirroring,OFF,ON;",
 			"O4,Hide overscan,OFF,ON;",
-			"T4,Start;",
-			"T5,Select;",
-			"T6,Reset;",
-			"V,v0.7;"
+			"T5,Start;",
+			"T6,Select;",
+			"T7,Reset;",
+			"V,v0.8;"
 };
 
 parameter CONF_STR_LEN = 8+25+20+27+24+9+10+9+7;
@@ -221,11 +221,12 @@ end
 wire strt = (start_cnt != 0);
 wire sel = (select_cnt != 0);
 
-wire [7:0] nes_joy_A = (reset_nes || osd_visible) ? 8'd0 : { joyB[0], joyB[1], joyB[2], joyB[3], 
-								 joyB[7] | strt, joyB[6] | sel, joyB[5], joyB[4] } | kbd_joy0;
-wire [7:0] nes_joy_B = (reset_nes || osd_visible) ? 8'd0 : { joyA[0], joyA[1], joyA[2], joyA[3], 
-							    joyA[7], joyA[6], joyA[5], joyA[4] } | kbd_joy1;
-
+wire [7:0] nes_joy_A = reset_nes ? 8'd0 : 
+							  osd_visible ? { 4'b0000, strt, sel, 2'b00 } :
+							  { joyB[0], joyB[1], joyB[2], joyB[3], joyB[7] | strt, joyB[6] | sel, joyB[5], joyB[4] } | kbd_joy0;
+wire [7:0] nes_joy_B = (reset_nes || osd_visible) ? 8'd0 : 
+							  { joyA[0], joyA[1], joyA[2], joyA[3], joyA[7], joyA[6], joyA[5], joyA[4] } | kbd_joy1;
+ 
   wire clock_locked;
   wire clk85;
   clk clock_21mhz(.inclk0(CLOCK_27[0]), .c0(clk85), .c1(SDRAM_CLK), .locked(clock_locked));
