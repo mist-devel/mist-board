@@ -64,20 +64,20 @@ module MMC1(input clk, input ce, input reset,
    
   // Update shift register
   always @(posedge clk) if (reset) begin
-		shift <= 1;
+		shift <= 5'b10000;
 		control <= 5'b0_11_00;
 		chr_bank_0 <= 0;
 		chr_bank_1 <= 0;
-		prg_bank <= 4'b1111;		// might not be the actual last page index but will be masked anyway
+		prg_bank <= 5'b00000;
 		delay_ctrl <= 0;
   end else if (ce) begin
     if (!prg_write)
 		delay_ctrl <= 1'b0;
     if (prg_write && prg_ain[15] && !delay_ctrl) begin
+	   delay_ctrl <= 1'b1;
       if (prg_din[7]) begin
         shift <= 5'b10000;
         control <= control | 5'b0_11_00;
-		  delay_ctrl <= 1'b1;
 //        $write("MMC1 RESET!\n");
       end else begin
         if (shift[0]) begin
