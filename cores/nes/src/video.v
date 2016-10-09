@@ -10,6 +10,7 @@ module video(
 	input smoothing,
 	input scanlines,
 	input overscan,
+	input palette,
 	
 	input sck,
 	input ss,
@@ -49,10 +50,20 @@ osd #(10'd0, 10'd0, 3'd4) osd (
 );
 
 // NES Palette -> RGB555 conversion
-reg [15:0] pallut[0:63];
-initial $readmemh("nes_palette.txt", pallut);
-wire [14:0] pixel = pallut[color][14:0];
+reg [15:0] pal_lut[0:63];
+initial $readmemh("nes_palette_original.txt", pal_lut); // MiST legacy 
 
+// NTSC UnsaturatedV6 palette
+//see: http://www.firebrandx.com/nespalette.html
+reg [15:0] pal_unsat_lut[0:63];
+initial $readmemh("nes_palette_unsaturatedv6.txt", pal_unsat_lut);
+
+// FCEUX palette
+reg [15:0] pal_fcelut[0:63];
+initial $readmemh("nes_palette_fceux.txt", pal_fcelut);
+
+wire [14:0] pixel = palette ?  pal_unsat_lut[color][14:0] : pal_fcelut[color][14:0];
+ 
 // Horizontal and vertical counters
 reg [9:0] h, v;
 wire hpicture  = (h < 512);             // 512 lines of picture
@@ -86,9 +97,9 @@ wire darker = !mode && v[0] && scanlines;
 // display overlay to hide overscan area
 // based on Mario3, DoubleDragon2, Shadow of the Ninja
 wire ol = overscan && ( (h > 512-16) || 
-								(h < 18) || 
-								(v < 8) || 
-								( v > (mode? 240-10 : 480-20) ) 
+								(h < 20) || 
+								(v < (mode ? 6 : 12)) || 
+								(v > (mode ? 240-10 : 480-20)) 
 							  );
 
 wire  [4:0]   vga_r = ol ? {4'b0, pixel_v[4:4]}   : (darker ? {1'b0, pixel_v[4:1]} : pixel_v[4:0]);

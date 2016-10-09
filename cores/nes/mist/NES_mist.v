@@ -158,13 +158,12 @@ parameter CONF_STR = {
 			"O2,Scanlines,OFF,ON;",
 			"O3,Invert mirroring,OFF,ON;",
 			"O4,Hide overscan,OFF,ON;",
-			"T5,Start;",
-			"T6,Select;",
-			"T7,Reset;",
+			"O5,Palette,FCEUX,Unsaturated-V6;",
+			"T6,Reset;",
 			"V,v0.8;"
 };
 
-parameter CONF_STR_LEN = 8+25+20+27+24+9+10+9+7;
+parameter CONF_STR_LEN = 8+25+20+27+24+32+9+7;
 wire [7:0] status;
 
 wire arm_reset = status[0];
@@ -172,12 +171,16 @@ wire smoothing_osd = status[1];
 wire scanlines_osd = status[2];
 wire mirroring_osd = status[3];
 wire overscan_osd = status[4];
-wire start_osd = status[5];
-wire select_osd = status[6];
-wire reset_osd = status[7];
+wire palette2_osd = status[5];
+wire reset_osd = status[6];
+
+// no longer used
+wire start_osd = 0;
+wire select_osd = 0;
 
 wire scandoubler_disable;
 wire ps2_kbd_clk, ps2_kbd_data;
+
 
 user_io #(.STRLEN(CONF_STR_LEN)) user_io(
    .conf_str(CONF_STR),
@@ -431,7 +434,8 @@ video video (
 	.smoothing(!smoothing_osd),
 	.scanlines(scanlines_osd),
 	.overscan(overscan_osd),
-
+	.palette(palette2_osd),
+	
 	.VGA_HS(VGA_HS),
 	.VGA_VS(VGA_VS),
 	.VGA_R(VGA_R),
