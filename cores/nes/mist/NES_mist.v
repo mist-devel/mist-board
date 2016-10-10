@@ -174,10 +174,6 @@ wire overscan_osd = status[4];
 wire palette2_osd = status[5];
 wire reset_osd = status[6];
 
-// no longer used
-wire start_osd = 0;
-wire select_osd = 0;
-
 wire scandoubler_disable;
 wire ps2_kbd_clk, ps2_kbd_data;
 
@@ -205,28 +201,8 @@ user_io #(.STRLEN(CONF_STR_LEN)) user_io(
    .ps2_kbd_data(ps2_kbd_data)
 );
 
-// if "Start" or "Select" are selected from the menu keep them set for half a second 
-reg [23:0] select_cnt;
-reg [23:0] start_cnt;
-always @(posedge clk) begin
-	if(reset_nes) begin
-		select_cnt <= 24'd0;
-		start_cnt <= 24'd0;
-	end else begin
-		if(start_osd) start_cnt <= 24'd11000000;
-		else if(start_cnt != 0) start_cnt <= start_cnt - 24'd1;
-	
-		if(select_osd) select_cnt <= 24'd11000000;
-		else if(select_cnt != 0) select_cnt <= select_cnt - 24'd1;
-	end
-end
-
-wire strt = (start_cnt != 0);
-wire sel = (select_cnt != 0);
-
-wire [7:0] nes_joy_A = reset_nes ? 8'd0 : 
-							  osd_visible ? { 4'b0000, strt, sel, 2'b00 } :
-							  { joyB[0], joyB[1], joyB[2], joyB[3], joyB[7] | strt, joyB[6] | sel, joyB[5], joyB[4] } | kbd_joy0;
+wire [7:0] nes_joy_A = (reset_nes || osd_visible) ? 8'd0 : 
+							  { joyB[0], joyB[1], joyB[2], joyB[3], joyB[7], joyB[6], joyB[5], joyB[4] } | kbd_joy0;
 wire [7:0] nes_joy_B = (reset_nes || osd_visible) ? 8'd0 : 
 							  { joyA[0], joyA[1], joyA[2], joyA[3], joyA[7], joyA[6], joyA[5], joyA[4] } | kbd_joy1;
  
