@@ -51,7 +51,7 @@ osd #(10'd0, 10'd0, 3'd4) osd (
 
 // NES Palette -> RGB555 conversion
 reg [15:0] pal_lut[0:63];
-initial $readmemh("nes_palette_original.txt", pal_lut); // MiST legacy 
+initial $readmemh("nes_palette.txt", pal_lut); // MiST legacy 
 
 // NTSC UnsaturatedV6 palette
 //see: http://www.firebrandx.com/nespalette.html
