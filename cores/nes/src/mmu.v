@@ -61,6 +61,8 @@ module MMC1(input clk, input ce, input reset,
   reg [4:0] prg_bank;
 
   reg delay_ctrl;	// used to prevent fast-write to the control register
+
+  wire [2:0] prg_size = flags[10:8];
    
   // Update shift register
   always @(posedge clk) if (reset) begin
@@ -108,8 +110,7 @@ module MMC1(input clk, input ce, input reset,
     3'b11_1: prgsel = 4'b1111;								// Swap 16Kb at $8000 with $C000 access, so select last page (hardcoded)
     endcase
   end
-  wire [21:0] prg_aout_tmp = {4'b00_00,  prgsel, prg_ain[13:0]};
-
+  
   // The CHR bank to load. Each increment here is 4 kb. So valid values are 0..31.
   reg [4:0] chrsel;
   always @* begin
@@ -120,6 +121,8 @@ module MMC1(input clk, input ce, input reset,
     endcase
   end
   assign chr_aout = {5'b100_00, chrsel, chr_ain[11:0]};
+  wire [21:0] prg_aout_tmp = prg_size == 5 ? {3'b000, chrsel[4], prgsel, prg_ain[13:0]}	// for large PRG ROM, CHR A16 selects the 256KB PRG bank
+														 : {4'b00_00, prgsel, prg_ain[13:0]};
   
   // The a10 VRAM address line. (Used for mirroring)
   reg vram_a10_t;
