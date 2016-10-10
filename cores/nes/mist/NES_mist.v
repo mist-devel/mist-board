@@ -25,21 +25,21 @@ module GameLoader(input clk, input reset,
   assign mem_data = indata;
   assign mem_write = (bytes_left != 0) && (state == 1 || state == 2) && indata_clk;
   
-  wire [2:0] prg_size = prgrom <= 1  ? 0 :
-                        prgrom <= 2  ? 1 : 
-                        prgrom <= 4  ? 2 : 
-                        prgrom <= 8  ? 3 : 
-                        prgrom <= 16 ? 4 : 
-                        prgrom <= 32 ? 5 : 
-                        prgrom <= 64 ? 6 : 7;
+  wire [2:0] prg_size = prgrom <= 1  ? 0 :		// 16KB
+                        prgrom <= 2  ? 1 : 		// 32KB
+                        prgrom <= 4  ? 2 : 		// 64KB
+                        prgrom <= 8  ? 3 : 		// 128KB
+                        prgrom <= 16 ? 4 : 		// 256KB
+                        prgrom <= 32 ? 5 : 		// 512KB
+                        prgrom <= 64 ? 6 : 7;	// 1MB/2MB
                         
-  wire [2:0] chr_size = chrrom <= 1  ? 0 : 
-                        chrrom <= 2  ? 1 : 
-                        chrrom <= 4  ? 2 : 
-                        chrrom <= 8  ? 3 : 
-                        chrrom <= 16 ? 4 : 
-                        chrrom <= 32 ? 5 : 
-                        chrrom <= 64 ? 6 : 7;
+  wire [2:0] chr_size = chrrom <= 1  ? 0 : 		// 8KB
+                        chrrom <= 2  ? 1 : 		// 16KB
+                        chrrom <= 4  ? 2 : 		// 32KB
+                        chrrom <= 8  ? 3 : 		// 64KB
+                        chrrom <= 16 ? 4 : 		// 128KB
+                        chrrom <= 32 ? 5 : 		// 256KB
+                        chrrom <= 64 ? 6 : 7;	// 512KB/1MB
   
   // detect iNES2.0 compliant header
   wire is_nes20 = (ines[7][3:2] == 2'b10);
