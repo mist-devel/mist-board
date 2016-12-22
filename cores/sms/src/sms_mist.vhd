@@ -46,7 +46,28 @@ entity sms_mist is
 end sms_mist;
 
 architecture Behavioral of sms_mist is
-	
+
+   component scandoubler is
+   port (
+      clk_in:         in std_logic;
+      clk_out:        in std_logic;
+                
+      scanlines:      in std_logic;
+              
+      hs_in:          in std_logic;
+      vs_in:          in std_logic;
+      r_in:           in std_logic_vector(5 downto 0);
+      g_in:           in std_logic_vector(5 downto 0);
+      b_in:           in std_logic_vector(5 downto 0);
+               
+      r_out:          out std_logic_vector(5 downto 0);
+      g_out:          out std_logic_vector(5 downto 0);
+      b_out:          out std_logic_vector(5 downto 0);
+      hs_out:         out std_logic;
+      vs_out:         out std_logic
+      );
+   end component;
+
 	component vga_video is
 	port (
 		clk16:			in  std_logic;
@@ -60,7 +81,20 @@ architecture Behavioral of sms_mist is
 		green:			out std_logic_vector(1 downto 0);
 		blue:				out std_logic_vector(1 downto 0));
 	end component;
-  
+ 
+	component tv_video is
+	port (
+		clk8:				in  std_logic;
+		x: 				out unsigned(8 downto 0);
+		y:					out unsigned(7 downto 0);
+		color:			in  std_logic_vector(5 downto 0);
+		hsync:			out std_logic;
+		vsync:			out std_logic;
+		red:				out std_logic_vector(1 downto 0);
+		green:			out std_logic_vector(1 downto 0);
+		blue:				out std_logic_vector(1 downto 0));
+	end component;
+	
   component sdram is
       port( sd_data : inout std_logic_vector(15 downto 0);
             sd_addr : out std_logic_vector(12 downto 0);
@@ -172,6 +206,8 @@ architecture Behavioral of sms_mist is
   signal b : std_logic_vector(1 downto 0);
   signal vs: std_logic;
   signal hs: std_logic;
+  signal hs_out: std_logic;
+  signal vs_out: std_logic;
   
   signal ioctl_wr : std_logic;
   signal ioctl_addr : std_logic_vector(24 downto 0);
@@ -211,10 +247,10 @@ begin
     end if;
   end process;
 	
-	video_inst: vga_video
+	video_inst: tv_video
 	port map (
-		clk16			=> clk16,
-		pal			=> status(1),
+		clk8			=> clk_cpu,
+		--pal			=> status(1),
 		x	 			=> x,
 		y				=> y,
 		color			=> color,
@@ -226,23 +262,49 @@ begin
 		blue			=> b
 	);
   
-  osd_inst : osd
-    port map (
-      pclk => clk16,
-      sdi => SPI_DI,
-      sck => SPI_SCK,
-      ss => SPI_SS3,
-      red_in => r & r & r,
-      green_in => g & g & g,
-      blue_in => b & b & b,
-      hs_in => hs,
-      vs_in => vs,
-      red_out => VGA_R,
-      green_out => VGA_G,
-      blue_out => VGA_B,
-      hs_out => VGA_HS,
-      vs_out => VGA_VS
-    );
+  --scandouble_inst: scandoubler
+	--port map(
+	--	  clk_in => clk_cpu,
+	--	  clk_out => clk16,
+	--	  scanlines => '0',
+	--	  hs_in => hs,
+	--	  vs_in => vs,
+   --   r_in => r & r & r,
+   --   g_in => g & g & g,
+   --   b_in => b & b & b,
+	--	r_out => red_vga,
+	--	g_out => green_vga,
+	--	b_out => blue_vga,
+	--	hs_out => hs_vga,
+	--	vs_out => vs_vga
+	--);
+	
+	VGA_R <= r & r & r;
+	VGA_G <= g & g & g;
+	VGA_B <= b & b & b;
+	VGA_HS <= hs xor vs;
+	VGA_VS <= '1';
+  
+  --osd_inst : osd
+  --  port map (
+  --    pclk => clk_cpu,
+  --    sdi => SPI_DI,
+  --    sck => SPI_SCK,
+  --    ss => SPI_SS3,
+  --    red_in => r & r & r,
+  --    green_in => g & g & g,
+  --    blue_in => b & b & b,
+  --    hs_in => hs,
+  --    vs_in => vs,
+  --    red_out => VGA_R,
+  --    green_out => VGA_G,
+  --    blue_out => VGA_B,
+  --    hs_out => hs_out,
+  --    vs_out => vs_out
+  --  );
+  
+  --VGA_HS <= hs_out xor vs_out;
+  --VGA_VS <= '1';
   
   -- sdram interface
   SDRAM_CKE <= '1';
@@ -322,7 +384,7 @@ begin
 	system_inst: work.system
 	port map (
 		clk_cpu		=> clk_cpu,
-		clk_vdp		=> clk16,
+		clk_vdp		=> clk_cpu,
 		
 		-- ram interface used  for cartridge emulation
 		ram_oe_n		=> ram_oe_n,
