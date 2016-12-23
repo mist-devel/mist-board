@@ -95,9 +95,10 @@ begin
 	--		hsync <= screen_sync;
 	--	end if;
 	--end process;
-
-	hsync <= screen_sync;
-	vsync <= vbl_sync;
+	--vsync <= '1';
+	
+	hsync <= not screen_sync when in_vbl='0' else '0';
+	vsync <= not vbl_sync when in_vbl='1' else '0';
 	
 	visible <= (line_visible = '1' and vcount>=40 and vcount<467);
 	

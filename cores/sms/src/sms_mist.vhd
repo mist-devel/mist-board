@@ -282,7 +282,7 @@ begin
 	VGA_R <= r & r & r;
 	VGA_G <= g & g & g;
 	VGA_B <= b & b & b;
-	VGA_HS <= hs xor vs;
+	VGA_HS <= not (hs xor vs);
 	VGA_VS <= '1';
   
   --osd_inst : osd
@@ -303,7 +303,7 @@ begin
   --    vs_out => vs_out
   --  );
   
-  --VGA_HS <= hs_out xor vs_out;
+  --VGA_HS <= not (hs_out xor vs_out);
   --VGA_VS <= '1';
   
   -- sdram interface
