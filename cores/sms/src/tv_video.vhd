@@ -100,7 +100,7 @@ begin
 	hsync <= not screen_sync when in_vbl='0' else '0';
 	vsync <= not vbl_sync when in_vbl='1' else '0';
 	
-	visible <= (line_visible = '1' and vcount>=40 and vcount<467);
+	visible <= (line_visible = '1' and vcount>=33 and vcount<453);
 	
 	process (clk8)
 	begin

@@ -279,32 +279,32 @@ begin
 	--	vs_out => vs_vga
 	--);
 	
-	VGA_R <= r & r & r;
-	VGA_G <= g & g & g;
-	VGA_B <= b & b & b;
-	VGA_HS <= not (hs xor vs);
-	VGA_VS <= '1';
+	--VGA_R <= r & r & r;
+	--VGA_G <= g & g & g;
+	--VGA_B <= b & b & b;
+	--VGA_HS <= not (hs xor vs);
+	--VGA_VS <= '1';
   
-  --osd_inst : osd
-  --  port map (
-  --    pclk => clk_cpu,
-  --    sdi => SPI_DI,
-  --    sck => SPI_SCK,
-  --    ss => SPI_SS3,
-  --    red_in => r & r & r,
-  --    green_in => g & g & g,
-  --    blue_in => b & b & b,
-  --    hs_in => hs,
-  --    vs_in => vs,
-  --    red_out => VGA_R,
-  --    green_out => VGA_G,
-  --    blue_out => VGA_B,
-  --    hs_out => hs_out,
-  --    vs_out => vs_out
-  --  );
+  osd_inst : osd
+    port map (
+      pclk => clk16,
+      sdi => SPI_DI,
+      sck => SPI_SCK,
+      ss => SPI_SS3,
+      red_in => r & r & r,
+      green_in => g & g & g,
+      blue_in => b & b & b,
+      hs_in => hs,
+      vs_in => vs,
+      red_out => VGA_R,
+      green_out => VGA_G,
+      blue_out => VGA_B,
+      hs_out => hs_out,
+      vs_out => vs_out
+    );
   
-  --VGA_HS <= not (hs_out xor vs_out);
-  --VGA_VS <= '1';
+  VGA_HS <= not (hs_out xor vs_out);
+  VGA_VS <= '1';
   
   -- sdram interface
   SDRAM_CKE <= '1';
