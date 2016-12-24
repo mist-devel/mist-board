@@ -197,6 +197,7 @@ architecture Behavioral of sms_mist is
   signal joy1 : std_logic_vector(5 downto 0);
   signal joya : std_logic_vector(5 downto 0);
   signal joyb : std_logic_vector(5 downto 0);
+  signal scandoubler_disable : std_logic;
   signal status : std_logic_vector(7 downto 0);
   signal j1_tr : std_logic;
   signal j2_tr : std_logic;
@@ -206,11 +207,23 @@ architecture Behavioral of sms_mist is
   signal b : std_logic_vector(1 downto 0);
   signal vs: std_logic;
   signal hs: std_logic;
-  signal r_out : std_logic_vector(5 downto 0);
-  signal g_out : std_logic_vector(5 downto 0);
-  signal b_out : std_logic_vector(5 downto 0);
-  signal hs_out: std_logic;
-  signal vs_out: std_logic;
+  
+  signal video_r: std_logic_vector(5 downto 0);
+  signal video_g: std_logic_vector(5 downto 0);
+  signal video_b: std_logic_vector(5 downto 0);
+  
+  signal sd_r : std_logic_vector(5 downto 0);
+  signal sd_g : std_logic_vector(5 downto 0);
+  signal sd_b : std_logic_vector(5 downto 0);
+  signal sd_hs: std_logic;
+  signal sd_vs: std_logic;
+
+  signal osd_clk: std_logic;
+  signal osd_r  : std_logic_vector(5 downto 0);
+  signal osd_g  : std_logic_vector(5 downto 0);
+  signal osd_b  : std_logic_vector(5 downto 0);
+  signal osd_hs : std_logic;
+  signal osd_vs : std_logic;
   
   signal ioctl_wr : std_logic;
   signal ioctl_addr : std_logic_vector(24 downto 0);
@@ -249,7 +262,7 @@ begin
       clk_cpu <= not clk_cpu;
     end if;
   end process;
-	
+    
 	video_inst: tv_video
 	port map (
 		clk8			=> clk_cpu,
@@ -264,7 +277,11 @@ begin
 		green			=> g,
 		blue			=> b
 	);
-  
+
+	video_r <= r & r & r;
+	video_g <= g & g & g;
+	video_b <= b & b & b;
+
 	scandouble_inst: scandoubler
 	port map(
 		clk_in => clk_cpu,
@@ -272,32 +289,41 @@ begin
 		scanlines => '0',
 		hs_in => hs,
 		vs_in => vs,
-      r_in => r & r & r,
-      g_in => g & g & g,
-      b_in => b & b & b,
-		r_out => r_out,
-		g_out => g_out,
-		b_out => b_out,
-		hs_out => hs_out,
-		vs_out => vs_out
+      r_in => video_r,
+      g_in => video_g,
+      b_in => video_b,
+		r_out => sd_r,
+		g_out => sd_g,
+		b_out => sd_b,
+		hs_out => sd_hs,
+		vs_out => sd_vs
 	);
-  
-  osd_inst : osd
+
+	scandoubler_disable <= '1';
+	VGA_HS <= not(hs xor vs) when scandoubler_disable = '1' else sd_hs;
+	VGA_VS <= '1' when scandoubler_disable = '1' else sd_vs;
+	
+	osd_clk <= clk_cpu when scandoubler_disable = '1' else clk16;
+	osd_hs  <= hs when scandoubler_disable = '1' else sd_hs;
+   osd_vs  <= vs when scandoubler_disable = '1' else sd_vs;
+	osd_r   <= video_r when scandoubler_disable = '1' else sd_r;
+	osd_g   <= video_g when scandoubler_disable = '1' else sd_g;
+	osd_b   <= video_b when scandoubler_disable = '1' else sd_b;
+	
+	osd_inst : osd
     port map (
-      pclk => clk16,
+      pclk => osd_clk,
       sdi => SPI_DI,
       sck => SPI_SCK,
       ss => SPI_SS3,
-      red_in => r_out,
-      green_in => g_out,
-      blue_in => b_out,
-      hs_in => hs_out,
-      vs_in => vs_out,
+      red_in => osd_r,
+      green_in => osd_g,
+      blue_in => osd_b,
+      hs_in => osd_hs,
+      vs_in => osd_vs,
       red_out => VGA_R,
       green_out => VGA_G,
-      blue_out => VGA_B,
-      hs_out => VGA_HS,
-      vs_out => VGA_VS
+      blue_out => VGA_B
     );
   
   -- sdram interface
