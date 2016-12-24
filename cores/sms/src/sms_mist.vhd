@@ -206,6 +206,9 @@ architecture Behavioral of sms_mist is
   signal b : std_logic_vector(1 downto 0);
   signal vs: std_logic;
   signal hs: std_logic;
+  signal r_out : std_logic_vector(5 downto 0);
+  signal g_out : std_logic_vector(5 downto 0);
+  signal b_out : std_logic_vector(5 downto 0);
   signal hs_out: std_logic;
   signal vs_out: std_logic;
   
@@ -262,28 +265,22 @@ begin
 		blue			=> b
 	);
   
-  --scandouble_inst: scandoubler
-	--port map(
-	--	  clk_in => clk_cpu,
-	--	  clk_out => clk16,
-	--	  scanlines => '0',
-	--	  hs_in => hs,
-	--	  vs_in => vs,
-   --   r_in => r & r & r,
-   --   g_in => g & g & g,
-   --   b_in => b & b & b,
-	--	r_out => red_vga,
-	--	g_out => green_vga,
-	--	b_out => blue_vga,
-	--	hs_out => hs_vga,
-	--	vs_out => vs_vga
-	--);
-	
-	--VGA_R <= r & r & r;
-	--VGA_G <= g & g & g;
-	--VGA_B <= b & b & b;
-	--VGA_HS <= not (hs xor vs);
-	--VGA_VS <= '1';
+	scandouble_inst: scandoubler
+	port map(
+		clk_in => clk_cpu,
+		clk_out => clk16,
+		scanlines => '0',
+		hs_in => hs,
+		vs_in => vs,
+      r_in => r & r & r,
+      g_in => g & g & g,
+      b_in => b & b & b,
+		r_out => r_out,
+		g_out => g_out,
+		b_out => b_out,
+		hs_out => hs_out,
+		vs_out => vs_out
+	);
   
   osd_inst : osd
     port map (
@@ -291,20 +288,17 @@ begin
       sdi => SPI_DI,
       sck => SPI_SCK,
       ss => SPI_SS3,
-      red_in => r & r & r,
-      green_in => g & g & g,
-      blue_in => b & b & b,
-      hs_in => hs,
-      vs_in => vs,
+      red_in => r_out,
+      green_in => g_out,
+      blue_in => b_out,
+      hs_in => hs_out,
+      vs_in => vs_out,
       red_out => VGA_R,
       green_out => VGA_G,
       blue_out => VGA_B,
-      hs_out => hs_out,
-      vs_out => vs_out
+      hs_out => VGA_HS,
+      vs_out => VGA_VS
     );
-  
-  VGA_HS <= not (hs_out xor vs_out);
-  VGA_VS <= '1';
   
   -- sdram interface
   SDRAM_CKE <= '1';
