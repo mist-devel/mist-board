@@ -67,20 +67,6 @@ architecture Behavioral of sms_mist is
       vs_out:         out std_logic
       );
    end component;
-
-	component vga_video is
-	port (
-		clk16:			in  std_logic;
-		pal:				in  std_logic;
-		x: 				out unsigned(8 downto 0);
-		y:					out unsigned(7 downto 0);
-		color:			in  std_logic_vector(5 downto 0);
-		hsync:			out std_logic;
-		vsync:			out std_logic;
-		red:				out std_logic_vector(1 downto 0);
-		green:			out std_logic_vector(1 downto 0);
-		blue:				out std_logic_vector(1 downto 0));
-	end component;
  
 	component tv_video is
 	port (
@@ -115,7 +101,7 @@ architecture Behavioral of sms_mist is
       );
   end component;
   
-  constant CONF_STR : string := "SMS;SMS;O1,Video,NTSC,PAL;O2,Joysticks,Normal,Swapped;T3,Pause;T4,Reset";
+  constant CONF_STR : string := "SMS;SMS;O1,Video,NTSC,PAL;O2,Scanlines,Off,On;O3,Joysticks,Normal,Swapped;T4,Pause;T5,Reset";
 
   function to_slv(s: string) return std_logic_vector is
     constant ss: string(1 to s'length) := s;
@@ -287,7 +273,7 @@ begin
 	port map(
 		clk_in => clk_cpu,
 		clk_out => clk16,
-		scanlines => '0',
+		scanlines => status(2),
 		hs_in => hs,
 		vs_in => vs,
       r_in => video_r,
@@ -400,8 +386,8 @@ begin
     );
 
 	-- joysticks can be swapped
-	joya <= joy1 when status(2)='0' else joy0;
-	joyb <= joy0 when status(2)='0' else joy1;
+	joya <= joy1 when status(3)='0' else joy0;
+	joyb <= joy0 when status(3)='0' else joy1;
 	 
 	system_inst: work.system
 	port map (
@@ -426,8 +412,8 @@ begin
 		j2_right		=> not joyb(0),
 		j2_tl			=> not joyb(4),
 		j2_tr			=> not joyb(5),
-		reset			=> not buttons(1) and not status(4) and not status(0) and pll_locked and reset_n,
-		pause			=> not status(3),
+		reset			=> not buttons(1) and not status(5) and not status(0) and pll_locked and reset_n,
+		pause			=> not status(4),
 
 		-- video
 		x				=> x,
