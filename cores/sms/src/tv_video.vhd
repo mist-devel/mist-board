@@ -4,7 +4,7 @@ use IEEE.NUMERIC_STD.ALL;
 
 entity tv_video is
 	Port (
-		clk8:				in  STD_LOGIC;
+		clk8:				in  std_logic;
 		x: 				out unsigned(8 downto 0);
 		y:					out unsigned(7 downto 0);
 		color:			in  std_logic_vector(5 downto 0);
@@ -25,8 +25,6 @@ architecture Behavioral of tv_video is
 	signal screen_sync:	std_logic;
 	signal vbl_sync:		std_logic;
 	
-	signal line_visible:	std_logic;
-	signal line_even:		std_logic;
 	signal hblank:			std_logic;
 	signal vblank:			std_logic;
 	signal visible:		boolean;
@@ -65,8 +63,6 @@ begin
 	y					<= y9(7 downto 0);
 	vblank			<= '1' when hcount=0 and vcount=0 else '0';
 	hblank			<= '1' when hcount=0 else '0';
-	line_visible	<= not in_vbl;
-	line_even		<= not vcount(0);
 	
 	process (vcount,hcount)
 	begin
@@ -86,21 +82,11 @@ begin
 			end if;
 		end if;
 	end process;
-	
-	--process (in_vbl,screen_sync,vbl_sync)
-	--begin
-	--	if in_vbl='1' then
-	--		hsync <= vbl_sync;
-	--	else
-	--		hsync <= screen_sync;
-	--	end if;
-	--end process;
-	--vsync <= '1';
-	
+		
 	hsync <= not screen_sync when in_vbl='0' else '0';
 	vsync <= not vbl_sync when in_vbl='1' else '0';
 	
-	visible <= (line_visible = '1' and vcount>=33 and vcount<453);
+	visible <= (hcount>=166 and hcount<422 and vcount>=40 and vcount<232);
 	
 	process (clk8)
 	begin
