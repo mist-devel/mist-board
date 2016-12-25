@@ -143,6 +143,7 @@ architecture Behavioral of sms_mist is
            status: out std_logic_vector(7 downto 0);
            SWITCHES : out std_logic_vector(1 downto 0);
            BUTTONS : out std_logic_vector(1 downto 0);
+			  scandoubler_disable : out std_logic;
           -- clk : in std_logic;
            ps2_clk : out std_logic;
            ps2_data : out std_logic
@@ -299,7 +300,7 @@ begin
 		vs_out => sd_vs
 	);
 
-	scandoubler_disable <= '1';
+	--scandoubler_disable <= '1';
 	VGA_HS <= not(hs xor vs) when scandoubler_disable = '1' else sd_hs;
 	VGA_VS <= '1' when scandoubler_disable = '1' else sd_vs;
 	
@@ -392,6 +393,7 @@ begin
       JOY1 => joy1,
       SWITCHES => switches,
       BUTTONS => buttons,
+		scandoubler_disable => scandoubler_disable,
      -- clk => open,
       ps2_clk => open,
       ps2_data => open
