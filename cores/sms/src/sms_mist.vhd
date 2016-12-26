@@ -68,7 +68,7 @@ architecture Behavioral of sms_mist is
       );
    end component;
  
-	component tv_video is
+	component ntsc_video is
 	port (
 		clk8:				in  std_logic;
 		x: 				out unsigned(8 downto 0);
@@ -80,7 +80,20 @@ architecture Behavioral of sms_mist is
 		green:			out std_logic_vector(1 downto 0);
 		blue:				out std_logic_vector(1 downto 0));
 	end component;
-	
+
+	component pal_video is
+	port (
+		clk8:				in  std_logic;
+		x: 				out unsigned(8 downto 0);
+		y:					out unsigned(7 downto 0);
+		color:			in  std_logic_vector(5 downto 0);
+		hsync:			out std_logic;
+		vsync:			out std_logic;
+		red:				out std_logic_vector(1 downto 0);
+		green:			out std_logic_vector(1 downto 0);
+		blue:				out std_logic_vector(1 downto 0));
+	end component;
+
   component sdram is
       port( sd_data : inout std_logic_vector(15 downto 0);
             sd_addr : out std_logic_vector(12 downto 0);
@@ -250,7 +263,7 @@ begin
     end if;
   end process;
     
-	video_inst: tv_video
+	video_inst: pal_video
 	port map (
 		clk8			=> clk_cpu,
 		--pal			=> status(1),

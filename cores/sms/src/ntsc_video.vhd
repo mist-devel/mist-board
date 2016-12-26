@@ -2,7 +2,7 @@ library IEEE;
 use IEEE.STD_LOGIC_1164.ALL;
 use IEEE.NUMERIC_STD.ALL;
 
-entity tv_video is
+entity ntsc_video is
 	Port (
 		clk8:				in  std_logic;
 		x: 				out unsigned(8 downto 0);
@@ -13,9 +13,9 @@ entity tv_video is
 		red:				out std_logic_vector(1 downto 0);
 		green:			out std_logic_vector(1 downto 0);
 		blue:				out std_logic_vector(1 downto 0));
-end tv_video;
+end ntsc_video;
 
-architecture Behavioral of tv_video is
+architecture Behavioral of ntsc_video is
 
 	signal hcount:			unsigned(8 downto 0) := (others => '0');
 	signal vcount:			unsigned(8 downto 0) := (others => '0');
@@ -24,9 +24,7 @@ architecture Behavioral of tv_video is
 	signal in_vbl:			std_logic;
 	signal screen_sync:	std_logic;
 	signal vbl_sync:		std_logic;
-	
-	signal hblank:			std_logic;
-	signal vblank:			std_logic;
+
 	signal visible:		boolean;
 	
 begin
@@ -61,8 +59,8 @@ begin
 	x					<= hcount-166;
 	y9					<= vcount-40;
 	y					<= y9(7 downto 0);
-	vblank			<= '1' when hcount=0 and vcount=0 else '0';
-	hblank			<= '1' when hcount=0 else '0';
+	--vblank			<= '1' when hcount=0 and vcount=0 else '0';
+	--hblank			<= '1' when hcount=0 else '0';
 	
 	process (vcount,hcount)
 	begin
@@ -86,7 +84,7 @@ begin
 	hsync <= not screen_sync when in_vbl='0' else '0';
 	vsync <= not vbl_sync when in_vbl='1' else '0';
 	
-	visible <= (hcount>=166 and hcount<422 and vcount>=40 and vcount<232);
+	visible <= (hcount>=164 and hcount<420 and vcount>=60 and vcount<252);
 	
 	process (clk8)
 	begin
