@@ -54,17 +54,10 @@ begin
 		end if;
 	end process;
 	
-	process (vcount)
-	begin
-		if vcount>=5 and vcount<309 then
-			in_vbl <= '0';
-		else
-			in_vbl <= '1';
-		end if;
-	end process;
+	in_vbl <= '1' when vcount<5 else '0';
 	
 	x					<= hcount-164;
-	y9					<= vcount-64 when vcount<256 else (others=>'1');
+	y9					<= vcount-64;
 	y					<= y9(7 downto 0);
 	--vblank			<= '1' when hcount=0 and vcount=0 else '0';
 	--hblank			<= '1' when hcount=0 else '0';
