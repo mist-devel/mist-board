@@ -84,7 +84,7 @@ begin
 	hsync <= not screen_sync when in_vbl='0' else '0';
 	vsync <= not vbl_sync when in_vbl='1' else '0';
 	
-	visible <= (hcount>=164 and hcount<420 and vcount>=60 and vcount<252);
+	visible <= (hcount>=164 and hcount<420 and vcount>=40 and vcount<232);
 	
 	process (clk8)
 	begin
