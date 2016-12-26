@@ -3,7 +3,7 @@ Source code for Gameboy for MIST
 
 This is source code of a gameboy implementation for the MIST. 
 
-It's based on the [t80](http://opencores.com/project,t80) CPU core. A minor
+It's based on the [t80](http://opencores.org/project,t80) CPU core. A minor
 fix was needed for the "LD ($FF00+C)" instruction.
 
 The audio implementation has been taken from the PACE framework. The
