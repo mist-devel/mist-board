@@ -44,6 +44,7 @@ architecture Behavioral of video is
 		blue:				out std_logic_vector(1 downto 0));
 	end component;
 	
+	signal ntsc_clk:		std_logic;
 	signal ntsc_x:			unsigned(8 downto 0);
 	signal ntsc_y:			unsigned(7 downto 0);
 	signal ntsc_hsync:	std_logic;
@@ -52,6 +53,7 @@ architecture Behavioral of video is
 	signal ntsc_green:	std_logic_vector(1 downto 0);
 	signal ntsc_blue:		std_logic_vector(1 downto 0);
 
+	signal pal_clk:		std_logic;
 	signal pal_x:			unsigned(8 downto 0);
 	signal pal_y:			unsigned(7 downto 0);
 	signal pal_hsync:		std_logic;
@@ -62,6 +64,9 @@ architecture Behavioral of video is
 
 begin
 
+	ntsc_clk <= '0' when pal='1' else clk8;
+	pal_clk <= clk8 when pal='1' else '0';
+	
 	x <= pal_x when pal='1' else ntsc_x;
 	y <= pal_y when pal='1' else ntsc_y;
 	
@@ -73,7 +78,7 @@ begin
 	
 	ntsc_inst: ntsc_video
 	port map (
-		clk8			=> clk8,
+		clk8			=> ntsc_clk,
 		x	 			=> ntsc_x,
 		y				=> ntsc_y,
 		color			=> color,
@@ -87,7 +92,7 @@ begin
 
 	pal_inst: pal_video
 	port map (
-		clk8			=> clk8,
+		clk8			=> pal_clk,
 		x	 			=> pal_x,
 		y				=> pal_y,
 		color			=> color,
