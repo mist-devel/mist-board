@@ -23,7 +23,8 @@ architecture Behavioral of pal_video is
 	
 	signal in_vbl:			std_logic;
 	signal screen_sync:	std_logic;
-	signal vbl_sync:		std_logic;
+	signal vbl_hsync:		std_logic;
+	signal vbl_vsync:		std_logic;
 	
 	signal visible:		boolean;
 
@@ -66,27 +67,33 @@ begin
 	begin
 		if vcount<2 then
 			if hcount<240 or (hcount>=256 and hcount<496) then
-				vbl_sync <= '0';
+				vbl_vsync <= '0';
+				vbl_hsync <= '0';
 			else
-				vbl_sync <= '1';
+				vbl_vsync <= '1';
+				vbl_hsync <= '0';
 			end if;
 		elsif vcount=2 then
 			if hcount<240 or (hcount>=256 and hcount<272) then
-				vbl_sync <= '0';
+				vbl_hsync <= '0';
+				vbl_vsync <= '0';
 			else
-				vbl_sync <= '1';
+				vbl_hsync <= '1';
+				vbl_vsync <= '0';
 			end if;
 		else
 			if hcount<16 or (hcount>=256 and hcount<272) then
-				vbl_sync <= '0';
+				vbl_hsync <= '0';
+				vbl_vsync <= '0';
 			else
-				vbl_sync <= '1';
+				vbl_hsync <= '1';
+				vbl_vsync <= '0';
 			end if;
 		end if;
 	end process;
 
-	hsync <= not screen_sync when in_vbl='0' else '0';
-	vsync <= not vbl_sync when in_vbl='1' else '0';
+	hsync <= not screen_sync when in_vbl='0' else vbl_hsync;
+	vsync <= not vbl_vsync when in_vbl='1' else '0';
 	
 	visible <= (hcount>=166 and hcount<422 and vcount>=64 and vcount<256);
 	

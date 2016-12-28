@@ -23,7 +23,8 @@ architecture Behavioral of ntsc_video is
 	
 	signal in_vbl:			std_logic;
 	signal screen_sync:	std_logic;
-	signal vbl_sync:		std_logic;
+	signal vbl_vsync:		std_logic;
+	signal vbl_hsync:		std_logic;
 
 	signal visible:		boolean;
 	
@@ -67,22 +68,26 @@ begin
 		if vcount<3 or (vcount>=6 and vcount<9) then
 			-- _^^^^^_^^^^^ : low pulse = 2.35us
 			if hcount<19 or (hcount>=254 and hcount<254+19) then
-				vbl_sync <= '0';
+				vbl_hsync <= '0';
+				vbl_vsync <= '0';
 			else
-				vbl_sync <= '1';
+				vbl_hsync <= '1';
+				vbl_vsync <= '0';
 			end if;
 		else
 			-- ____^^ : high pulse = 4.7us
 			if hcount<(254-38) or (hcount>=254 and hcount<508-38) then
-				vbl_sync <= '0';
+				vbl_vsync <= '0';
+				vbl_hsync <= '0';
 			else
-				vbl_sync <= '1';
+				vbl_vsync <= '1';
+				vbl_hsync <= '0';
 			end if;
 		end if;
 	end process;
-		
-	hsync <= not screen_sync when in_vbl='0' else '0';
-	vsync <= not vbl_sync when in_vbl='1' else '0';
+
+	hsync <= not screen_sync when in_vbl='0' else vbl_hsync;
+	vsync <= not vbl_vsync when in_vbl='1' else '0';
 	
 	visible <= (hcount>=164 and hcount<420 and vcount>=40 and vcount<232);
 	
