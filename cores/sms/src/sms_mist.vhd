@@ -46,10 +46,31 @@ entity sms_mist is
 end sms_mist;
 
 architecture Behavioral of sms_mist is
-	
-	component vga_video is
+
+   component scandoubler is
+   port (
+      clk_in:         in std_logic;
+      clk_out:        in std_logic;
+                
+      scanlines:      in std_logic;
+              
+      hs_in:          in std_logic;
+      vs_in:          in std_logic;
+      r_in:           in std_logic_vector(5 downto 0);
+      g_in:           in std_logic_vector(5 downto 0);
+      b_in:           in std_logic_vector(5 downto 0);
+               
+      r_out:          out std_logic_vector(5 downto 0);
+      g_out:          out std_logic_vector(5 downto 0);
+      b_out:          out std_logic_vector(5 downto 0);
+      hs_out:         out std_logic;
+      vs_out:         out std_logic
+      );
+   end component;
+ 
+	component video is
 	port (
-		clk16:			in  std_logic;
+		clk8:				in  std_logic;
 		pal:				in  std_logic;
 		x: 				out unsigned(8 downto 0);
 		y:					out unsigned(7 downto 0);
@@ -60,7 +81,7 @@ architecture Behavioral of sms_mist is
 		green:			out std_logic_vector(1 downto 0);
 		blue:				out std_logic_vector(1 downto 0));
 	end component;
-  
+
   component sdram is
       port( sd_data : inout std_logic_vector(15 downto 0);
             sd_addr : out std_logic_vector(12 downto 0);
@@ -81,7 +102,7 @@ architecture Behavioral of sms_mist is
       );
   end component;
   
-  constant CONF_STR : string := "SMS;SMS;O1,Video,NTSC,PAL;O2,Joysticks,Normal,Swapped;T3,Pause;T4,Reset";
+  constant CONF_STR : string := "SMS;SMS;O1,Video,NTSC,PAL;O2,Scanlines,Off,On;O3,Joysticks,Normal,Swapped;T4,Pause;T5,Reset";
 
   function to_slv(s: string) return std_logic_vector is
     constant ss: string(1 to s'length) := s;
@@ -109,6 +130,7 @@ architecture Behavioral of sms_mist is
            status: out std_logic_vector(7 downto 0);
            SWITCHES : out std_logic_vector(1 downto 0);
            BUTTONS : out std_logic_vector(1 downto 0);
+			  scandoubler_disable : out std_logic;
           -- clk : in std_logic;
            ps2_clk : out std_logic;
            ps2_data : out std_logic
@@ -163,6 +185,7 @@ architecture Behavioral of sms_mist is
   signal joy1 : std_logic_vector(5 downto 0);
   signal joya : std_logic_vector(5 downto 0);
   signal joyb : std_logic_vector(5 downto 0);
+  signal scandoubler_disable : std_logic;
   signal status : std_logic_vector(7 downto 0);
   signal j1_tr : std_logic;
   signal j2_tr : std_logic;
@@ -172,6 +195,23 @@ architecture Behavioral of sms_mist is
   signal b : std_logic_vector(1 downto 0);
   signal vs: std_logic;
   signal hs: std_logic;
+  
+  signal video_r: std_logic_vector(5 downto 0);
+  signal video_g: std_logic_vector(5 downto 0);
+  signal video_b: std_logic_vector(5 downto 0);
+  
+  signal sd_r : std_logic_vector(5 downto 0);
+  signal sd_g : std_logic_vector(5 downto 0);
+  signal sd_b : std_logic_vector(5 downto 0);
+  signal sd_hs: std_logic;
+  signal sd_vs: std_logic;
+
+  signal osd_clk: std_logic;
+  signal osd_r  : std_logic_vector(5 downto 0);
+  signal osd_g  : std_logic_vector(5 downto 0);
+  signal osd_b  : std_logic_vector(5 downto 0);
+  signal osd_hs : std_logic;
+  signal osd_vs : std_logic;
   
   signal ioctl_wr : std_logic;
   signal ioctl_addr : std_logic_vector(24 downto 0);
@@ -210,10 +250,10 @@ begin
       clk_cpu <= not clk_cpu;
     end if;
   end process;
-	
-	video_inst: vga_video
+    
+	video_inst: video
 	port map (
-		clk16			=> clk16,
+		clk8			=> clk_cpu,
 		pal			=> status(1),
 		x	 			=> x,
 		y				=> y,
@@ -225,23 +265,53 @@ begin
 		green			=> g,
 		blue			=> b
 	);
-  
-  osd_inst : osd
+
+	video_r <= r & r & r;
+	video_g <= g & g & g;
+	video_b <= b & b & b;
+
+	scandouble_inst: scandoubler
+	port map(
+		clk_in => clk_cpu,
+		clk_out => clk16,
+		scanlines => status(2),
+		hs_in => hs,
+		vs_in => vs,
+      r_in => video_r,
+      g_in => video_g,
+      b_in => video_b,
+		r_out => sd_r,
+		g_out => sd_g,
+		b_out => sd_b,
+		hs_out => sd_hs,
+		vs_out => sd_vs
+	);
+
+	--scandoubler_disable <= '1';
+	VGA_HS <= not(hs xor vs) when scandoubler_disable = '1' else sd_hs;
+	VGA_VS <= '1' when scandoubler_disable = '1' else sd_vs;
+	
+	osd_clk <= clk_cpu when scandoubler_disable = '1' else clk16;
+	osd_hs  <= hs when scandoubler_disable = '1' else sd_hs;
+   osd_vs  <= vs when scandoubler_disable = '1' else sd_vs;
+	osd_r   <= video_r when scandoubler_disable = '1' else sd_r;
+	osd_g   <= video_g when scandoubler_disable = '1' else sd_g;
+	osd_b   <= video_b when scandoubler_disable = '1' else sd_b;
+	
+	osd_inst : osd
     port map (
-      pclk => clk16,
+      pclk => osd_clk,
       sdi => SPI_DI,
       sck => SPI_SCK,
       ss => SPI_SS3,
-      red_in => r & r & r,
-      green_in => g & g & g,
-      blue_in => b & b & b,
-      hs_in => hs,
-      vs_in => vs,
+      red_in => osd_r,
+      green_in => osd_g,
+      blue_in => osd_b,
+      hs_in => osd_hs,
+      vs_in => osd_vs,
       red_out => VGA_R,
       green_out => VGA_G,
-      blue_out => VGA_B,
-      hs_out => VGA_HS,
-      vs_out => VGA_VS
+      blue_out => VGA_B
     );
   
   -- sdram interface
@@ -310,19 +380,20 @@ begin
       JOY1 => joy1,
       SWITCHES => switches,
       BUTTONS => buttons,
+		scandoubler_disable => scandoubler_disable,
      -- clk => open,
       ps2_clk => open,
       ps2_data => open
     );
 
 	-- joysticks can be swapped
-	joya <= joy1 when status(2)='0' else joy0;
-	joyb <= joy0 when status(2)='0' else joy1;
+	joya <= joy1 when status(3)='0' else joy0;
+	joyb <= joy0 when status(3)='0' else joy1;
 	 
 	system_inst: work.system
 	port map (
 		clk_cpu		=> clk_cpu,
-		clk_vdp		=> clk16,
+		clk_vdp		=> clk_cpu,
 		
 		-- ram interface used  for cartridge emulation
 		ram_oe_n		=> ram_oe_n,
@@ -342,8 +413,8 @@ begin
 		j2_right		=> not joyb(0),
 		j2_tl			=> not joyb(4),
 		j2_tr			=> not joyb(5),
-		reset			=> not buttons(1) and not status(4) and not status(0) and pll_locked and reset_n,
-		pause			=> not status(3),
+		reset			=> not buttons(1) and not status(5) and not status(0) and pll_locked and reset_n,
+		pause			=> not status(4),
 
 		-- video
 		x				=> x,
