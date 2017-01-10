@@ -296,6 +296,7 @@ set_global_assignment -name VERILOG_FILE src/compat.v
 set_global_assignment -name VERILOG_FILE src/ppu.v
 set_global_assignment -name VERILOG_FILE src/mmu.v
 set_global_assignment -name VERILOG_FILE src/cpu.v
+set_global_assignment -name SYSTEMVERILOG_FILE src/video_mixer.sv
 set_global_assignment -name VERILOG_FILE src/video.v
 set_global_assignment -name VERILOG_FILE src/nes.v
 set_global_assignment -name VERILOG_FILE src/MicroCode.v

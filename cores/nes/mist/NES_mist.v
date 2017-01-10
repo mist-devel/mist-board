@@ -175,6 +175,7 @@ wire palette2_osd = status[5];
 wire reset_osd = status[6];
 
 wire scandoubler_disable;
+wire ypbpr;
 wire ps2_kbd_clk, ps2_kbd_data;
 
 
@@ -190,6 +191,7 @@ user_io #(.STRLEN(CONF_STR_LEN)) user_io(
    .switches(switches),
    .buttons(buttons),
    .scandoubler_disable(scandoubler_disable),
+   .ypbpr(ypbpr),
 
    .joystick_0(joyA),
    .joystick_1(joyB),
@@ -407,6 +409,7 @@ video video (
 	.count_v(scanline),
 	.count_h(cycle),
 	.mode(scandoubler_disable),
+	.ypbpr(ypbpr),
 	.smoothing(!smoothing_osd),
 	.scanlines(scanlines_osd),
 	.overscan(overscan_osd),

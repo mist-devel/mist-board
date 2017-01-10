@@ -7,6 +7,7 @@ module video(
 	input [8:0] count_h,
 	input [8:0] count_v,
 	input mode,
+	input ypbpr,
 	input smoothing,
 	input scanlines,
 	input overscan,
@@ -18,8 +19,8 @@ module video(
 
 	output       VGA_HS,
 	output       VGA_VS,
-	output [5:0] VGA_R, 
-	output [5:0] VGA_G, 
+	output [5:0] VGA_R,
+	output [5:0] VGA_G,
 	output [5:0] VGA_B,
 	
 	output osd_visible
@@ -29,6 +30,8 @@ reg clk2 = 1'b0;
 always @(posedge clk) clk2 <= ~clk2;
 wire clkv = mode ? clk2 : clk;
 
+wire [5:0] R_out, G_out, B_out;
+
 osd #(10'd0, 10'd0, 3'd4) osd (
    .pclk(clkv),
 
@@ -36,16 +39,16 @@ osd #(10'd0, 10'd0, 3'd4) osd (
    .sdi(sdi),
    .ss(ss),
 
-   .red_in  ({vga_r, 1'b0}),
-   .green_in({vga_g, 1'b0}),
-   .blue_in ({vga_b, 1'b0}),
+   .red_in  ({vga_r, vga_r[4]}),
+   .green_in({vga_g, vga_g[4]}),
+   .blue_in ({vga_b, vga_b[4]}),
    .hs_in(sync_h),
    .vs_in(sync_v),
 
-   .red_out(VGA_R),
-   .green_out(VGA_G),
-   .blue_out(VGA_B),
-	
+   .red_out(R_out),
+   .green_out(G_out),
+   .blue_out(B_out),
+
 	.osd_enable(osd_visible)
 );
 
@@ -103,7 +106,30 @@ wire  [4:0]   vga_g = ol ? {4'b0, pixel_v[9:9]}   : (darker ? {1'b0, pixel_v[9:6
 wire  [4:0]   vga_b = ol ? {4'b0, pixel_v[14:14]} : (darker ? {1'b0, pixel_v[14:11]} : pixel_v[14:10]);
 wire         sync_h = ((h >= (512 + 23 + (mode ? 18 : 35))) && (h < (512 + 23 + (mode ? 18 : 35) + 82)));
 wire         sync_v = ((v >= (mode ? 240 + 5  : 480 + 10))  && (v < (mode ? 240 + 14 : 480 + 12)));
-assign       VGA_HS = mode ? ~(sync_h ^ sync_v) : ~sync_h;
-assign       VGA_VS = mode ? 1'b1 : ~sync_v;
+
+video_mixer video_mixer
+(
+	.scandoubler_disable(mode),
+	.ypbpr(ypbpr),
+	.ypbpr_full(1),
+
+	.r_i({R_out, R_out[5:4]}),
+	.g_i({G_out, G_out[5:4]}),
+	.b_i({B_out, B_out[5:4]}),
+	.hsync_i(sync_h),
+	.vsync_i(sync_v),
+
+	.r_p({R_out, R_out[5:4]}),
+	.g_p({G_out, G_out[5:4]}),
+	.b_p({B_out, B_out[5:4]}),
+	.hsync_p(sync_h),
+	.vsync_p(sync_v),
+
+	.VGA_HS(VGA_HS),
+	.VGA_VS(VGA_VS),
+	.VGA_R(VGA_R),
+	.VGA_G(VGA_G),
+	.VGA_B(VGA_B)
+);
 
 endmodule
