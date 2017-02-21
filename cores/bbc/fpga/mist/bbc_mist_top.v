@@ -109,7 +109,7 @@ clockgen CLOCKS(
 
 // without scan doubler only half the pixel clock is used
 reg clk_12m;
-always @(clk_24m)
+always @(posedge clk_24m)
 	clk_12m <= !clk_12m;
 
 wire clk_osd = scandoubler_disable?clk_12m:clk_24m;
@@ -133,7 +133,9 @@ osd #(0,0,4) OSD (
    .green_out  ( VGA_G        ),
    .blue_out   ( VGA_B        ),
    .hs_out     ( v_hs         ),
-   .vs_out     ( v_vs         )
+   .vs_out     ( v_vs         ),
+
+   .tv15khz    ( scandoubler_disable )
 );
 
 wire v_hs, v_vs;

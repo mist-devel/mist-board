@@ -45,7 +45,9 @@ module osd (
 	output [5:0]  	green_out,
 	output [5:0]  	blue_out,
 	output			hs_out,
-	output			vs_out
+	output			vs_out,
+
+    input           tv15khz
 );
 
 parameter OSD_X_OFFSET = 10'd0;
@@ -194,9 +196,17 @@ always @(posedge pclk)
   osd_byte <= osd_buffer[{osd_vcnt[6:4], osd_hcnt}];
 
 wire [2:0] osd_color = OSD_COLOR;
-assign red_out   = !osd_de? {3{red_in}}     :  {osd_pixel, osd_pixel, osd_color[2], {red_in, red_in[1]}  };
-assign green_out = !osd_de? {3{green_in}}   :  {osd_pixel, osd_pixel, osd_color[1], {green_in, green_in[1]} };
-assign blue_out  = !osd_de? {3{blue_in}}    :  {osd_pixel, osd_pixel, osd_color[0], {blue_in, blue_in[1]} };
+
+// RGB 15khz output is different to fix dull colours, VGA not affected.
+// BBC only uses one bit per colour but video engine uses a 2-bit vector, MSB is only used.
+// BBC has a fixed palette of 8 colours.
+wire [5:0] r_in = tv15khz? {5{red_in[0]}}   : {3{red_in}};
+wire [5:0] g_in = tv15khz? {5{green_in[0]}} : {3{green_in}};
+wire [5:0] b_in = tv15khz? {5{blue_in[0]}}  : {3{blue_in}};
+
+assign red_out   = !osd_de? r_in :  {osd_pixel, osd_pixel, osd_color[2], {red_in, red_in[1]}  };
+assign green_out = !osd_de? g_in :  {osd_pixel, osd_pixel, osd_color[1], {green_in, green_in[1]} };
+assign blue_out  = !osd_de? b_in :  {osd_pixel, osd_pixel, osd_color[0], {blue_in, blue_in[1]} };
 
 assign hs_out = hs_in;
 assign vs_out = vs_in;
