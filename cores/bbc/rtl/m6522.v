@@ -340,66 +340,76 @@ end
 
 always @(posedge CLK) begin
 
-    if (ENA_4 === 1'b 1) begin
-        t1_w_reset_int <= 1'b0;
-        t1_load_counter <= 1'b0;
-        t2_w_reset_int <= 1'b0;
-        t2_load_counter <= 1'b0;
-        load_data <= 8'h 00;
-        sr_write_ena <= 1'b0;
-        ifr_write_ena <= 1'b0;
-        ier_write_ena <= 1'b0;
+    //Fix incorrect power up values in timer latches
+    if (RESET_L === 1'b 0) begin
+        r_t1l_l <= 8'h FE;
+        r_t1l_h <= 8'h FF;
+        r_t2l_l <= 8'h FE;
+        r_t2l_h <= 8'h FF;
+    end
+    else  begin
 
-        if (cs === 1'b 1 & I_RW_L === 1'b 0) begin
-            load_data <= I_DATA;
-
-            case (I_RS)
-                4'h 4: begin
-                    r_t1l_l <= I_DATA;
-                end
-
-                4'h 5: begin
-                    r_t1l_h <= I_DATA;
-                    t1_w_reset_int <= 1'b1;
-                    t1_load_counter <= 1'b1;
-                end
-
-                4'h 6: begin
-                    r_t1l_l <= I_DATA;
-                end
-
-                4'h 7: begin
-                    r_t1l_h <= I_DATA;
-                    t1_w_reset_int <= 1'b1;
-                end
-
-                4'h 8: begin
-                    r_t2l_l <= I_DATA;
-                end
-
-                4'h 9: begin
-                    r_t2l_h <= I_DATA;
-                    t2_w_reset_int <= 1'b1;
-                    t2_load_counter <= 1'b1;
-                end
-
-                4'h A: begin
-                    sr_write_ena <= 1'b1;
-                end
-
-                4'h D: begin
-                    ifr_write_ena <= 1'b1;
-                end
-
-                4'h E: begin
-                    ier_write_ena <= 1'b1;
-                end
-
-                default:
-                    ;
-
-            endcase
-        end
+         if (ENA_4 === 1'b 1) begin
+              t1_w_reset_int <= 1'b0;
+              t1_load_counter <= 1'b0;
+              t2_w_reset_int <= 1'b0;
+              t2_load_counter <= 1'b0;
+              load_data <= 8'h 00;
+              sr_write_ena <= 1'b0;
+              ifr_write_ena <= 1'b0;
+              ier_write_ena <= 1'b0;
+    
+              if (cs === 1'b 1 & I_RW_L === 1'b 0) begin
+                    load_data <= I_DATA;
+    
+                    case (I_RS)
+                         4'h 4: begin
+                              r_t1l_l <= I_DATA;
+                         end
+    
+                         4'h 5: begin
+                              r_t1l_h <= I_DATA;
+                              t1_w_reset_int <= 1'b1;
+                              t1_load_counter <= 1'b1;
+                         end
+    
+                         4'h 6: begin
+                              r_t1l_l <= I_DATA;
+                         end
+    
+                         4'h 7: begin
+                              r_t1l_h <= I_DATA;
+                              t1_w_reset_int <= 1'b1;
+                         end
+    
+                         4'h 8: begin
+                              r_t2l_l <= I_DATA;
+                         end
+    
+                         4'h 9: begin
+                              r_t2l_h <= I_DATA;
+                              t2_w_reset_int <= 1'b1;
+                              t2_load_counter <= 1'b1;
+                         end
+    
+                         4'h A: begin
+                              sr_write_ena <= 1'b1;
+                         end
+    
+                         4'h D: begin
+                              ifr_write_ena <= 1'b1;
+                         end
+    
+                         4'h E: begin
+                              ier_write_ena <= 1'b1;
+                         end
+    
+                         default:
+                              ;
+    
+                    endcase
+              end
+         end
     end
 end
 
