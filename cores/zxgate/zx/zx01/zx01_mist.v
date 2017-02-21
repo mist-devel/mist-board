@@ -118,6 +118,7 @@ parameter CONF_STR = {
 parameter CONF_STR_LEN = 7+27+22;
 
 wire [7:0] status;
+wire scandoubler_disable;
 
 user_io #(.STRLEN(CONF_STR_LEN)) user_io(
 	.conf_str		( CONF_STR     ),
@@ -128,6 +129,8 @@ user_io #(.STRLEN(CONF_STR_LEN)) user_io(
    .SPI_MISO    	(SPI_DO			),   // tristate handling inside user_io
    .SPI_MOSI    	(SPI_DI			),
 
+	.scandoubler_disable ( scandoubler_disable   ),
+	
    .SWITCHES 		(switches		),
    .BUTTONS 		(buttons			),
 
@@ -168,8 +171,24 @@ wire mem16k = !status[2];   // bit 2 of status register is 0 when 16k is enabled
 // fine tune the OSD position in x and y direction. The third parameter
 // adjusts the OSD color (0=dark grey, 1=blue, 2=green, 3=cyan, 4=red,
 // 5=purple, 6=yellow, 7=light grey)
+
+wire vga_hsync, vga_vsync;
+
+// ZX81 generates csync already, just use that.
+// Scandoubler generates hs from csync.
+// Tape loading issues when Signal II Tap settings switched off,
+// mystery, possibly due to optimisations breaking the tape
+// interface?
+wire video_hs = scandoubler_disable?csync:~hs;
+
+// TV SCART has csync on hsync pin and "high" on vsync pin
+assign VGA_VS = scandoubler_disable?1'b1:vga_vsync;
+assign VGA_HS = scandoubler_disable?csync:vga_hsync;
+
+wire osd_clk = scandoubler_disable?clk:clk13;
+
 osd #(15,0,5) osd (
-	.pclk			( clk13			),
+	.pclk			( osd_clk		),
 
 	// spi for OSD
    .sdi        ( SPI_DI       ),
@@ -179,14 +198,14 @@ osd #(15,0,5) osd (
 	.red_in		( video6			),
 	.green_in	( video6			),
 	.blue_in		( video6			),
-	.hs_in		( ~hs				),
+	.hs_in		( video_hs		),
 	.vs_in		( ~vs				),
 	
 	.red_out		( VGA_R			),
 	.green_out	( VGA_G			),
 	.blue_out	( VGA_B			),
-	.hs_out		( VGA_HS			),
-	.vs_out		( VGA_VS			)
+	.hs_out		( vga_hsync		),
+	.vs_out		( vga_vsync		)
 );	
 
 wire [5:0] video6 = { vb, vb, vb, vb, vb, vb};
@@ -194,7 +213,8 @@ wire [5:0] video6 = { vb, vb, vb, vb, vb, vb};
 // "video bit" forced black outside horizontal display enable (h_de)
 // and vsync (vs). Also the "transistor inverter" present in the zx01 
 // is implemented here
-wire vb = v_de && h_de && ~sd_video;
+// 15khz takes video signal directly from ZX video.
+wire vb = v_de && h_de && (scandoubler_disable?~video:~sd_video);
 
 // video and csync output from the zx01
 wire video;
@@ -209,15 +229,16 @@ reg [9:0] zx_col;
 // counter to determine sync lengths in the composity sync signal
 // used to differentiate between hsync and vsync
 reg [7:0] sync_len;
+//reg vs, csD /* synthesis noprune */;
 reg vs, csD;
 
 // horizontal display goes from 40 to 168. We add 16 border pixels left and right
-wire h_de = (sd_col >= 2*32) && (sd_col < 2*182);   // 176
+wire h_de = (sd_col >= (scandoubler_disable?40:(2*32))) && (sd_col < 2*182);   // 176
 
 // vertical display goes from line 32 to 224.We add 16 border pixels top and bottom
 wire v_de = (line_cnt >= 16) && (line_cnt < 272);    // 240  
 
-wire hs = sd_col >= 2*192;
+wire hs = sd_col >= (scandoubler_disable?192:(2*192));
 
 // debug signal indicating that the scandoubler adjusted its hsync phase. This
 // signal should only occur once at stargup. The fact that it also triggers in
@@ -237,7 +258,7 @@ reg sd_toggle;
 reg sd_video;
 
 // scan doublers hsync/vsync generator runs on 6.5MHz
-always @(posedge clk13) begin
+always @(posedge osd_clk) begin
 	trigger <= 1'b0;
 
 	csD <= csync;
