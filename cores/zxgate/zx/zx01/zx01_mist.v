@@ -148,7 +148,7 @@ user_io #(.STRLEN(CONF_STR_LEN)) user_io(
 );
 
 wire reset_in = status[0];
-wire ntsc = status[1];
+wire ntsc = !status[1];
 wire mem16k = !status[2];   // bit 2 of status register is 0 when 16k is enabled
 
 // ----------------------- Quick'n dirty scan doubler ---------------------------
@@ -236,7 +236,7 @@ reg vs, csD;
 wire h_de = (sd_col >= (scandoubler_disable?40:(2*32))) && (sd_col < 2*182);   // 176
 
 // vertical display goes from line 32 to 224.We add 16 border pixels top and bottom
-wire v_de = (line_cnt >= 16) && (line_cnt < 272);    // 240  
+wire v_de = (line_cnt >= 16) && (line_cnt < 296);    // 240  
 
 wire hs = sd_col >= (scandoubler_disable?192:(2*192));
 
