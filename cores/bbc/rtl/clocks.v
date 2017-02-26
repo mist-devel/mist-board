@@ -48,7 +48,7 @@ module clocks(
     );
 
 reg     [4:0] clken_counter; 
-reg     cpu_cycle_mask; 
+reg     [1:0] cpu_cycle_mask; 
 
 //  SAA5050 needs a 6 MHz clock enable relative to a 24 MHz clock
 reg     [1:0] ttxt_clken_counter; 
@@ -69,7 +69,7 @@ assign mhz1_clken = mhz2_clken & clken_counter[4];
 //  31^M
 assign cpu_cycle = ~(clken_counter[0] | clken_counter[1] | clken_counter[2] | clken_counter[3]);
 //  0/16^M
-assign cpu_clken = /* reset_n && */ cpu_cycle & ~cpu_cycle_mask;
+assign cpu_clken = cpu_cycle & ~cpu_cycle_mask[1] & ~cpu_cycle_mask[0];
 
 always @(posedge clk_32m)
    begin : clk_gen
@@ -83,28 +83,25 @@ always @(posedge clk_32m)
 //      end
    end
 	
+
 always @(posedge clk_32m)
    begin : cycle_stretch
-   if (reset_n === 1'b 0)
-      begin
-      cpu_cycle_mask <= 1'b 0;   
+   if (reset_n === 1'b 0) begin
+      cpu_cycle_mask <= 2'b 00;   
       end
-   else if (mhz2_clken === 1'b 1 )
-      begin
-      if ((mhz1_enable === 1'b 1) && (cpu_cycle_mask === 1'b 0))
-         begin
-
-			//  Block CPU cycles until 1 MHz cycle has completed
-         cpu_cycle_mask <= 1'b 1;   
-         end
-      if (mhz1_clken === 1'b 1)
-         begin
-			//  CPU can run again
-			//  FIXME: This may not be correct in terms of CPU cycles, but it
-			//  should work
-         cpu_cycle_mask <= 1'b 0;   
-         end
-      end
+   else if (mhz2_clken === 1'b 1 ) begin
+			if ((mhz1_enable === 1'b 1) && (cpu_cycle_mask === 2'b 00)) begin
+				//  Block CPU cycles until 1 MHz cycle has completed
+				if (mhz1_clken === 1'b 0) begin
+					cpu_cycle_mask <= 2'b 01;   
+				end else begin
+					cpu_cycle_mask <= 2'b 10;
+				end
+			end
+			if (cpu_cycle_mask !== 2'b 00) begin
+				cpu_cycle_mask <= cpu_cycle_mask - 2'b 01;
+			end
+		end
    end
 
 always @(posedge clk_24m)

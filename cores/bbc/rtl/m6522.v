@@ -40,6 +40,9 @@
 //
 //  Revision list
 //
+//  version 004 fixes to PB7 T1 control and Mode 0 Shift Register operation
+//  version 003 fix reset of T1/T2 IFR flags if T1/T2 is reload via reg5/reg9 from wolfgang (WoS)
+//              Ported to numeric_std and simulation fix for signal initializations from arnim laeuger
 //  version 002 fix from Mark McDougall, untested
 //  version 001 initial release
 //  not very sure about the shift register, documentation is a bit light.
@@ -114,7 +117,7 @@ wire    O_CB1;
 wire    O_CB1_OE_L;
 reg     O_CB2;
 reg     O_CB2_OE_L;
-reg     [1:0] phase;
+reg     [1:0] phase = 2'b00;
 reg     p2_h_t1;
 wire     cs;
 
@@ -145,24 +148,24 @@ reg     [7:0] load_data;
 //  timer 1
 reg     [15:0] t1c;
 reg     t1c_active;
-wire    t1c_done;
+reg     t1c_done;
 reg     t1_w_reset_int;
 reg     t1_r_reset_int;
 reg     t1_load_counter;
-wire    t1_reload_counter;
+reg     t1_reload_counter;
 reg     t1_toggle;
 reg     t1_irq;
 
 //  timer 2
 reg     [15:0] t2c;
 reg     t2c_active;
-wire    t2c_done;
+reg     t2c_done;
 reg     t2_pb6;
 reg     t2_pb6_t1;
 reg     t2_w_reset_int;
 reg     t2_r_reset_int;
 reg     t2_load_counter;
-wire    t2_reload_counter;
+reg     t2_reload_counter;
 reg     t2_irq;
 reg     t2_sr_ena;
 
@@ -202,8 +205,6 @@ wire    cb2_int;
 reg     ca2_irq;
 reg     cb2_irq;
 reg     final_irq;
-wire    p_timer1_done_done;
-wire    p_timer2_done_done;
 reg      p_timer2_ena;
 reg      p_sr_dir_out;
 reg      p_sr_ena;
@@ -328,6 +329,7 @@ always @(posedge CLK) begin
             end
 
 				if (r_acr[7] === 1'b1) begin
+                    // DMB: Forgetting to clear B7 broke Acornsoft Planetoid
 					if(t1_load_counter)
 						r_orb[7] <= 1'b0; 			// writing T1C-H resets bit 7
 					else if (t1_toggle === 1'b1)
@@ -340,8 +342,12 @@ end
 
 always @(posedge CLK) begin
 
-    //Fix incorrect power up values in timer latches
     if (RESET_L === 1'b 0) begin
+        // The spec says, this is not reset.
+        // Fact is that the 1541 VIA1 timer won't work,
+        // as the firmware ONLY sets the r_t1l_h latch!!!!
+        // DMB: These are observed power on values from the Beeb
+        // DMB: Note, it's a little overzeleaous setting these on reset; that doesn't happen in reality 
         r_t1l_l <= 8'h FE;
         r_t1l_h <= 8'h FF;
         r_t2l_l <= 8'h FE;
@@ -419,20 +425,21 @@ assign O_DATA_OE_L = (cs === 1'b 1 & I_RW_L === 1'b 1) ? 1'b0 : 1'b1;
 
 always @(posedge CLK) begin
 
-    if (ENA_4 === 1'b 1) begin
+	if (ENA_4 === 1'b 1) begin
 
         t1_r_reset_int <= 1'b0;
         t2_r_reset_int <= 1'b0;
         sr_read_ena <= 1'b0;
         r_irb_hs <= 1'b 0;
         r_ira_hs <= 1'b 0;
+        O_DATA <= 8'h 00;   // default
 
         if (cs === 1'b 1 & I_RW_L === 1'b 1) begin
             case (I_RS)
-                4'h 0: begin
-                    O_DATA <= r_irb & ~r_ddrb | r_orb & r_ddrb;
                     // when x"0" => O_DATA <= r_irb; r_irb_hs <= '1';
                     //  fix from Mark McDougall, untested
+                4'h 0: begin
+                    O_DATA <= r_irb & ~r_ddrb | r_orb & r_ddrb;
                     r_irb_hs <= 1'b 1;
                 end
 
@@ -505,7 +512,7 @@ always @(posedge CLK) begin
 
             endcase
         end
-    end
+	end
 end
 
 //
@@ -781,9 +788,10 @@ always @(posedge CLK) begin
     end
 end
 
+//  data direction reg (ddr) 0 = input, 1 = output
+
 assign O_PA = r_ora;
 assign O_PA_OE_L = ~r_ddra;
-
 
 assign O_PB_OE_L[6:0] = ~r_ddrb[6:0];
 //  not clear if r_ddrb(7) must be 1 as well, an output if under t1 control
@@ -795,11 +803,21 @@ assign O_PB[7:0] = r_orb[7:0];
 //  Timer 1
 //
 
-//  data direction reg (ddr) 0 = input, 1 = output
+reg p_timer1_done_done;
+always @(posedge CLK) begin
+    
+    if (ENA_4 === 1'b1) begin
+        p_timer1_done_done = t1c == 16'h 0000;
+        t1c_done <= p_timer1_done_done & phase == 2'b 11;
+        if (phase === 2'b 11) begin
+            t1_reload_counter <= p_timer1_done_done & r_acr[6] == 1'b1;
+        end
+        if (t1_load_counter ) begin
+            t1c_done <= 1'b0;
+        end
+    end
+end
 
-assign p_timer1_done_done = t1c == 16'h 0000;
-assign t1c_done = p_timer1_done_done & phase == 2'b 11;
-assign t1_reload_counter = p_timer1_done_done & r_acr[6] == 1'b 1;
 
 always @(posedge CLK) begin
 
@@ -819,18 +837,17 @@ always @(posedge CLK) begin
             t1c_active <= 1'b0;
         end
 
-        if (RESET_L === 1'b 0) begin
-            t1c_active <= 1'b0;
-        end
-
         t1_toggle <= 1'b 0;
 
         if (t1c_active & t1c_done) begin
             t1_toggle <= 1'b 1;
             t1_irq <= 1'b 1;
         end
-        else if (RESET_L === 1'b 0 | t1_w_reset_int | t1_r_reset_int |
-                 clear_irq[6] === 1'b 1 ) begin
+        else if (t1_w_reset_int | t1_r_reset_int | clear_irq[6] === 1'b 1 ) begin
+            t1_irq <= 1'b 0;
+        end
+
+        if (t1_load_counter) begin  // irq reset on load!
             t1_irq <= 1'b 0;
         end
     end
@@ -852,9 +869,20 @@ always @(posedge CLK) begin
     end
 end
 
-assign p_timer2_done_done = t2c == 16'h 0000;
-assign t2c_done = p_timer2_done_done & phase == 2'b 11;
-assign t2_reload_counter = p_timer2_done_done;
+reg p_timer2_done_done;
+always @(posedge CLK) begin
+    
+    if (ENA_4 === 1'b1) begin
+        p_timer2_done_done = t2c == 16'h 0000;
+        t2c_done <= p_timer2_done_done & phase == 2'b 11;
+        if (phase === 2'b 11) begin
+            t2_reload_counter <= p_timer2_done_done;
+        end
+        if (t2_load_counter ) begin // done reset on load!
+            t2c_done <= 1'b0;
+        end
+    end
+end
 
 
 always @(posedge CLK) begin
@@ -893,17 +921,17 @@ always @(posedge CLK) begin
             t2c_active <= 1'b0;
         end
 
-        if (RESET_L === 1'b 0) begin
-            t2c_active <= 1'b0;
-        end
-
         if (t2c_active & t2c_done) begin
             t2_irq <= 1'b 1;
         end
-        else if (RESET_L === 1'b 0 | t2_w_reset_int | t2_r_reset_int |
-                 clear_irq[5] === 1'b 1 ) begin
+        else if (t2_w_reset_int | t2_r_reset_int | clear_irq[5] === 1'b 1 ) begin
             t2_irq <= 1'b 0;
         end
+
+        if (t2_load_counter) begin  // irq reset on load!
+            t2_irq <= 1'b 0;
+        end
+
     end
 end
 
@@ -1011,7 +1039,10 @@ always @(posedge CLK) begin
                     //  input
                     if (sr_cnt[3] === 1'b 1 | p_sr_cb1_ip === 1'b 1) begin
                         if (sr_strobe_rising) begin
-                            r_sr <= {r_sr[6:0], I_CB2};
+                            r_sr[0] <= I_CB2;
+                        end
+                        else if (sr_strobe_falling) begin
+                            r_sr[7:1] <= r_sr[6:0];
                         end
                     end
 
@@ -1036,7 +1067,10 @@ always @(posedge CLK) begin
 
             p_sr_sr_count_ena = sr_strobe_rising;
 
-            if (sr_write_ena | sr_read_ena) begin
+            // DMB: reseting sr_count when not enabled cause the sr to
+            // start running immediately it was enabled, which is incorrect
+            // and broke the latest SmartSPI ROM on the BBC Micro
+            if (p_sr_ena & (sr_write_ena | sr_read_ena)) begin
 
                 //  some documentation says sr bit in IFR must be set as well ?
                 sr_cnt <= 4'b 1000;

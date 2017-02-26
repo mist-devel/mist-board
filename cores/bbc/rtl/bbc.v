@@ -88,6 +88,7 @@ wire    io_fred;
 wire    io_jim; 
 wire    io_sheila; 
 
+// SHEILA
 wire     crtc_enable; 
 wire     acia_enable; 
 wire     serproc_enable; 
@@ -645,6 +646,11 @@ assign sound_di = sys_via_pa_out;
 
 //  Others (idle until missing bits implemented)
 assign sys_via_pb_in[7:4] = { 2'b11, !joy_but[1], !joy_but[0] }; 
+assign sys_via_pb_in[3:0] = sys_via_pb_out[3:0];
+
+// Fixes Planetoid, Snapper etc
+assign user_via_pa_in = user_via_pa_out; 
+assign user_via_pb_in = user_via_pb_out;
 
 
 assign MEM_ADR = cpu_a[15:0];
