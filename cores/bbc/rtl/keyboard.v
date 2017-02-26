@@ -112,9 +112,8 @@ end
 //  Column counts automatically when AUTOSCAN is enabled, otherwise
 //  value is loaded from external input
 
-wire [7:0] k = keys[col[3:0]];
-// use a bitwise reduction to check if any bit in k is set.
-assign INT = |k;
+wire [7:0] k = keys[col];
+assign INT = k[7] | k[6] | k[5] | k[4] | k[3] | k[2] | k[1];
 assign KEYPRESS = AUTOSCAN === 1'b0 ?  k[ROW] : 1'b0;
 
 //  Decode PS/2 data
