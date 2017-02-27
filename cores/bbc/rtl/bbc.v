@@ -170,7 +170,7 @@ wire    [1:0] disp_addr_offs;
 wire    caps_lock_led_n; 
 wire    shift_lock_led_n; 
 
-//  Sound generator^M
+//  Sound generator
 wire    sound_ready;
 wire    [7:0] sound_di;
 wire    [7:0] sound_ao;
@@ -586,9 +586,9 @@ always @(crtc_ma or crtc_ra or disp_addr_offs)
    end
 
 // SOUND 
-
-assign AUDIO_L = {1'b0, sound_ao, sound_ao[7:1]};
-assign AUDIO_R = {1'b0, sound_ao, sound_ao[7:1]};
+// Convert from 8bit signed to unsigned for MiST DAC
+assign AUDIO_L = {~sound_ao[7], sound_ao[6:0], 8'b00000000};
+assign AUDIO_R = {~sound_ao[7], sound_ao[6:0], 8'b00000000};
 
 //  VIDPROC
 assign vidproc_invert_n = 1'b 1; 
