@@ -66,9 +66,9 @@ localparam HBP2 = 192;
 
 // x1024
 localparam V    = 1024;
-localparam VFP  = 9;
-localparam VS   = 4;
-localparam VBP  = 9;
+localparam VFP  = 1;
+localparam VS   = 3;
+localparam VBP  = 38;
 
 assign read = (bus_cycle == 2) && me;  // memory enable can directly be used as a ram read signal
 
