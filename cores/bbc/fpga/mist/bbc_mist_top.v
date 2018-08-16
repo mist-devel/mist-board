@@ -34,7 +34,7 @@ module bbc_mist_top(
 	
   
   // SPI
-  inout          SPI_DO,
+  output         SPI_DO,
   input          SPI_DI,
   input          SPI_SCK,
   input          SPI_SS2,    // data_io
@@ -157,6 +157,8 @@ wire [7:0] sd_dout;
 wire sd_dout_strobe;
 wire [7:0] sd_din;
 wire sd_din_strobe;
+wire [8:0] sd_buff_addr;
+wire sd_ack_conf;
 
 wire [7:0] joystick_0;
 wire [7:0] joystick_1;
@@ -167,8 +169,9 @@ wire scandoubler_disable;
 
 user_io #(.STRLEN(CONF_STR_LEN)) user_io(
    .conf_str      ( CONF_STR        ),
-   // the spi interface
+	.clk_sys(clk_32m),
 
+   // the spi interface
    .SPI_CLK     	( SPI_SCK         ),
    .SPI_SS_IO     ( CONF_DATA0      ),
    .SPI_MISO      ( SPI_DO          ),   // tristate handling inside user_io
@@ -196,6 +199,8 @@ user_io #(.STRLEN(CONF_STR_LEN)) user_io(
    .sd_dout_strobe(sd_dout_strobe	),
    .sd_din     	( sd_din				),
    .sd_din_strobe (sd_din_strobe		),
+	.sd_buff_addr  (sd_buff_addr     ),
+	.sd_ack_conf   (sd_ack_conf      ),
 
 	.ps2_clk 		( clk_14k			), 
 	.ps2_kbd_clk	( ps2_clk			), 
@@ -211,18 +216,21 @@ assign user_via_cb1_in = user_via_pb_out[1];
 
 sd_card sd_card (
    // connection to io controller
+	.clk(clk_32m),
    .io_lba (sd_lba ),
    .io_rd  (sd_rd),
    .io_wr  (sd_wr),
    .io_ack (sd_ack),
+	.io_ack_conf (sd_ack_conf      ),
    .io_conf (sd_conf),
    .io_sdhc (sd_sdhc),
    .io_din (sd_dout),
    .io_din_strobe (sd_dout_strobe),
    .io_dout (sd_din),
    .io_dout_strobe ( sd_din_strobe),
+	.io_buff_addr  (sd_buff_addr     ),
  
-   .allow_sdhc ( 1'b0),   // SDHC not supported
+   .allow_sdhc ( 1'b1),   // SDHC not supported
 
    // connection to local CPU
    .sd_cs   ( sd_cs          ),
@@ -459,6 +467,7 @@ wire sideways_ram =
 
 // status[2] is '1' of low mapping is selected in the menu
 wire basic_map = status[2]?(mem_romsel == 4'h0):(mem_romsel == 4'he);
+//wire smmc_map = 0;
 wire smmc_map = status[2]?(mem_romsel == 4'h2):(mem_romsel == 4'hc);
 	
 assign mem_di = 

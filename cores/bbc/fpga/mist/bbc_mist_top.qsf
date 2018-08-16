@@ -133,7 +133,7 @@ set_location_assignment PIN_65 -to AUDIO_L
 set_location_assignment PIN_80 -to AUDIO_R
 
 set_global_assignment -name ENABLE_SIGNALTAP OFF
-set_global_assignment -name USE_SIGNALTAP_FILE signal_tap.stp
+set_global_assignment -name USE_SIGNALTAP_FILE output_files/stp2.stp
 set_global_assignment -name ENABLE_CONFIGURATION_PINS OFF
 set_global_assignment -name ENABLE_NCE_PIN OFF
 set_global_assignment -name ENABLE_BOOT_SEL_PIN OFF
@@ -185,6 +185,7 @@ set_global_assignment -name VHDL_FILE "../../rtl/sn76489-1.0/sn76489_clock_div-c
 set_global_assignment -name VHDL_FILE "../../rtl/sn76489-1.0/sn76489_clock_div.vhd"
 set_global_assignment -name VHDL_FILE "../../rtl/sn76489-1.0/sn76489_attenuator-c.vhd"
 set_global_assignment -name VHDL_FILE "../../rtl/sn76489-1.0/sn76489_attenuator.vhd"
+set_global_assignment -name VERILOG_FILE sd_card.v
 set_global_assignment -name VERILOG_FILE user_io.v
 set_global_assignment -name VERILOG_FILE osd.v
 set_global_assignment -name VERILOG_FILE data_io.v
