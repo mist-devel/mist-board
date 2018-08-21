@@ -208,31 +208,29 @@ user_io #(.STRLEN(CONF_STR_LEN)) user_io(
 );
 
 // wire the sd card to the user port
-wire sd_sck = user_via_pb_out[1];
-wire sd_cs = 1'b0;
-wire sd_sdi = user_via_pb_out[0];
-wire sd_sdo = user_via_cb2_in;
-assign user_via_cb1_in = user_via_pb_out[1];
+wire sd_sck;
+wire sd_cs;
+wire sd_sdi;
+wire sd_sdo;
 
-sd_card sd_card (
-   // connection to io controller
+ sd_card sd_card (
+	// connection to io controller
 	.clk(clk_32m),
-   .io_lba (sd_lba ),
-   .io_rd  (sd_rd),
-   .io_wr  (sd_wr),
-   .io_ack (sd_ack),
+	.io_lba (sd_lba ),
+	.io_rd  (sd_rd),
+	.io_wr  (sd_wr),
+	.io_ack (sd_ack),
 	.io_ack_conf (sd_ack_conf      ),
-   .io_conf (sd_conf),
-   .io_sdhc (sd_sdhc),
-   .io_din (sd_dout),
-   .io_din_strobe (sd_dout_strobe),
-   .io_dout (sd_din),
-   .io_dout_strobe ( sd_din_strobe),
+	.io_conf (sd_conf),
+	.io_sdhc (sd_sdhc),
+	.io_din (sd_dout),
+	.io_din_strobe (sd_dout_strobe),
+	.io_dout (sd_din),
+	.io_dout_strobe ( sd_din_strobe),
 	.io_buff_addr  (sd_buff_addr     ),
- 
    .allow_sdhc ( 1'b1),   // SDHC not supported
-
-   // connection to local CPU
+ 
+    // connection to local CPU
    .sd_cs   ( sd_cs          ),
    .sd_sck  ( sd_sck         ),
    .sd_sdi  ( sd_sdi         ),
@@ -325,11 +323,12 @@ bbc BBC(
     .VID_ADR    ( vid_adr       ),
     .VID_DI     ( vid_data      ),
 	
-    .SHIFT     ( autoboot_shift ),
-	
-	 .user_via_pb_out ( user_via_pb_out   ),
-	 .user_via_cb1_in ( user_via_cb1_in   ),
-	 .user_via_cb2_in ( user_via_cb2_in   ),
+    .SHIFT      ( autoboot_shift ),
+
+	 .SDCLK      (sd_sck         ),
+	 .SDSS       (sd_cs          ),
+	 .SDMISO     (sd_sdo         ),
+	 .SDMOSI     (sd_sdi         ),
 
 	 .joy_but    ( { joystick_1[4], joystick_0[4] } ),
 	 .joy0_axis0 ( joystick_analog_0[15:8] ),
@@ -467,7 +466,6 @@ wire sideways_ram =
 
 // status[2] is '1' of low mapping is selected in the menu
 wire basic_map = status[2]?(mem_romsel == 4'h0):(mem_romsel == 4'he);
-//wire smmc_map = 0;
 wire smmc_map = status[2]?(mem_romsel == 4'h2):(mem_romsel == 4'hc);
 	
 assign mem_di = 

@@ -193,7 +193,7 @@ set_global_assignment -name VERILOG_FILE clockgen.v
 set_global_assignment -name VERILOG_FILE ../rtl/scandoubler.v
 set_global_assignment -name VERILOG_FILE ../../rtl/bbc.v
 set_global_assignment -name CDF_FILE output_files/Chain4.cdf
-set_global_assignment -name VERILOG_FILE ../../rtl/m6522.v
+set_global_assignment -name VHDL_FILE ../../rtl/m6522.vhd
 set_global_assignment -name QIP_FILE smmc.qip
 set_global_assignment -name QIP_FILE os12.qip
 set_global_assignment -name QIP_FILE basic2.qip
