@@ -115,7 +115,6 @@ wire    cpu_we;
 
 wire    [23:0] cpu_a; 
 wire    [7:0] cpu_di; 
-reg     [7:0] cpu_di_r;
 wire    [7:0] cpu_do; 
 
 //  CRTC signals
@@ -284,32 +283,23 @@ address_decode ADDRDECODE(
 	.mhz1_enable(mhz1_enable)
 );
 
-/*input clk;              // CPU clock 
-input reset;            // reset signal
-output reg [15:0] AB;   // address bus
-input [7:0] DI;         // data in, read bus
-output [7:0] DO;        // data out, write bus
-output WE;              // write enable
-input IRQ;              // interrupt request
-input NMI;              // non-maskable interrupt request
-input RDY;              // Ready signal. Pauses CPU when RDY=0 
-*/
-
-cpu CPU (	
-	.clk	( CLK32M_I	),
-	.reset 	( ~reset_n	),
+T65 CPU (
+	.Mode   (CPU_MODE),
+	.Res_n  (reset_n),
+	.Enable (cpu_clken),
+	.Clk    (CLK32M_I),
+	.Rdy    (cpu_clken),
+	.Abort_n(cpu_abort_n),
+	.NMI_n  (cpu_nmi_n),
+	.IRQ_n  (cpu_irq_n),
+	.SO_n   (cpu_so_n),
+	.R_W_n  (cpu_r_nw),
 	
-    .IRQ	( ~cpu_irq_n	),
-	.NMI	( ~cpu_nmi_n	),
-	
-    .WE     ( cpu_we     	),
-	.AB		( cpu_a[15:0] ),
-	.DI		( cpu_di_r		),
-	.DO		( cpu_do		),
-	.RDY	( cpu_clken     )
+	.DI     (cpu_di),
+	.DO     (cpu_do),
+	.A      (cpu_a)
 );
 
-assign cpu_r_nw = ~cpu_we;
 
 m6522 SYS_VIA (	
 	  //  System VIA is reset by power on reset only
@@ -502,12 +492,10 @@ saa5050 TELETEXT (
 
 initial begin : via_init   
 
-	//user_via_cb1_in = 1'b 0;   
-   user_via_ca2_in = 1'b 0;   
-   user_via_ca1_in = 1'b 0; 
-   user_via_ca2_in = 1'b 0;	
-   crtc_lpstb = 1'b 0;   
-	
+   user_via_ca1_in = 1'b 0;
+   user_via_ca2_in = 1'b 0;
+   crtc_lpstb = 1'b 0;
+
 end
 
 // This is needed as in v003 of the 6522 data out is only valid while I_P2_H is asserted
@@ -548,11 +536,6 @@ always @(posedge CLK32M_I) begin
 				
 		end
 		
-        // retard DI by one cpu clock cycle 
-        if (cpu_clken === 1'b1) begin
-            cpu_di_r <= cpu_di;
-        end 
-        
 	end
 end
 	
