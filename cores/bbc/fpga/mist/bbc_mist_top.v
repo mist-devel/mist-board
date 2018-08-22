@@ -405,11 +405,11 @@ basic2 basic2 (
    .q			( basic_do			)
 );
 
-wire [7:0] smmc_do;
-smmc smmc (
+wire [7:0] mmfs_do;
+mmfs mmfs (
 	.clock 	( clk_32m			),
    .address	( mem_adr[13:0]	),
-   .q			( smmc_do		   )
+   .q			( mmfs_do		   )
 );
 
 audio	AUDIO	(
@@ -466,11 +466,11 @@ wire sideways_ram =
 
 // status[2] is '1' of low mapping is selected in the menu
 wire basic_map = status[2]?(mem_romsel == 4'h0):(mem_romsel == 4'he);
-wire smmc_map = status[2]?(mem_romsel == 4'h2):(mem_romsel == 4'hc);
+wire mmfs_map = status[2]?(mem_romsel == 4'h2):(mem_romsel == 4'hc);
 	
 assign mem_di = 
 	((mem_adr[15:14] == 2'b10) && basic_map) ? basic_do : 
-	((mem_adr[15:14] == 2'b10) && smmc_map) ? smmc_do :
+	((mem_adr[15:14] == 2'b10) && mmfs_map) ? mmfs_do :
 	((mem_adr[15:14] == 2'b10) && (mem_romsel == 4'ha)) ? ram_do :
 	mos_rom ? os_do : 
 	cpu_ram ? ram_do :
