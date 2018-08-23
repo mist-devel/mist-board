@@ -4,7 +4,7 @@
 // MODULE: altsyncram 
 
 // ============================================================
-// File Name: smmc.v
+// File Name: mmfs.v
 // Megafunction Name(s):
 // 			altsyncram
 //
@@ -36,7 +36,7 @@
 // synopsys translate_off
 `timescale 1 ps / 1 ps
 // synopsys translate_on
-module smmc (
+module mmfs (
 	address,
 	clock,
 	q);
@@ -84,9 +84,9 @@ module smmc (
 		altsyncram_component.clock_enable_input_a = "BYPASS",
 		altsyncram_component.clock_enable_output_a = "BYPASS",
 `ifdef NO_PLI
-		altsyncram_component.init_file = "../../roms/smmc.rif"
+		altsyncram_component.init_file = "../../roms/mmfs.rif"
 `else
-		altsyncram_component.init_file = "../../roms/smmc.hex"
+		altsyncram_component.init_file = "../../roms/mmfs.hex"
 `endif
 ,
 		altsyncram_component.intended_device_family = "Cyclone III",
@@ -123,7 +123,7 @@ endmodule
 // Retrieval info: PRIVATE: JTAG_ENABLED NUMERIC "0"
 // Retrieval info: PRIVATE: JTAG_ID STRING "NONE"
 // Retrieval info: PRIVATE: MAXIMUM_DEPTH NUMERIC "0"
-// Retrieval info: PRIVATE: MIFfilename STRING "../../roms/smmc.hex"
+// Retrieval info: PRIVATE: MIFfilename STRING "../../roms/mmfs.hex"
 // Retrieval info: PRIVATE: NUMWORDS_A NUMERIC "16384"
 // Retrieval info: PRIVATE: RAM_BLOCK_TYPE NUMERIC "0"
 // Retrieval info: PRIVATE: RegAddr NUMERIC "1"
@@ -138,7 +138,7 @@ endmodule
 // Retrieval info: CONSTANT: ADDRESS_ACLR_A STRING "NONE"
 // Retrieval info: CONSTANT: CLOCK_ENABLE_INPUT_A STRING "BYPASS"
 // Retrieval info: CONSTANT: CLOCK_ENABLE_OUTPUT_A STRING "BYPASS"
-// Retrieval info: CONSTANT: INIT_FILE STRING "../../roms/smmc.hex"
+// Retrieval info: CONSTANT: INIT_FILE STRING "../../roms/mmfs.hex"
 // Retrieval info: CONSTANT: INTENDED_DEVICE_FAMILY STRING "Cyclone III"
 // Retrieval info: CONSTANT: LPM_HINT STRING "ENABLE_RUNTIME_MOD=NO"
 // Retrieval info: CONSTANT: LPM_TYPE STRING "altsyncram"
@@ -155,10 +155,10 @@ endmodule
 // Retrieval info: CONNECT: @address_a 0 0 14 0 address 0 0 14 0
 // Retrieval info: CONNECT: @clock0 0 0 0 0 clock 0 0 0 0
 // Retrieval info: CONNECT: q 0 0 8 0 @q_a 0 0 8 0
-// Retrieval info: GEN_FILE: TYPE_NORMAL smmc.v TRUE
-// Retrieval info: GEN_FILE: TYPE_NORMAL smmc.inc FALSE
-// Retrieval info: GEN_FILE: TYPE_NORMAL smmc.cmp FALSE
-// Retrieval info: GEN_FILE: TYPE_NORMAL smmc.bsf FALSE
-// Retrieval info: GEN_FILE: TYPE_NORMAL smmc_inst.v FALSE
-// Retrieval info: GEN_FILE: TYPE_NORMAL smmc_bb.v FALSE
+// Retrieval info: GEN_FILE: TYPE_NORMAL mmfs.v TRUE
+// Retrieval info: GEN_FILE: TYPE_NORMAL mmfs.inc FALSE
+// Retrieval info: GEN_FILE: TYPE_NORMAL mmfs.cmp FALSE
+// Retrieval info: GEN_FILE: TYPE_NORMAL mmfs.bsf FALSE
+// Retrieval info: GEN_FILE: TYPE_NORMAL mmfs_inst.v FALSE
+// Retrieval info: GEN_FILE: TYPE_NORMAL mmfs_bb.v FALSE
 // Retrieval info: LIB_FILE: altera_mf

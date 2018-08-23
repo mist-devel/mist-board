@@ -38,11 +38,11 @@ module bbc(
 
 	// externally pressed "shift" key for autoboot
 	input          SHIFT,
-	
-	// expose pins required for mmc
-	output [7:0]   user_via_pb_out,
-	input          user_via_cb1_in,
-	input          user_via_cb2_in,
+
+	output         SDSS,
+	output         SDCLK,
+	output         SDMOSI,
+	input          SDMISO,
 	
 	// analog joystick input 
 	input [1:0]	 	joy_but,
@@ -115,7 +115,6 @@ wire    cpu_we;
 
 wire    [23:0] cpu_a; 
 wire    [7:0] cpu_di; 
-reg     [7:0] cpu_di_r;
 wire    [7:0] cpu_do; 
 
 //  CRTC signals
@@ -176,7 +175,8 @@ wire    [7:0] sound_di;
 wire    [7:0] sound_ao;
 
 //  System VIA signals
-wire    [7:0] sys_via_do; 
+wire    [7:0] sys_via_do;
+reg     [7:0] sys_via_do_r;
 wire    sys_via_do_oe_n; 
 wire    sys_via_irq_n; 
 wire     sys_via_ca1_in; 
@@ -197,7 +197,8 @@ wire    [7:0] sys_via_pb_out;
 wire    [7:0] sys_via_pb_oe_n; 
 
 //  User VIA signals
-wire    [7:0] user_via_do; 
+wire    [7:0] user_via_do;
+reg     [7:0] user_via_do_r;
 wire    user_via_do_oe_n; 
 wire    user_via_irq_n; 
 reg     user_via_ca1_in; 
@@ -207,15 +208,27 @@ wire    user_via_ca2_oe_n;
 wire    [7:0] user_via_pa_in; 
 wire    [7:0] user_via_pa_out; 
 wire    [7:0] user_via_pa_oe_n; 
-//TH wire     user_via_cb1_in; 
+wire     user_via_cb1_in; 
 wire    user_via_cb1_out; 
 wire    user_via_cb1_oe_n; 
-//TH wire     user_via_cb2_in; 
+wire     user_via_cb2_in; 
 wire    user_via_cb2_out; 
 wire    user_via_cb2_oe_n; 
 wire    [7:0] user_via_pb_in; 
-//TH wire    [7:0] user_via_pb_out; 
+wire    [7:0] user_via_pb_out; 
 wire    [7:0] user_via_pb_oe_n; 
+
+// MMC
+// SDCLK is driven from either PB1 or CB1 depending on the SR Mode
+wire   sdclk_int = ~user_via_pb_oe_n[1] ? user_via_pb_out[1] : 
+						(~user_via_cb1_oe_n ? user_via_cb1_out : 1);
+assign SDCLK = sdclk_int;
+assign user_via_cb1_in = sdclk_int;
+// SDMOSI is always driven from PB0
+assign SDMOSI = ~user_via_pb_oe_n[0] ? user_via_pb_out[0] : 1;
+// SDMISO is always read from CB2
+assign user_via_cb2_in = SDMISO;
+assign SDSS = 0;
 
 // calulation for display address
 
@@ -270,65 +283,62 @@ address_decode ADDRDECODE(
 	.mhz1_enable(mhz1_enable)
 );
 
-/*input clk;              // CPU clock 
-input reset;            // reset signal
-output reg [15:0] AB;   // address bus
-input [7:0] DI;         // data in, read bus
-output [7:0] DO;        // data out, write bus
-output WE;              // write enable
-input IRQ;              // interrupt request
-input NMI;              // non-maskable interrupt request
-input RDY;              // Ready signal. Pauses CPU when RDY=0 
-*/
-
-cpu CPU (	
-	.clk	( CLK32M_I	),
-	.reset 	( ~reset_n	),
+T65 CPU (
+	.Mode   (CPU_MODE),
+	.Res_n  (reset_n),
+	.Enable (cpu_clken),
+	.Clk    (CLK32M_I),
+	.Rdy    (cpu_clken),
+	.Abort_n(cpu_abort_n),
+	.NMI_n  (cpu_nmi_n),
+	.IRQ_n  (cpu_irq_n),
+	.SO_n   (cpu_so_n),
+	.R_W_n  (cpu_r_nw),
 	
-    .IRQ	( ~cpu_irq_n	),
-	.NMI	( ~cpu_nmi_n	),
-	
-    .WE     ( cpu_we     	),
-	.AB		( cpu_a[15:0] ),
-	.DI		( cpu_di_r		),
-	.DO		( cpu_do		),
-	.RDY	( cpu_clken     )
+	.DI     (cpu_di),
+	.DO     (cpu_do),
+	.A      (cpu_a)
 );
-
-assign cpu_r_nw = ~cpu_we;
 
 
 m6522 SYS_VIA (	
 	  //  System VIA is reset by power on reset only
-	 .ENA_4(mhz4_clken),
-	 .CLK(CLK32M_I),
+
 	 .I_RS(cpu_a[3:0]),
 	 .I_DATA(cpu_do),
 	 .O_DATA(sys_via_do),
 	 .O_DATA_OE_L(sys_via_do_oe_n),
+
 	 .I_RW_L(cpu_r_nw),
 	 .I_CS1(sys_via_enable),
 	 .I_CS2_L(1'b 0), // nCS2(1'b 0),	 
 	 .O_IRQ_L(sys_via_irq_n),
- 	 .I_P2_H(mhz1_clken),
-	 .RESET_L(reset_n),
-	 
+
 	 .I_CA1(sys_via_ca1_in),
 	 .I_CA2(sys_via_ca2_in),
 	 .O_CA2(sys_via_ca2_out),
 	 .O_CA2_OE_L(sys_via_ca2_oe_n),
+
 	 .I_PA(sys_via_pa_in),
 	 .O_PA(sys_via_pa_out),
 	 .O_PA_OE_L(sys_via_pa_oe_n),
+
 	 .I_CB1(sys_via_cb1_in),
 	 .O_CB1(sys_via_cb1_out),
 	 .O_CB1_OE_L(sys_via_cb1_oe_n),
+
 	 .I_CB2(sys_via_cb2_in),
 	 .O_CB2(sys_via_cb2_out),
 	 .O_CB2_OE_L(sys_via_cb2_oe_n),
+
 	 .I_PB(sys_via_pb_in),
 	 .O_PB(sys_via_pb_out),
-	 .O_PB_OE_L(sys_via_pb_oe_n)
+	 .O_PB_OE_L(sys_via_pb_oe_n),
+
+	 .I_P2_H(mhz1_clken),
+	 .RESET_L(reset_n),
+	 .ENA_4(mhz4_clken),
+	 .CLK(CLK32M_I)
 );
 
 m6522 USER_VIA (	
@@ -482,12 +492,19 @@ saa5050 TELETEXT (
 
 initial begin : via_init   
 
-	//user_via_cb1_in = 1'b 0;   
-   user_via_ca2_in = 1'b 0;   
-   user_via_ca1_in = 1'b 0; 
-   user_via_ca2_in = 1'b 0;	
-   crtc_lpstb = 1'b 0;   
-	
+   user_via_ca1_in = 1'b 0;
+   user_via_ca2_in = 1'b 0;
+   crtc_lpstb = 1'b 0;
+
+end
+
+// This is needed as in v003 of the 6522 data out is only valid while I_P2_H is asserted
+// I_P2_H is driven from mhz1_clken
+always @(posedge CLK32M_I) begin 
+	if (mhz1_clken) begin
+		user_via_do_r <= user_via_do;
+		sys_via_do_r  <= sys_via_do;
+	end
 end
 
 // rom select latch
@@ -519,11 +536,6 @@ always @(posedge CLK32M_I) begin
 				
 		end
 		
-        // retard DI by one cpu clock cycle 
-        if (cpu_clken === 1'b1) begin
-            cpu_di_r <= cpu_di;
-        end 
-        
 	end
 end
 	
@@ -619,8 +631,8 @@ assign cpu_di = ram_enable === 1'b 1 ? MEM_DI :
 	mos_enable === 1'b 1 ? MEM_DI :
 	crtc_enable === 1'b 1 ? crtc_do : 
 	acia_enable === 1'b 1 ? 8'b 00000010 : 
-	sys_via_enable === 1'b 1 ? sys_via_do : 
-	user_via_enable === 1'b 1 ? user_via_do : 
+	sys_via_enable === 1'b 1 ? sys_via_do_r : 
+	user_via_enable === 1'b 1 ? user_via_do_r : 
 	adc_enable === 1'b 1 ? adc_do : 
 	//tube_enable === 1'b 1 ? tube_do : 
 	//adlc_enable === 1'b 1 ? bbcddr_out :
