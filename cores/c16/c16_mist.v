@@ -57,6 +57,7 @@ module c16_mist (
    output [5:0]  VGA_B
 );
 
+parameter MODE_PAL = 1'b1;
 // -------------------------------------------------------------------------
 // ------------------------------ user_io ----------------------------------
 // -------------------------------------------------------------------------
@@ -502,7 +503,7 @@ always @(negedge clk28) begin
 end
 
 // include the c16 itself
-C16 c16 (
+C16 #(.MODE_PAL(MODE_PAL)) c16 (
 	.CLK28   ( clk28 ),
 	.RESET   ( reset ),
 	.WAIT    ( c16_wait ),
@@ -553,8 +554,7 @@ C16 c16 (
 
 // the FPGATED uses two different clocks for NTSC and PAL mode.
 // Switching the clocks may crash the system. We might need to force a reset it.
-wire clk28 = c16_pal?clk28_pal:clk28_ntsc;
-//wire clk28 = clk28_pal;
+wire clk28 = MODE_PAL?clk28_pal:clk28_ntsc;
 wire pll_locked = pll_pal_locked && pll_ntsc_locked;
 
 // tv15hkz has quarter the pixel rate, so we need a 7mhz clock for the OSD

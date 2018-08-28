@@ -29,8 +29,8 @@
 //		If you want to convert your own kernal image to compatible version use
 //		bin2hex.pl perl script to convert it to .hex format.
 //////////////////////////////////////////////////////////////////////////////////
-module kernal_rom(
-	 input wire clk,
+module kernal_rom #(parameter MODE_PAL=1) (
+    input wire clk,
     input wire [13:0] address_in,
     output wire [7:0] data_out,
     input wire [7:0] data_in,
@@ -50,10 +50,11 @@ initial begin
 //$readmemh("Diag264_PAL.hex",kernal);
 
 //$readmemh("Diag264_NTSC.hex",kernal);
+if (MODE_PAL)
+$readmemh("roms/kernal_PAL.hex",kernal);
+else 
+$readmemh("roms/kernal_NTSC.hex",kernal);
 
-$readmemh("kernal_PAL.hex",kernal);
-
-//$readmemh("kernal_NTSC.hex",kernal);
 
 //$readmemh("Jiffy_PAL.hex",kernal); 
 // Note that Jiffy DOS is not free so Jiffy_PAL.hex is not included with FPGATED source code
