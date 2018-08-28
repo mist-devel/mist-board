@@ -70,14 +70,14 @@ module c16_mist (
 // it to control the menu on the OSD 
 parameter CONF_STR = {
         "C16;PRG;",
-		  "S1,D64;",
+		  "S,D64,Mount Disk;",
         "O2,Scanlines,Off,On;",
         "O3,Joysticks,Normal,Swapped;",
 		  "O4,Memory,64k,16k;",
-        "T5,Reset"
+        "T5,Reset;"
 };
 
-parameter CONF_STR_LEN = 8+7+20+28+18+8;
+parameter CONF_STR_LEN = 8+17+20+28+18+9;
 
 // the status register is controlled by the on screen display (OSD)
 wire [7:0] status;
@@ -210,21 +210,25 @@ always @(posedge clk28) begin
 end
 
 // signals to connect io controller with virtual sd card
-wire [32:0] sd_lba;
+wire [31:0] sd_lba;
 wire sd_rd;
 wire sd_wr;
 wire sd_ack;
+wire sd_ack_conf;
 wire sd_conf;
-wire sd_sdhc;
+wire sd_sdhc = 1'b1;
 wire [7:0] sd_dout;
 wire sd_dout_strobe;
 wire [7:0] sd_din;
 wire sd_din_strobe;
-wire sd_change;
-       		
+wire img_mounted;
+wire [8:0] sd_buff_addr;
+
 // include user_io module for arm controller communication
 user_io #(.STRLEN(CONF_STR_LEN)) user_io ( 
       .conf_str       ( CONF_STR       ),
+
+      .clk_sys        ( clk28          ),
 
       .SPI_CLK        ( SPI_SCK        ),
       .SPI_SS_IO      ( CONF_DATA0     ),
@@ -248,43 +252,23 @@ user_io #(.STRLEN(CONF_STR_LEN)) user_io (
       .sd_rd          ( sd_rd ),
       .sd_wr          ( sd_wr ),
       .sd_ack         ( sd_ack ),
+		.sd_ack_conf    ( sd_ack_conf ),
       .sd_conf        ( sd_conf ),
       .sd_sdhc        ( sd_sdhc ),
       .sd_dout        ( sd_dout ),
       .sd_dout_strobe ( sd_dout_strobe ),
       .sd_din         ( sd_din ),
       .sd_din_strobe  ( sd_din_strobe ),
-      .sd_change      ( sd_change ),
+		.sd_buff_addr	 ( sd_buff_addr),
+      .img_mounted    ( img_mounted ),
 
       .status         ( status         )
 );
 
+wire sd_cs;
 wire sd_dat;
-wire sd_dat3;
 wire sd_cmd;
 wire sd_clk;
-
-sd_card sd_card (
-	// connection to io controller
-   .io_lba         ( sd_lba         ),
-   .io_rd          ( sd_rd          ),
-   .io_wr          ( sd_wr          ),
-   .io_ack         ( sd_ack         ),
-   .io_conf        ( sd_conf        ),
-   .io_sdhc        ( sd_sdhc        ),
-   .io_din         ( sd_dout        ),
-   .io_din_strobe  ( sd_dout_strobe ),
-   .io_dout        ( sd_din         ),
-   .io_dout_strobe ( sd_din_strobe  ),
- 
-   .allow_sdhc     ( 1'b1           ),
-
-   // connection to host
-   .sd_cs          ( sd_dat3        ),
-   .sd_sck         ( sd_clk         ),
-   .sd_sdi         ( sd_cmd         ),
-   .sd_sdo         ( sd_dat         )
-);
 
 // ---------------------------------------------------------------------------------
 // ------------------------------ prg memory injection -----------------------------
@@ -570,8 +554,9 @@ C16 c16 (
 // the FPGATED uses two different clocks for NTSC and PAL mode.
 // Switching the clocks may crash the system. We might need to force a reset it.
 wire clk28 = c16_pal?clk28_pal:clk28_ntsc;
+//wire clk28 = clk28_pal;
 wire pll_locked = pll_pal_locked && pll_ntsc_locked;
-	
+
 // tv15hkz has quarter the pixel rate, so we need a 7mhz clock for the OSD
 reg clk7;
 always @(posedge clk14)
@@ -621,18 +606,12 @@ wire c1541_iec_atn_i  = c16_iec_atn_i;
 wire c1541_iec_data_i = c16_iec_data_i;
 wire c1541_iec_clk_i  = c16_iec_clk_i;
 
-
 c1541_sd c1541_sd (
-	.clk32 ( clk32 ),
-	.clk18 ( clk28 ),           // MiST uses virtual SPI SD, so any clock can be used.
+	.clk32 ( clk28 ),
 	.reset ( reset ),
 
-	.c1541rom_addr ( 14'h0000 ),
-	.c1541rom_data ( 8'h00 ),
-	.c1541rom_wr ( 1'b0 ),
-	
-   .disk_change ( sd_change ), 
-   .disk_num ( 10'd0 ),        // not seletable by f8 or similar
+   .disk_change ( img_mounted ), 
+   .disk_num ( 10'd0 ), // always 0 on MiST, the image is selected by the OSD menu
 
 	.iec_atn_i  ( c1541_iec_atn_i  ),
 	.iec_data_i ( c1541_iec_data_i ),
@@ -642,12 +621,16 @@ c1541_sd c1541_sd (
 	.iec_data_o ( c1541_iec_data_o ),
 	.iec_clk_o  ( c1541_iec_clk_o  ),
 
-   .sd_dat  ( sd_dat  ),
-   .sd_dat3 ( sd_dat3 ),
-   .sd_cmd  ( sd_cmd  ),
-   .sd_clk  ( sd_clk  ),
+   .sd_lba         ( sd_lba         ),
+   .sd_rd          ( sd_rd          ),
+   .sd_wr          ( sd_wr          ),
+   .sd_ack         ( sd_ack         ),
+   .sd_buff_din    ( sd_din         ),
+   .sd_buff_dout   ( sd_dout        ),
+   .sd_buff_wr     ( sd_dout_strobe ),
+	.sd_buff_addr   ( sd_buff_addr   ),
 
-   .led ( led_disk )
+//   .led ( led_disk )
 );
 
 endmodule
