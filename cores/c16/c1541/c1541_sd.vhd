@@ -54,6 +54,8 @@ port(
 	sd_buff_din    : out std_logic_vector(7 downto 0);
 	sd_buff_wr     : in std_logic;
 
+	led            : out std_logic;
+
 	dbg_track_num_dbl : out std_logic_vector(6 downto 0);
 	dbg_sd_busy     : out std_logic;
 	dbg_sd_state    : out std_logic_vector(7 downto 0);
@@ -368,5 +370,7 @@ dbg_sd_busy  <= sd_busy;
 dbg_track_num_dbl <= new_track_num_dbl;
 dbg_mtr <= mtr;
 dbg_act <= act;
+
+led <= act;
 
 end struct;
