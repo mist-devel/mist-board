@@ -412,11 +412,12 @@ wire [5:0] osd_b_in = tv15khz?{c16_b, 2'b00}:video_b;
 wire osd_hs_in = tv15khz?!c16_hs:video_hs;
 wire osd_vs_in = tv15khz?!c16_vs:video_vs;
 
-wire osd_clk = tv15khz?clk7:clk28;
+wire osd_clk = tv15khz?clk7:clk14;
 
 // include the on screen display
 osd #(11,0,5) osd (
-   .pclk       ( osd_clk     ),
+   .clk_sys    ( clk28        ),
+   .ce_pix     ( osd_clk      ),
 
    // spi for OSD
    .sdi        ( SPI_DI       ),
@@ -560,12 +561,16 @@ wire pll_locked = pll_pal_locked && pll_ntsc_locked;
 
 // tv15hkz has quarter the pixel rate, so we need a 7mhz clock for the OSD
 reg clk7;
-always @(posedge clk14)
-	clk7 <= !clk7;
-
 reg clk14;
-always @(posedge clk28)
-	clk14 <= !clk14;
+
+always @(posedge clk28) begin
+
+   reg [1:0] counter;
+
+	counter <= counter + 1'd1;
+	clk7    <= !counter;
+	clk14   <= !counter[0];
+end
 
 // A PLL to derive the system clock from the MiSTs 27MHz
 wire clk32;
