@@ -1,18 +1,18 @@
 -- ****
 -- T65(b) core. In an effort to merge and maintain bug fixes ....
 --
---
--- Ver 300 Bugfixes by ehenciak added
--- MikeJ March 2005
--- Latest version from www.fpgaarcade.com (original www.opencores.org)
+-- See list of changes in T65 top file (T65.vhd)...
 --
 -- ****
---
 -- 65xx compatible microprocessor core
 --
--- Version : 0246
+-- FPGAARCADE SVN: $Id: T65_Pack.vhd 1234 2015-02-28 20:14:50Z wolfgang.scherr $
 --
--- Copyright (c) 2002 Daniel Wallner (jesus@opencores.org)
+-- Copyright (c) 2002...2015
+--               Daniel Wallner (jesus <at> opencores <dot> org)
+--               Mike Johnson   (mikej <at> fpgaarcade <dot> com)
+--               Wolfgang Scherr (WoS <at> pin4 <dot> at>
+--               Morten Leikvoll ()
 --
 -- All rights reserved
 --
@@ -42,76 +42,139 @@
 -- ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 -- POSSIBILITY OF SUCH DAMAGE.
 --
--- Please report bugs to the author, but before you do so, please
+-- Please report bugs to the author(s), but before you do so, please
 -- make sure that this is not a derivative work and that
 -- you have the latest version of this file.
 --
--- The latest version of this file can be found at:
---      http://www.opencores.org/cvsweb.shtml/t65/
---
 -- Limitations :
---
--- File history :
---
+--   See in T65 top file (T65.vhd)...
 
 library IEEE;
 use IEEE.std_logic_1164.all;
 
 package T65_Pack is
 
-	constant Flag_C : integer := 0;
-	constant Flag_Z : integer := 1;
-	constant Flag_I : integer := 2;
-	constant Flag_D : integer := 3;
-	constant Flag_B : integer := 4;
-	constant Flag_1 : integer := 5;
-	constant Flag_V : integer := 6;
-	constant Flag_N : integer := 7;
+  constant Flag_C : integer := 0;
+  constant Flag_Z : integer := 1;
+  constant Flag_I : integer := 2;
+  constant Flag_D : integer := 3;
+  constant Flag_B : integer := 4;
+  constant Flag_1 : integer := 5;
+  constant Flag_V : integer := 6;
+  constant Flag_N : integer := 7;
 
-	component T65_MCode
-	port(
-		Mode                    : in  std_logic_vector(1 downto 0);      -- "00" => 6502, "01" => 65C02, "10" => 65816
-		IR                      : in  std_logic_vector(7 downto 0);
-		MCycle                  : in  std_logic_vector(2 downto 0);
-		P                       : in  std_logic_vector(7 downto 0);
-		LCycle                  : out std_logic_vector(2 downto 0);
-		ALU_Op                  : out std_logic_vector(3 downto 0);
-		Set_BusA_To             : out std_logic_vector(2 downto 0); -- DI,A,X,Y,S,P
-		Set_Addr_To             : out std_logic_vector(1 downto 0); -- PC Adder,S,AD,BA
-		Write_Data              : out std_logic_vector(2 downto 0); -- DL,A,X,Y,S,P,PCL,PCH
-		Jump                    : out std_logic_vector(1 downto 0); -- PC,++,DIDL,Rel
-		BAAdd                   : out std_logic_vector(1 downto 0);     -- None,DB Inc,BA Add,BA Adj
-		BreakAtNA               : out std_logic;
-		ADAdd                   : out std_logic;
-		AddY                    : out std_logic;
-		PCAdd                   : out std_logic;
-		Inc_S                   : out std_logic;
-		Dec_S                   : out std_logic;
-		LDA                     : out std_logic;
-		LDP                     : out std_logic;
-		LDX                     : out std_logic;
-		LDY                     : out std_logic;
-		LDS                     : out std_logic;
-		LDDI                    : out std_logic;
-		LDALU                   : out std_logic;
-		LDAD                    : out std_logic;
-		LDBAL                   : out std_logic;
-		LDBAH                   : out std_logic;
-		SaveP                   : out std_logic;
-		Write                   : out std_logic
-	);
-	end component;
+  subtype T_Lcycle is std_logic_vector(2 downto 0);
+  constant Cycle_sync :T_Lcycle:="000";
+  constant Cycle_1    :T_Lcycle:="001";
+  constant Cycle_2    :T_Lcycle:="010";
+  constant Cycle_3    :T_Lcycle:="011";
+  constant Cycle_4    :T_Lcycle:="100";
+  constant Cycle_5    :T_Lcycle:="101";
+  constant Cycle_6    :T_Lcycle:="110";
+  constant Cycle_7    :T_Lcycle:="111";
 
-	component T65_ALU
-	port(
-		Mode    : in  std_logic_vector(1 downto 0);      -- "00" => 6502, "01" => 65C02, "10" => 65C816
-		Op      : in  std_logic_vector(3 downto 0);
-		BusA    : in  std_logic_vector(7 downto 0);
-		BusB    : in  std_logic_vector(7 downto 0);
-		P_In    : in  std_logic_vector(7 downto 0);
-		P_Out   : out std_logic_vector(7 downto 0);
-		Q       : out std_logic_vector(7 downto 0)
-	);
-	end component;
+  function CycleNext(c:T_Lcycle) return T_Lcycle;
+
+  type T_Set_BusA_To is
+  (
+    Set_BusA_To_DI,
+    Set_BusA_To_ABC,
+    Set_BusA_To_X,
+    Set_BusA_To_Y,
+    Set_BusA_To_S,
+    Set_BusA_To_P,
+    Set_BusA_To_DA,
+    Set_BusA_To_DAO,
+    Set_BusA_To_DAX,
+    Set_BusA_To_AAX,
+    Set_BusA_To_DONTCARE
+  );
+  
+  type T_Set_Addr_To is
+  (
+    Set_Addr_To_PBR,
+    Set_Addr_To_SP,
+    Set_Addr_To_ZPG,
+    Set_Addr_To_BA
+  );
+  
+  type T_Write_Data is
+  (
+    Write_Data_DL,
+    Write_Data_ABC,
+    Write_Data_X,
+    Write_Data_Y,
+    Write_Data_S,
+    Write_Data_P,
+    Write_Data_PCL,
+    Write_Data_PCH,
+    Write_Data_AX,
+    Write_Data_AXB,
+    Write_Data_XB,
+    Write_Data_YB,
+    Write_Data_DONTCARE
+  );
+  
+  type T_ALU_OP is
+  (
+    ALU_OP_OR,  --"0000"
+    ALU_OP_AND,  --"0001"
+    ALU_OP_EOR,  --"0010"
+    ALU_OP_ADC,  --"0011"
+    ALU_OP_EQ1,  --"0100" EQ1 does not change N,Z flags, EQ2/3 does.
+    ALU_OP_EQ2,  --"0101" Not sure yet whats the difference between EQ2&3. They seem to do the same ALU op
+    ALU_OP_CMP,  --"0110"
+    ALU_OP_SBC,  --"0111"
+    ALU_OP_ASL,  --"1000"
+    ALU_OP_ROL,  --"1001"
+    ALU_OP_LSR,  --"1010"
+    ALU_OP_ROR,  --"1011"
+    ALU_OP_BIT,  --"1100"
+--    ALU_OP_EQ3,  --"1101"
+    ALU_OP_DEC,  --"1110"
+    ALU_OP_INC,  --"1111"
+    ALU_OP_ARR,
+    ALU_OP_ANC,
+    ALU_OP_SAX,
+    ALU_OP_XAA
+--    ALU_OP_UNDEF--"----"--may be replaced with any?
+  );
+
+  type T_t65_dbg is record
+    I     : std_logic_vector(7 downto 0); -- instruction
+    A     : std_logic_vector(7 downto 0); -- A reg
+    X     : std_logic_vector(7 downto 0); -- X reg
+    Y     : std_logic_vector(7 downto 0); -- Y reg
+    S     : std_logic_vector(7 downto 0); -- stack pointer
+    P     : std_logic_vector(7 downto 0); -- processor flags
+  end record;
 
 end;
+
+package body T65_Pack is
+
+  function CycleNext(c:T_Lcycle) return T_Lcycle is
+  begin
+    case(c) is
+    when Cycle_sync=>
+      return Cycle_1;
+    when Cycle_1=>
+      return Cycle_2;
+    when Cycle_2=>
+      return Cycle_3;
+    when Cycle_3=>
+      return Cycle_4;
+    when Cycle_4=>
+      return Cycle_5;
+    when Cycle_5=>
+      return Cycle_6;
+    when Cycle_6=>
+      return Cycle_7;
+    when Cycle_7=>
+      return Cycle_sync;
+    when others=>
+      return Cycle_sync;
+    end case;
+  end CycleNext;
+
+end T65_Pack;
