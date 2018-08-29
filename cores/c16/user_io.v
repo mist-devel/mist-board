@@ -25,7 +25,9 @@
 module user_io #(parameter STRLEN=0) (
 	input [(8*STRLEN)-1:0] conf_str,
 
-	input 		       clk_sys,
+	input 		       clk_sys, // clock for system-related messages (kbd, joy, etc...)
+	input              clk_sd,  // clock for SD-card related messages
+
 	input 		       SPI_CLK,
 	input 		       SPI_SS_IO,
 	output reg	       SPI_MISO,
@@ -88,9 +90,6 @@ wire [7:0] core_type = 8'ha4;
 // command byte read by the io controller
 wire [7:0] sd_cmd = { 4'h5, sd_conf, sd_sdhc, sd_wr, sd_rd };
 
-// filter spi clock. the 8 bit gate delay is ~2.5ns in total
-//wire [7:0] spi_sck_D = { spi_sck_D[6:0], SPI_CLK } /* synthesis keep */;
-//wire spi_sck = (spi_sck && spi_sck_D != 8'h00) || (!spi_sck && spi_sck_D == 8'hff);
 wire spi_sck = SPI_CLK;
 
 // ---------------- PS2 ---------------------
@@ -368,6 +367,78 @@ always @(posedge clk_sys) begin
 	spi_byte_inD <= spi_byte_in_r;
 	spi_byte_in <= spi_byte_inD;
 
+	if (~spi_transfer_endD & spi_transfer_end) begin
+		abyte_cnt <= 8'd0;
+	end else if (~spi_receiver_strobeD & spi_receiver_strobe) begin
+
+		if(abyte_cnt != 8'd255) 
+			abyte_cnt <= byte_cnt + 8'd1;
+
+		if(abyte_cnt == 0) begin
+			acmd <= spi_byte_in;
+		end else begin
+			case(acmd)
+				// buttons and switches
+				8'h01: but_sw <= spi_byte_in;
+				8'h02: joystick_0 <= spi_byte_in;
+				8'h03: joystick_1 <= spi_byte_in;
+				8'h04: begin
+					// store incoming ps2 mouse bytes 
+					ps2_mouse_fifo[ps2_mouse_wptr] <= spi_byte_in;
+					ps2_mouse_wptr <= ps2_mouse_wptr + 1;
+				end
+				8'h05: begin
+					// store incoming ps2 keyboard bytes 
+					ps2_kbd_fifo[ps2_kbd_wptr] <= spi_byte_in;
+					ps2_kbd_wptr <= ps2_kbd_wptr + 1;
+				end
+
+				8'h15: status <= spi_byte_in;
+
+				// joystick analog
+				8'h1a: begin
+					// first byte is joystick indes
+					if(abyte_cnt == 1)
+						stick_idx <= spi_byte_in[2:0];
+					else if(abyte_cnt == 2) begin
+						// second byte is x axis
+						if(stick_idx == 0)
+							joystick_analog_0[15:8] <= spi_byte_in;
+						else if(stick_idx == 1)
+							joystick_analog_1[15:8] <= spi_byte_in;
+					end else if(abyte_cnt == 3) begin
+						// third byte is y axis
+						if(stick_idx == 0)
+							joystick_analog_0[7:0] <= spi_byte_in;
+						else if(stick_idx == 1)
+							joystick_analog_1[7:0] <= spi_byte_in;
+					end
+				end
+			endcase
+		end
+	end
+end
+
+// Process SD-card related bytes from SPI at the clk_sd domain
+always @(posedge clk_sd) begin
+
+	reg       spi_receiver_strobe;
+	reg       spi_transfer_end;
+	reg [7:0] spi_byte_in;
+	reg       spi_receiver_strobeD;
+	reg       spi_transfer_endD;
+	reg [7:0] spi_byte_inD;
+	reg [7:0] acmd;
+	reg [7:0] abyte_cnt;   // counts bytes
+
+	//synchronize between SPI and sd clock domains
+	spi_receiver_strobeD <= spi_receiver_strobe_r;
+	spi_receiver_strobe <= spi_receiver_strobeD;
+	spi_transfer_endD	<= spi_transfer_end_r;
+	spi_transfer_end	<= spi_transfer_endD;
+	spi_byte_inD <= spi_byte_in_r;
+	spi_byte_in <= spi_byte_inD;
+
 	if(sd_dout_strobe) begin
 		sd_dout_strobe<= 0;
 		if(~&sd_buff_addr) sd_buff_addr <= sd_buff_addr + 1'b1;
@@ -404,22 +475,6 @@ always @(posedge clk_sys) begin
 
 		end else begin
 			case(acmd)
-				// buttons and switches
-				8'h01: but_sw <= spi_byte_in;
-				8'h02: joystick_0 <= spi_byte_in;
-				8'h03: joystick_1 <= spi_byte_in;
-				8'h04: begin
-					// store incoming ps2 mouse bytes 
-					ps2_mouse_fifo[ps2_mouse_wptr] <= spi_byte_in;
-					ps2_mouse_wptr <= ps2_mouse_wptr + 1;
-				end
-				8'h05: begin
-					// store incoming ps2 keyboard bytes 
-					ps2_kbd_fifo[ps2_kbd_wptr] <= spi_byte_in;
-					ps2_kbd_wptr <= ps2_kbd_wptr + 1;
-				end
-
-				8'h15: status <= spi_byte_in;
 
 				// send sector IO -> FPGA
 				8'h17: begin
@@ -437,26 +492,6 @@ always @(posedge clk_sys) begin
 					sd_dout_strobe <= 1'b1;
 					sd_ack_conf <= 1'b1;
 					sd_dout <= spi_byte_in;
-				end
-
-				// joystick analog
-				8'h1a: begin
-					// first byte is joystick indes
-					if(abyte_cnt == 1)
-						stick_idx <= spi_byte_in[2:0];
-					else if(abyte_cnt == 2) begin
-						// second byte is x axis
-						if(stick_idx == 0)
-							joystick_analog_0[15:8] <= spi_byte_in;
-						else if(stick_idx == 1)
-							joystick_analog_1[15:8] <= spi_byte_in;
-					end else if(abyte_cnt == 3) begin
-						// third byte is y axis
-						if(stick_idx == 0)
-							joystick_analog_0[7:0] <= spi_byte_in;
-						else if(stick_idx == 1)
-							joystick_analog_1[7:0] <= spi_byte_in;
-					end
 				end
 				
 				 8'h1c: img_mounted <= 1;

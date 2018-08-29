@@ -34,6 +34,8 @@ derive_clock_uncertainty
 
 # Clock groups
 set_clock_groups -asynchronous -group [get_clocks {SPI_SCK}] -group [get_clocks {pll_pal|altpll_component|auto_generated|pll1|clk[*]}]
+set_clock_groups -asynchronous -group [get_clocks {pll_pal|altpll_component|auto_generated|pll1|clk[1]}] -group [get_clocks {pll_pal|altpll_component|auto_generated|pll1|clk[0]}]
+set_clock_groups -asynchronous -group [get_clocks {pll_pal|altpll_component|auto_generated|pll1|clk[1]}] -group [get_clocks {pll_ntsc|altpll_component|auto_generated|pll1|clk[0]}]
 
 
 # Some relaxed constrain to the VGA pins. The signals should arrive together, the delay is not really important.
