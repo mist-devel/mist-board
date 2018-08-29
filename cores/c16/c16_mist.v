@@ -365,11 +365,11 @@ wire [7:0] zp_ovl_dout =
 	
 // the address taken from the first to bytes of a prg file tell
 // us where the file is to go in memory
-reg [15:0] ioctl_load_addr /* synthesis noprune */;
-reg 	   ioctl_ram_wr /* synthesis noprune */;
-reg 	ioctl_sdram_write /* synthesis noprune */;
-reg [15:0] ioctl_sdram_addr /* synthesis noprune */;
-reg [7:0] ioctl_sdram_data /* synthesis noprune */;
+reg [15:0] ioctl_load_addr;
+reg 	   ioctl_ram_wr;
+reg 	ioctl_sdram_write;
+reg [15:0] ioctl_sdram_addr;
+reg [7:0] ioctl_sdram_data;
   
 always @(negedge c16_ras) begin
 	ioctl_sdram_write <= ioctl_ram_wr;
