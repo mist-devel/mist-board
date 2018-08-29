@@ -57,7 +57,7 @@ assign enable=~cs&cs_prev;		// cs falling edge detection
 assign data_out=(~cs)?data:8'hff;
 
 initial begin
-$readmemh("basic.hex",basic);
+$readmemh("roms/basic.hex",basic);
 end
 
 endmodule
