@@ -30,7 +30,7 @@
 // Additional Comments: 
 //
 //////////////////////////////////////////////////////////////////////////////////
-module C16(
+module C16 #(parameter MODE_PAL = 1)(
 	input wire CLK28,
 	input wire RESET,
 	input wire WAIT,
@@ -150,7 +150,7 @@ ted mos8360(
 	
 // Kernal rom
 
-	kernal_rom kernal(
+	kernal_rom #(.MODE_PAL(MODE_PAL)) kernal(
 		.clk(CLK28),
 		.address_in(sreset?kernal_dl_addr:c16_addr[13:0]),
 		.data_out(kernal_data),
