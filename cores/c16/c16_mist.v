@@ -230,6 +230,7 @@ user_io #(.STRLEN(CONF_STR_LEN)) user_io (
       .conf_str       ( CONF_STR       ),
 
       .clk_sys        ( clk28          ),
+		.clk_sd         ( clk32          ),
 
       .SPI_CLK        ( SPI_SCK        ),
       .SPI_SS_IO      ( CONF_DATA0     ),
@@ -587,8 +588,8 @@ pll_ntsc pll_ntsc (
 // ----------------------------------- floppy 1541 ---------------------------------
 // ---------------------------------------------------------------------------------
 
-wire [7:0] led_disk;
-assign LED = !led_disk[6];
+wire led_disk;
+assign LED = !led_disk;
 
 wire c16_iec_atn_o;
 wire c16_iec_data_o;
@@ -607,7 +608,7 @@ wire c1541_iec_data_i = c16_iec_data_i;
 wire c1541_iec_clk_i  = c16_iec_clk_i;
 
 c1541_sd c1541_sd (
-	.clk32 ( clk28 ),
+	.clk32 ( clk32 ),
 	.reset ( reset ),
 
    .disk_change ( img_mounted ), 
@@ -630,7 +631,7 @@ c1541_sd c1541_sd (
    .sd_buff_wr     ( sd_dout_strobe ),
 	.sd_buff_addr   ( sd_buff_addr   ),
 
-//   .led ( led_disk )
+   .led ( led_disk )
 );
 
 endmodule
