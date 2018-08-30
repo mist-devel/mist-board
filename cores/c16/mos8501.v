@@ -59,26 +59,25 @@ reg [7:0] port_data=8'b0;
 reg rw_reg,aec_reg;
 
 // 6502 CPU core
+wire we_n;
+assign we = ~we_n;
 
-	cpu65xx #(.pipelineOpcode("\false"),.pipelineAluMux("\false"),.pipelineAluOut("\false")) 
-		cpu_core(
-		.clk(clk), 
-		.reset(reset), 
-		.enable(enable_cpu), 
-		.nmi_n(1'b1), 
-		.irq_n(irq_n), 
-		.di(core_data_in), 
-		.do(core_data_out), 
-		.addr(core_address), 
-		.we(we),
-		.so_n(1'b1),
-		.debugOpcode(),
-		.debugPc(),
-		.debugA(),
-		.debugX(),
-		.debugY(),
-		.debugS()
-	);
+T65 cpu_core(
+	
+	.Mode (2'b00),
+	.Res_n (~reset),
+	.Enable(enable_cpu),
+	.Clk(clk),
+	.Rdy(enable_cpu),
+	.Abort_n(1),
+	.IRQ_n(irq_n),
+	.NMI_n(1),
+	.SO_n(1),
+	.R_w_n(we_n),
+	.A(core_address),
+	.DI(core_data_in),
+	.DO(core_data_out)
+);
 
 assign address=(aec)?core_address:16'hffff;		// address tri state emulated for easy bus signal combining
 
