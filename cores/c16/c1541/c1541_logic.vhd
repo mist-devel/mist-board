@@ -123,8 +123,8 @@ begin
         clk_1M_pulse <= '1';
       end if;
       -- if count = "000100000" then -- DAR divide by 33 (otherwise real c64 miss EOI acknowledge)
-      if count = "000011110" then -- TH divide by 31
-      count := (others => '0');   -- DAR	
+      if count = "000011111" then -- TH - C16 MiST: zero after 31, restart from 1
+      count := (0 => '1', others => '0');
 			else                        -- DAR
       count := std_logic_vector(unsigned(count) + 1);
 			end if;                     -- DAR

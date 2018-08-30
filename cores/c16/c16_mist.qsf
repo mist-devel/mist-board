@@ -323,6 +323,7 @@ set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to SPI_DO
 set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to CONF_DATA0
 set_global_assignment -name VERILOG_INPUT_VERSION VERILOG_2001
 set_global_assignment -name VERILOG_SHOW_LMF_MAPPING_MESSAGES OFF
+set_instance_assignment -name PARTITION_HIERARCHY root_partition -to | -section_id Top
 set_global_assignment -name VHDL_FILE gen_ram.vhd
 set_global_assignment -name QIP_FILE pll_ntsc.qip
 set_global_assignment -name QIP_FILE pll_pal.qip
@@ -330,8 +331,6 @@ set_global_assignment -name VERILOG_FILE data_io.v
 set_global_assignment -name VERILOG_FILE sdram.v
 set_global_assignment -name VERILOG_FILE osd.v
 set_global_assignment -name VERILOG_FILE scandoubler.v
-set_global_assignment -name VHDL_FILE cpu65xx_fast.vhd
-set_global_assignment -name VHDL_FILE cpu65xx_e.vhd
 set_global_assignment -name VERILOG_FILE user_io.v
 set_global_assignment -name VERILOG_FILE ted.v
 set_global_assignment -name VERILOG_FILE mos8501.v
@@ -355,4 +354,3 @@ set_global_assignment -name VHDL_FILE t65/T65_Pack.vhd
 set_global_assignment -name VHDL_FILE t65/T65_MCode.vhd
 set_global_assignment -name VHDL_FILE t65/T65_ALU.vhd
 set_global_assignment -name VHDL_FILE t65/T65.vhd
-set_instance_assignment -name PARTITION_HIERARCHY root_partition -to | -section_id Top
