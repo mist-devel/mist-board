@@ -109,26 +109,25 @@ end
 
 // horizontal counter
 reg [9:0] h_cnt;
-reg hsD, hsD2;
 reg [9:0] hs_low, hs_high;
 wire hs_pol = hs_high < hs_low;
 wire [9:0] h_dsp_width = hs_pol?hs_low:hs_high;
 wire [9:0] h_dsp_ctr = { 1'b0, h_dsp_width[9:1] };
 
 always @(posedge clk_sys) begin
+	reg hsD;
+
 	if (ce_pix) begin
-		// bring hsync into local clock domain
 		hsD <= hs_in;
-		hsD2 <= hsD;
 
 		// falling edge of hs_in
-		if(!hsD && hsD2) begin
+		if(!hs_in && hsD) begin
 			h_cnt <= 10'd0;
 			hs_high <= h_cnt;
 		end
 
 		// rising edge of hs_in
-		else if(hsD && !hsD2) begin
+		else if(hs_in && !hsD) begin
 			h_cnt <= 10'd0;
 			hs_low <= h_cnt;
 		end
@@ -140,30 +139,27 @@ end
 
 // vertical counter
 reg [9:0] v_cnt;
-reg vsD, vsD2;
 reg [9:0] vs_low, vs_high;
 wire vs_pol = vs_high < vs_low;
 wire [9:0] v_dsp_width = vs_pol?vs_low:vs_high;
 wire [9:0] v_dsp_ctr = { 1'b0, v_dsp_width[9:1] };
 
 always @(posedge clk_sys) begin
-	reg hsD;
+	reg hsD, vsD;
 	
 	hsD <= hs_in;
 	
 	if (~hsD & hs_in) begin
-		// bring vsync into local clock domain
 		vsD <= vs_in;
-		vsD2 <= vsD;
 
 		// falling edge of vs_in
-		if(!vsD && vsD2) begin
+		if(!vs_in && vsD) begin
 			v_cnt <= 10'd0;
 			vs_high <= v_cnt;
 		end
 
 		// rising edge of vs_in
-		else if(vsD && !vsD2) begin
+		else if(vs_in && !vsD) begin
 			v_cnt <= 10'd0;
 			vs_low <= v_cnt;
 		end
