@@ -112,19 +112,21 @@ reg clk_12m;
 always @(posedge clk_24m)
 	clk_12m <= !clk_12m;
 
-wire clk_osd = scandoubler_disable?clk_12m:clk_24m;
+//wire clk_osd = scandoubler_disable?clk_12m:clk_24m;
+wire clk_osd = scandoubler_disable?clk_12m:1;
 	
 osd #(0,0,4) OSD (
-   .pclk       ( clk_osd      ),
+	.clk_sys    ( clk_24m      ),
+   .ce_pix     ( clk_osd      ),
 
    // spi for OSD
    .sdi        ( SPI_DI       ),
    .sck        ( SPI_SCK      ),
    .ss         ( SPI_SS3      ),
 
-   .red_in     ( video_r      ),
-   .green_in   ( video_g      ),
-   .blue_in    ( video_b      ),
+   .red_in     ( scandoubler_disable? {5{video_r[0]}}   : {3{video_r}} ),
+   .green_in   ( scandoubler_disable? {5{video_g[0]}} : {3{video_g}} ),
+   .blue_in    ( scandoubler_disable? {5{video_b[0]}}  : {3{video_b}} ),
 	
    .hs_in      ( video_hs      ),
    .vs_in      ( video_vs      ),
@@ -134,8 +136,6 @@ osd #(0,0,4) OSD (
    .blue_out   ( VGA_B        ),
    .hs_out     ( v_hs         ),
    .vs_out     ( v_vs         ),
-
-   .tv15khz    ( scandoubler_disable )
 );
 
 wire v_hs, v_vs;
