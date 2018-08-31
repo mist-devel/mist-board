@@ -112,8 +112,7 @@ begin
   reset_n <= not reset;
   
   process (clk_32M, reset)
-    variable count  : std_logic_vector(8 downto 0) := (others => '0');
-    alias hcnt : std_logic_vector(1 downto 0) is count(4 downto 3);
+    variable count  : std_logic_vector(4 downto 0) := (others => '0');
   begin
     if rising_edge(clk_32M) then
       -- generate 1MHz pulse
@@ -122,17 +121,12 @@ begin
       if count(4 downto 0) = "01000" then
         clk_1M_pulse <= '1';
       end if;
-      -- if count = "000100000" then -- DAR divide by 33 (otherwise real c64 miss EOI acknowledge)
-      if count = "000011111" then -- TH - C16 MiST: zero after 31, restart from 1
-      count := (0 => '1', others => '0');
-			else                        -- DAR
-      count := std_logic_vector(unsigned(count) + 1);
-			end if;                     -- DAR
+			count := std_logic_vector(unsigned(count) + 1);
     end if;
-    p2_h <= not hcnt(1);
+    p2_h <= not count(4);
 
     -- for original m6522 design that requires a real clock
---    clk_4M_en <= not count(2);
+    -- clk_4M_en <= not count(2);
 
     -- for version 002 with clock enable
     if count(2 downto 0) = "111" then
@@ -159,10 +153,10 @@ begin
   -- hook up UC1 ports
   --
   
-  uc1_cs1 <= cpu_a(11);
+  uc1_cs1 <= '1';
   --uc1_cs2_n: see decode logic above
   -- CA1
-  --uc1_ca1_i <= not sb_atn_in;  -- DAR comment : synched with clk_4M_en see below
+  uc1_ca1_i <= not sb_atn_in;
   -- PA
   uc1_pa_i(0) <= tr00_sense_n;
   uc1_pa_i(7 downto 1) <= (others => '0');  -- NC
@@ -187,7 +181,7 @@ begin
   -- hook up UC3 ports
   --
   
-  uc3_cs1 <= cpu_a(11);
+  uc3_cs1 <= '1';
   --uc3_cs2_n: see decode logic above
   -- CA1
   uc3_ca1_i <= cpu_so_n; -- byte ready gated with soe
@@ -223,54 +217,19 @@ begin
   -- external connections
   -- ATN never driven by the 1541
   sb_atn_oe <= '0';
-      
-			
-  -- DAR
-	process (clk_32M)
-	begin 
-    if rising_edge(clk_32M) then
-			if clk_4M_en = '1' then
-				uc1_ca1_i <= not sb_atn_in; -- DAR sample external atn to ensure not missing edge within VIA
-			end if;	
-		end if;		
-	end process;
 
-	process (clk_32M, cpu_sync)
-	begin 
-    if rising_edge(clk_32M) then
-			if cpu_sync = '1' then
-				dbg_adr_fetch <= cpu_a(15 downto 0);
-			end if;
-		end if;		
-	end process;
-	dbg_cpu_irq <= cpu_irq_n;
-	-- DAR
-		
-  cpu_inst : entity work.T65
-    port map
-    (
-      Mode        => "00",  -- 6502
-      Res_n       => reset_n,
-      Enable      => clk_1M_pulse,
-      Clk         => clk_32M,
-      Rdy         => '1',
-      Abort_n     => '1',
-      IRQ_n       => cpu_irq_n,
-      NMI_n       => '1',
-      SO_n        => cpu_so_n,
-      R_W_n       => cpu_rw_n,
-      Sync        => cpu_sync, -- open -- DAR
-      EF          => open,
-      MF          => open,
-      XF          => open,
-      ML_n        => open,
-      VP_n        => open,
-      VDA         => open,
-      VPA         => open,
-      A           => cpu_a,
-      DI          => cpu_di,
-      DO          => cpu_do
-    );
+  cpu: work.proc_core
+		port map(
+			reset        => reset,
+			clock_en     => clk_1M_pulse,
+			clock        => clk_32M,
+			so_n         => cpu_so_n,
+			irq_n        => cpu_irq_n,
+			read_write_n => cpu_rw_n,
+			addr_out     => cpu_a(16 downto 0),
+			data_in      => cpu_di,
+			data_out     => cpu_do
+	);
 
   rom_inst : entity work.sprom
     generic map
