@@ -310,7 +310,7 @@ data_io data_io (
 reg [15:0] reg_2d;
 reg [15:0] reg_2f;
 reg [15:0] reg_31;
-reg [15:0] reg_ae;
+reg [15:0] reg_9d;
 
 wire zp_2d_sel = c16_sdram_addr == 16'h002d;
 wire zp_2e_sel = c16_sdram_addr == 16'h002e;
@@ -318,12 +318,12 @@ wire zp_2f_sel = c16_sdram_addr == 16'h002f;
 wire zp_30_sel = c16_sdram_addr == 16'h0030;
 wire zp_31_sel = c16_sdram_addr == 16'h0031;
 wire zp_32_sel = c16_sdram_addr == 16'h0032;
-wire zp_ae_sel = c16_sdram_addr == 16'h00ae;
-wire zp_af_sel = c16_sdram_addr == 16'h00af;
+wire zp_9d_sel = c16_sdram_addr == 16'h009d;
+wire zp_9e_sel = c16_sdram_addr == 16'h009e;
 
 wire zp_overwrite = 
 	zp_2d_sel || zp_2e_sel || zp_2f_sel || zp_30_sel ||
-	zp_31_sel || zp_32_sel || zp_ae_sel || zp_af_sel;
+	zp_31_sel || zp_32_sel || zp_9d_sel || zp_9e_sel;
 
 reg zp_cas_delay, zp_sel;
 reg zp_dl_delay, zp_dl;
@@ -343,7 +343,7 @@ always @(posedge clk28) begin
 		reg_2d <= ioctl_sdram_addr + 16'd1;
 		reg_2f <= ioctl_sdram_addr + 16'd1;
 		reg_31 <= ioctl_sdram_addr + 16'd1;
-		reg_ae <= ioctl_sdram_addr + 16'd1;
+		reg_9d <= ioctl_sdram_addr + 16'd1;
 	end else	if(zp_sel && !c16_rw) begin
 		// cpu writes registers
 		if(zp_2d_sel) reg_2d[ 7:0] <= c16_dout;
@@ -352,8 +352,8 @@ always @(posedge clk28) begin
 		if(zp_30_sel) reg_2f[15:8] <= c16_dout;
 		if(zp_31_sel) reg_31[ 7:0] <= c16_dout;
 		if(zp_32_sel) reg_31[15:8] <= c16_dout;
-		if(zp_ae_sel) reg_ae[ 7:0] <= c16_dout;
-		if(zp_af_sel) reg_ae[15:8] <= c16_dout;
+		if(zp_9d_sel) reg_9d[ 7:0] <= c16_dout;
+		if(zp_9e_sel) reg_9d[15:8] <= c16_dout;
 	end
 end
 	
@@ -361,7 +361,7 @@ wire [7:0] zp_ovl_dout =
 	zp_2d_sel?reg_2d[7:0]:zp_2e_sel?reg_2d[15:8]:
 	zp_2f_sel?reg_2f[7:0]:zp_30_sel?reg_2f[15:8]:
 	zp_31_sel?reg_31[7:0]:zp_32_sel?reg_31[15:8]:
-	zp_ae_sel?reg_ae[7:0]:zp_af_sel?reg_ae[15:8]:
+	zp_9d_sel?reg_9d[7:0]:zp_9e_sel?reg_9d[15:8]:
 	8'hff;
 	
 // the address taken from the first to bytes of a prg file tell
