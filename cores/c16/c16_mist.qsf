@@ -343,12 +343,12 @@ set_global_assignment -name VERILOG_FILE c16.v
 set_global_assignment -name VERILOG_FILE basic_rom.v
 set_global_assignment -name SIGNALTAP_FILE stp1.stp
 set_global_assignment -name SIGNALTAP_FILE output_files/stp1.stp
-set_global_assignment -name VHDL_FILE c1541/m6522.vhd
 set_global_assignment -name VHDL_FILE c1541/gcr_floppy.vhd
 set_global_assignment -name VHDL_FILE c1541/spram.vhd
 set_global_assignment -name VHDL_FILE c1541/sprom.vhd
 set_global_assignment -name VHDL_FILE c1541/c1541_sd.vhd
 set_global_assignment -name VHDL_FILE c1541/c1541_logic.vhd
+set_global_assignment -name VHDL_FILE c1541/via6522.vhd
 set_global_assignment -name SYSTEMVERILOG_FILE c1541/mist_sd_card.sv
 set_global_assignment -name VHDL_FILE 1541ultimate2cpu/shifter.vhd
 set_global_assignment -name VHDL_FILE 1541ultimate2cpu/proc_registers.vhd
