@@ -40,6 +40,11 @@ entity c1541_logic is
     wps_n           : in std_logic;                       -- write-protect sense
     tr00_sense_n    : in std_logic;                       -- track 0 sense (unused?)
     act             : out std_logic;                       -- activity LED
+
+    c1541rom_clk    : in std_logic;
+    c1541rom_addr   : in std_logic_vector(13 downto 0);
+    c1541rom_data   : in std_logic_vector(7 downto 0);
+    c1541rom_wr     : in std_logic;
 		
 		dbg_adr_fetch : out std_logic_vector(15 downto 0);  -- dbg DAR
 		dbg_cpu_irq   : out std_logic                       -- dbg DAR
@@ -126,7 +131,7 @@ begin
         count := std_logic_vector(unsigned(count) + 1);
     end if;
 
-    if count = "00000" then clk_1M_pulse <= '1'; else clk_1M_pulse <='0' ; end if;
+    if count = "10000" then clk_1M_pulse <= '1'; else clk_1M_pulse <='0' ; end if;
     if count = "00000" then p2_h_r <= '1'; else p2_h_r <='0' ; end if;
     if count = "10000" then p2_h_f <= '1'; else p2_h_f <='0' ; end if;
   end process;
@@ -226,24 +231,29 @@ begin
 			data_out     => cpu_do
 	);
 
-  rom_inst : entity work.sprom
+  rom_inst : entity work.gen_rom
     generic map
     (
 --  	 init_file   => "../roms/JiffyDOS_C1541.hex",               -- DAR tested OK
 --	 init_file   => "../roms/25196802.hex",             
 --	 init_file   => "../roms/25196801.hex",             
-     init_file   => "../roms/325302-1_901229-03.hex",   
+      INIT_FILE   => "../roms/325302-1_901229-03.hex",   
 --     init_file   => "../roms/1541_c000_01_and_e000_06aa.hex",   -- DAR tested OK
 
 
-      numwords_a  => 16384,
-      widthad_a   => 14
+      DATA_WIDTH  => 8,
+      ADDR_WIDTH   => 14
     )
     port map
     (
-      clock     => clk_32M,
-      address   => cpu_a(13 downto 0),
-      q         => rom_do
+      rdclock     => clk_32M,
+      rdaddress   => cpu_a(13 downto 0),
+      q           => rom_do,
+
+		wrclock     => c1541rom_clk,
+		wraddress   => c1541rom_addr,
+		wren        => c1541rom_wr,
+		data        => c1541rom_data
     );
 
   ram_inst : entity work.spram

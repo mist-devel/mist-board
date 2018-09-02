@@ -487,21 +487,23 @@ wire c16_rw;
 wire [7:0] c16_a;
 wire [7:0] c16_dout;
 
-reg kernal_dl_wr;
-reg [7:0] kernal_dl_data;
-reg [13:0] kernal_dl_addr;
+reg kernal_dl_wr, basic_dl_wr, c1541_dl_wr;
+reg [7:0] rom_dl_data;
+reg [13:0] rom_dl_addr;
 
-wire ioctl_kernal_wr = rom_download && ioctl_wr;
+wire ioctl_rom_wr = rom_download && ioctl_wr;
 
-reg last_ioctl_wr;
 always @(negedge clk28) begin
-	last_ioctl_wr <= ioctl_kernal_wr;
-	if(ioctl_kernal_wr && !last_ioctl_wr) begin
-		kernal_dl_data <= ioctl_data;
-		kernal_dl_addr <= ioctl_addr[13:0];
-		kernal_dl_wr <= 1'b1;
+   reg last_ioctl_rom_wr;
+	last_ioctl_rom_wr <= ioctl_rom_wr;
+	if(ioctl_rom_wr && !last_ioctl_rom_wr) begin
+		rom_dl_data  <= ioctl_data;
+		rom_dl_addr  <= ioctl_addr[13:0];
+		c1541_dl_wr  <= !ioctl_addr[15:14];
+		kernal_dl_wr <= ioctl_addr[15:14] == 2'd1;
+		basic_dl_wr  <= ioctl_addr[15:14] == 2'd2;
 	end else
-		kernal_dl_wr <= 1'b0;
+		{ kernal_dl_wr, basic_dl_wr, c1541_dl_wr } <= 0;
 end
 
 // include the c16 itself
@@ -529,9 +531,10 @@ C16 #(.MODE_PAL(MODE_PAL)) c16 (
 	.PS2DAT  ( ps2_kbd_data ),
 	.PS2CLK  ( ps2_kbd_clk  ),
 
-	.kernal_dl_addr  ( kernal_dl_addr ),
-	.kernal_dl_data  ( kernal_dl_data ),
-	.kernal_dl_write ( kernal_dl_wr),
+	.dl_addr         ( rom_dl_addr ),
+	.dl_data         ( rom_dl_data ),
+	.kernal_dl_write ( kernal_dl_wr   ),
+	.basic_dl_write  ( basic_dl_wr    ),
 	
 	.IEC_DATAOUT ( c16_iec_data_o ),
 	.IEC_DATAIN  ( !c16_iec_data_i ),
@@ -635,8 +638,12 @@ c1541_sd c1541_sd (
    .sd_buff_dout   ( sd_dout        ),
    .sd_buff_wr     ( sd_dout_strobe ),
 	.sd_buff_addr   ( sd_buff_addr   ),
+   .led ( led_disk ),
 
-   .led ( led_disk )
+   .c1541rom_clk   ( clk28         ),
+   .c1541rom_addr  ( rom_dl_addr    ),
+   .c1541rom_data  ( rom_dl_data    ),
+   .c1541rom_wr    ( c1541_dl_wr    )
 );
 
 endmodule

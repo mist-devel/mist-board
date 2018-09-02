@@ -37,6 +37,8 @@ module basic_rom(
     input wire clk,
     input wire [13:0] address_in,
     output wire [7:0] data_out,
+    input wire [7:0] data_in,
+    input wire wr,	 
     input wire cs
     );
 
@@ -46,9 +48,13 @@ reg [7:0] data;
 reg cs_prev=1'b1;
 wire enable;
 
-always@(posedge clk)
+always@(posedge clk) begin
+	if (wr)
+		basic[address_in] <= data_in;
+
 	if(enable)
 		data<=basic[address_in];
+end
 
 always@(posedge clk)
 	cs_prev<=cs;

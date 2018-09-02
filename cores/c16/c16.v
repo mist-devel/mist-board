@@ -65,10 +65,11 @@ module C16 #(parameter MODE_PAL = 1)(
 	
 	output AUDIO_L,
 	output AUDIO_R,
-	
-	input [13:0] kernal_dl_addr,
-	input [7:0] kernal_dl_data,
+
+	input [13:0] dl_addr,
+	input [7:0] dl_data,
 	input kernal_dl_write,
+	input basic_dl_write,
 
 	output PAL,
 	
@@ -152,9 +153,9 @@ ted mos8360(
 
 	kernal_rom #(.MODE_PAL(MODE_PAL)) kernal(
 		.clk(CLK28),
-		.address_in(sreset?kernal_dl_addr:c16_addr[13:0]),
+		.address_in(kernal_dl_write?dl_addr:c16_addr[13:0]),
 		.data_out(kernal_data),
-		.data_in(kernal_dl_data),
+		.data_in(dl_data),
 		.wr(kernal_dl_write),
 		.cs(cs1)
 		);
@@ -163,8 +164,10 @@ ted mos8360(
 
 	basic_rom basic(
 		.clk(CLK28),
-		.address_in(c16_addr[13:0]),
+		.address_in(basic_dl_write?dl_addr:c16_addr[13:0]),
 		.data_out(basic_data),
+		.data_in(dl_data),
+		.wr(basic_dl_write),
 		.cs(cs0)
 		);
 
