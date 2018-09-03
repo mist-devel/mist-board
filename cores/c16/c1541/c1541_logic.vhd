@@ -203,7 +203,8 @@ begin
   --
   -- CPU connections
   --
-  cpu_di <= rom_do when rom_cs = '1' else
+  cpu_di <= cpu_do when cpu_rw_n = '0' else
+            rom_do when rom_cs = '1' else
             ram_do when ram_cs = '1' else
             uc1_do when (uc1_cs1 = '1' and uc1_cs2_n = '0') else
             uc3_do when (uc3_cs1 = '1' and uc3_cs2_n = '0') else
@@ -218,18 +219,31 @@ begin
   -- ATN never driven by the 1541
   sb_atn_oe <= '0';
 
-  cpu: work.proc_core
-		port map(
-			reset        => reset,
-			clock_en     => clk_1M_pulse,
-			clock        => clk_32M,
-			so_n         => cpu_so_n,
-			irq_n        => cpu_irq_n,
-			read_write_n => cpu_rw_n,
-			addr_out     => cpu_a(16 downto 0),
-			data_in      => cpu_di,
-			data_out     => cpu_do
-	);
+  cpu_inst : entity work.T65
+    port map
+    (
+      Mode        => "00",  -- 6502
+      Res_n       => reset_n,
+      Enable      => clk_1M_pulse,
+      Clk         => clk_32M,
+      Rdy         => '1',
+      Abort_n     => '1',
+      IRQ_n       => cpu_irq_n,
+      NMI_n       => '1',
+      SO_n        => cpu_so_n,
+      R_W_n       => cpu_rw_n,
+      Sync        => cpu_sync, -- open -- DAR
+      EF          => open,
+      MF          => open,
+      XF          => open,
+      ML_n        => open,
+      VP_n        => open,
+      VDA         => open,
+      VPA         => open,
+      A           => cpu_a,
+      DI          => cpu_di,
+      DO          => cpu_do
+    );
 
   rom_inst : entity work.gen_rom
     generic map
