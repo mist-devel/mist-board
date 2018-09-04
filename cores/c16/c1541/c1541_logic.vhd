@@ -40,6 +40,11 @@ entity c1541_logic is
     wps_n           : in std_logic;                       -- write-protect sense
     tr00_sense_n    : in std_logic;                       -- track 0 sense (unused?)
     act             : out std_logic;                       -- activity LED
+
+    c1541rom_clk    : in std_logic;
+    c1541rom_addr   : in std_logic_vector(13 downto 0);
+    c1541rom_data   : in std_logic_vector(7 downto 0);
+    c1541rom_wr     : in std_logic;
 		
 		dbg_adr_fetch : out std_logic_vector(15 downto 0);  -- dbg DAR
 		dbg_cpu_irq   : out std_logic                       -- dbg DAR
@@ -50,8 +55,8 @@ architecture SYN of c1541_logic is
 
   -- clocks, reset
   signal reset_n        : std_logic;
-  signal clk_4M_en      : std_logic;
-  signal p2_h           : std_logic;
+  signal p2_h_r         : std_logic;
+  signal p2_h_f         : std_logic;
   signal clk_1M_pulse   : std_logic;
     
   -- cpu signals  
@@ -107,6 +112,14 @@ architecture SYN of c1541_logic is
   signal atn            : std_logic; -- attention
   signal soe            : std_logic; -- set overflow enable
   
+  signal uc1_pb_oe      : std_logic_vector(7 downto 0);
+  signal uc1_irq        : std_logic;
+  signal uc3_irq        : std_logic;
+  signal uc3_ca2_oe     : std_logic;
+  signal uc3_cb2_oe     : std_logic;
+  signal uc3_pa_oe      : std_logic_vector(7 downto 0);
+  signal uc3_pb_oe      : std_logic_vector(7 downto 0);
+
 begin
 
   reset_n <= not reset;
@@ -115,25 +128,12 @@ begin
     variable count  : std_logic_vector(4 downto 0) := (others => '0');
   begin
     if rising_edge(clk_32M) then
-      -- generate 1MHz pulse
-      clk_1M_pulse <= '0';
-      --if count(4 downto 0) = "00111" then			
-      if count(4 downto 0) = "01000" then
-        clk_1M_pulse <= '1';
-      end if;
-			count := std_logic_vector(unsigned(count) + 1);
+        count := std_logic_vector(unsigned(count) + 1);
     end if;
-    p2_h <= not count(4);
 
-    -- for original m6522 design that requires a real clock
-    -- clk_4M_en <= not count(2);
-
-    -- for version 002 with clock enable
-    if count(2 downto 0) = "111" then
-      clk_4M_en <= '1';
-    else
-      clk_4M_en <= '0';
-  end if;
+    if count = "10000" then clk_1M_pulse <= '1'; else clk_1M_pulse <='0' ; end if;
+    if count = "00000" then p2_h_r <= '1'; else p2_h_r <='0' ; end if;
+    if count = "10000" then p2_h_f <= '1'; else p2_h_f <='0' ; end if;
   end process;
 
   -- decode logic
@@ -203,7 +203,8 @@ begin
   --
   -- CPU connections
   --
-  cpu_di <= rom_do when rom_cs = '1' else
+  cpu_di <= cpu_do when cpu_rw_n = '0' else
+            rom_do when rom_cs = '1' else
             ram_do when ram_cs = '1' else
             uc1_do when (uc1_cs1 = '1' and uc1_cs2_n = '0') else
             uc3_do when (uc3_cs1 = '1' and uc3_cs2_n = '0') else
@@ -218,37 +219,55 @@ begin
   -- ATN never driven by the 1541
   sb_atn_oe <= '0';
 
-  cpu: work.proc_core
-		port map(
-			reset        => reset,
-			clock_en     => clk_1M_pulse,
-			clock        => clk_32M,
-			so_n         => cpu_so_n,
-			irq_n        => cpu_irq_n,
-			read_write_n => cpu_rw_n,
-			addr_out     => cpu_a(16 downto 0),
-			data_in      => cpu_di,
-			data_out     => cpu_do
-	);
+  cpu_inst : entity work.T65
+    port map
+    (
+      Mode        => "00",  -- 6502
+      Res_n       => reset_n,
+      Enable      => clk_1M_pulse,
+      Clk         => clk_32M,
+      Rdy         => '1',
+      Abort_n     => '1',
+      IRQ_n       => cpu_irq_n,
+      NMI_n       => '1',
+      SO_n        => cpu_so_n,
+      R_W_n       => cpu_rw_n,
+      Sync        => cpu_sync, -- open -- DAR
+      EF          => open,
+      MF          => open,
+      XF          => open,
+      ML_n        => open,
+      VP_n        => open,
+      VDA         => open,
+      VPA         => open,
+      A           => cpu_a,
+      DI          => cpu_di,
+      DO          => cpu_do
+    );
 
-  rom_inst : entity work.sprom
+  rom_inst : entity work.gen_rom
     generic map
     (
 --  	 init_file   => "../roms/JiffyDOS_C1541.hex",               -- DAR tested OK
 --	 init_file   => "../roms/25196802.hex",             
 --	 init_file   => "../roms/25196801.hex",             
-     init_file   => "../roms/325302-1_901229-03.hex",   
+      INIT_FILE   => "../roms/325302-1_901229-03.hex",   
 --     init_file   => "../roms/1541_c000_01_and_e000_06aa.hex",   -- DAR tested OK
 
 
-      numwords_a  => 16384,
-      widthad_a   => 14
+      DATA_WIDTH  => 8,
+      ADDR_WIDTH   => 14
     )
     port map
     (
-      clock     => clk_32M,
-      address   => cpu_a(13 downto 0),
-      q         => rom_do
+      rdclock     => clk_32M,
+      rdaddress   => cpu_a(13 downto 0),
+      q           => rom_do,
+
+		wrclock     => c1541rom_clk,
+		wraddress   => c1541rom_addr,
+		wren        => c1541rom_wr,
+		data        => c1541rom_data
     );
 
   ram_inst : entity work.spram
@@ -266,90 +285,78 @@ begin
       q         => ram_do
     );
 
-  uc1_via6522_inst : entity work.M6522
+  uc1_pb_oe_n <= not uc1_pb_oe;
+  uc1_irq_n   <= not uc1_irq;
+
+  uc1_via6522_inst : entity work.via6522
     port map
     (
-      I_RS            => cpu_a(3 downto 0),
-      I_DATA          => cpu_do,
-      O_DATA          => uc1_do,
-      O_DATA_OE_L     => uc1_do_oe_n,
+      clock           => clk_32M,
+      rising          => p2_h_r,
+      falling         => p2_h_f,
+      reset           => not reset_n,
 
-      I_RW_L          => cpu_rw_n,
-      I_CS1           => uc1_cs1,
-      I_CS2_L         => uc1_cs2_n,
+      addr            => cpu_a(3 downto 0),
+      wen             => not cpu_rw_n and not uc1_cs2_n,
+      ren             => cpu_rw_n and not uc1_cs2_n,
+      data_in         => cpu_do,
+      data_out        => uc1_do,
 
-      O_IRQ_L         => uc1_irq_n,
+      port_a_i        => uc1_pa_i,
 
-      -- port a
-      I_CA1           => uc1_ca1_i,
-      I_CA2           => '0',
-      O_CA2           => open,
-      O_CA2_OE_L      => open,
+      port_b_o        => uc1_pb_o,
+      port_b_t        => uc1_pb_oe,
+      port_b_i        => uc1_pb_i,
 
-      I_PA            => uc1_pa_i,
-      O_PA            => open,
-      O_PA_OE_L       => open,
+      ca1_i           => uc1_ca1_i,
+      ca2_i           => '0',
 
-      -- port b
-      I_CB1           => '0',
-      O_CB1           => open,
-      O_CB1_OE_L      => open,
+      cb1_i           => '0',
+      cb2_i           => '0',
 
-      I_CB2           => '0',
-      O_CB2           => open,
-      O_CB2_OE_L      => open,
-
-      I_PB            => uc1_pb_i,
-      O_PB            => uc1_pb_o,
-      O_PB_OE_L       => uc1_pb_oe_n,
-
-      RESET_L         => reset_n,
-      CLK             => clk_32M,
-      I_P2_H          => p2_h,          -- high for phase 2 clock  ____----__
-      ENA_4           => clk_4M_en      -- 4x system clock (4HZ)   _-_-_-_-_-
+      irq             => uc1_irq
     );
 
-  uc3_via6522_inst : entity work.M6522
+  uc3_irq_n    <= not uc3_irq;
+  uc3_ca2_oe_n <= not uc3_ca2_oe;
+  uc3_cb2_oe_n <= not uc3_cb2_oe;
+  uc3_pa_oe_n  <= not uc3_pa_oe;
+  uc3_pb_oe_n  <= not uc3_pb_oe;
+
+  uc3_via6522_inst : entity work.via6522
     port map
     (
-      I_RS            => cpu_a(3 downto 0),
-      I_DATA          => cpu_do,
-      O_DATA          => uc3_do,
-      O_DATA_OE_L     => uc3_do_oe_n,
+      clock           => clk_32M,
+      rising          => p2_h_r,
+      falling         => p2_h_f,
+      reset           => not reset_n,
 
-      I_RW_L          => cpu_rw_n,
-      I_CS1           => cpu_a(11),
-      I_CS2_L         => uc3_cs2_n,
+      addr            => cpu_a(3 downto 0),
+      wen             => not cpu_rw_n and not uc3_cs2_n,
+      ren             => cpu_rw_n and not uc3_cs2_n,
+      data_in         => cpu_do,
+      data_out        => uc3_do,
 
-      O_IRQ_L         => uc3_irq_n,
+      port_a_o        => uc3_pa_o,
+      port_a_t        => uc3_pa_oe,
+      port_a_i        => uc3_pa_i,
 
-      -- port a
-      I_CA1           => uc3_ca1_i,
-      I_CA2           => '0',
-      O_CA2           => uc3_ca2_o,
-      O_CA2_OE_L      => uc3_ca2_oe_n,
+      port_b_o        => uc3_pb_o,
+      port_b_t        => uc3_pb_oe,
+      port_b_i        => uc3_pb_i,
 
-      I_PA            => uc3_pa_i,
-      O_PA            => uc3_pa_o,
-      O_PA_OE_L       => uc3_pa_oe_n,
+      ca1_i           => uc3_ca1_i,
 
-      -- port b
-      I_CB1           => '0',
-      O_CB1           => open,
-      O_CB1_OE_L      => open,
+      ca2_o           => uc3_ca2_o,
+      ca2_i           => '0',
+      ca2_t           => uc3_ca2_oe,
 
-      I_CB2           => '0',
-      O_CB2           => uc3_cb2_o,
-      O_CB2_OE_L      => uc3_cb2_oe_n,
+      cb1_i           => '0',
 
-      I_PB            => uc3_pb_i,
-      O_PB            => uc3_pb_o,
-      O_PB_OE_L       => uc3_pb_oe_n,
+      cb2_o           => uc3_cb2_o,
+      cb2_i           => '0',
+      cb2_t           => uc3_cb2_oe,
 
-      RESET_L         => reset_n,
-      CLK             => clk_32M,
-      I_P2_H          => p2_h,          -- high for phase 2 clock  ____----__
-      ENA_4           => clk_4M_en      -- 4x system clock (4HZ)   _-_-_-_-_-
+      irq             => uc3_irq
     );
-
 end SYN;

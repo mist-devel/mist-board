@@ -66,6 +66,8 @@ signal gcr_byte    : std_logic_vector(7 downto 0);
 signal mode_r1     : std_logic;
 signal mode_r2     : std_logic;
 
+signal old_track   : std_logic_vector(5 downto 0);
+
 type gcr_array is array(0 to 15) of std_logic_vector(4 downto 0);
 
 signal gcr_lut : gcr_array := 
@@ -193,7 +195,13 @@ end process;
 
 read_write_process : process (clk32, bit_clk_en)
 begin
-	if rising_edge(clk32) and bit_clk_en = '1' then
+	if rising_edge(clk32) then
+
+	  old_track <= track_num;
+
+	  if old_track /= track_num then
+	    sector <= (others => '0'); --reset sector number on track change
+	  else if bit_clk_en = '1' then
 
 		mode_r2 <= mode;
 		if mode = '1' then autorise_write <= '0'; end if;
@@ -312,7 +320,9 @@ begin
 			end if;
 				
 		end if;
+	  end if;
 	end if;
+  end if;
 end process;
 
 end struct;

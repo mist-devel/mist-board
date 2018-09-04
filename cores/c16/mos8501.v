@@ -59,6 +59,7 @@ reg [7:0] port_data=8'b0;
 reg rw_reg,aec_reg;
 
 // 6502 CPU core
+
 wire we_n;
 assign we = ~we_n;
 
@@ -75,7 +76,7 @@ T65 cpu_core(
 	.SO_n(1),
 	.R_w_n(we_n),
 	.A(core_address),
-	.DI(core_data_in),
+	.DI(we_n ? core_data_in : core_data_out),
 	.DO(core_data_out)
 );
 

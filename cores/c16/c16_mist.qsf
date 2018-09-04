@@ -167,7 +167,7 @@ set_global_assignment -name USE_CONFIGURATION_DEVICE OFF
 # SignalTap II Assignments
 # ========================
 set_global_assignment -name ENABLE_SIGNALTAP OFF
-set_global_assignment -name USE_SIGNALTAP_FILE output_files/stp2.stp
+set_global_assignment -name USE_SIGNALTAP_FILE output_files/stp1.stp
 
 # Power Estimation Assignments
 # ============================
@@ -323,7 +323,6 @@ set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to SPI_DO
 set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to CONF_DATA0
 set_global_assignment -name VERILOG_INPUT_VERSION VERILOG_2001
 set_global_assignment -name VERILOG_SHOW_LMF_MAPPING_MESSAGES OFF
-set_instance_assignment -name PARTITION_HIERARCHY root_partition -to | -section_id Top
 set_global_assignment -name VHDL_FILE gen_ram.vhd
 set_global_assignment -name QIP_FILE pll_ntsc.qip
 set_global_assignment -name QIP_FILE pll_pal.qip
@@ -341,30 +340,16 @@ set_global_assignment -name VERILOG_FILE c16_mist.v
 set_global_assignment -name VERILOG_FILE c16_keymatrix.v
 set_global_assignment -name VERILOG_FILE c16.v
 set_global_assignment -name VERILOG_FILE basic_rom.v
-set_global_assignment -name SIGNALTAP_FILE stp1.stp
-set_global_assignment -name SIGNALTAP_FILE output_files/stp1.stp
-set_global_assignment -name VHDL_FILE c1541/m6522.vhd
 set_global_assignment -name VHDL_FILE c1541/gcr_floppy.vhd
 set_global_assignment -name VHDL_FILE c1541/spram.vhd
-set_global_assignment -name VHDL_FILE c1541/sprom.vhd
+set_global_assignment -name VHDL_FILE c1541/gen_rom.vhd
 set_global_assignment -name VHDL_FILE c1541/c1541_sd.vhd
 set_global_assignment -name VHDL_FILE c1541/c1541_logic.vhd
+set_global_assignment -name VHDL_FILE c1541/via6522.vhd
 set_global_assignment -name SYSTEMVERILOG_FILE c1541/mist_sd_card.sv
-set_global_assignment -name VHDL_FILE 1541ultimate2cpu/shifter.vhd
-set_global_assignment -name VHDL_FILE 1541ultimate2cpu/proc_registers.vhd
-set_global_assignment -name VHDL_FILE 1541ultimate2cpu/proc_interrupt.vhd
-set_global_assignment -name VHDL_FILE 1541ultimate2cpu/proc_core.vhd
-set_global_assignment -name VHDL_FILE 1541ultimate2cpu/proc_control.vhd
-set_global_assignment -name VHDL_FILE 1541ultimate2cpu/pkg_6502_opcodes.vhd
-set_global_assignment -name VHDL_FILE 1541ultimate2cpu/pkg_6502_defs.vhd
-set_global_assignment -name VHDL_FILE 1541ultimate2cpu/pkg_6502_decode.vhd
-set_global_assignment -name VHDL_FILE 1541ultimate2cpu/implied.vhd
-set_global_assignment -name VHDL_FILE 1541ultimate2cpu/data_oper.vhd
-set_global_assignment -name VHDL_FILE 1541ultimate2cpu/cpu6502.vhd
-set_global_assignment -name VHDL_FILE 1541ultimate2cpu/bit_cpx_cpy.vhd
-set_global_assignment -name VHDL_FILE 1541ultimate2cpu/alu.vhd
 set_global_assignment -name VHDL_FILE t65/T65_Pack.vhd
 set_global_assignment -name VHDL_FILE t65/T65_MCode.vhd
 set_global_assignment -name VHDL_FILE t65/T65_ALU.vhd
 set_global_assignment -name VHDL_FILE t65/T65.vhd
-set_global_assignment -name SIGNALTAP_FILE output_files/stp2.stp
+set_global_assignment -name SIGNALTAP_FILE output_files/stp1.stp
+set_instance_assignment -name PARTITION_HIERARCHY root_partition -to | -section_id Top

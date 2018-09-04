@@ -56,6 +56,11 @@ port(
 
 	led            : out std_logic;
 
+   c1541rom_clk    : in std_logic;
+   c1541rom_addr   : in std_logic_vector(13 downto 0);
+   c1541rom_data   : in std_logic_vector(7 downto 0);
+   c1541rom_wr     : in std_logic;
+
 	dbg_track_num_dbl : out std_logic_vector(6 downto 0);
 	dbg_sd_busy     : out std_logic;
 	dbg_sd_state    : out std_logic_vector(7 downto 0);
@@ -171,7 +176,12 @@ begin
     wps_n           => '1',      -- write-protect sense (0 = protected)
     tr00_sense_n    => '1',      -- track 0 sense (unused?)
     act             => act,      -- activity LED
-		
+
+    c1541rom_clk    => c1541rom_clk,
+    c1541rom_addr   => c1541rom_addr,
+    c1541rom_data   => c1541rom_data,
+    c1541rom_wr     => c1541rom_wr,
+
 	 dbg_adr_fetch => dbg_adr_fetch,
 	 dbg_cpu_irq   => open
   );
