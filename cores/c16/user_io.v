@@ -33,15 +33,15 @@ module user_io #(parameter STRLEN=0) (
 	output reg	       SPI_MISO,
 	input 		       SPI_MOSI,
 	
-	output reg [7:0]       joystick_0,
-	output reg [7:0]       joystick_1,
-	output reg [15:0]      joystick_analog_0,
-	output reg [15:0]      joystick_analog_1,
-	output [1:0] 	       buttons,
-	output [1:0] 	       switches,
+	output reg [7:0]   joystick_0,
+	output reg [7:0]   joystick_1,
+	output reg [15:0]  joystick_analog_0,
+	output reg [15:0]  joystick_analog_1,
+	output [1:0] 	    buttons,
+	output [1:0] 	    switches,
 	output 		       scandoubler_disable,
-				      
-	output reg [7:0]       status,
+	output             ypbpr,
+	output reg [31:0]  status,
 
 	// connection to sd card emulation
 	input       [31:0] sd_lba,
@@ -58,6 +58,7 @@ module user_io #(parameter STRLEN=0) (
 	output reg   [8:0] sd_buff_addr,
 	
 	output reg         img_mounted, //rising edge if a new image is mounted
+	output reg  [31:0] img_size,    // size of image in bytes
 
 	// ps2 keyboard emulation
 	input 		       ps2_clk, // 12-16khz provided by core
@@ -77,12 +78,13 @@ reg [2:0] 	  bit_cnt;    // counts bits 0-7 0-7 ...
 reg [7:0]         byte_cnt;   // counts bytes
 reg [5:0]         joystick0;
 reg [5:0]         joystick1;
-reg [4:0] 	  but_sw;
+reg [7:0] 	  but_sw;
 reg [2:0]         stick_idx;
 
 assign buttons = but_sw[1:0];
 assign switches = but_sw[3:2];
 assign scandoubler_disable = but_sw[4];
+assign ypbpr = but_sw[5];
 
 // this variant of user_io is for 8 bit cores (type == a4) only
 wire [7:0] core_type = 8'ha4;
@@ -112,56 +114,60 @@ assign ps2_kbd_clk = ps2_clk || (ps2_kbd_tx_state == 0);
 // ps2 transmitter
 // Takes a byte from the FIFO and sends it in a ps2 compliant serial format.
 reg ps2_kbd_r_inc;
-always@(posedge ps2_clk) begin
-	ps2_kbd_r_inc <= 1'b0;
-	
-	if(ps2_kbd_r_inc)
-		ps2_kbd_rptr <= ps2_kbd_rptr + 1;
+always@(posedge clk_sys) begin
+	reg ps2_clkD;
 
-	// transmitter is idle?
-	if(ps2_kbd_tx_state == 0) begin
-		// data in fifo present?
-		if(ps2_kbd_wptr != ps2_kbd_rptr) begin
-			// load tx register from fifo
-			ps2_kbd_tx_byte <= ps2_kbd_fifo[ps2_kbd_rptr];
-			ps2_kbd_r_inc <= 1'b1;
-			
-			// reset parity
-			ps2_kbd_parity <= 1'b1;
-			
-			// start transmitter
-			ps2_kbd_tx_state <= 4'd1;
+	ps2_clkD <= ps2_clk;
+	if (~ps2_clkD & ps2_clk) begin
+		ps2_kbd_r_inc <= 1'b0;
 
-			// put start bit on data line
-			ps2_kbd_data <= 1'b0;			// start bit is 0
+		if(ps2_kbd_r_inc)
+			ps2_kbd_rptr <= ps2_kbd_rptr + 1'd1;
+
+		// transmitter is idle?
+		if(ps2_kbd_tx_state == 0) begin
+			// data in fifo present?
+			if(ps2_kbd_wptr != ps2_kbd_rptr) begin
+				// load tx register from fifo
+				ps2_kbd_tx_byte <= ps2_kbd_fifo[ps2_kbd_rptr];
+				ps2_kbd_r_inc <= 1'b1;
+
+				// reset parity
+				ps2_kbd_parity <= 1'b1;
+
+				// start transmitter
+				ps2_kbd_tx_state <= 4'd1;
+
+				// put start bit on data line
+				ps2_kbd_data <= 1'b0;			// start bit is 0
+			end
+		end else begin
+
+			// transmission of 8 data bits
+			if((ps2_kbd_tx_state >= 1)&&(ps2_kbd_tx_state < 9)) begin
+				ps2_kbd_data <= ps2_kbd_tx_byte[0];			  // data bits
+				ps2_kbd_tx_byte[6:0] <= ps2_kbd_tx_byte[7:1]; // shift down
+				if(ps2_kbd_tx_byte[0]) 
+					ps2_kbd_parity <= !ps2_kbd_parity;
+			end
+
+			// transmission of parity
+			if(ps2_kbd_tx_state == 9)
+				ps2_kbd_data <= ps2_kbd_parity;
+			
+			// transmission of stop bit
+			if(ps2_kbd_tx_state == 10)
+				ps2_kbd_data <= 1'b1;			// stop bit is 1
+
+			// advance state machine
+			if(ps2_kbd_tx_state < 11)
+				ps2_kbd_tx_state <= ps2_kbd_tx_state + 4'd1;
+			else	
+				ps2_kbd_tx_state <= 4'd0;
 		end
-	end else begin
-	
-		// transmission of 8 data bits
-		if((ps2_kbd_tx_state >= 1)&&(ps2_kbd_tx_state < 9)) begin
-			ps2_kbd_data <= ps2_kbd_tx_byte[0];			  // data bits
-			ps2_kbd_tx_byte[6:0] <= ps2_kbd_tx_byte[7:1]; // shift down
-			if(ps2_kbd_tx_byte[0]) 
-				ps2_kbd_parity <= !ps2_kbd_parity;
-		end
-
-		// transmission of parity
-		if(ps2_kbd_tx_state == 9)
-			ps2_kbd_data <= ps2_kbd_parity;
-			
-		// transmission of stop bit
-		if(ps2_kbd_tx_state == 10)
-			ps2_kbd_data <= 1'b1;			// stop bit is 1
-
-		// advance state machine
-		if(ps2_kbd_tx_state < 11)
-			ps2_kbd_tx_state <= ps2_kbd_tx_state + 4'd1;
-		else	
-			ps2_kbd_tx_state <= 4'd0;
-	
 	end
 end
-  
+
 // mouse
 reg [7:0] ps2_mouse_fifo [(2**PS2_FIFO_BITS)-1:0];
 reg [PS2_FIFO_BITS-1:0] ps2_mouse_wptr;
@@ -177,53 +183,57 @@ assign ps2_mouse_clk = ps2_clk || (ps2_mouse_tx_state == 0);
 // ps2 transmitter
 // Takes a byte from the FIFO and sends it in a ps2 compliant serial format.
 reg ps2_mouse_r_inc;
-always@(posedge ps2_clk) begin
-	ps2_mouse_r_inc <= 1'b0;
-	
-	if(ps2_mouse_r_inc)
-		ps2_mouse_rptr <= ps2_mouse_rptr + 1;
+always@(posedge clk_sys) begin
+	reg ps2_clkD;
 
-	// transmitter is idle?
-	if(ps2_mouse_tx_state == 0) begin
-		// data in fifo present?
-		if(ps2_mouse_wptr != ps2_mouse_rptr) begin
-			// load tx register from fifo
-			ps2_mouse_tx_byte <= ps2_mouse_fifo[ps2_mouse_rptr];
-			ps2_mouse_r_inc <= 1'b1;
-			
-			// reset parity
-			ps2_mouse_parity <= 1'b1;
-			
-			// start transmitter
-			ps2_mouse_tx_state <= 4'd1;
+	ps2_clkD <= ps2_clk;
+	if (~ps2_clkD & ps2_clk) begin
+		ps2_mouse_r_inc <= 1'b0;
 
-			// put start bit on data line
-			ps2_mouse_data <= 1'b0;			// start bit is 0
+		if(ps2_mouse_r_inc)
+			ps2_mouse_rptr <= ps2_mouse_rptr + 1'd1;
+
+		// transmitter is idle?
+		if(ps2_mouse_tx_state == 0) begin
+			// data in fifo present?
+			if(ps2_mouse_wptr != ps2_mouse_rptr) begin
+				// load tx register from fifo
+				ps2_mouse_tx_byte <= ps2_mouse_fifo[ps2_mouse_rptr];
+				ps2_mouse_r_inc <= 1'b1;
+
+				// reset parity
+				ps2_mouse_parity <= 1'b1;
+
+				// start transmitter
+				ps2_mouse_tx_state <= 4'd1;
+
+				// put start bit on data line
+				ps2_mouse_data <= 1'b0;			// start bit is 0
+			end
+		end else begin
+
+			// transmission of 8 data bits
+			if((ps2_mouse_tx_state >= 1)&&(ps2_mouse_tx_state < 9)) begin
+				ps2_mouse_data <= ps2_mouse_tx_byte[0];			  // data bits
+				ps2_mouse_tx_byte[6:0] <= ps2_mouse_tx_byte[7:1]; // shift down
+				if(ps2_mouse_tx_byte[0]) 
+					ps2_mouse_parity <= !ps2_mouse_parity;
+			end
+
+			// transmission of parity
+			if(ps2_mouse_tx_state == 9)
+				ps2_mouse_data <= ps2_mouse_parity;
+
+			// transmission of stop bit
+			if(ps2_mouse_tx_state == 10)
+				ps2_mouse_data <= 1'b1;			// stop bit is 1
+
+			// advance state machine
+			if(ps2_mouse_tx_state < 11)
+				ps2_mouse_tx_state <= ps2_mouse_tx_state + 4'd1;
+			else	
+				ps2_mouse_tx_state <= 4'd0;
 		end
-	end else begin
-	
-		// transmission of 8 data bits
-		if((ps2_mouse_tx_state >= 1)&&(ps2_mouse_tx_state < 9)) begin
-			ps2_mouse_data <= ps2_mouse_tx_byte[0];			  // data bits
-			ps2_mouse_tx_byte[6:0] <= ps2_mouse_tx_byte[7:1]; // shift down
-			if(ps2_mouse_tx_byte[0]) 
-				ps2_mouse_parity <= !ps2_mouse_parity;
-		end
-
-		// transmission of parity
-		if(ps2_mouse_tx_state == 9)
-			ps2_mouse_data <= ps2_mouse_parity;
-			
-		// transmission of stop bit
-		if(ps2_mouse_tx_state == 10)
-			ps2_mouse_data <= 1'b1;			// stop bit is 1
-
-		// advance state machine
-		if(ps2_mouse_tx_state < 11)
-			ps2_mouse_tx_state <= ps2_mouse_tx_state + 4'd1;
-		else	
-			ps2_mouse_tx_state <= 4'd0;
-	
 	end
 end
 
@@ -246,7 +256,7 @@ always @(posedge serial_strobe or posedge status[0]) begin
 		serial_out_wptr <= 0;
 	end else begin 
 		serial_out_fifo[serial_out_wptr] <= serial_data;
-		serial_out_wptr <= serial_out_wptr + 1;
+		serial_out_wptr <= serial_out_wptr + 1'd1;
 	end
 end 
 
@@ -257,7 +267,7 @@ always@(negedge spi_sck or posedge status[0]) begin
 		if((byte_cnt != 0) && (cmd == 8'h1b)) begin
 			// read last bit -> advance read pointer
 			if((bit_cnt == 7) && !byte_cnt[0] && serial_out_data_available)
-				serial_out_rptr <= serial_out_rptr + 1;
+				serial_out_rptr <= serial_out_rptr + 1'd1;
 		end
 	end
 end
@@ -385,15 +395,13 @@ always @(posedge clk_sys) begin
 				8'h04: begin
 					// store incoming ps2 mouse bytes 
 					ps2_mouse_fifo[ps2_mouse_wptr] <= spi_byte_in;
-					ps2_mouse_wptr <= ps2_mouse_wptr + 1;
+					ps2_mouse_wptr <= ps2_mouse_wptr + 1'd1;
 				end
 				8'h05: begin
 					// store incoming ps2 keyboard bytes 
 					ps2_kbd_fifo[ps2_kbd_wptr] <= spi_byte_in;
-					ps2_kbd_wptr <= ps2_kbd_wptr + 1;
+					ps2_kbd_wptr <= ps2_kbd_wptr + 1'd1;
 				end
-
-				8'h15: status <= spi_byte_in;
 
 				// joystick analog
 				8'h1a: begin
@@ -414,7 +422,13 @@ always @(posedge clk_sys) begin
 							joystick_analog_1[7:0] <= spi_byte_in;
 					end
 				end
-			endcase
+
+				8'h15: status <= spi_byte_in;
+
+				// status, 32bit version
+				8'h1e: if(abyte_cnt<6) status[(abyte_cnt-2)<<3 +:8] <= spi_byte_in;
+
+				endcase
 		end
 	end
 end
@@ -493,8 +507,11 @@ always @(posedge clk_sd) begin
 					sd_ack_conf <= 1'b1;
 					sd_dout <= spi_byte_in;
 				end
-				
-				 8'h1c: img_mounted <= 1;
+
+				8'h1c: img_mounted <= 1;
+
+				// send image info
+				8'h1d: if(abyte_cnt<6) img_size[(byte_cnt-2)<<3 +:8] <= spi_byte_in;
 			endcase
 		end
 	end
