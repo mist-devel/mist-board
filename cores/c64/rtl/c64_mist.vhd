@@ -499,10 +499,11 @@ end component cartridge;
 begin
 
 	-- 1541 activity led
-	LED <= not ioctl_download;
+	LED <= not ioctl_download and not led_disk;
 
 	iec_cycle <= '1' when ces = "1011" else '0';
-		
+
+	sd_sdhc <= '1';
 	-- User io
 	mist_io_d : mist_io
 	generic map (STRLEN => CONF_STR'length)
@@ -912,12 +913,14 @@ begin
 		clk32 => clk32,
 		reset => c1541_reset,
 
+		c1541rom_clk => clk32,
 		c1541rom_addr => ioctl_addr(13 downto 0),
 		c1541rom_data => ioctl_data,
 		c1541rom_wr => c1541rom_wr,
 
-		disk_change => sd_change, 
-		disk_readonly => disk_readonly,
+		disk_change => sd_change,
+		disk_num  => (others => '0'), -- always 0 on MiST, the image is selected by the OSD menu
+--		disk_readonly => disk_readonly,
 
 		iec_atn_i  => c1541_iec_atn_i,
 		iec_data_i => c1541_iec_data_i,
@@ -931,9 +934,6 @@ begin
 		sd_rd  => sd_rd,
 		sd_wr  => sd_wr,
 		sd_ack => sd_ack,
-		sd_ack_conf => sd_ack_conf,
-		sd_conf => sd_conf,
-		sd_sdhc => sd_sdhc,
 		sd_buff_addr => sd_buff_addr,
 		sd_buff_dout => sd_buff_dout,
 		sd_buff_din  => sd_buff_din,

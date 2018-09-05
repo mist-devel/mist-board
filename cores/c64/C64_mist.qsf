@@ -41,7 +41,7 @@
 # ========================
 set_global_assignment -name ORIGINAL_QUARTUS_VERSION 13.1
 set_global_assignment -name PROJECT_CREATION_TIME_DATE "21:40:24  MAY 17, 2014"
-set_global_assignment -name LAST_QUARTUS_VERSION "13.0 SP1"
+set_global_assignment -name LAST_QUARTUS_VERSION 13.1
 set_global_assignment -name PROJECT_OUTPUT_DIRECTORY output_files
 set_global_assignment -name SMART_RECOMPILE ON
 set_global_assignment -name FLOW_ENABLE_IO_ASSIGNMENT_ANALYSIS ON
@@ -320,11 +320,6 @@ set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to CONF_DATA0
 set_global_assignment -name PARTITION_NETLIST_TYPE SOURCE -section_id Top
 set_global_assignment -name PARTITION_FITTER_PRESERVATION_LEVEL PLACEMENT_AND_ROUTING -section_id Top
 set_global_assignment -name PARTITION_COLOR 16764057 -section_id Top
-set_global_assignment -name VERILOG_FILE rtl/1541/trkbuf.v
-set_global_assignment -name VHDL_FILE rtl/1541/rom_C1541.vhd
-set_global_assignment -name VHDL_FILE rtl/1541/c1541_sd.vhd
-set_global_assignment -name VHDL_FILE rtl/1541/c1541_rom.vhd
-set_global_assignment -name VHDL_FILE rtl/1541/c1541_logic.vhd
 set_global_assignment -name VHDL_FILE rtl/c64_mist.vhd
 set_global_assignment -name VHDL_FILE rtl/fpga64_sid_iec.vhd
 set_global_assignment -name VHDL_FILE rtl/video_vicII_656x_e.vhd
@@ -337,7 +332,6 @@ set_global_assignment -name VHDL_FILE rtl/cpu65xx_fast.vhd
 set_global_assignment -name VHDL_FILE rtl/cpu65xx_e.vhd
 set_global_assignment -name VHDL_FILE rtl/cia6526.vhd
 set_global_assignment -name VHDL_FILE rtl/cpu_6510.vhd
-set_global_assignment -name VHDL_FILE rtl/m6522.vhd
 set_global_assignment -name VERILOG_FILE rtl/cartridge.v
 set_global_assignment -name VHDL_FILE rtl/rom_c64_chargen.vhd
 set_global_assignment -name VHDL_FILE rtl/rom_C64.vhd
@@ -358,6 +352,16 @@ set_global_assignment -name VHDL_FILE rtl/io_ps2_keyboard.vhd
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/hq2x.sv
 set_global_assignment -name VHDL_FILE rtl/gen_ram.vhd
 set_global_assignment -name VHDL_FILE rtl/composite_sync.vhd
-set_global_assignment -name TEXT_FILE ../Text1.txt
-set_global_assignment -name VHDL_FILE rtl/1541/gcr_floppy.vhd
+set_global_assignment -name VHDL_FILE rtl/c1541/via6522.vhd
+set_global_assignment -name VHDL_FILE rtl/c1541/spram.vhd
+set_global_assignment -name VHDL_FILE rtl/c1541/spi_controller.vhd
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/c1541/mist_sd_card.sv
+set_global_assignment -name VHDL_FILE rtl/c1541/gen_rom.vhd
+set_global_assignment -name VHDL_FILE rtl/c1541/gcr_floppy.vhd
+set_global_assignment -name VHDL_FILE rtl/c1541/c1541_sd.vhd
+set_global_assignment -name VHDL_FILE rtl/c1541/c1541_logic.vhd
+set_global_assignment -name VHDL_FILE rtl/t65/T65_Pack.vhd
+set_global_assignment -name VHDL_FILE rtl/t65/T65_MCode.vhd
+set_global_assignment -name VHDL_FILE rtl/t65/T65_ALU.vhd
+set_global_assignment -name VHDL_FILE rtl/t65/T65.vhd
 set_instance_assignment -name PARTITION_HIERARCHY root_partition -to | -section_id Top

@@ -1,5 +1,6 @@
 // 
-// c1541_track
+// sd_card.v
+//
 // Copyright (c) 2016 Sorgelig
 //
 // This source file is free software: you can redistribute it and/or modify
@@ -18,7 +19,7 @@
 //
 /////////////////////////////////////////////////////////////////////////
 
-module c1541_track
+module mist_sd_card
 (
 	input         clk,
 	input         reset,
@@ -36,38 +37,28 @@ module c1541_track
 	input         save_track,
 	input         change,
 	input   [5:0] track,
-	input   [4:0] sector,
-	input   [7:0] buff_addr,
-	output  [7:0] buff_dout,
-	input   [7:0] buff_din,
-	input         buff_we,
+
+	output [12:0] ram_addr,
+	output  [7:0] ram_di,
+	input   [7:0] ram_do,
+	output        ram_we,
+	output reg    sector_offset, // 0 : sector 0 is at ram adr 0,
+	                             // 1 : sector 0 is at ram adr 256
 	output reg    busy
 );
 
 assign sd_lba = lba;
-
-trk_dpram buffer
-(
-	.clock(clk),
-
-	.address_a(sd_buff_base + base_fix + sd_buff_addr),
-	.data_a(sd_buff_dout),
-	.wren_a(sd_ack & sd_buff_wr),
-	.q_a(sd_buff_din),
-
-	.address_b({sector, buff_addr}),
-	.data_b(buff_din),
-	.wren_b(buff_we),
-	.q_b(buff_dout)
-);
+assign ram_addr = { rel_lba, sd_buff_addr};
+assign ram_di = sd_buff_dout;
+assign sd_buff_din = ram_do;
+assign ram_we = sd_buff_wr;
 
 wire [9:0] start_sectors[41] =
 		'{  0,  0, 21, 42, 63, 84,105,126,147,168,189,210,231,252,273,294,315,336,357,376,395,
 		  414,433,452,471,490,508,526,544,562,580,598,615,632,649,666,683,700,717,734,751};
 
 reg [31:0] lba;
-reg [12:0] base_fix;
-reg [12:0] sd_buff_base;
+reg [3:0]  rel_lba;
 
 always @(posedge clk) begin
 	reg old_ack;
@@ -91,9 +82,9 @@ always @(posedge clk) begin
 	else
 	if(busy) begin
 		if(old_ack && ~sd_ack) begin
-			if(sd_buff_base < 'h1800) begin
-				sd_buff_base <= sd_buff_base + 13'd512;
+			if(~&rel_lba) begin
 				lba <= lba + 1'd1;
+				rel_lba <= rel_lba + 1'd1;
 				if(saving) sd_wr <= 1;
 					else sd_rd <= 1;
 			end
@@ -101,8 +92,8 @@ always @(posedge clk) begin
 			if(saving && (cur_track != track)) begin
 				saving <= 0;
 				cur_track <= track;
-				sd_buff_base <= 0;
-				base_fix <= start_sectors[track][0] ? 13'h1F00 : 13'h0000;
+				rel_lba <= 0;
+				sector_offset <= start_sectors[track][0] ;
 				lba <= start_sectors[track][9:1];
 				sd_rd <= 1;
 			end
@@ -116,8 +107,8 @@ always @(posedge clk) begin
 	if(ready) begin
 		if(save_track && cur_track != 'b111111) begin
 			saving <= 1;
-			sd_buff_base <= 0;
 			lba <= start_sectors[cur_track][9:1];
+			rel_lba <= 0;
 			sd_wr <= 1;
 			busy <= 1;
 		end
@@ -125,49 +116,12 @@ always @(posedge clk) begin
 		if((cur_track != track) || (old_change && ~change)) begin
 			saving <= 0;
 			cur_track <= track;
-			sd_buff_base <= 0;
-			base_fix <= start_sectors[track][0] ? 13'h1F00 : 13'h0000;
+			rel_lba <= 0;
+			sector_offset <= start_sectors[track][0] ;
 			lba <= start_sectors[track][9:1];
 			sd_rd <= 1;
 			busy <= 1;
 		end
-	end
-end
-
-endmodule
-
-module trk_dpram #(parameter DATAWIDTH=8, ADDRWIDTH=13)
-(
-	input	                     clock,
-
-	input	     [ADDRWIDTH-1:0] address_a,
-	input	     [DATAWIDTH-1:0] data_a,
-	input	                     wren_a,
-	output reg [DATAWIDTH-1:0] q_a,
-
-	input	     [ADDRWIDTH-1:0] address_b,
-	input	     [DATAWIDTH-1:0] data_b,
-	input	                     wren_b,
-	output reg [DATAWIDTH-1:0] q_b
-);
-
-logic [DATAWIDTH-1:0] ram[0:(1<<ADDRWIDTH)-1];
-
-always_ff@(posedge clock) begin
-	if(wren_a) begin
-		ram[address_a] <= data_a;
-		q_a <= data_a;
-	end else begin
-		q_a <= ram[address_a];
-	end
-end
-
-always_ff@(posedge clock) begin
-	if(wren_b) begin
-		ram[address_b] <= data_b;
-		q_b <= data_b;
-	end else begin
-		q_b <= ram[address_b];
 	end
 end
 
