@@ -328,8 +328,6 @@ set_global_assignment -name VHDL_FILE rtl/fpga64_rgbcolor.vhd
 set_global_assignment -name VHDL_FILE rtl/fpga64_keyboard_matrix_mark_mcdougall.vhd
 set_global_assignment -name VHDL_FILE rtl/fpga64_bustiming.vhd
 set_global_assignment -name VHDL_FILE rtl/fpga64_buslogic_roms_mmu.vhd
-set_global_assignment -name VHDL_FILE rtl/cpu65xx_fast.vhd
-set_global_assignment -name VHDL_FILE rtl/cpu65xx_e.vhd
 set_global_assignment -name VHDL_FILE rtl/cia6526.vhd
 set_global_assignment -name VHDL_FILE rtl/cpu_6510.vhd
 set_global_assignment -name VERILOG_FILE rtl/cartridge.v
@@ -339,7 +337,6 @@ set_global_assignment -name VHDL_FILE rtl/rom_GS64.vhd
 set_global_assignment -name VERILOG_FILE rtl/sigma_delta_dac.v
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/video_mixer.sv
 set_global_assignment -name VERILOG_FILE rtl/sdram.v
-set_global_assignment -name SYSTEMVERILOG_FILE rtl/sd_card.sv
 set_global_assignment -name VERILOG_FILE rtl/scandoubler.v
 set_global_assignment -name VHDL_FILE rtl/pll.vhd
 set_global_assignment -name VERILOG_FILE rtl/osd.v
