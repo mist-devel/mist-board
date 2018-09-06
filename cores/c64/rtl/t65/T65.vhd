@@ -152,7 +152,8 @@ entity T65 is
     DO      : out std_logic_vector(7 downto 0);
     -- 6502 registers (MSB) PC, SP, P, Y, X, A (LSB)
     Regs    : out std_logic_vector(63 downto 0);
-    DEBUG   : out T_t65_dbg
+    DEBUG   : out T_t65_dbg;
+    NMI_ack : out std_logic
   );
 end T65;
 
@@ -236,6 +237,8 @@ architecture rtl of T65 is
   signal NMI_entered    : std_logic;
 
 begin
+  NMI_ack <= NMIAct;
+
   -- gate Rdy with read/write to make an "OK, it's really OK to stop the processor 
   really_rdy <= Rdy or not(WRn_i);
   Sync <= '1' when MCycle = "000" else '0';
