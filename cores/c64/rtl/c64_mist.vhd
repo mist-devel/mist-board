@@ -130,6 +130,7 @@ constant CONF_STR : string :=
 --	"F,T64,Load File;"&--5
 	"O2,Video standard,PAL,NTSC;"&
 	"O8A,Scandoubler Fx,None,HQ2x-320,HQ2x-160,CRT 25%,CRT 50%;"&
+	"OD,SID,6581,8580;"&
 	"O3,Joysticks,normal,swapped;"&
 	"O6,Audio filter,On,Off;"&
 --	"OB,BIOS,C64,C64GS;" &
@@ -481,7 +482,7 @@ end component cartridge;
 	signal hsync_out : std_logic;
 	signal vsync_out : std_logic;
 	
-	signal audio_data : std_logic_vector(15 downto 0);
+	signal audio_data : std_logic_vector(17 downto 0);
 	
 	signal reset_counter    : integer;
 	signal reset_n          : std_logic;
@@ -817,8 +818,8 @@ begin
    dac : sigma_delta_dac
     port map (
       clk => clk32,
-      ldatasum => audio_data(15 downto 1),
-		rdatasum => audio_data(15 downto 1),
+      ldatasum => audio_data(17 downto 3),
+		rdatasum => audio_data(17 downto 3),
 		aleft => AUDIO_L,
 		aright => AUDIO_R
  	);
@@ -868,6 +869,7 @@ begin
 		idle => idle,
 		audio_data => audio_data,
 		extfilter_en => not status(6),
+		sid_ver => status(13),
 		iec_data_o => c64_iec_data_o,
 		iec_atn_o  => c64_iec_atn_o,
 		iec_clk_o  => c64_iec_clk_o,

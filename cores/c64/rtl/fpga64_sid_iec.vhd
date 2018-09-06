@@ -93,8 +93,9 @@ entity fpga64_sid_iec is
 		--Connector to the SID
 		SIDclk      : buffer std_logic;
 		still       : out unsigned(15 downto 0);
-		audio_data  : out std_logic_vector(15 downto 0);
+		audio_data  : out std_logic_vector(17 downto 0);
 		extfilter_en: in  std_logic;
+		sid_ver     : in  std_logic;
 
 		-- IEC
 		iec_data_o	: out std_logic;
@@ -179,6 +180,8 @@ architecture rtl of fpga64_sid_iec is
 	
 	-- SID signals
 	signal sid_do : std_logic_vector(7 downto 0);
+	signal sid_do6581 : std_logic_vector(7 downto 0);
+	signal sid_do8580 : std_logic_vector(7 downto 0);
 
 	-- CIA signals
 	signal enableCia : std_logic;
@@ -255,6 +258,7 @@ architecture rtl of fpga64_sid_iec is
 	signal voice_volume : signed(17 downto 0);
 	signal pot_x        : std_logic_vector(7 downto 0);
 	signal pot_y        : std_logic_vector(7 downto 0);
+	signal audio_8580 : std_logic_vector(15 downto 0);
 
 	component sid8580
 		port (
@@ -561,7 +565,36 @@ div1m: process(clk32)				-- this process devides 32 MHz to 1MHz (for the SID)
 		end if;
 	end process;
 
-sid_8580 : sid8580
+	audio_data <= std_logic_vector(voice_volume) when sid_ver='0' else (audio_8580 & "00");
+	sid_do     <= sid_do6581                     when sid_ver='0' else sid_do8580;
+
+	pot_x <= X"FF" when ((cia1_pao(7) and JoyA(5)) or (cia1_pao(6) and JoyB(5))) = '0' else X"00";
+	pot_y <= X"FF" when ((cia1_pao(7) and JoyA(6)) or (cia1_pao(6) and JoyB(6))) = '0' else X"00";
+
+	sid_6581: entity work.sid_top
+	port map (
+		clock => clk32,
+		reset => reset,
+
+		addr => "000" & cpuAddr(4 downto 0),
+		wren => pulseWrRam and phi0_cpu and cs_sid,
+		wdata => std_logic_vector(cpuDo),
+		rdata => sid_do6581,
+
+		potx => pot_x(0),
+		poty => pot_y(0),
+
+		comb_wave_l => '0',
+		comb_wave_r => '0',
+
+		extfilter_en => extfilter_en,
+
+		start_iter => clk_1MHz(31),
+		sample_left => voice_volume,
+		sample_right => open
+	);
+
+	sid_8580 : sid8580
 	port map (
 		reset => reset,
 		clk => clk32,
@@ -569,15 +602,13 @@ sid_8580 : sid8580
 		we => pulseWrRam and phi0_cpu and cs_sid,
 		addr => std_logic_vector(cpuAddr(4 downto 0)),
 		data_in => std_logic_vector(cpuDo),
-		data_out => sid_do,
+		data_out => sid_do8580,
 		pot_x => pot_x,
 		pot_y => pot_y,
-		audio_data => audio_data,
+		audio_data => audio_8580,
 		extfilter_en => extfilter_en
-	);
+); 
 	
-	pot_x <= X"FF" when ((cia1_pao(7) and JoyA(5)) or (cia1_pao(6) and JoyB(5))) = '0' else X"00";
-	pot_y <= X"FF" when ((cia1_pao(7) and JoyA(6)) or (cia1_pao(6) and JoyB(6))) = '0' else X"00";
 -- -----------------------------------------------------------------------
 -- CIAs
 -- -----------------------------------------------------------------------
