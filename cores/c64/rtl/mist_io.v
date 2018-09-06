@@ -1,0 +1,661 @@
+//
+// mist_io.v
+//
+// mist_io for the MiST board
+// http://code.google.com/p/mist-board/
+//
+// Copyright (c) 2014 Till Harbaum <till@harbaum.org>
+//
+// This source file is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published
+// by the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This source file is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+//
+///////////////////////////////////////////////////////////////////////
+
+//
+// Use buffer to access SD card. It's time-critical part.
+// Made module synchroneous with 2 clock domains: clk_sys and SPI_SCK
+//                                                           (Sorgelig)
+//
+// for synchronous projects default value for PS2DIV is fine for any frequency of system clock.
+// clk_ps2 = clk_sys/(PS2DIV*2)
+//
+
+module mist_io #(parameter STRLEN=0, parameter PS2DIV=100)
+(
+
+	// parameter STRLEN and the actual length of conf_str have to match
+	input [(8*STRLEN)-1:0] conf_str,
+
+	// Global clock. It should be around 100MHz (higher is better).
+	input             clk_sys,
+	input             clk_sd,
+
+	// Global SPI clock from ARM. 24MHz
+	input             SPI_SCK,
+
+	input             CONF_DATA0,
+	input             SPI_SS2,
+	output            SPI_DO,
+	input             SPI_DI,
+
+	output reg  [7:0] joystick_0,
+	output reg  [7:0] joystick_1,
+	output reg [15:0] joystick_analog_0,
+	output reg [15:0] joystick_analog_1,
+	output      [1:0] buttons,
+	output      [1:0] switches,
+	output            scandoubler_disable,
+	output            ypbpr,
+
+	output reg [31:0] status,
+
+	// SD config
+	input             sd_conf,
+	input             sd_sdhc,
+	output reg        img_mounted, // signaling that new image has been mounted
+	output reg [31:0] img_size,    // size of image in bytes
+
+	// SD block level access
+	input      [31:0] sd_lba,
+	input             sd_rd,
+	input             sd_wr,
+	output reg        sd_ack,
+	output reg        sd_ack_conf,
+
+	// SD byte level access. Signals for 2-PORT altsyncram.
+	output reg  [8:0] sd_buff_addr,
+	output reg  [7:0] sd_buff_dout,
+	input       [7:0] sd_buff_din,
+	output            sd_buff_wr,
+
+	// ps2 keyboard emulation
+	output            ps2_kbd_clk,
+	output reg        ps2_kbd_data,
+	output            ps2_mouse_clk,
+	output reg        ps2_mouse_data,
+	input             ps2_caps_led,
+
+	// ARM -> FPGA download
+	input             ioctl_force_erase,
+	output reg        ioctl_download = 0, // signal indicating an active download
+	output reg        ioctl_erasing = 0,  // signal indicating an active erase
+	output reg  [7:0] ioctl_index,        // menu index used to upload the file
+	output reg        ioctl_wr = 0,
+	output reg [24:0] ioctl_addr,
+	output reg  [7:0] ioctl_dout
+);
+
+reg [6:0]         sbuf;
+reg [7:0]         cmd;
+reg [2:0] 	  bit_cnt;    // counts bits 0-7 0-7 ...
+reg [7:0]         byte_cnt;   // counts bytes
+reg [5:0]         joystick0;
+reg [5:0]         joystick1;
+reg [7:0] 	  but_sw;
+reg [2:0]         stick_idx;
+
+assign buttons = but_sw[1:0];
+assign switches = but_sw[3:2];
+assign scandoubler_disable = but_sw[4];
+assign ypbpr = but_sw[5];
+
+// this variant of user_io is for 8 bit cores (type == a4) only
+wire [7:0] core_type = 8'ha4;
+
+// command byte read by the io controller
+wire [7:0] sd_cmd = { 4'h5, sd_conf, sd_sdhc, sd_wr, sd_rd };
+
+wire spi_sck = SPI_SCK;
+
+reg spi_do;
+assign SPI_DO = CONF_DATA0 ? 1'bZ : spi_do;
+
+// ---------------- PS2 ---------------------
+
+// 8 byte fifos to store ps2 bytes
+localparam PS2_FIFO_BITS = 3;
+
+reg ps2_clk;
+always @(negedge clk_sys) begin
+       integer cnt;
+       cnt <= cnt + 1'd1;
+       if(cnt == PS2DIV) begin
+               ps2_clk <= ~ps2_clk;
+               cnt <= 0;
+       end
+end
+
+// keyboard
+reg [7:0] ps2_kbd_fifo [(2**PS2_FIFO_BITS)-1:0];
+reg [PS2_FIFO_BITS-1:0] ps2_kbd_wptr;
+reg [PS2_FIFO_BITS-1:0] ps2_kbd_rptr;
+
+// ps2 transmitter state machine
+reg [3:0] ps2_kbd_tx_state;
+reg [7:0] ps2_kbd_tx_byte;
+reg ps2_kbd_parity;
+
+assign ps2_kbd_clk = ps2_clk || (ps2_kbd_tx_state == 0);
+
+// ps2 transmitter
+// Takes a byte from the FIFO and sends it in a ps2 compliant serial format.
+reg ps2_kbd_r_inc;
+always@(posedge clk_sys) begin
+	reg ps2_clkD;
+
+	ps2_clkD <= ps2_clk;
+	if (~ps2_clkD & ps2_clk) begin
+		ps2_kbd_r_inc <= 1'b0;
+
+		if(ps2_kbd_r_inc)
+			ps2_kbd_rptr <= ps2_kbd_rptr + 1'd1;
+
+		// transmitter is idle?
+		if(ps2_kbd_tx_state == 0) begin
+			// data in fifo present?
+			if(ps2_kbd_wptr != ps2_kbd_rptr) begin
+				// load tx register from fifo
+				ps2_kbd_tx_byte <= ps2_kbd_fifo[ps2_kbd_rptr];
+				ps2_kbd_r_inc <= 1'b1;
+
+				// reset parity
+				ps2_kbd_parity <= 1'b1;
+
+				// start transmitter
+				ps2_kbd_tx_state <= 4'd1;
+
+				// put start bit on data line
+				ps2_kbd_data <= 1'b0;			// start bit is 0
+			end
+		end else begin
+
+			// transmission of 8 data bits
+			if((ps2_kbd_tx_state >= 1)&&(ps2_kbd_tx_state < 9)) begin
+				ps2_kbd_data <= ps2_kbd_tx_byte[0];			  // data bits
+				ps2_kbd_tx_byte[6:0] <= ps2_kbd_tx_byte[7:1]; // shift down
+				if(ps2_kbd_tx_byte[0]) 
+					ps2_kbd_parity <= !ps2_kbd_parity;
+			end
+
+			// transmission of parity
+			if(ps2_kbd_tx_state == 9)
+				ps2_kbd_data <= ps2_kbd_parity;
+			
+			// transmission of stop bit
+			if(ps2_kbd_tx_state == 10)
+				ps2_kbd_data <= 1'b1;			// stop bit is 1
+
+			// advance state machine
+			if(ps2_kbd_tx_state < 11)
+				ps2_kbd_tx_state <= ps2_kbd_tx_state + 4'd1;
+			else	
+				ps2_kbd_tx_state <= 4'd0;
+		end
+	end
+end
+
+// mouse
+reg [7:0] ps2_mouse_fifo [(2**PS2_FIFO_BITS)-1:0];
+reg [PS2_FIFO_BITS-1:0] ps2_mouse_wptr;
+reg [PS2_FIFO_BITS-1:0] ps2_mouse_rptr;
+
+// ps2 transmitter state machine
+reg [3:0] ps2_mouse_tx_state;
+reg [7:0] ps2_mouse_tx_byte;
+reg ps2_mouse_parity;
+
+assign ps2_mouse_clk = ps2_clk || (ps2_mouse_tx_state == 0);
+
+// ps2 transmitter
+// Takes a byte from the FIFO and sends it in a ps2 compliant serial format.
+reg ps2_mouse_r_inc;
+always@(posedge clk_sys) begin
+	reg ps2_clkD;
+
+	ps2_clkD <= ps2_clk;
+	if (~ps2_clkD & ps2_clk) begin
+		ps2_mouse_r_inc <= 1'b0;
+
+		if(ps2_mouse_r_inc)
+			ps2_mouse_rptr <= ps2_mouse_rptr + 1'd1;
+
+		// transmitter is idle?
+		if(ps2_mouse_tx_state == 0) begin
+			// data in fifo present?
+			if(ps2_mouse_wptr != ps2_mouse_rptr) begin
+				// load tx register from fifo
+				ps2_mouse_tx_byte <= ps2_mouse_fifo[ps2_mouse_rptr];
+				ps2_mouse_r_inc <= 1'b1;
+
+				// reset parity
+				ps2_mouse_parity <= 1'b1;
+
+				// start transmitter
+				ps2_mouse_tx_state <= 4'd1;
+
+				// put start bit on data line
+				ps2_mouse_data <= 1'b0;			// start bit is 0
+			end
+		end else begin
+
+			// transmission of 8 data bits
+			if((ps2_mouse_tx_state >= 1)&&(ps2_mouse_tx_state < 9)) begin
+				ps2_mouse_data <= ps2_mouse_tx_byte[0];			  // data bits
+				ps2_mouse_tx_byte[6:0] <= ps2_mouse_tx_byte[7:1]; // shift down
+				if(ps2_mouse_tx_byte[0]) 
+					ps2_mouse_parity <= !ps2_mouse_parity;
+			end
+
+			// transmission of parity
+			if(ps2_mouse_tx_state == 9)
+				ps2_mouse_data <= ps2_mouse_parity;
+
+			// transmission of stop bit
+			if(ps2_mouse_tx_state == 10)
+				ps2_mouse_data <= 1'b1;			// stop bit is 1
+
+			// advance state machine
+			if(ps2_mouse_tx_state < 11)
+				ps2_mouse_tx_state <= ps2_mouse_tx_state + 4'd1;
+			else	
+				ps2_mouse_tx_state <= 4'd0;
+		end
+	end
+end
+
+// fifo to receive serial data from core to be forwarded to io controller
+
+// 16 byte fifo to store serial bytes
+localparam SERIAL_OUT_FIFO_BITS = 6;
+reg [7:0] serial_out_fifo [(2**SERIAL_OUT_FIFO_BITS)-1:0];
+reg [SERIAL_OUT_FIFO_BITS-1:0] serial_out_wptr;
+reg [SERIAL_OUT_FIFO_BITS-1:0] serial_out_rptr;
+ 
+wire serial_out_data_available = serial_out_wptr != serial_out_rptr;
+wire [7:0] serial_out_byte = serial_out_fifo[serial_out_rptr] /* synthesis keep */;
+wire [7:0] serial_out_status = { 7'b1000000, serial_out_data_available};
+/*
+// status[0] is reset signal from io controller and is thus used to flush
+// the fifo
+always @(posedge serial_strobe or posedge status[0]) begin
+	if(status[0] == 1) begin
+		serial_out_wptr <= 0;
+	end else begin 
+		serial_out_fifo[serial_out_wptr] <= serial_data;
+		serial_out_wptr <= serial_out_wptr + 1'd1;
+	end
+end 
+
+always@(negedge spi_sck or posedge status[0]) begin
+	if(status[0] == 1) begin
+		serial_out_rptr <= 0;
+	end else begin
+		if((byte_cnt != 0) && (cmd == 8'h1b)) begin
+			// read last bit -> advance read pointer
+			if((bit_cnt == 7) && !byte_cnt[0] && serial_out_data_available)
+				serial_out_rptr <= serial_out_rptr + 1'd1;
+		end
+	end
+end
+*/
+
+// SPI bit and byte counters
+always@(posedge spi_sck or posedge CONF_DATA0) begin
+	if(CONF_DATA0 == 1) begin
+		bit_cnt <= 0;
+	   byte_cnt <= 0;
+	end else begin
+		if((bit_cnt == 7)&&(byte_cnt != 8'd255)) 
+			byte_cnt <= byte_cnt + 8'd1;
+
+		bit_cnt <= bit_cnt + 1'd1;
+	end
+end
+
+// SPI transmitter FPGA -> IO
+reg [7:0] spi_byte_out;
+
+always@(negedge spi_sck or posedge CONF_DATA0) begin
+	spi_do <= spi_byte_out[~bit_cnt];
+end
+
+always@(posedge spi_sck or posedge CONF_DATA0) begin
+	reg [31:0] sd_lba_r;
+	
+	if(CONF_DATA0 == 1) begin
+		spi_byte_out <= core_type;
+	end else begin
+		// read the command byte to choose the response
+		if(bit_cnt == 7) begin
+			if(!byte_cnt) cmd <= {sbuf, SPI_DI};
+
+         spi_byte_out <= 0;
+         case({(!byte_cnt) ? {sbuf, SPI_DI} : cmd})
+				// reading config string
+            8'h14: if(byte_cnt < STRLEN) spi_byte_out <= conf_str[(STRLEN - byte_cnt - 1)<<3 +:8];
+
+            // reading sd card status
+            8'h16: if(byte_cnt == 0) begin
+					spi_byte_out <= sd_cmd;
+					sd_lba_r <= sd_lba;
+            end
+            else if(byte_cnt < 5) spi_byte_out <= sd_lba_r[(4-byte_cnt)<<3 +:8];
+
+            // reading sd card write data
+            8'h18: spi_byte_out <= sd_buff_din;
+				8'h1b:
+					// send alternating flag byte and data
+					if(byte_cnt[0]) spi_byte_out <= serial_out_status;
+					else spi_byte_out <= serial_out_byte;
+			endcase
+		end
+	end
+end
+
+// SPI receiver IO -> FPGA
+
+reg       spi_receiver_strobe_r;
+reg       spi_transfer_end_r;
+reg [7:0] spi_byte_in_r;
+
+// Read at spi_sck clock domain, assemble bytes for transferring to clk_sys
+always@(posedge spi_sck or posedge CONF_DATA0) begin
+
+	if(CONF_DATA0 == 1) begin
+		spi_receiver_strobe_r <= 0;
+		spi_transfer_end_r <= 1;
+	end else begin
+		spi_receiver_strobe_r <= 0;
+		spi_transfer_end_r <= 0;
+
+		if(bit_cnt != 7)
+			sbuf[6:0] <= { sbuf[5:0], SPI_DI };
+
+		// finished reading a byte, prepare to transfer to clk_sys
+      if(bit_cnt == 7) begin
+			spi_byte_in_r <= { sbuf, SPI_DI};
+			spi_receiver_strobe_r <= 1;
+		end
+	end
+end
+
+// Process bytes from SPI at the clk_sys domain
+always @(posedge clk_sys) begin
+
+	reg       spi_receiver_strobe;
+	reg       spi_transfer_end;
+	reg [7:0] spi_byte_in;
+	reg       spi_receiver_strobeD;
+	reg       spi_transfer_endD;
+	reg [7:0] spi_byte_inD;
+	reg [7:0] acmd;
+	reg [7:0] abyte_cnt;   // counts bytes
+
+	//synchronize between SPI and sys clock domains
+	spi_receiver_strobeD <= spi_receiver_strobe_r;
+	spi_receiver_strobe <= spi_receiver_strobeD;
+	spi_transfer_endD	<= spi_transfer_end_r;
+	spi_transfer_end	<= spi_transfer_endD;
+	spi_byte_inD <= spi_byte_in_r;
+	spi_byte_in <= spi_byte_inD;
+
+	if (~spi_transfer_endD & spi_transfer_end) begin
+		abyte_cnt <= 8'd0;
+	end else if (~spi_receiver_strobeD & spi_receiver_strobe) begin
+
+		if(abyte_cnt != 8'd255) 
+			abyte_cnt <= byte_cnt + 8'd1;
+
+		if(abyte_cnt == 0) begin
+			acmd <= spi_byte_in;
+		end else begin
+			case(acmd)
+				// buttons and switches
+				8'h01: but_sw <= spi_byte_in;
+				8'h02: joystick_0 <= spi_byte_in;
+				8'h03: joystick_1 <= spi_byte_in;
+				8'h04: begin
+					// store incoming ps2 mouse bytes 
+					ps2_mouse_fifo[ps2_mouse_wptr] <= spi_byte_in;
+					ps2_mouse_wptr <= ps2_mouse_wptr + 1'd1;
+				end
+				8'h05: begin
+					// store incoming ps2 keyboard bytes 
+					ps2_kbd_fifo[ps2_kbd_wptr] <= spi_byte_in;
+					ps2_kbd_wptr <= ps2_kbd_wptr + 1'd1;
+				end
+
+				// joystick analog
+				8'h1a: begin
+					// first byte is joystick indes
+					if(abyte_cnt == 1)
+						stick_idx <= spi_byte_in[2:0];
+					else if(abyte_cnt == 2) begin
+						// second byte is x axis
+						if(stick_idx == 0)
+							joystick_analog_0[15:8] <= spi_byte_in;
+						else if(stick_idx == 1)
+							joystick_analog_1[15:8] <= spi_byte_in;
+					end else if(abyte_cnt == 3) begin
+						// third byte is y axis
+						if(stick_idx == 0)
+							joystick_analog_0[7:0] <= spi_byte_in;
+						else if(stick_idx == 1)
+							joystick_analog_1[7:0] <= spi_byte_in;
+					end
+				end
+
+				8'h15: status <= spi_byte_in;
+
+				// status, 32bit version
+				8'h1e: if(abyte_cnt<6) status[(abyte_cnt-2)<<3 +:8] <= spi_byte_in;
+
+				endcase
+		end
+	end
+end
+
+reg    sd_din_strobe;
+reg    sd_dout_strobe;
+assign sd_buff_wr = sd_dout_strobe;
+
+// Process SD-card related bytes from SPI at the clk_sd domain
+always @(posedge clk_sd) begin
+
+	reg       spi_receiver_strobe;
+	reg       spi_transfer_end;
+	reg [7:0] spi_byte_in;
+	reg       spi_receiver_strobeD;
+	reg       spi_transfer_endD;
+	reg [7:0] spi_byte_inD;
+	reg [7:0] acmd;
+	reg [7:0] abyte_cnt;   // counts bytes
+
+	//synchronize between SPI and sd clock domains
+	spi_receiver_strobeD <= spi_receiver_strobe_r;
+	spi_receiver_strobe <= spi_receiver_strobeD;
+	spi_transfer_endD	<= spi_transfer_end_r;
+	spi_transfer_end	<= spi_transfer_endD;
+	spi_byte_inD <= spi_byte_in_r;
+	spi_byte_in <= spi_byte_inD;
+
+	if(sd_dout_strobe) begin
+		sd_dout_strobe<= 0;
+		if(~&sd_buff_addr) sd_buff_addr <= sd_buff_addr + 1'b1;
+	end
+
+	if(sd_din_strobe) begin
+		sd_din_strobe<= 0;
+		if(~&sd_buff_addr) sd_buff_addr <= sd_buff_addr + 1'b1;
+	end
+
+	img_mounted <= 0;
+
+	if (~spi_transfer_endD & spi_transfer_end) begin
+		abyte_cnt <= 8'd0;
+		sd_ack <= 1'b0;
+		sd_ack_conf <= 1'b0;
+		sd_dout_strobe <= 1'b0;
+		sd_din_strobe <= 1'b0;
+		sd_buff_addr<= 0;
+	end else if (~spi_receiver_strobeD & spi_receiver_strobe) begin
+
+		if(abyte_cnt != 8'd255) 
+			abyte_cnt <= byte_cnt + 8'd1;
+
+		if(abyte_cnt == 0) begin
+			acmd <= spi_byte_in;
+
+			// fetch first byte when sectore FPGA->IO command has been seen
+			if(spi_byte_in == 8'h18)
+				sd_din_strobe <= 1'b1;
+
+			if((spi_byte_in == 8'h17) || (spi_byte_in == 8'h18))
+				sd_ack <= 1'b1;
+
+		end else begin
+			case(acmd)
+
+				// send sector IO -> FPGA
+				8'h17: begin
+					// flag that download begins
+					sd_dout_strobe <= 1'b1;
+					sd_buff_dout <= spi_byte_in;
+				end
+
+				// send sector FPGA -> IO
+				8'h18: sd_din_strobe <= 1'b1;
+
+				// send SD config IO -> FPGA
+				8'h19: begin
+					// flag that download begins
+					sd_dout_strobe <= 1'b1;
+					sd_ack_conf <= 1'b1;
+					sd_buff_dout <= spi_byte_in;
+				end
+
+				8'h1c: img_mounted <= 1;
+
+				// send image info
+				8'h1d: if(abyte_cnt<6) img_size[(byte_cnt-2)<<3 +:8] <= spi_byte_in;
+			endcase
+		end
+	end
+end
+
+
+///////////////////////////////   DOWNLOADING   ///////////////////////////////
+
+reg  [7:0] data_w;
+reg [24:0] addr_w;
+reg        rclk   = 0;
+
+localparam UIO_FILE_TX      = 8'h53;
+localparam UIO_FILE_TX_DAT  = 8'h54;
+localparam UIO_FILE_INDEX   = 8'h55;
+
+// data_io has its own SPI interface to the io controller
+always@(posedge SPI_SCK, posedge SPI_SS2) begin
+	reg  [6:0] sbuf;
+	reg  [7:0] cmd;
+	reg  [4:0] cnt;
+	reg [24:0] addr;
+
+	if(SPI_SS2) cnt <= 0;
+	else begin
+		rclk <= 0;
+
+		// don't shift in last bit. It is evaluated directly
+		// when writing to ram
+		if(cnt != 15) sbuf <= { sbuf[5:0], SPI_DI};
+
+		// increase target address after write
+		if(rclk) addr <= addr + 1'd1;
+
+		// count 0-7 8-15 8-15 ... 
+		if(cnt < 15) cnt <= cnt + 1'd1;
+			else cnt <= 8;
+
+		// finished command byte
+      if(cnt == 7) cmd <= {sbuf, SPI_DI};
+
+		// prepare/end transmission
+		if((cmd == UIO_FILE_TX) && (cnt == 15)) begin
+			// prepare 
+			if(SPI_DI) begin
+				addr <= 0;
+				ioctl_download <= 1; 
+			end else begin
+				addr_w <= addr;
+				ioctl_download <= 0;
+			end
+		end
+
+		// command 0x54: UIO_FILE_TX
+		if((cmd == UIO_FILE_TX_DAT) && (cnt == 15)) begin
+			addr_w <= addr;
+			data_w <= {sbuf, SPI_DI};
+			rclk <= 1;
+		end
+
+      // expose file (menu) index
+      if((cmd == UIO_FILE_INDEX) && (cnt == 15)) ioctl_index <= {sbuf, SPI_DI};
+	end
+end
+
+reg  [24:0] erase_mask;
+wire [24:0] next_erase = (ioctl_addr + 1'd1) & erase_mask;
+
+always@(posedge clk_sys) begin
+	reg        rclkD, rclkD2;
+	reg        old_force = 0;
+	reg  [6:0] erase_clk_div;
+	reg [24:0] end_addr;
+
+	rclkD    <= rclk;
+	rclkD2   <= rclkD;
+	ioctl_wr <= 0;
+
+	if(rclkD & ~rclkD2) begin
+		ioctl_dout <= data_w;
+		ioctl_addr <= addr_w;
+		ioctl_wr   <= 1;
+	end
+
+	if(ioctl_download) begin
+		old_force     <= 0;
+		ioctl_erasing <= 0;
+	end else begin
+
+		old_force <= ioctl_force_erase;
+		if(ioctl_force_erase & ~old_force) begin
+			ioctl_addr    <= 'h1FFFF;
+			erase_mask    <= 'h1FFFF;
+			end_addr      <= 'h10002;
+			erase_clk_div <= 1;
+			ioctl_erasing <= 1;
+		end else if(ioctl_erasing) begin
+			erase_clk_div <= erase_clk_div + 1'd1;
+			if(!erase_clk_div) begin
+				if(next_erase == end_addr) ioctl_erasing <= 0;
+				else begin
+					ioctl_addr <= next_erase;
+					ioctl_dout <= 0;
+					ioctl_wr   <= 1;
+				end
+			end
+		end
+	end
+end
+
+endmodule
