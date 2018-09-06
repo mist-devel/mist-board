@@ -155,6 +155,7 @@ end function;
 component mist_io generic(STRLEN : integer := 0 ); port
 (
 	clk_sys           : in  std_logic;
+	clk_sd            : in  std_logic;
 
 	SPI_SCK           : in  std_logic;
 	CONF_DATA0        : in  std_logic;
@@ -509,6 +510,7 @@ begin
 	generic map (STRLEN => CONF_STR'length)
 	port map (
 		clk_sys => clk32,
+		clk_sd  => clk32,
 
 		SPI_SCK => SPI_SCK,
 		CONF_DATA0 => CONF_DATA0,
