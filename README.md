@@ -7,9 +7,11 @@ The MIST board was designed to implement classic 16 bit computers like the Amiga
 ![https://raw.githubusercontent.com/wiki/mist-devel/mist-board/mist_board.jpg](https://raw.githubusercontent.com/wiki/mist-devel/mist-board/mist_board.jpg)
 
 This repository contains the source code of many cores. Further cores can be
-found in various other peoples repositories like:
+found in various other repositories like:
 
   * [Winfried Soltys' github repository](https://github.com/wsoltys)
   * [Sorgelig's github repository](https://github.com/sorgelig)
   * [Rok Krajnc's github repository](https://github.com/rkrajnc)
   * [Robinsonb5's github repository](https://github.com/robinsonb5)
+  * [Gehstcock's github repository](https://github.com/Gehstock)
+  * [Gyurco's github repository](https://github.com/gyurco)
