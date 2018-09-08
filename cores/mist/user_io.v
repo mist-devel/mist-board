@@ -59,7 +59,8 @@ module user_io(
 		// on-board buttons and dip switches
 		output [1:0] 	  BUTTONS,
 		output [1:0]     SWITCHES,
-		output           scandoubler_disable
+		output           scandoubler_disable,
+		output           ypbpr
 );
 
 // filter spi clock. the 8 bit gate delay is ~2.5ns in total
@@ -70,7 +71,7 @@ reg [3:0] 			byte_cnt;
 reg [6:0]         sbuf;
 reg [7:0]         cmd;
 reg [3:0] 	      bit_cnt;       // 0..15
-reg [4:0] 	      but_sw;
+reg [5:0] 	      but_sw;
 
 // counter runs 0..7,8..15,8..15,8..15
 wire [2:0] tx_bit = ~(bit_cnt[2:0]);
@@ -78,6 +79,7 @@ wire [2:0] tx_bit = ~(bit_cnt[2:0]);
 assign BUTTONS = but_sw[1:0];
 assign SWITCHES = but_sw[3:2];
 assign scandoubler_disable = but_sw[4];
+assign ypbpr = but_sw[5];
 
 // prepent "a5" to status to make sure io controller can detect that a core
 // doesn't support the command
@@ -204,7 +206,7 @@ always@(negedge spi_sck) begin
 				eth_mac_begin <= 1'b0;
 
 				if(cmd == 1) 
-					 but_sw <= { sbuf[3:0], SPI_MOSI }; 
+					 but_sw <= { sbuf[4:0], SPI_MOSI }; 
 
 				// send ikbd byte to acia
 			   if(cmd == 2) begin

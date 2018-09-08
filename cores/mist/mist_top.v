@@ -269,8 +269,6 @@ end
 
 wire viking_active = (viking_in_use == 8'hff);
 
-// xyz
-
 video video (
 	.clk_128      	(clk_128    ),
 	.clk_32      	(clk_32     ),
@@ -312,6 +310,7 @@ video video (
    .viking_enable       ( viking_active       ), // enable and activate viking video card
    .viking_himem        ( steroids            ), // let viking use memory from $e80000
    .scandoubler_disable ( scandoubler_disable ), // don't use scandoubler in 15khz modes 
+   .ypbpr               ( ypbpr               ), // output ypbpr instead of rgb 
 	.adjust              ( video_adj    	    ),
 	.pal56               ( ~system_ctrl[9]     ),
    .scanlines           ( system_ctrl[21:20]  ),
@@ -1127,6 +1126,7 @@ wire eth_rx_write_strobe, eth_rx_write_begin;
 
 wire [2:0] switches;
 wire scandoubler_disable;
+wire ypbpr;
 
 //// user io has an extra spi channel outside minimig core ////
 user_io user_io(
@@ -1180,6 +1180,7 @@ user_io user_io(
 
 		// io controller requests to disable vga scandoubler
 		.scandoubler_disable       (scandoubler_disable),
+		.ypbpr                     (ypbpr),
 		.SWITCHES                  (switches ),
 		.CORE_TYPE						(8'ha3)    // mist core id
 );

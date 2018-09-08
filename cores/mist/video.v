@@ -59,7 +59,8 @@ module video (
   // system config
   input         viking_enable,       // enable viking video card
   input         viking_himem,        // let viking use memory from $e80000
-  input 	scandoubler_disable, // don't use scandoubler in 15khz modes 
+  input 	scandoubler_disable,        // don't use scandoubler in 15khz modes 
+  input 	ypbpr,                      // output ypbpr instead of rgb 
   input 	pal56,               // use VGA compatible 56hz for PAL
   input [1:0] 	scanlines,           // scanlines (00-none 01-25% 10-50% 11-100%)
   input [15:0] 	adjust,              // hor/ver video adjust
@@ -75,13 +76,15 @@ module video (
 assign vaddr = viking_enable?viking_vaddr:shifter_vaddr;
 assign read  = viking_enable?viking_read:shifter_read;
 
+wire ypbpr_cs = ~(shifter_sd_adjusted_hs ^ shifter_sd_adjusted_vs);
+
 // if we use 15khz signals without scan doubler then we need
 // to create a composite sync on hsync
 wire enable_csync =  sd_15khz_detected && scandoubler_disable;
 // wire csync = shifter_hs == shifter_vs;
 wire csync = shifter_sd_adjusted_hs == shifter_sd_adjusted_vs;
-assign hs = enable_csync?csync:stvid_hs;
-assign vs = enable_csync?1'b1:stvid_vs;
+assign hs = enable_csync?csync:ypbpr?ypbpr_cs:stvid_hs;
+assign vs = (enable_csync || ypbpr)?1'b1:stvid_vs;
 
 // ------------------------- OSD ---------------------------
 
@@ -92,7 +95,24 @@ always @(posedge clk_128)
 
 wire osd_clk = viking_enable?clk_128:clk_32;
    
+wire [5:0] y, pb, pr;
+rgb2ypbpr rgb2ypbpr (
+	.red    ( osd_r ),
+	.green  ( osd_g ),
+	.blue   ( osd_b ),
+	
+	.y      ( y     ),
+	.pb     ( pb    ),
+	.pr     ( pr    )
+);
+
+// demultiplex between ypbpr and rgb signals
+assign video_r = ypbpr?pr:osd_r;
+assign video_g = ypbpr? y:osd_g;
+assign video_b = ypbpr?pb:osd_b;
+
 // include OSD overlay
+wire [5:0] osd_r, osd_g, osd_b;
 osd osd (
          .clk        ( osd_clk    ),
 
@@ -110,9 +130,9 @@ osd osd (
          .b_in       ( ovl_b ),
 	 
          // receive signal with OSD overlayed
-         .r_out      ( video_r  ),
-         .g_out      ( video_g  ),
-         .b_out      ( video_b  )
+         .r_out      ( osd_r  ),
+         .g_out      ( osd_g  ),
+         .b_out      ( osd_b  )
 );
 
 // include debug overlay
