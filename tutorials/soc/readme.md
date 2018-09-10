@@ -717,7 +717,7 @@ to a TVs RGBS input. Many old CRTs also support this.
 Links:
  - [MIST Scart cable](https://github.com/mist-devel/mist-board/wiki/ScartCable)
  - [Disabling scandoubler in MIST .ini file](https://github.com/mist-devel/mist-board/wiki/DocIni#scandoubler_disable)
- - [Buy a cable](http://lotharek.pl/product.php?pid=168)
+ - Buy a cable [from Lotharek](https://lotharek.pl/productdetail.php?id=171) or [Dragonbox](https://www.dragonbox.de/de/413-mist-scart-kabel-2m-kabel.html)
 
 Files required on SD card:
  - [`soc.rbf`](https://github.com/mist-devel/mist-board/raw/master/tutorials/soc/lesson11/soc.rbf) renamed to `core.rbf`
@@ -749,9 +749,8 @@ This makes a YPbPr connection a very nice choice when connecting the
 MIST to many modern TVs.
 
 Links:
- - [MIST YpbPr adapter](https://github.com/mist-devel/mist-board/wiki/YPbPr_Cable)
+ - [MIST YPbPr adapter](https://github.com/mist-devel/mist-board/wiki/YPbPr_Cable)
  - [Enabling YPbPr in the MIST .ini file](https://github.com/mist-devel/mist-board/wiki/DocIni#ypbpr)
- - [Buy a cable](http://lotharek.pl/product.php?pid=168)
 
 Files required on SD card:
  - [`soc.rbf`](https://github.com/mist-devel/mist-board/raw/master/tutorials/soc/lesson12/soc.rbf) renamed to `core.rbf`
