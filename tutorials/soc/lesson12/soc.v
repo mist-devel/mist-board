@@ -99,7 +99,7 @@ scandoubler scandoubler (
 // In TV (15khz) mode the composite sync signal required by TVs is output on
 // the VGA_HS output. The VGA_VS is driven to high and can be used e.g. to switch
 // a scart tv into RGBS mode. See https://github.com/mist-devel/mist-board/wiki/ScartCable
-assign VGA_HS = (scandoubler_disable || ypbpr)?!(video_hs^video_vs):sd_hs;
+assign VGA_HS = (scandoubler_disable || ypbpr)?!(sd_hs^sd_vs):sd_hs;
 assign VGA_VS = (scandoubler_disable || ypbpr)?1'b1:sd_vs;
 assign VGA_R  = ypbpr?pr:out_r;
 assign VGA_G  = ypbpr? y:out_g;
