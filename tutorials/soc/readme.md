@@ -721,4 +721,38 @@ Links:
 
 Files required on SD card:
  - [`soc.rbf`](https://github.com/mist-devel/mist-board/raw/master/tutorials/soc/lesson11/soc.rbf) renamed to `core.rbf`
+
+[Lesson 12](https://github.com/mist-devel/mist-board/tree/master/tutorials/soc/lesson12): YPbPr component video
+-------------------------------
+
+SCART is a nice way to send a true "retro" video signal to a TV.
+Unfortunately SCART or any other kind of RGBs input isn't available
+on most modern TVs anymore.
+
+What many TVs still have is a so-called YPbPr component input. This
+type of input uses three connections Y, Pb and Pr. Y carries a
+geyscale signal together with a composite sync signal. Thus only
+connecting the Y signal may already result in a grayscale image
+on many TVs. The other two signal Pb and Pr carry color difference
+signals. Together with the Y signal they allow the TV to reconstruct
+the color. 
+
+For YPbPr a special adaptor is need for the MIST as described in the
+[MIST wiki](https://github.com/mist-devel/mist-board/wiki/YPbPr_Cable).
+
+Many TVs support various common video modes on their component inputs.
+It is thus often possible to use the YPbPr with or without
+scandoubler.  With scandoubler enabled the resulting 720p modes may
+even use scanline effects.
+
+This makes a YPbPr connection a very nice choice when connecting the
+MIST to many modern TVs.
+
+Links:
+ - [MIST YpbPr adapter](https://github.com/mist-devel/mist-board/wiki/YPbPr_Cable)
+ - [Enabling YPbPr in the MIST .ini file](https://github.com/mist-devel/mist-board/wiki/DocIni#ypbpr)
+ - [Buy a cable](http://lotharek.pl/product.php?pid=168)
+
+Files required on SD card:
+ - [`soc.rbf`](https://github.com/mist-devel/mist-board/raw/master/tutorials/soc/lesson12/soc.rbf) renamed to `core.rbf`
   
