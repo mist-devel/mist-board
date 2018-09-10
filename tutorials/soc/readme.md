@@ -750,8 +750,7 @@ color differnce signals instead of RGB and it must output a composite
 sync signal on the VGAs hsync output and a static high voltage on the
 VGAs vsync output. Using the OSD to switch between these two modes
 would be rather useless since with the wrong setting the OSD is
-invisible. The MISTs firmware thus accepts a [`scandoubler_disable`
-option in the
+invisible. The MISTs firmware thus accepts a [`ypbpr` option in the
 `mist.ini`](https://github.com/mist-devel/mist-board/wiki/DocIni#ypbpr)
 to globally force cores supporting this video mode. This option can be
 combined with the [`scandoubler_disable`
