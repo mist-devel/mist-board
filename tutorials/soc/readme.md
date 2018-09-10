@@ -745,6 +745,18 @@ It is thus often possible to use the YPbPr with or without
 scandoubler.  With scandoubler enabled the resulting 720p modes may
 even use scanline effects.
 
+In order to make use of such a cable a MIST core has to output the
+color differnce signals instead of RGB and it must output a composite
+sync signal on the VGAs hsync output and a static high voltage on the
+VGAs vsync output. Using the OSD to switch between these two modes
+would be rather useless since with the wrong setting the OSD is
+invisible. The MISTs firmware thus accepts a [`scandoubler_disable`
+option in the
+`mist.ini`](https://github.com/mist-devel/mist-board/wiki/DocIni#ypbpr)
+to globally force cores supporting this video mode. This option can be
+combined with the [`scandoubler_disable`
+option](https://github.com/mist-devel/mist-board/wiki/DocIni#scandoubler_disable)
+
 This makes a YPbPr connection a very nice choice when connecting the
 MIST to many modern TVs.
 
