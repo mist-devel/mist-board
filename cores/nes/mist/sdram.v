@@ -24,14 +24,14 @@
 module sdram (
 
 	// interface to the MT48LC16M16 chip
-	inout [15:0]  		sd_data,    // 16 bit bidirectional data bus
-	output [12:0]		sd_addr,    // 13 bit multiplexed address bus
-	output [1:0] 		sd_dqm,     // two byte masks
-	output [1:0] 		sd_ba,      // two banks
-	output 				sd_cs,      // a single chip select
-	output 				sd_we,      // write enable
-	output 				sd_ras,     // row address select
-	output 				sd_cas,     // columns address select
+	inout reg  [15:0]  		sd_data,    // 16 bit bidirectional data bus
+	output reg [12:0]		sd_addr,    // 13 bit multiplexed address bus
+	output reg  [1:0] 		sd_dqm,     // two byte masks
+	output reg  [1:0] 		sd_ba,      // two banks
+	output reg				sd_cs,      // a single chip select
+	output reg				sd_we,      // write enable
+	output reg				sd_ras,     // row address select
+	output reg				sd_cas,     // columns address select
 
 	// cpu/chipset interface
 	input 		 		init,			// init signal after FPGA config to initialize RAM
@@ -108,18 +108,6 @@ localparam CMD_LOAD_MODE       = 4'b0000;
 
 wire [3:0] sd_cmd;   // current command sent to sd ram
 
-// drive control signals according to current command
-assign sd_cs  = sd_cmd[3];
-assign sd_ras = sd_cmd[2];
-assign sd_cas = sd_cmd[1];
-assign sd_we  = sd_cmd[0];
-
-// drive ram data lines when writing, set them as inputs otherwise
-// the eight bits are sent on both bytes ports. Which one's actually
-// written depends on the state of dqm of which only one is active
-// at a time when writing
-assign sd_data = we?{din, din}:16'bZZZZZZZZZZZZZZZZ;
-
 wire oe = oeA || oeB;
 
 reg addr0;
@@ -154,10 +142,26 @@ wire [12:0] reset_addr = (reset == 13)?13'b0010000000000:MODE;
 wire [12:0] run_addr = 
 	(q == STATE_CMD_START)?addr[21:9]:{ 4'b0010, addr[24], addr[8:1]};
 
-assign sd_addr = (reset != 0)?reset_addr:run_addr;
+//register SDRAM output signals
+always @(posedge clk) begin
 
-assign sd_ba = addr[23:22];
+// drive ram data lines when writing, set them as inputs otherwise
+// the eight bits are sent on both bytes ports. Which one's actually
+// written depends on the state of dqm of which only one is active
+// at a time when writing
+	sd_data <= we?{din, din}:16'bZZZZZZZZZZZZZZZZ;
 
-assign sd_dqm = we?{ addr[0], ~addr[0] }:2'b00;
+	sd_addr <= (reset != 0)?reset_addr:run_addr;
+
+	sd_ba <= addr[23:22];
+
+	sd_dqm <= we?{ addr[0], ~addr[0] }:2'b00;
+	
+	// drive control signals according to current command
+	sd_cs  <= sd_cmd[3];
+	sd_ras <= sd_cmd[2];
+	sd_cas <= sd_cmd[1];
+	sd_we  <= sd_cmd[0];
+end
 
 endmodule
