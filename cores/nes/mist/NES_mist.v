@@ -180,13 +180,14 @@ wire ps2_kbd_clk, ps2_kbd_data;
 
 
 user_io #(.STRLEN(CONF_STR_LEN)) user_io(
+   .clk_sys(clk),
    .conf_str(CONF_STR),
    // the spi interface
 
-   .SPI_SCK(SPI_SCK),
-   .CONF_DATA0(CONF_DATA0),
-   .SPI_DO(SPI_DO),   // tristate handling inside user_io
-   .SPI_DI(SPI_DI),
+   .SPI_CLK(SPI_SCK),
+   .SPI_SS_IO(CONF_DATA0),
+   .SPI_MISO(SPI_DO),   // tristate handling inside user_io
+   .SPI_MOSI(SPI_DI),
 
    .switches(switches),
    .buttons(buttons),
@@ -198,7 +199,6 @@ user_io #(.STRLEN(CONF_STR_LEN)) user_io(
 
    .status(status),
 
-   .ps2_clk(ps2_clk),   // should be 10-16kHz for ps2 clock
    .ps2_kbd_clk(ps2_kbd_clk),
    .ps2_kbd_data(ps2_kbd_data)
 );
@@ -210,12 +210,13 @@ wire [7:0] nes_joy_B = (reset_nes || osd_visible) ? 8'd0 :
  
   wire clock_locked;
   wire clk85;
-  clk clock_21mhz(.inclk0(CLOCK_27[0]), .c0(clk85), .c1(SDRAM_CLK), .locked(clock_locked));
+  wire clk;
+  clk clock_21mhz(.inclk0(CLOCK_27[0]), .c0(clk85), .c1(SDRAM_CLK), .c2(clk), .locked(clock_locked));
 
   // reset after download
   reg [7:0] download_reset_cnt;
   wire download_reset = download_reset_cnt != 0;
-  always @(posedge CLOCK_27[0]) begin
+  always @(posedge clk) begin
 	if(downloading)
 		download_reset_cnt <= 8'd255;
 	else if(download_reset_cnt != 0)
@@ -223,19 +224,10 @@ wire [7:0] nes_joy_B = (reset_nes || osd_visible) ? 8'd0 :
  end
 
   // hold machine in reset until first download starts
-  reg init_reset;
-  always @(posedge CLOCK_27[0]) begin
-	if(!clock_locked)
-		init_reset <= 1'b1;
-	else if(downloading)
-		init_reset <= 1'b0;
+  reg init_reset = 1;
+  always @(posedge clk) begin
+	if(downloading)	init_reset <= 1'b0;
   end
-  
-  reg [12:0] clkcnt;
-  always @(posedge clk85)
-	clkcnt <= clkcnt + 2'd1;
-  wire clk = clkcnt[1];
-  wire ps2_clk = clkcnt[12];
   
   wire [8:0] cycle;
   wire [8:0] scanline;
@@ -301,12 +293,12 @@ wire [7:0] nes_joy_B = (reset_nes || osd_visible) ? 8'd0 :
     mapper_flags <= loader_flags;
 	 
 	// LED displays loader status
-	reg [12:0] led_blink;	// divide PS2 clock to around 1Hz
-	always @(posedge ps2_clk) begin
+	reg [23:0] led_blink;	// divide 21MHz clock to around 1Hz
+	always @(posedge clk) begin
 		led_blink <= led_blink + 13'd1;
 	end
  
-	assign LED = downloading ? 0 : loader_fail ? led_blink[12] : 1;
+	assign LED = downloading ? 0 : loader_fail ? led_blink[23] : 1;
 
   wire osd_visible;
 

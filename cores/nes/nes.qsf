@@ -31,8 +31,8 @@ set_global_assignment -name USE_GENERATED_PHYSICAL_CONSTRAINTS OFF -section_id e
 set_global_assignment -name DEVICE_FILTER_PIN_COUNT 144
 set_global_assignment -name POWER_PRESET_COOLING_SOLUTION "NO HEAT SINK WITH STILL AIR"
 set_global_assignment -name POWER_BOARD_THERMAL_MODEL "NONE (CONSERVATIVE)"
-set_global_assignment -name OPTIMIZE_HOLD_TIMING OFF
-set_global_assignment -name FITTER_EFFORT "FAST FIT"
+set_global_assignment -name OPTIMIZE_HOLD_TIMING "ALL PATHS"
+set_global_assignment -name FITTER_EFFORT "STANDARD FIT"
 set_global_assignment -name STRATIX_CONFIGURATION_DEVICE EPCS4
 set_global_assignment -name CYCLONEII_RESERVE_NCEO_AFTER_CONFIGURATION "USE AS REGULAR IO"
 set_global_assignment -name RESERVE_ASDO_AFTER_CONFIGURATION "AS INPUT TRI-STATED"
@@ -128,7 +128,7 @@ set_global_assignment -name PHYSICAL_SYNTHESIS_COMBO_LOGIC ON
 set_global_assignment -name PHYSICAL_SYNTHESIS_REGISTER_DUPLICATION ON
 set_global_assignment -name PHYSICAL_SYNTHESIS_EFFORT NORMAL
 set_global_assignment -name FMAX_REQUIREMENT "114 MHz"
-set_global_assignment -name OPTIMIZE_MULTI_CORNER_TIMING OFF
+set_global_assignment -name OPTIMIZE_MULTI_CORNER_TIMING ON
 set_global_assignment -name MIN_CORE_JUNCTION_TEMP 0
 set_global_assignment -name MAX_CORE_JUNCTION_TEMP 85
 set_global_assignment -name USE_CONFIGURATION_DEVICE ON
@@ -240,50 +240,48 @@ set_instance_assignment -name FAST_INPUT_REGISTER ON -to SDRAM_DQ[12]
 set_instance_assignment -name FAST_INPUT_REGISTER ON -to SDRAM_DQ[13]
 set_instance_assignment -name FAST_INPUT_REGISTER ON -to SDRAM_DQ[14]
 set_instance_assignment -name FAST_INPUT_REGISTER ON -to SDRAM_DQ[15]
-set_instance_assignment -name GLOBAL_SIGNAL "GLOBAL CLOCK" -to clk_8
-set_instance_assignment -name GLOBAL_SIGNAL "GLOBAL CLOCK" -to clk_128
 set_instance_assignment -name GLOBAL_SIGNAL "GLOBAL CLOCK" -to SDRAM_CLK
 set_instance_assignment -name GLOBAL_SIGNAL "GLOBAL CLOCK" -to SPI_SCK
-set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to SDRAM_A[0]
-set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to SDRAM_A[1]
-set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to SDRAM_A[2]
-set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to SDRAM_A[3]
-set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to SDRAM_A[4]
-set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to SDRAM_A[5]
-set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to SDRAM_A[6]
-set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to SDRAM_A[7]
-set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to SDRAM_A[8]
-set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to SDRAM_A[9]
-set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to SDRAM_A[10]
-set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to SDRAM_A[11]
-set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to SDRAM_A[12]
-set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to SDRAM_DQ[0]
-set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to SDRAM_DQ[1]
-set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to SDRAM_DQ[2]
-set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to SDRAM_DQ[3]
-set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to SDRAM_DQ[4]
-set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to SDRAM_DQ[5]
-set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to SDRAM_DQ[6]
-set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to SDRAM_DQ[7]
-set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to SDRAM_DQ[8]
-set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to SDRAM_DQ[9]
-set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to SDRAM_DQ[10]
-set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to SDRAM_DQ[11]
-set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to SDRAM_DQ[12]
-set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to SDRAM_DQ[13]
-set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to SDRAM_DQ[14]
-set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to SDRAM_DQ[15]
-set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to SDRAM_BA[0]
-set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to SDRAM_BA[1]
-set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to SDRAM_DQML
-set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to SDRAM_DQMH
-set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to SDRAM_nRAS
-set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to SDRAM_nCAS
-set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to SDRAM_nWE
-set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to SDRAM_nCS
-set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to SDRAM_CKE
-set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to SDRAM_CLK
-set_instance_assignment -name GLOBAL_SIGNAL "GLOBAL CLOCK" -to clk_32
+set_instance_assignment -name CURRENT_STRENGTH_NEW "MAXIMUM CURRENT" -to SDRAM_A[0]
+set_instance_assignment -name CURRENT_STRENGTH_NEW "MAXIMUM CURRENT" -to SDRAM_A[1]
+set_instance_assignment -name CURRENT_STRENGTH_NEW "MAXIMUM CURRENT" -to SDRAM_A[2]
+set_instance_assignment -name CURRENT_STRENGTH_NEW "MAXIMUM CURRENT" -to SDRAM_A[3]
+set_instance_assignment -name CURRENT_STRENGTH_NEW "MAXIMUM CURRENT" -to SDRAM_A[4]
+set_instance_assignment -name CURRENT_STRENGTH_NEW "MAXIMUM CURRENT" -to SDRAM_A[5]
+set_instance_assignment -name CURRENT_STRENGTH_NEW "MAXIMUM CURRENT" -to SDRAM_A[6]
+set_instance_assignment -name CURRENT_STRENGTH_NEW "MAXIMUM CURRENT" -to SDRAM_A[7]
+set_instance_assignment -name CURRENT_STRENGTH_NEW "MAXIMUM CURRENT" -to SDRAM_A[8]
+set_instance_assignment -name CURRENT_STRENGTH_NEW "MAXIMUM CURRENT" -to SDRAM_A[9]
+set_instance_assignment -name CURRENT_STRENGTH_NEW "MAXIMUM CURRENT" -to SDRAM_A[10]
+set_instance_assignment -name CURRENT_STRENGTH_NEW "MAXIMUM CURRENT" -to SDRAM_A[11]
+set_instance_assignment -name CURRENT_STRENGTH_NEW "MAXIMUM CURRENT" -to SDRAM_A[12]
+set_instance_assignment -name CURRENT_STRENGTH_NEW "MAXIMUM CURRENT" -to SDRAM_DQ[0]
+set_instance_assignment -name CURRENT_STRENGTH_NEW "MAXIMUM CURRENT" -to SDRAM_DQ[1]
+set_instance_assignment -name CURRENT_STRENGTH_NEW "MAXIMUM CURRENT" -to SDRAM_DQ[2]
+set_instance_assignment -name CURRENT_STRENGTH_NEW "MAXIMUM CURRENT" -to SDRAM_DQ[3]
+set_instance_assignment -name CURRENT_STRENGTH_NEW "MAXIMUM CURRENT" -to SDRAM_DQ[4]
+set_instance_assignment -name CURRENT_STRENGTH_NEW "MAXIMUM CURRENT" -to SDRAM_DQ[5]
+set_instance_assignment -name CURRENT_STRENGTH_NEW "MAXIMUM CURRENT" -to SDRAM_DQ[6]
+set_instance_assignment -name CURRENT_STRENGTH_NEW "MAXIMUM CURRENT" -to SDRAM_DQ[7]
+set_instance_assignment -name CURRENT_STRENGTH_NEW "MAXIMUM CURRENT" -to SDRAM_DQ[8]
+set_instance_assignment -name CURRENT_STRENGTH_NEW "MAXIMUM CURRENT" -to SDRAM_DQ[9]
+set_instance_assignment -name CURRENT_STRENGTH_NEW "MAXIMUM CURRENT" -to SDRAM_DQ[10]
+set_instance_assignment -name CURRENT_STRENGTH_NEW "MAXIMUM CURRENT" -to SDRAM_DQ[11]
+set_instance_assignment -name CURRENT_STRENGTH_NEW "MAXIMUM CURRENT" -to SDRAM_DQ[12]
+set_instance_assignment -name CURRENT_STRENGTH_NEW "MAXIMUM CURRENT" -to SDRAM_DQ[13]
+set_instance_assignment -name CURRENT_STRENGTH_NEW "MAXIMUM CURRENT" -to SDRAM_DQ[14]
+set_instance_assignment -name CURRENT_STRENGTH_NEW "MAXIMUM CURRENT" -to SDRAM_DQ[15]
+set_instance_assignment -name CURRENT_STRENGTH_NEW "MAXIMUM CURRENT" -to SDRAM_BA[0]
+set_instance_assignment -name CURRENT_STRENGTH_NEW "MAXIMUM CURRENT" -to SDRAM_BA[1]
+set_instance_assignment -name CURRENT_STRENGTH_NEW "MAXIMUM CURRENT" -to SDRAM_DQML
+set_instance_assignment -name CURRENT_STRENGTH_NEW "MAXIMUM CURRENT" -to SDRAM_DQMH
+set_instance_assignment -name CURRENT_STRENGTH_NEW "MAXIMUM CURRENT" -to SDRAM_nRAS
+set_instance_assignment -name CURRENT_STRENGTH_NEW "MAXIMUM CURRENT" -to SDRAM_nCAS
+set_instance_assignment -name CURRENT_STRENGTH_NEW "MAXIMUM CURRENT" -to SDRAM_nWE
+set_instance_assignment -name CURRENT_STRENGTH_NEW "MAXIMUM CURRENT" -to SDRAM_nCS
+set_instance_assignment -name CURRENT_STRENGTH_NEW "MAXIMUM CURRENT" -to SDRAM_CKE
+set_instance_assignment -name CURRENT_STRENGTH_NEW "MAXIMUM CURRENT" -to SDRAM_CLK
+set_global_assignment -name SDC_FILE mist/constraints.sdc
 set_global_assignment -name VERILOG_FILE mist/ps2_intf.v
 set_global_assignment -name VERILOG_FILE mist/keyboard.v
 set_global_assignment -name VERILOG_FILE mist/sigma_delta_dac.v

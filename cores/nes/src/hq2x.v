@@ -202,10 +202,9 @@ wire less_254 = (offs >= 510) || (offs < 254);
 wire [8:0] inbuf_rd_addr = {i[0] == 0 ? prevbuf : curbuf, offs[7:0]};
 
 always @(posedge clk) begin
-  if (i == 0 && less_254) Curr2 <= inbuf[inbuf_rd_addr];
+  if ((i == 0 || i ==1) && less_254) Curr2 <= inbuf[inbuf_rd_addr];
   if (i == 1 && less_254) begin
     Prev2 <= Curr2;
-    Curr2 <= inbuf[inbuf_rd_addr];
   end
   if (i == 2 && less_254) begin
     Next2 <= last_line ? Curr2 : inputpixel;
