@@ -260,12 +260,13 @@ begin
         when x"E" => if (reg(7)(6) = '0') then -- input
                        O_DA <= ioa_inreg;
                      else
-                       O_DA <= reg(14); -- read output reg
+							  -- outputs have pullups and can still be driven low externally
+                       O_DA <= reg(14) AND ioa_inreg; -- read output reg
                      end if;
         when x"F" => if (reg(7)(7) = '0') then
                        O_DA <= iob_inreg;
                      else
-                       O_DA <= reg(15);
+                       O_DA <= reg(15) AND iob_inreg;
                      end if;
         when others => null;
       end case;
@@ -529,7 +530,7 @@ begin
             vol_table_in_r(11 downto 8) <= reg(10)(3 downto 0);
           else
             vol_table_in_l(11 downto 8) <= env_vol(4 downto 1);
-            vol_table_in_r(11 downto 8) <= env_vol(4 downto 1);
+            vol_table_in_r(11 downto 8) <= reg(10)(3 downto 0);
           end if;
         end if;
       end if;
