@@ -1,6 +1,8 @@
 // Copyright (c) 2012-2013 Ludvig Strigeus
 // This program is GPL Licensed. See COPYING for the full license.
 
+// altera message_off 10935
+
 // Module handles updating the loopy scroll register
 module LoopyGen (
 					 input clk, input ce,
@@ -35,19 +37,19 @@ module LoopyGen (
     if (is_rendering) begin
       // Increment course X scroll right after attribute table byte was fetched.
       if (cycle[2:0] == 3 && (cycle < 256 || cycle >= 320 && cycle < 336)) begin
-        loopy_v[4:0] <= loopy_v[4:0] + 1;
+        loopy_v[4:0] <= loopy_v[4:0] + 1'd1;
         loopy_v[10] <= loopy_v[10] ^ (loopy_v[4:0] == 31);
       end
 
       // Vertical Increment  
       if (cycle == 251) begin
-        loopy_v[14:12] <= loopy_v[14:12] + 1;
+        loopy_v[14:12] <= loopy_v[14:12] + 1'd1;
         if (loopy_v[14:12] == 7) begin
           if (loopy_v[9:5] == 29) begin
             loopy_v[9:5] <= 0;
             loopy_v[11] <= !loopy_v[11];
           end else begin
-            loopy_v[9:5] <= loopy_v[9:5] + 1;
+            loopy_v[9:5] <= loopy_v[9:5] + 1'd1;
           end
         end
       end
@@ -88,7 +90,7 @@ module LoopyGen (
       ppu_address_latch <= 0; //Reset PPU address latch
     end else if ((read || write) && ain == 7 && !is_rendering) begin
       // Increment address every time we accessed a reg
-      loopy_v <= loopy_v + (ppu_incr ? 32 : 1);
+      loopy_v <= loopy_v + (ppu_incr ? 15'd32 : 15'd1);
     end
   end
   assign loopy = loopy_v;
@@ -127,7 +129,7 @@ module ClockGen(input clk, input ce, input reset,
     cycle <= 0;
     is_in_vblank <= 1;
   end else if (ce) begin
-    cycle <= end_of_line ? 0 : cycle + 1;
+    cycle <= end_of_line ? 1'd0 : cycle + 1'd1;
     is_in_vblank <= new_is_in_vblank;
   end
 //  always @(posedge clk) if (ce) begin
@@ -140,12 +142,11 @@ module ClockGen(input clk, input ce, input reset,
     second_frame <= 0;
   end else if (ce && end_of_line) begin
     // Once the scanline counter reaches end of 260, it gets reset to -1.
-    scanline <= exiting_vblank ? 9'b111111111 : scanline + 1;
+    scanline <= exiting_vblank ? 9'b111111111 : scanline + 1'd1;
     // The pre render flag is set while we're on scanline -1.
     is_pre_render <= exiting_vblank;
     
-    if (exiting_vblank)
-      second_frame <= !second_frame;
+    //if (exiting_vblank) second_frame <= !second_frame;
   end
   
 endmodule // ClockGen
@@ -228,11 +229,12 @@ module SpriteRAM(input clk, input ce,
                  output reg spr_overflow,   // Set to true if we had more than 8 objects on a scan line. Reset when exiting vblank.
                  output reg sprite0);       // True if sprite#0 is included on the scan line currently being painted.
   reg [7:0] sprtemp[0:31];   // Sprite Temporary Memory. 32 bytes.
-  reg [7:0] oam[0:255];      // Sprite OAM. 256 bytes.
   reg [7:0] oam_ptr;         // Pointer into oam_ptr.
   reg [2:0] p;               // Upper 3 bits of pointer into temp, the lower bits are oam_ptr[1:0].
   reg [1:0] state;           // Current state machine state
-  wire [7:0] oam_data = oam[oam_ptr];
+  reg [7:0] oam[256];        // Sprite OAM. 256 bytes.
+  reg [7:0] oam_data;
+
   // Compute the current address we read/write in sprtemp.
   reg [4:0] sprtemp_ptr;
   // Check if the current Y coordinate is inside.
@@ -282,13 +284,18 @@ module SpriteRAM(input clk, input ce,
     new_oam_ptr[1:0] = oam_ptr[1:0] + {1'b0, oam_inc[0]};
     {oam_wrapped, new_oam_ptr[7:2]} = {1'b0, oam_ptr[7:2]} + {6'b0, oam_inc[1]};
   end
+
+  wire [7:0] oam_ptr_tmp = oam_ptr_load ? data_in : new_oam_ptr;
   always @(posedge clk) if (ce) begin
      
     // Some bits of the OAM are hardwired to zero.
-    if (oam_load)
-      oam[oam_ptr] <= (oam_ptr & 3) == 2 ? data_in & 8'hE3: data_in;
-    if (cycle[0] && sprites_enabled || oam_load || oam_ptr_load) begin
-      oam_ptr <= oam_ptr_load ? data_in : new_oam_ptr;
+    if (oam_load) begin
+		oam[oam_ptr] <= (oam_ptr & 3) == 2 ? data_in & 8'hE3: data_in;
+		oam_data <= (oam_ptr & 3) == 2 ? data_in & 8'hE3: data_in;
+	 end
+    if((cycle[0] && sprites_enabled) || oam_load || oam_ptr_load) begin
+		oam_ptr <= oam_ptr_tmp;
+		oam_data <= oam[oam_ptr_tmp];
     end
     // Set overflow flag?
     if (sprites_enabled && state == 2'b11 && spr_is_inside)
@@ -305,7 +312,7 @@ module SpriteRAM(input clk, input ce,
     // Update state machine on every second cycle.
     if (cycle[0]) begin
       // Increment p whenever oam_ptr carries in state 0 or 1.
-      if (!state[1] && oam_ptr[1:0] == 2'b11) p <= p + 1;
+      if (!state[1] && oam_ptr[1:0] == 2'b11) p <= p + 1'd1;
       // Set sprite0 if sprite1 was included on the scan line
       casez({state, (p == 7) && (oam_ptr[1:0] == 2'b11), oam_wrapped})
       4'b00_0_?: state <= 2'b00;  // State #0: Keep filling
@@ -322,6 +329,7 @@ module SpriteRAM(input clk, input ce,
       state <= 0;
       p <= 0;
       oam_ptr <= 0;
+		oam_data <= oam[0];
       sprite0_curr <= 0;
       sprite0 <= sprite0_curr;
     end
@@ -355,7 +363,7 @@ module SpriteAddressGen(input clk, input ce,
   wire load_pix2 = (cycle == 7) && enabled;
   reg dummy_sprite; // Set if attrib indicates the sprite is invalid.
   // Flip incoming vram data based on flipx. Zero out the sprite if it's invalid. The bits are already flipped once.
-  wire [7:0] vram_f = dummy_sprite ? 0 : 
+  wire [7:0] vram_f = dummy_sprite ? 8'd0 : 
                       !flip_x ?      {vram_data[0], vram_data[1], vram_data[2], vram_data[3], vram_data[4], vram_data[5], vram_data[6], vram_data[7]} : 
                                      vram_data;
   wire [3:0] y_f = temp_y ^ {flip_y, flip_y, flip_y, flip_y};
@@ -679,7 +687,7 @@ module PPU(input clk, input ce, input reset,   // input clock  21.48 MHz / 4. 1 
   always @(posedge clk) if (ce) begin
     if (vram_read_delayed)
       vram_latch <= vram_din;
-    vram_read_delayed = vram_r;
+    vram_read_delayed <= vram_r;
   end
   
   // Value currently being written to video ram

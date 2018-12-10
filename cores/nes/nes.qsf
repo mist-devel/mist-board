@@ -281,6 +281,7 @@ set_instance_assignment -name CURRENT_STRENGTH_NEW "MAXIMUM CURRENT" -to SDRAM_n
 set_instance_assignment -name CURRENT_STRENGTH_NEW "MAXIMUM CURRENT" -to SDRAM_nCS
 set_instance_assignment -name CURRENT_STRENGTH_NEW "MAXIMUM CURRENT" -to SDRAM_CKE
 set_instance_assignment -name CURRENT_STRENGTH_NEW "MAXIMUM CURRENT" -to SDRAM_CLK
+set_global_assignment -name SYSTEMVERILOG_FILE src/apu.sv
 set_global_assignment -name VHDL_FILE t65/T65_Pack.vhd
 set_global_assignment -name VHDL_FILE t65/T65_MCode.vhd
 set_global_assignment -name VHDL_FILE t65/T65_ALU.vhd
@@ -304,6 +305,5 @@ set_global_assignment -name VERILOG_FILE src/nes.v
 set_global_assignment -name VERILOG_FILE src/MicroCode.v
 set_global_assignment -name VERILOG_FILE src/hq2x.v
 set_global_assignment -name VERILOG_FILE src/dsp.v
-set_global_assignment -name VERILOG_FILE src/apu.v
 set_global_assignment -name VERILOG_FILE mist/NES_mist.v
 set_instance_assignment -name PARTITION_HIERARCHY root_partition -to | -section_id Top

@@ -160,7 +160,7 @@ module NES(input clk, input reset, input ce,
     if (reset)
       cpu_cycle_counter <= 0;
     else if (ce)
-      cpu_cycle_counter <= (cpu_cycle_counter == 2) ? 0 : cpu_cycle_counter + 1;
+      cpu_cycle_counter <= (cpu_cycle_counter == 2) ? 2'd0 : cpu_cycle_counter + 1'd1;
   end
 
   // Sample the NMI flag on cycle #0, otherwise if NMI happens on cycle #0 or #1,
@@ -174,7 +174,7 @@ module NES(input clk, input reset, input ce,
       nmi_active <= nmi;
   end
 
-  wire apu_ce =        ce && (cpu_cycle_counter == 2);
+  wire apu_ce = ce && (cpu_cycle_counter == 2);
 
   // -- CPU
   wire [15:0] cpu_addr;
@@ -182,7 +182,8 @@ module NES(input clk, input reset, input ce,
   wire pause_cpu;
   reg apu_irq_delayed;
   reg mapper_irq_delayed;
-  T65 cpu
+  
+	T65 cpu
 	(
 		.mode(0),
 		.BCD_en(0),
@@ -199,6 +200,8 @@ module NES(input clk, input reset, input ce,
 		.DI(cpu_rnw ? from_data_bus : cpu_dout),
 		.DO(cpu_dout)
 	);
+
+
   // -- DMA
   wire [15:0] dma_aout;
   wire dma_aout_enable;
@@ -217,7 +220,7 @@ module NES(input clk, input reset, input ce,
                     odd_or_even,                    // Even or odd cycle
                     (addr == 'h4014 && mw_int),     // Sprite trigger
                     apu_dma_request,                // DMC Trigger
-                    cpu_rnw,                         // CPU in a read cycle?
+                    cpu_rnw,                        // CPU in a read cycle?
                     cpu_dout,                       // Data from cpu
                     from_data_bus,                  // Data from RAM etc.
                     apu_dma_addr,                   // DMC addr

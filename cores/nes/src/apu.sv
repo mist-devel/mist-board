@@ -71,7 +71,7 @@ reg [2:0] SeqPos;
 wire [10:0] ShiftedPeriod = (Period >> SweepShift);
 wire [10:0] PeriodRhs = (SweepNegate ? (~ShiftedPeriod + {10'b0, sq2}) : ShiftedPeriod);
 wire [11:0] NewSweepPeriod = Period + PeriodRhs;
-wire ValidFreq = Period[10:3] >= 8 && (SweepNegate || !NewSweepPeriod[11]);
+wire ValidFreq = (|Period[10:3]) && (SweepNegate || !NewSweepPeriod[11]);
 
 always @(posedge clk) if (reset) begin
     LenCtr <= 0;
@@ -131,14 +131,14 @@ always @(posedge clk) if (reset) begin
   if (TimerCtr == 0) begin
     // Timer was clocked
     TimerCtr <= {Period, 1'b0};
-    SeqPos <= SeqPos - 1;
+    SeqPos <= SeqPos - 1'd1;
   end else begin
-    TimerCtr <= TimerCtr - 1;
+    TimerCtr <= TimerCtr - 1'd1;
   end
 
   // Clock the length counter?
   if (LenCtr_Clock && LenCtr != 0 && !LenCtrHalt) begin
-    LenCtr <= LenCtr - 1;
+    LenCtr <= LenCtr - 1'd1;
   end
   
   // Clock the sweep unit?
@@ -148,7 +148,7 @@ always @(posedge clk) if (reset) begin
       if (SweepEnable && SweepShift != 0 && ValidFreq)
         Period <= NewSweepPeriod[10:0];
     end else begin
-      SweepDivider <= SweepDivider - 1;
+      SweepDivider <= SweepDivider - 1'd1;
     end
     if (SweepReset)
       SweepDivider <= SweepPeriod;
@@ -164,9 +164,9 @@ always @(posedge clk) if (reset) begin
     end else if (EnvDivider == 0) begin
       EnvDivider <= Volume;
       if (Envelope != 0 || EnvLoop)
-        Envelope <= Envelope - 1;
+        Envelope <= Envelope - 1'd1;
     end else begin
-      EnvDivider <= EnvDivider - 1;
+      EnvDivider <= EnvDivider - 1'd1;
     end
   end
  
@@ -252,12 +252,12 @@ module TriangleChan(input clk, input ce, input reset,
     if (TimerCtr == 0) begin
       TimerCtr <= Period;
     end else begin
-      TimerCtr <= TimerCtr - 1;
+      TimerCtr <= TimerCtr - 1'd1;
     end
     //
     // Clock the length counter?
     if (LenCtr_Clock && !LenCtrZero && !LenCtrHalt) begin
-      LenCtr <= LenCtr - 1;
+      LenCtr <= LenCtr - 1'd1;
     end
     //
     // Clock the linear counter?
@@ -265,7 +265,7 @@ module TriangleChan(input clk, input ce, input reset,
       if (LinHalt)
         LinCtr <= LinCtrPeriod;
       else if (!LinCtrZero)
-        LinCtr <= LinCtr - 1;
+        LinCtr <= LinCtr - 1'd1;
       if (!LinCtrl)
         LinHalt <= 0;
     end
@@ -276,7 +276,7 @@ module TriangleChan(input clk, input ce, input reset,
       //
     // Clock the sequencer position
     if (TimerCtr == 0 && !LenCtrZero && !LinCtrZero)
-      SeqPos <= SeqPos + 1;
+      SeqPos <= SeqPos + 1'd1;
   end
   // Generate the output
   assign Sample = SeqPos[3:0] ^ {4{~SeqPos[4]}};
@@ -371,11 +371,11 @@ module NoiseChan(input clk, input ce, input reset,
         Shift[0] ^ (ShortMode ? Shift[6] : Shift[1]), 
         Shift[14:1]}; 
     end else begin
-      TimerCtr <= TimerCtr - 1;
+      TimerCtr <= TimerCtr - 1'd1;
     end
     // Clock the length counter?
     if (LenCtr_Clock && LenCtr != 0 && !LenCtrHalt) begin
-      LenCtr <= LenCtr - 1;
+      LenCtr <= LenCtr - 1'd1;
     end
     // Clock the envelope generator?
     if (Env_Clock) begin
@@ -386,11 +386,11 @@ module NoiseChan(input clk, input ce, input reset,
       end else if (EnvDivider == 0) begin
         EnvDivider <= Volume;
         if (Envelope != 0)
-          Envelope <= Envelope - 1;
+          Envelope <= Envelope - 1'd1;
         else if (EnvLoop)
           Envelope <= 15;
       end else
-        EnvDivider <= EnvDivider - 1;
+        EnvDivider <= EnvDivider - 1'd1;
     end
     if (!Enabled)
       LenCtr <= 0;
@@ -398,7 +398,7 @@ module NoiseChan(input clk, input ce, input reset,
   // Produce the output signal
   assign Sample = 
     (LenCtr == 0 || Shift[0]) ?
-      0 : 
+      4'd0 : 
       (EnvDisable ? Volume : Envelope);
 endmodule
 
@@ -429,7 +429,6 @@ module DmcChan(input clk, input ce, input reset,
   reg [7:0] SampleBuffer;    // Next value to be loaded into shift reg
   reg HasSampleBuffer;       // Sample buffer is nonempty
   reg HasShiftReg;           // Shift reg is non empty
-  reg [8:0] NewPeriod[0:15];
   reg DmcEnabled;
   reg [1:0] ActivationDelay;
   assign DmaAddr = {1'b1, Address};
@@ -439,24 +438,13 @@ module DmcChan(input clk, input ce, input reset,
   
   assign DmaReq = !HasSampleBuffer && DmcEnabled && !ActivationDelay[0];
     
-  initial begin
-    NewPeriod[0] = 428;
-    NewPeriod[1] = 380;
-    NewPeriod[2] = 340;
-    NewPeriod[3] = 320;
-    NewPeriod[4] = 286;
-    NewPeriod[5] = 254;
-    NewPeriod[6] = 226;
-    NewPeriod[7] = 214;
-    NewPeriod[8] = 190;
-    NewPeriod[9] = 160;
-    NewPeriod[10] = 142;
-    NewPeriod[11] = 128;
-    NewPeriod[12] = 106;
-    NewPeriod[13] = 84;
-    NewPeriod[14] = 72;
-    NewPeriod[15] = 54;
-  end
+  wire [8:0] NewPeriod[16] = '{
+		428, 380, 340, 320,
+		286, 254, 226, 214,
+		190, 160, 142, 128,
+		106, 84, 72, 54
+  };
+
   // Shift register initially loaded with 07
   always @(posedge clk) begin
     if (reset) begin
@@ -512,7 +500,7 @@ module DmcChan(input clk, input ce, input reset,
         endcase
       end
 
-      Cycles <= Cycles - 1;
+      Cycles <= Cycles - 1'd1;
       if (Cycles == 1) begin
         Cycles <= NewPeriod[Freq];
         if (HasShiftReg) begin
@@ -523,7 +511,7 @@ module DmcChan(input clk, input ce, input reset,
           end
         end
         ShiftReg <= {1'b0, ShiftReg[7:1]};
-        BitsUsed <= BitsUsed + 1;
+        BitsUsed <= BitsUsed + 1'd1;
         if (BitsUsed == 7) begin
           HasShiftReg <= HasSampleBuffer;
           ShiftReg <= SampleBuffer;
@@ -533,8 +521,8 @@ module DmcChan(input clk, input ce, input reset,
       
       // Acknowledge DMA?
       if (DmaAck) begin
-        Address <= Address + 1;
-        BytesLeft <= BytesLeft - 1;
+        Address <= Address + 1'd1;
+        BytesLeft <= BytesLeft - 1'd1;
         HasSampleBuffer <= 1;
         SampleBuffer <= DmaData;
         if (BytesLeft == 0) begin
@@ -549,75 +537,56 @@ module DmcChan(input clk, input ce, input reset,
   end
 endmodule
 
-module ApuLookupTable(input clk, input [7:0] in_a, input [7:0] in_b, output [15:0] out);
-  reg [15:0] lookup[0:511];
-  reg [15:0] tmp_a, tmp_b;
-  initial begin
-    lookup[  0] =     0; lookup[  1] =   760; lookup[  2] =  1503; lookup[  3] =  2228;
-    lookup[  4] =  2936; lookup[  5] =  3627; lookup[  6] =  4303; lookup[  7] =  4963;
-    lookup[  8] =  5609; lookup[  9] =  6240; lookup[ 10] =  6858; lookup[ 11] =  7462;
-    lookup[ 12] =  8053; lookup[ 13] =  8631; lookup[ 14] =  9198; lookup[ 15] =  9752;
-    lookup[ 16] = 10296; lookup[ 17] = 10828; lookup[ 18] = 11349; lookup[ 19] = 11860;
-    lookup[ 20] = 12361; lookup[ 21] = 12852; lookup[ 22] = 13334; lookup[ 23] = 13807;
-    lookup[ 24] = 14270; lookup[ 25] = 14725; lookup[ 26] = 15171; lookup[ 27] = 15609;
-    lookup[ 28] = 16039; lookup[ 29] = 16461; lookup[ 30] = 16876; lookup[256] =     0;
-    lookup[257] =   439; lookup[258] =   874; lookup[259] =  1306; lookup[260] =  1735;
-    lookup[261] =  2160; lookup[262] =  2581; lookup[263] =  2999; lookup[264] =  3414;
-    lookup[265] =  3826; lookup[266] =  4234; lookup[267] =  4639; lookup[268] =  5041;
-    lookup[269] =  5440; lookup[270] =  5836; lookup[271] =  6229; lookup[272] =  6618;
-    lookup[273] =  7005; lookup[274] =  7389; lookup[275] =  7769; lookup[276] =  8147;
-    lookup[277] =  8522; lookup[278] =  8895; lookup[279] =  9264; lookup[280] =  9631;
-    lookup[281] =  9995; lookup[282] = 10356; lookup[283] = 10714; lookup[284] = 11070;
-    lookup[285] = 11423; lookup[286] = 11774; lookup[287] = 12122; lookup[288] = 12468;
-    lookup[289] = 12811; lookup[290] = 13152; lookup[291] = 13490; lookup[292] = 13825;
-    lookup[293] = 14159; lookup[294] = 14490; lookup[295] = 14818; lookup[296] = 15145;
-    lookup[297] = 15469; lookup[298] = 15791; lookup[299] = 16110; lookup[300] = 16427;
-    lookup[301] = 16742; lookup[302] = 17055; lookup[303] = 17366; lookup[304] = 17675;
-    lookup[305] = 17981; lookup[306] = 18286; lookup[307] = 18588; lookup[308] = 18888;
-    lookup[309] = 19187; lookup[310] = 19483; lookup[311] = 19777; lookup[312] = 20069;
-    lookup[313] = 20360; lookup[314] = 20648; lookup[315] = 20935; lookup[316] = 21219;
-    lookup[317] = 21502; lookup[318] = 21783; lookup[319] = 22062; lookup[320] = 22339;
-    lookup[321] = 22615; lookup[322] = 22889; lookup[323] = 23160; lookup[324] = 23431;
-    lookup[325] = 23699; lookup[326] = 23966; lookup[327] = 24231; lookup[328] = 24494;
-    lookup[329] = 24756; lookup[330] = 25016; lookup[331] = 25274; lookup[332] = 25531;
-    lookup[333] = 25786; lookup[334] = 26040; lookup[335] = 26292; lookup[336] = 26542;
-    lookup[337] = 26791; lookup[338] = 27039; lookup[339] = 27284; lookup[340] = 27529;
-    lookup[341] = 27772; lookup[342] = 28013; lookup[343] = 28253; lookup[344] = 28492;
-    lookup[345] = 28729; lookup[346] = 28964; lookup[347] = 29198; lookup[348] = 29431;
-    lookup[349] = 29663; lookup[350] = 29893; lookup[351] = 30121; lookup[352] = 30349;
-    lookup[353] = 30575; lookup[354] = 30800; lookup[355] = 31023; lookup[356] = 31245;
-    lookup[357] = 31466; lookup[358] = 31685; lookup[359] = 31904; lookup[360] = 32121;
-    lookup[361] = 32336; lookup[362] = 32551; lookup[363] = 32764; lookup[364] = 32976;
-    lookup[365] = 33187; lookup[366] = 33397; lookup[367] = 33605; lookup[368] = 33813;
-    lookup[369] = 34019; lookup[370] = 34224; lookup[371] = 34428; lookup[372] = 34630;
-    lookup[373] = 34832; lookup[374] = 35032; lookup[375] = 35232; lookup[376] = 35430;
-    lookup[377] = 35627; lookup[378] = 35823; lookup[379] = 36018; lookup[380] = 36212;
-    lookup[381] = 36405; lookup[382] = 36597; lookup[383] = 36788; lookup[384] = 36978;
-    lookup[385] = 37166; lookup[386] = 37354; lookup[387] = 37541; lookup[388] = 37727;
-    lookup[389] = 37912; lookup[390] = 38095; lookup[391] = 38278; lookup[392] = 38460;
-    lookup[393] = 38641; lookup[394] = 38821; lookup[395] = 39000; lookup[396] = 39178;
-    lookup[397] = 39355; lookup[398] = 39532; lookup[399] = 39707; lookup[400] = 39881;
-    lookup[401] = 40055; lookup[402] = 40228; lookup[403] = 40399; lookup[404] = 40570;
-    lookup[405] = 40740; lookup[406] = 40909; lookup[407] = 41078; lookup[408] = 41245;
-    lookup[409] = 41412; lookup[410] = 41577; lookup[411] = 41742; lookup[412] = 41906;
-    lookup[413] = 42070; lookup[414] = 42232; lookup[415] = 42394; lookup[416] = 42555;
-    lookup[417] = 42715; lookup[418] = 42874; lookup[419] = 43032; lookup[420] = 43190;
-    lookup[421] = 43347; lookup[422] = 43503; lookup[423] = 43659; lookup[424] = 43813;
-    lookup[425] = 43967; lookup[426] = 44120; lookup[427] = 44273; lookup[428] = 44424;
-    lookup[429] = 44575; lookup[430] = 44726; lookup[431] = 44875; lookup[432] = 45024;
-    lookup[433] = 45172; lookup[434] = 45319; lookup[435] = 45466; lookup[436] = 45612;
-    lookup[437] = 45757; lookup[438] = 45902; lookup[439] = 46046; lookup[440] = 46189;
-    lookup[441] = 46332; lookup[442] = 46474; lookup[443] = 46615; lookup[444] = 46756;
-    lookup[445] = 46895; lookup[446] = 47035; lookup[447] = 47173; lookup[448] = 47312;
-    lookup[449] = 47449; lookup[450] = 47586; lookup[451] = 47722; lookup[452] = 47857;
-    lookup[453] = 47992; lookup[454] = 48127; lookup[455] = 48260; lookup[456] = 48393;
-    lookup[457] = 48526; lookup[458] = 48658;  
-  end
-  always @(posedge clk) begin
-    tmp_a <= lookup[{1'b0, in_a}];
-    tmp_b <= lookup[{1'b1, in_b}];
-  end
-  assign out = tmp_a + tmp_b;
+module ApuLookupTable
+(
+	input clk,
+	input [7:0] in_a,
+	input [7:0] in_b,
+	output reg [15:0] out
+);
+
+wire [15:0] lookup_a[256] = '{
+       0,   760,  1503,  2228,  2936,  3627,  4303,  4963,  5609,  6240,  6858,  7462,  8053,  8631,  9198,  9752,
+   10296, 10828, 11349, 11860, 12361, 12852, 13334, 13807, 14270, 14725, 15171, 15609, 16039, 16461, 16876,     0,
+       0,     0,     0,     0,     0,     0,     0,     0,     0,     0,     0,     0,     0,     0,     0,     0,
+       0,     0,     0,     0,     0,     0,     0,     0,     0,     0,     0,     0,     0,     0,     0,     0,
+       0,     0,     0,     0,     0,     0,     0,     0,     0,     0,     0,     0,     0,     0,     0,     0,
+       0,     0,     0,     0,     0,     0,     0,     0,     0,     0,     0,     0,     0,     0,     0,     0,
+       0,     0,     0,     0,     0,     0,     0,     0,     0,     0,     0,     0,     0,     0,     0,     0,
+       0,     0,     0,     0,     0,     0,     0,     0,     0,     0,     0,     0,     0,     0,     0,     0,
+       0,     0,     0,     0,     0,     0,     0,     0,     0,     0,     0,     0,     0,     0,     0,     0,
+       0,     0,     0,     0,     0,     0,     0,     0,     0,     0,     0,     0,     0,     0,     0,     0,
+       0,     0,     0,     0,     0,     0,     0,     0,     0,     0,     0,     0,     0,     0,     0,     0,
+       0,     0,     0,     0,     0,     0,     0,     0,     0,     0,     0,     0,     0,     0,     0,     0,
+       0,     0,     0,     0,     0,     0,     0,     0,     0,     0,     0,     0,     0,     0,     0,     0,
+       0,     0,     0,     0,     0,     0,     0,     0,     0,     0,     0,     0,     0,     0,     0,     0,
+       0,     0,     0,     0,     0,     0,     0,     0,     0,     0,     0,     0,     0,     0,     0,     0,
+       0,     0,     0,     0,     0,     0,     0,     0,     0,     0,     0,     0,     0,     0,     0,     0
+};
+
+wire [15:0] lookup_b[256] = '{
+       0,   439,   874,  1306,  1735,  2160,  2581,  2999,  3414,  3826,  4234,  4639,  5041,  5440,  5836,  6229,
+    6618,  7005,  7389,  7769,  8147,  8522,  8895,  9264,  9631,  9995, 10356, 10714, 11070, 11423, 11774, 12122,
+   12468, 12811, 13152, 13490, 13825, 14159, 14490, 14818, 15145, 15469, 15791, 16110, 16427, 16742, 17055, 17366,
+   17675, 17981, 18286, 18588, 18888, 19187, 19483, 19777, 20069, 20360, 20648, 20935, 21219, 21502, 21783, 22062,
+   22339, 22615, 22889, 23160, 23431, 23699, 23966, 24231, 24494, 24756, 25016, 25274, 25531, 25786, 26040, 26292,
+   26542, 26791, 27039, 27284, 27529, 27772, 28013, 28253, 28492, 28729, 28964, 29198, 29431, 29663, 29893, 30121,
+   30349, 30575, 30800, 31023, 31245, 31466, 31685, 31904, 32121, 32336, 32551, 32764, 32976, 33187, 33397, 33605,
+   33813, 34019, 34224, 34428, 34630, 34832, 35032, 35232, 35430, 35627, 35823, 36018, 36212, 36405, 36597, 36788,
+   36978, 37166, 37354, 37541, 37727, 37912, 38095, 38278, 38460, 38641, 38821, 39000, 39178, 39355, 39532, 39707,
+   39881, 40055, 40228, 40399, 40570, 40740, 40909, 41078, 41245, 41412, 41577, 41742, 41906, 42070, 42232, 42394,
+   42555, 42715, 42874, 43032, 43190, 43347, 43503, 43659, 43813, 43967, 44120, 44273, 44424, 44575, 44726, 44875,
+   45024, 45172, 45319, 45466, 45612, 45757, 45902, 46046, 46189, 46332, 46474, 46615, 46756, 46895, 47035, 47173,
+   47312, 47449, 47586, 47722, 47857, 47992, 48127, 48260, 48393, 48526, 48658,     0,     0,     0,     0,     0,
+       0,     0,     0,     0,     0,     0,     0,     0,     0,     0,     0,     0,     0,     0,     0,     0,
+       0,     0,     0,     0,     0,     0,     0,     0,     0,     0,     0,     0,     0,     0,     0,     0,
+       0,     0,     0,     0,     0,     0,     0,     0,     0,     0,     0,     0,     0,     0,     0,     0
+};
+
+always @(posedge clk) begin
+	out <= lookup_a[in_a] + lookup_b[in_b];
+end
+
 endmodule
 
 
@@ -712,7 +681,7 @@ always @(posedge clk) if (reset) begin
   Cycles <= 4; // This needs to be 5 for proper power up behavior
   IrqCtr <= 0;
 end else if (ce) begin   
-  FrameInterrupt <= IrqCtr[1] ? 1 : (ADDR == 5'h15 && MR || ApuMW5 && ADDR[1:0] == 3 && DIN[6]) ? 0 : FrameInterrupt;
+  FrameInterrupt <= IrqCtr[1] ? 1'd1 : (ADDR == 5'h15 && MR || ApuMW5 && ADDR[1:0] == 3 && DIN[6]) ? 1'd0 : FrameInterrupt;
   InternalClock <= !InternalClock;
   IrqCtr <= {IrqCtr[0], 1'b0};
   Cycles <= Cycles + 1;
@@ -721,8 +690,6 @@ end else if (ce) begin
   if (Cycles == 7457) begin
     ClkE <= 1;
   end else if (Cycles == 14913) begin
-    ClkE <= 1;
-    ClkL <= 1;
     ClkE <= 1;
     ClkL <= 1;
   end else if (Cycles == 22371) begin
