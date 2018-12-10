@@ -281,6 +281,11 @@ set_instance_assignment -name CURRENT_STRENGTH_NEW "MAXIMUM CURRENT" -to SDRAM_n
 set_instance_assignment -name CURRENT_STRENGTH_NEW "MAXIMUM CURRENT" -to SDRAM_nCS
 set_instance_assignment -name CURRENT_STRENGTH_NEW "MAXIMUM CURRENT" -to SDRAM_CKE
 set_instance_assignment -name CURRENT_STRENGTH_NEW "MAXIMUM CURRENT" -to SDRAM_CLK
+set_global_assignment -name VHDL_FILE t65/T65_Pack.vhd
+set_global_assignment -name VHDL_FILE t65/T65_MCode.vhd
+set_global_assignment -name VHDL_FILE t65/T65_ALU.vhd
+set_global_assignment -name VHDL_FILE t65/T65.vhd
+set_global_assignment -name QIP_FILE t65/t65.qip
 set_global_assignment -name SDC_FILE mist/constraints.sdc
 set_global_assignment -name VERILOG_FILE mist/ps2_intf.v
 set_global_assignment -name VERILOG_FILE mist/keyboard.v
@@ -293,7 +298,6 @@ set_global_assignment -name VERILOG_FILE mist/clk.v
 set_global_assignment -name VERILOG_FILE src/compat.v
 set_global_assignment -name VERILOG_FILE src/ppu.v
 set_global_assignment -name VERILOG_FILE src/mmu.v
-set_global_assignment -name VERILOG_FILE src/cpu.v
 set_global_assignment -name SYSTEMVERILOG_FILE src/video_mixer.sv
 set_global_assignment -name VERILOG_FILE src/video.v
 set_global_assignment -name VERILOG_FILE src/nes.v

@@ -1,0 +1,4 @@
+set_global_assignment -name VHDL_FILE t65/T65_Pack.vhd
+set_global_assignment -name VHDL_FILE t65/T65_ALU.vhd
+set_global_assignment -name VHDL_FILE t65/T65_MCode.vhd
+set_global_assignment -name VHDL_FILE t65/T65.vhd
