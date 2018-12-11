@@ -43,7 +43,8 @@ end
 assign Yout = {Y, 1'b0};
 endmodule
 
-module SquareChan(input clk, input ce, input reset, input sq2,
+module SquareChan(input MMC5,
+                  input clk, input ce, input reset, input sq2,
                   input [1:0] Addr,
                   input [7:0] DIN,
                   input MW,
@@ -71,8 +72,9 @@ reg [2:0] SeqPos;
 wire [10:0] ShiftedPeriod = (Period >> SweepShift);
 wire [10:0] PeriodRhs = (SweepNegate ? (~ShiftedPeriod + {10'b0, sq2}) : ShiftedPeriod);
 wire [11:0] NewSweepPeriod = Period + PeriodRhs;
-wire ValidFreq = (|Period[10:3]) && (SweepNegate || !NewSweepPeriod[11]);
-
+wire ValidFreq = (MMC5==1) || ((|Period[10:3]) && (SweepNegate || !NewSweepPeriod[11]));
+ // |Period[10:3] is equivalent to Period >= 8
+ 
 always @(posedge clk) if (reset) begin
     LenCtr <= 0;
     Duty <= 0;
@@ -105,11 +107,13 @@ always @(posedge clk) if (reset) begin
     end
     1: begin
 //      if (sq2) $write("SQ1: SweepEnable=%d, SweepPeriod=%d, SweepNegate=%d, SweepShift=%d, DIN=%X\n", DIN[7], DIN[6:4], DIN[3], DIN[2:0], DIN);
+		if (MMC5==0) begin
       SweepEnable <= DIN[7];
       SweepPeriod <= DIN[6:4];
       SweepNegate <= DIN[3];
       SweepShift <= DIN[2:0];
       SweepReset <= 1;
+		end
     end
     2: begin
 //      if (sq2) $write("SQ2: Period=%d. DIN=%X\n", DIN, DIN);
@@ -136,9 +140,16 @@ always @(posedge clk) if (reset) begin
     TimerCtr <= TimerCtr - 1'd1;
   end
 
+	if (MMC5==0) begin
   // Clock the length counter?
   if (LenCtr_Clock && LenCtr != 0 && !LenCtrHalt) begin
     LenCtr <= LenCtr - 1'd1;
+  end
+  else
+  // Clock the length counter? //double speed for MMC5=Env_Clock
+  if (Env_Clock && LenCtr != 0 && !LenCtrHalt) begin
+    LenCtr <= LenCtr - 1'd1;
+  end
   end
   
   // Clock the sweep unit?
@@ -175,6 +186,8 @@ always @(posedge clk) if (reset) begin
     LenCtr <= 0;
 end
 
+wire DutyEnabledUsed = (MMC5==1) ^ DutyEnabled;  
+
 reg DutyEnabled;  
 always @* begin
   // Determine if the duty is enabled or not
@@ -186,7 +199,7 @@ always @* begin
   endcase
 
   // Compute the output
-  if (LenCtr == 0 || !ValidFreq || !DutyEnabled)
+  if (LenCtr == 0 || !ValidFreq || !DutyEnabledUsed)
     Sample = 0;
   else
     Sample = EnvDisable ? Volume : Envelope;
@@ -402,7 +415,8 @@ module NoiseChan(input clk, input ce, input reset,
       (EnvDisable ? Volume : Envelope);
 endmodule
 
-module DmcChan(input clk, input ce, input reset,
+module DmcChan(input MMC5,
+               input clk, input ce, input reset,
                input odd_or_even,
                input [2:0] Addr,
                input [7:0] DIN,
@@ -418,7 +432,7 @@ module DmcChan(input clk, input ce, input reset,
   reg IrqActive;
   reg Loop;                 // Looping enabled
   reg [3:0] Freq;           // Current value of frequency register
-  reg [6:0] Dac = 0;        // Current value of DAC
+  reg [7:0] Dac = 0;        // Current value of DAC
   reg [7:0] SampleAddress;  // Base address of sample
   reg [7:0] SampleLen;      // Length of sample
   reg [7:0] ShiftReg;       // Shift register
@@ -432,7 +446,7 @@ module DmcChan(input clk, input ce, input reset,
   reg DmcEnabled;
   reg [1:0] ActivationDelay;
   assign DmaAddr = {1'b1, Address};
-  assign Sample = Dac;
+  assign Sample = Dac[6:0];
   assign Irq = IrqActive;
   assign IsDmcActive = DmcEnabled;
   
@@ -479,13 +493,13 @@ module DmcChan(input clk, input ce, input reset,
           end
         1: begin  // $4011   -ddd dddd   DAC
             // This will get missed if the Dac <= far below runs, that is by design.
-            Dac <= DIN[6:0];
+            Dac <= {(MMC5==1) && DIN[7],DIN[6:0]};
           end
         2: begin  // $4012   aaaa aaaa   sample address
-            SampleAddress <= DIN[7:0];
+            SampleAddress <= (MMC5==1) ? 8'h0 : DIN[7:0];
           end
         3: begin  // $4013   llll llll   sample length
-            SampleLen <= DIN[7:0];
+            SampleLen <= (MMC5==1) ? 8'h0 : DIN[7:0];
           end
         5: begin // $4015 write	---D NT21  Enable DMC (D)
             IrqActive <= 0;
@@ -590,7 +604,8 @@ end
 endmodule
 
 
-module APU(input clk, input ce, input reset,
+module APU(input MMC5,
+           input clk, input ce, input reset,
            input [4:0] ADDR,  // APU Address Line
            input [7:0] DIN,   // Data to APU
            output [7:0] DOUT, // Data from APU
@@ -644,11 +659,11 @@ assign odd_or_even = InternalClock;
 
 
 // Generate each channel
-SquareChan   Sq1(clk, ce, reset, 0, ADDR[1:0], DIN, ApuMW0, ClkL, ClkE, Enabled[0], LenCtr_In, Sq1Sample, Sq1NonZero);
-SquareChan   Sq2(clk, ce, reset, 1, ADDR[1:0], DIN, ApuMW1, ClkL, ClkE, Enabled[1], LenCtr_In, Sq2Sample, Sq2NonZero);
+SquareChan	 Sq1(MMC5, clk, ce, reset, 1'b0, ADDR[1:0], DIN, ApuMW0, ClkL, ClkE, Enabled[0], LenCtr_In, Sq1Sample, Sq1NonZero);
+SquareChan   Sq2(MMC5, clk, ce, reset, 1'b1, ADDR[1:0], DIN, ApuMW1, ClkL, ClkE, Enabled[1], LenCtr_In, Sq2Sample, Sq2NonZero);
 TriangleChan Tri(clk, ce, reset, ADDR[1:0], DIN, ApuMW2, ClkL, ClkE, Enabled[2], LenCtr_In, TriSample, TriNonZero);
 NoiseChan    Noi(clk, ce, reset, ADDR[1:0], DIN, ApuMW3, ClkL, ClkE, Enabled[3], LenCtr_In, NoiSample, NoiNonZero);
-DmcChan      Dmc(clk, ce, reset, odd_or_even, ADDR[2:0], DIN, ApuMW4, DmcSample, DmaReq, DmaAck, DmaAddr, DmaData, DmcIrq, IsDmcActive);
+DmcChan      Dmc(MMC5, clk, ce, reset, odd_or_even, ADDR[2:0], DIN, ApuMW4, DmcSample, DmaReq, DmaAck, DmaAddr, DmaData, DmcIrq, IsDmcActive);
 
 // Reading this register clears the frame interrupt flag (but not the DMC interrupt flag).
 // If an interrupt flag was set at the same moment of the read, it will read back as 1 but it will not be cleared.
@@ -684,7 +699,7 @@ end else if (ce) begin
   FrameInterrupt <= IrqCtr[1] ? 1'd1 : (ADDR == 5'h15 && MR || ApuMW5 && ADDR[1:0] == 3 && DIN[6]) ? 1'd0 : FrameInterrupt;
   InternalClock <= !InternalClock;
   IrqCtr <= {IrqCtr[0], 1'b0};
-  Cycles <= Cycles + 1;
+  Cycles <= Cycles + 1'd1;
   ClkE <= 0;
   ClkL <= 0;
   if (Cycles == 7457) begin

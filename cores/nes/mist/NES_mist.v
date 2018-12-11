@@ -305,6 +305,9 @@ wire [7:0] nes_joy_B = (reset_nes || osd_visible) ? 8'd0 :
   wire reset_nes = (init_reset || buttons[1] || arm_reset || reset_osd || download_reset || loader_fail);
   wire run_nes = (nes_ce == 3);	// keep running even when reset, so that the reset can actually do its job!
 
+  wire ext_audio = 1;
+  wire int_audio = 1;
+
   // NES is clocked at every 4th cycle.
   always @(posedge clk)
     nes_ce <= nes_ce + 1;
@@ -313,14 +316,16 @@ wire [7:0] nes_joy_B = (reset_nes || osd_visible) ? 8'd0 :
           mapper_flags,
           sample, color,
           joypad_strobe, joypad_clock, {powerpad_d4[0],powerpad_d3[0],joypad_bits2[0],joypad_bits[0]},
+			 0, 			//fds_swap
           5'b11111,  // enable all channels
           memory_addr,
           memory_read_cpu, memory_din_cpu,
           memory_read_ppu, memory_din_ppu,
           memory_write, memory_dout,
           cycle, scanline,
-          dbgadr,
-          dbgctr);
+          int_audio,
+          ext_audio
+			 );
 
 assign SDRAM_CKE         = 1'b1;
 
