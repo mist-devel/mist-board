@@ -61,7 +61,13 @@ initial $readmemh("nes_palette_unsaturatedv6.txt", pal_unsat_lut);
 reg [15:0] pal_fcelut[0:63];
 initial $readmemh("nes_palette_fceux.txt", pal_fcelut);
 
-wire [14:0] pixel = palette ?  pal_unsat_lut[color][14:0] : pal_fcelut[color][14:0];
+wire [14:0] pixel = palette ?  pixel_unsat[14:0] : pixel_fce[14:0];
+reg [15:0] pixel_unsat, pixel_fce;
+
+always @(posedge clk) begin
+    pixel_unsat <= pal_unsat_lut[color];
+    pixel_fce <= pal_fcelut[color];
+end
  
 // Horizontal and vertical counters
 reg [9:0] h, v;

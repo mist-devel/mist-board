@@ -283,30 +283,6 @@ set_instance_assignment -name CURRENT_STRENGTH_NEW "MAXIMUM CURRENT" -to SDRAM_C
 set_instance_assignment -name CURRENT_STRENGTH_NEW "MAXIMUM CURRENT" -to SDRAM_CLK
 set_global_assignment -name VHDL_FILE src/OPLL/dpram.vhd
 set_global_assignment -name QIP_FILE src/OPLL/OPLL.qip
-set_global_assignment -name VHDL_FILE src/OPLL/eseopll.vhd
-set_global_assignment -name VHDL_FILE src/OPLL/VM2413/voicerom.vhd
-set_global_assignment -name VHDL_FILE src/OPLL/VM2413/voicememory.vhd
-set_global_assignment -name VHDL_FILE src/OPLL/VM2413/vm2413.vhd
-set_global_assignment -name VHDL_FILE src/OPLL/VM2413/temporalmixer.vhd
-set_global_assignment -name VHDL_FILE src/OPLL/VM2413/slotcounter.vhd
-set_global_assignment -name VHDL_FILE src/OPLL/VM2413/sinetable.vhd
-set_global_assignment -name VHDL_FILE src/OPLL/VM2413/registermemory.vhd
-set_global_assignment -name VHDL_FILE src/OPLL/VM2413/phasememory.vhd
-set_global_assignment -name VHDL_FILE src/OPLL/VM2413/phasegenerator.vhd
-set_global_assignment -name VHDL_FILE src/OPLL/VM2413/outputmemory.vhd
-set_global_assignment -name VHDL_FILE src/OPLL/VM2413/outputgenerator.vhd
-set_global_assignment -name VHDL_FILE src/OPLL/VM2413/opll.vhd
-set_global_assignment -name VHDL_FILE src/OPLL/VM2413/operator.vhd
-set_global_assignment -name VHDL_FILE src/OPLL/VM2413/lineartable.vhd
-set_global_assignment -name VHDL_FILE src/OPLL/VM2413/feedbackmemory.vhd
-set_global_assignment -name VHDL_FILE src/OPLL/VM2413/envelopememory.vhd
-set_global_assignment -name VHDL_FILE src/OPLL/VM2413/envelopegenerator.vhd
-set_global_assignment -name VHDL_FILE src/OPLL/VM2413/controller.vhd
-set_global_assignment -name VHDL_FILE src/OPLL/VM2413/attacktable.vhd
-set_global_assignment -name VHDL_FILE src/t65/T65_Pack.vhd
-set_global_assignment -name VHDL_FILE src/t65/T65_MCode.vhd
-set_global_assignment -name VHDL_FILE src/t65/T65_ALU.vhd
-set_global_assignment -name VHDL_FILE src/t65/T65.vhd
 set_global_assignment -name QIP_FILE src/t65/t65.qip
 set_global_assignment -name VERILOG_FILE src/mapLoopy.v
 set_global_assignment -name SYSTEMVERILOG_FILE src/apu.sv
@@ -329,4 +305,9 @@ set_global_assignment -name VERILOG_FILE src/MicroCode.v
 set_global_assignment -name VERILOG_FILE src/hq2x.v
 set_global_assignment -name VERILOG_FILE src/dsp.v
 set_global_assignment -name VERILOG_FILE mist/NES_mist.v
+set_instance_assignment -name CURRENT_STRENGTH_NEW "MAXIMUM CURRENT" -to VGA_HS
+set_instance_assignment -name CURRENT_STRENGTH_NEW "MAXIMUM CURRENT" -to VGA_VS
+set_instance_assignment -name CURRENT_STRENGTH_NEW "MAXIMUM CURRENT" -to VGA_R[*]
+set_instance_assignment -name CURRENT_STRENGTH_NEW "MAXIMUM CURRENT" -to VGA_G[*]
+set_instance_assignment -name CURRENT_STRENGTH_NEW "MAXIMUM CURRENT" -to VGA_B[*]
 set_instance_assignment -name PARTITION_HIERARCHY root_partition -to | -section_id Top
