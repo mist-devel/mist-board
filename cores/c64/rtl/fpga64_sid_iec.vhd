@@ -581,8 +581,8 @@ div1m: process(clk32)				-- this process devides 32 MHz to 1MHz (for the SID)
 		wdata => std_logic_vector(cpuDo),
 		rdata => sid_do6581,
 
-		potx => pot_x(0),
-		poty => pot_y(0),
+		potx => pot_x,
+		poty => pot_y,
 
 		comb_wave_l => '0',
 		comb_wave_r => '0',
