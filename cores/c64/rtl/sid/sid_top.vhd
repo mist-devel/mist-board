@@ -28,8 +28,9 @@ port (
     wren          : in  std_logic;
     wdata         : in  std_logic_vector(7 downto 0);
     rdata         : out std_logic_vector(7 downto 0);
-    potx          : in  std_logic;
-    poty          : in  std_logic;
+
+    potx          : in  std_logic_vector(7 downto 0);
+    poty          : in  std_logic_vector(7 downto 0);
 
     comb_wave_l   : in  std_logic := '0';
     comb_wave_r   : in  std_logic := '0';
@@ -132,6 +133,7 @@ begin
 		wren        => wren,
 		wdata       => wdata,
 		rdata       => rdata,
+
 		potx        => potx,
 		poty        => poty,
 

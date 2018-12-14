@@ -128,14 +128,14 @@ constant CONF_STR : string :=
 	"F,CRT,Load Cartridge;" &--3
 --	"F,TAP,Load File;"&--4
 --	"F,T64,Load File;"&--5
+	"OE,Disk Write,Enable,Disable;"&
 	"O2,Video standard,PAL,NTSC;"&
 	"O8A,Scandoubler Fx,None,HQ2x-320,HQ2x-160,CRT 25%,CRT 50%;"&
 	"OD,SID,6581,8580;"&
 	"O3,Joysticks,normal,swapped;"&
 	"O6,Audio filter,On,Off;"&
 --	"OB,BIOS,C64,C64GS;" &
-	"T5,Reset & Detach Cartridge;"&
-	"V0,v0.35.00";
+	"T5,Reset & Detach Cartridge;";
 
 -- convert string to std_logic_vector to be given to user_io
 function to_slv(s: string) return std_logic_vector is 
@@ -152,29 +152,25 @@ begin
   return rval; 
 end function; 
 
-
-component mist_io generic(STRLEN : integer := 0 ); port
+component user_io generic(STRLEN : integer := 0 ); port
 (
-	clk_sys           : in  std_logic;
-	clk_sd            : in  std_logic;
-
-	SPI_SCK           : in  std_logic;
-	CONF_DATA0        : in  std_logic;
-	SPI_SS2           : in  std_logic;
-	SPI_DI            : in  std_logic;
-	SPI_DO            : out std_logic;
-	conf_str          : in  std_logic_vector(8*STRLEN-1 downto 0);
-
-	switches          : out std_logic_vector(1 downto 0);
-	buttons           : out std_logic_vector(1 downto 0);
-	scandoubler_disable : out std_logic;
-	ypbpr             : out std_logic;
-
-	joystick_0        : out std_logic_vector(7 downto 0);
-	joystick_1        : out std_logic_vector(7 downto 0);
+	clk_sys : in std_logic;
+	clk_sd  : in std_logic;
+	SPI_CLK, SPI_SS_IO, SPI_MOSI :in std_logic;
+	SPI_MISO : out std_logic;
+	conf_str : in std_logic_vector(8*STRLEN-1 downto 0);
+	joystick_0 : out std_logic_vector(31 downto 0);
+	joystick_1 : out std_logic_vector(31 downto 0);
+	joystick_2 : out std_logic_vector(31 downto 0);
+	joystick_3 : out std_logic_vector(31 downto 0);
+	joystick_4 : out std_logic_vector(31 downto 0);
 	joystick_analog_0 : out std_logic_vector(15 downto 0);
 	joystick_analog_1 : out std_logic_vector(15 downto 0);
-	status            : out std_logic_vector(31 downto 0);
+	status: out std_logic_vector(31 downto 0);
+	switches : out std_logic_vector(1 downto 0);
+	buttons : out std_logic_vector(1 downto 0);
+	scandoubler_disable : out std_logic;
+	ypbpr : out std_logic;
 
 	sd_lba            : in  std_logic_vector(31 downto 0);
 	sd_rd             : in  std_logic;
@@ -186,16 +182,22 @@ component mist_io generic(STRLEN : integer := 0 ); port
 	img_mounted       : out std_logic;
 
 	sd_buff_addr      : out std_logic_vector(8 downto 0);
-	sd_buff_dout      : out std_logic_vector(7 downto 0);
-	sd_buff_din       : in  std_logic_vector(7 downto 0);
-	sd_buff_wr        : out std_logic;
+	sd_dout           : out std_logic_vector(7 downto 0);
+	sd_din            : in  std_logic_vector(7 downto 0);
+	sd_dout_strobe    : out std_logic;
 	
 	ps2_kbd_clk       : out std_logic;
 	ps2_kbd_data      : out std_logic;
 
 	ps2_mouse_clk     : out std_logic;
-	ps2_mouse_data    : out std_logic;
+	ps2_mouse_data    : out std_logic
+	);
+end component user_io;
 
+component data_io port
+(
+	clk_sys			  : in std_logic;
+	SPI_SCK, SPI_SS2, SPI_DI :in std_logic;
 	ioctl_force_erase : in  std_logic;
 	ioctl_download    : out std_logic;
 	ioctl_erasing     : out std_logic;
@@ -204,7 +206,7 @@ component mist_io generic(STRLEN : integer := 0 ); port
 	ioctl_addr        : out std_logic_vector(24 downto 0);
 	ioctl_dout        : out std_logic_vector(7 downto 0)
 	);
-end component mist_io;
+end component data_io;
 
 component video_mixer
 	generic ( LINE_LENGTH : integer := 512; HALF_DEPTH : integer := 0 );
@@ -347,8 +349,8 @@ end component cartridge;
 	signal c1541rom_wr   : std_logic;
 	signal c64rom_wr     : std_logic;
 
-	signal joyA : std_logic_vector(7 downto 0);
-	signal joyB : std_logic_vector(7 downto 0);
+	signal joyA : std_logic_vector(31 downto 0);
+	signal joyB : std_logic_vector(31 downto 0);
 	signal joyA_int : std_logic_vector(6 downto 0);
 	signal joyB_int : std_logic_vector(6 downto 0);
 	signal joyA_c64 : std_logic_vector(6 downto 0);
@@ -454,21 +456,20 @@ begin
 
 	sd_sdhc <= '1';
 	-- User io
-	mist_io_d : mist_io
+	user_io_d : user_io
 	generic map (STRLEN => CONF_STR'length)
 	port map (
 		clk_sys => clk32,
 		clk_sd  => clk32,
 
-		SPI_SCK => SPI_SCK,
-		CONF_DATA0 => CONF_DATA0,
-		SPI_SS2 => SPI_SS2,
-		SPI_DO => SPI_DO,
-		SPI_DI => SPI_DI,
+		SPI_CLK => SPI_SCK,
+		SPI_SS_IO => CONF_DATA0,
+		SPI_MISO => SPI_DO,
+		SPI_MOSI => SPI_DI,
 
 		joystick_0 => joyA,
 		joystick_1 => joyB,
-					 
+
 		conf_str => to_slv(CONF_STR),
 
 		status => status,
@@ -484,12 +485,21 @@ begin
 		sd_conf => sd_conf,
 		sd_sdhc => sd_sdhc,
 		sd_buff_addr => sd_buff_addr,
-		sd_buff_dout => sd_buff_dout,
-		sd_buff_din => sd_buff_din,
-		sd_buff_wr => sd_buff_wr,
+		sd_dout => sd_buff_dout,
+		sd_din => sd_buff_din,
+		sd_dout_strobe => sd_buff_wr,
 		img_mounted => sd_change,
 		ps2_kbd_clk => ps2_clk,
-		ps2_kbd_data => ps2_dat,
+		ps2_kbd_data => ps2_dat
+	);
+
+	data_io_d: data_io
+	port map (
+		clk_sys => clk32,
+		SPI_SCK => SPI_SCK,
+		SPI_SS2 => SPI_SS2,
+		SPI_DI => SPI_DI,
+
 		ioctl_download => ioctl_download,
 		ioctl_force_erase => ioctl_force_erase,
 		ioctl_erasing => ioctl_erasing,
@@ -497,8 +507,7 @@ begin
 		ioctl_wr => ioctl_wr,
 		ioctl_addr => ioctl_addr,
 		ioctl_dout => ioctl_data
-);
-
+	);
 
 	cart_loading <= '1' when ioctl_download = '1' and ioctl_index = 3 else '0';
 
@@ -820,8 +829,8 @@ begin
 		iec_data_o => c64_iec_data_o,
 		iec_atn_o  => c64_iec_atn_o,
 		iec_clk_o  => c64_iec_clk_o,
-		iec_data_i => not c64_iec_data_i,
-		iec_clk_i  => not c64_iec_clk_i,
+		iec_data_i => c64_iec_data_i,
+		iec_clk_i  => c64_iec_clk_i,
 --		iec_atn_i  => not c64_iec_atn_i,
 		disk_num => open,
 		c64rom_addr => ioctl_addr(13 downto 0),
@@ -831,14 +840,14 @@ begin
 		reset_key => reset_key
 	);
 
+	disk_readonly <= status(14);
 
-   c64_iec_atn_i  <= not ((not c64_iec_atn_o)  and (not c1541_iec_atn_o) );
-   c64_iec_data_i <= not ((not c64_iec_data_o) and (not c1541_iec_data_o));
-	c64_iec_clk_i  <= not ((not c64_iec_clk_o)  and (not c1541_iec_clk_o) );
+    c64_iec_data_i <= c1541_iec_data_o;
+    c64_iec_clk_i <= c1541_iec_clk_o;
 
-	c1541_iec_atn_i  <= c64_iec_atn_i;
-	c1541_iec_data_i <= c64_iec_data_i;
-	c1541_iec_clk_i  <= c64_iec_clk_i;
+	c1541_iec_atn_i  <= c64_iec_atn_o;
+	c1541_iec_data_i <= c64_iec_data_o;
+	c1541_iec_clk_i  <= c64_iec_clk_o;
 
 	process(clk32, reset_n)
 		variable reset_cnt : integer range 0 to 32000000;
@@ -858,7 +867,7 @@ begin
 		end if;
 	end process;
 
-	c1541_sd : entity work.c1541_sd
+	c1541_sd_inst : entity work.c1541_sd
 	port map
 	(
 		clk32 => clk32,
@@ -871,13 +880,13 @@ begin
 
 		disk_change => sd_change,
 		disk_num  => (others => '0'), -- always 0 on MiST, the image is selected by the OSD menu
---		disk_readonly => disk_readonly,
+		disk_readonly => disk_readonly,
 
 		iec_atn_i  => c1541_iec_atn_i,
 		iec_data_i => c1541_iec_data_i,
 		iec_clk_i  => c1541_iec_clk_i,
 
-		iec_atn_o  => c1541_iec_atn_o,
+		--iec_atn_o  => c1541_iec_atn_o,
 		iec_data_o => c1541_iec_data_o,
 		iec_clk_o  => c1541_iec_clk_o,
 

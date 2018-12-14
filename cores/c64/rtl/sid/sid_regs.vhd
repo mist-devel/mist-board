@@ -23,8 +23,11 @@ port (
     wren          : in  std_logic;
     wdata         : in  std_logic_vector(7 downto 0);
     rdata         : out std_logic_vector(7 downto 0);
-    potx          : in  std_logic;
-    poty          : in  std_logic;---
+    
+    potx          : in  std_logic_vector(7 downto 0);
+    poty          : in  std_logic_vector(7 downto 0);
+
+---
     comb_wave_l   : in  std_logic;
     comb_wave_r   : in  std_logic;
 ---
@@ -202,14 +205,22 @@ begin
 
             -- Readback (unmapped address)
             case addr is
-				when "00011001" => rdata <= potx & potx & potx & potx & potx & potx & potx & potx;
-            when "00011010" => rdata <= poty & poty & poty & poty & poty & poty & poty & poty;
+            when "00011001" => rdata <= potx;
+            when "00011010" => rdata <= poty;
             when "00011011" => rdata <= osc3;
             when "00011100" => rdata <= env3;
             when others     => rdata <= (others => '0');
             end case;
 
             if reset='1' then
+					 freq_lo  <= (others => (others => '0'));
+					 freq_hi  <= (others => (others => '0'));
+					 phase_lo <= (others => (others => '0'));
+					 phase_hi <= (others => (others => '0'));
+					 control  <= (others => (others => '0'));
+					 att_dec  <= (others => (others => '0'));
+					 sust_rel <= (others => (others => '0'));
+
                 filt_en_i    <= (others => '0');
                 voice3_off_l <= '0';
                 voice3_off_r <= '0';
