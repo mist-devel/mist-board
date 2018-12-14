@@ -128,14 +128,14 @@ constant CONF_STR : string :=
 	"F,CRT,Load Cartridge;" &--3
 --	"F,TAP,Load File;"&--4
 --	"F,T64,Load File;"&--5
+	"OE,Disk Write,Enable,Disable;"&
 	"O2,Video standard,PAL,NTSC;"&
 	"O8A,Scandoubler Fx,None,HQ2x-320,HQ2x-160,CRT 25%,CRT 50%;"&
 	"OD,SID,6581,8580;"&
 	"O3,Joysticks,normal,swapped;"&
 	"O6,Audio filter,On,Off;"&
 --	"OB,BIOS,C64,C64GS;" &
-	"T5,Reset & Detach Cartridge;"&
-	"V0,v0.35.00";
+	"T5,Reset & Detach Cartridge;";
 
 -- convert string to std_logic_vector to be given to user_io
 function to_slv(s: string) return std_logic_vector is 
@@ -840,6 +840,8 @@ begin
 		reset_key => reset_key
 	);
 
+	disk_readonly <= status(14);
+
     c64_iec_data_i <= c1541_iec_data_o;
     c64_iec_clk_i <= c1541_iec_clk_o;
 
@@ -878,7 +880,7 @@ begin
 
 		disk_change => sd_change,
 		disk_num  => (others => '0'), -- always 0 on MiST, the image is selected by the OSD menu
-		--disk_readonly => disk_readonly,
+		disk_readonly => disk_readonly,
 
 		iec_atn_i  => c1541_iec_atn_i,
 		iec_data_i => c1541_iec_data_i,

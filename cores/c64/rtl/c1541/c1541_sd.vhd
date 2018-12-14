@@ -33,6 +33,7 @@ port(
 	
 	disk_num : in std_logic_vector(9 downto 0);
 	disk_change : in std_logic;
+	disk_readonly : in std_logic;
 
 	iec_atn_i  : in std_logic;
 	iec_data_i : in std_logic;
@@ -171,7 +172,7 @@ begin
     freq            => freq,     -- motor frequency
     sync_n          => sync_n,   -- reading SYNC bytes
     byte_n          => byte_n,   -- byte ready
-    wps_n           => '1',      -- write-protect sense (0 = protected)
+    wps_n           => not disk_readonly,      -- write-protect sense (0 = protected)
     tr00_sense_n    => '1',      -- track 0 sense (unused?)
     act             => act,      -- activity LED
 
