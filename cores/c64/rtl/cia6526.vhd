@@ -86,8 +86,6 @@ architecture Behavioral of cia6526 is
 	signal loadTimerB : std_logic;
 	signal nextClkTimerB : std_logic;
 	signal clkTimerB : std_logic; -- internal timer clock
-	
-	signal WR_Delay_offset : std_logic; -- adjustable WR signal delay - LCA jun17
 
 	-- Config register A
 	signal cra_start : std_logic;
@@ -458,34 +456,7 @@ begin
 -- -----------------------------------------------------------------------
 -- Timer A and B
 -- -----------------------------------------------------------------------
-
-
--- adjustable time delay jun17 - LCA
-
--- -----------------------------------------------------------------------
--- -----------------------------------------------------------------------
-
-	process(clk)
-		variable WR_delay : unsigned(15 downto 0);
-	begin
-		if rising_edge(clk) then
-			if (myWr = '0' or reset =  '1') then
-				WR_delay := "0000000000000000";
-				WR_Delay_offset <= '0';
---			end if;
-			elsif (myWr = '1' and (WR_delay < 31)) then
-				WR_delay := WR_delay + 1;
---			end if;
-			elsif (WR_delay > 8) then               -- adds a (1/32mhz * value) qualifier to WR signal in timers - LCA jun17
-				WR_Delay_offset <= '1';
-				else
-				WR_Delay_offset <= '0';
-			end if;
-		end if;		
-	end process;
 	
--- -----------------------------------------------------------------------
-
 	process(clk)
 		variable newTimerA : unsigned(15 downto 0);
 		variable timerAInput : std_logic;
@@ -506,7 +477,6 @@ begin
 			end if;
 
 			if myWr = '1' then
---			if (myWr = '1' and WR_Delay_offset = '1') then         -- x/32mhz offset to qualify WR signal LCA jun17
 				case addr is
 				when X"4" =>
 					talo <= di;
