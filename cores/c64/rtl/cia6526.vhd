@@ -78,11 +78,13 @@ architecture Behavioral of cia6526 is
 	signal timerA : unsigned(15 downto 0);
 	signal forceTimerA : std_logic;
 	signal loadTimerA : std_logic;
+	signal nextClkTimerA : std_logic;
 	signal clkTimerA : std_logic; -- internal timer clock
 
 	signal timerB: unsigned(15 downto 0);
 	signal forceTimerB : std_logic;
 	signal loadTimerB : std_logic;
+	signal nextClkTimerB : std_logic;
 	signal clkTimerB : std_logic; -- internal timer clock
 	
 	signal WR_Delay_offset : std_logic; -- adjustable WR signal delay - LCA jun17
@@ -176,15 +178,15 @@ begin
 		ppbd <= ddrb;
 		ppbo <= prb or (not ddrb);
 		if cra_pbon = '1' then
-			ppbo(6) <= timerAPulse or (not ddrb(6));
+			ppbo(6) <= timerAPulse;
 			if cra_outmode = '1' then
-				ppbo(6) <= timerAToggle or (not ddrb(6));
+				ppbo(6) <= timerAToggle;
 			end if;
 		end if;
 		if crb_pbon = '1' then
-			ppbo(7) <= timerBPulse or (not ddrb(7));
+			ppbo(7) <= timerBPulse;
 			if crb_outmode = '1' then
-				ppbo(7) <= timerBToggle or (not ddrb(7));
+				ppbo(7) <= timerBToggle;
 			end if;
 		end if;
 	end process;
@@ -486,10 +488,9 @@ begin
 
 	process(clk)
 		variable newTimerA : unsigned(15 downto 0);
-		variable nextClkTimerA : std_logic;
+		variable timerAInput : std_logic;
 		variable timerBInput : std_logic;
 		variable newTimerB : unsigned(15 downto 0);
-		variable nextClkTimerB : std_logic;
 		variable new_cra_runmode : std_logic;
 		variable new_crb_runmode : std_logic;
 	begin		
@@ -555,7 +556,10 @@ begin
 				newTimerA := timerA;
 				
 				-- CNT is not emulated so don't count when inmode = 1
-				nextClkTimerA := cra_start and (not cra_inmode);
+				timerAInput := not cra_inmode;
+
+				nextClkTimerA <= timerAInput and cra_start;
+				clkTimerA <= nextClkTimerA;
 				if clkTimerA = '1' then
 					newTimerA := newTimerA - 1;
 				end if;
@@ -567,12 +571,12 @@ begin
 					timerAToggle <= not timerAToggle;
 					if (new_cra_runmode or cra_runmode) = '1' then
 						cra_start <= '0';
+						newTimerA := (others => '0');
 					end if;
 				end if;
 				if forceTimerA = '1' then
 					loadTimerA <= '1';
 				end if;
-				clkTimerA <= nextClkTimerA;
 				timerA <= newTimerA;
 					
 				--
@@ -591,7 +595,9 @@ begin
 					-- CNT is not emulated so don't count
 					timerBInput := '0';
 				end if;
-				nextClkTimerB := timerBInput and crb_start;
+
+				nextClkTimerB <= timerBInput and crb_start;
+				clkTimerB <= nextClkTimerB;
 				if clkTimerB = '1' then
 					newTimerB := newTimerB - 1;
 				end if;				
@@ -603,12 +609,12 @@ begin
 					timerBToggle <= not timerBToggle;
 					if (new_crb_runmode or crb_runmode) = '1' then
 						crb_start <= '0';
+						newTimerB := (others => '0');
 					end if;
 				end if;
 				if forceTimerB = '1' then
 					loadTimerB <= '1';
 				end if;
-				clkTimerB <= nextClkTimerB;
 				timerB <= newTimerB;
 			end if;
 
