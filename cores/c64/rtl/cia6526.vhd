@@ -462,14 +462,10 @@ begin
 		variable timerAInput : std_logic;
 		variable timerBInput : std_logic;
 		variable newTimerB : unsigned(15 downto 0);
-		variable new_cra_runmode : std_logic;
-		variable new_crb_runmode : std_logic;
 	begin		
 		if rising_edge(clk) then
 			loadTimerA <= '0';
 			loadTimerB <= '0';
-			new_cra_runmode := cra_runmode;
-			new_crb_runmode := crb_runmode;
 			
 			if resetIrq then
 				intr_timerA <= '0';
@@ -498,27 +494,28 @@ begin
 						timerAToggle <= timerAToggle or di(0);
 					end if;
 					cra_start <= di(0);
-					new_cra_runmode := di(3);
+					cra_runmode_reg <= di(3);
 				when X"F" =>
 					if crb_start = '0' then
 						-- Only set on rising edge
 						timerBToggle <= timerBToggle or di(0);
 					end if;
 					crb_start <= di(0);
-					new_crb_runmode := di(3);
+					crb_runmode_reg <= di(3);
 				when others => null;
 				end case;
 			end if;
 			
 			if reset = '1' then
-				new_cra_runmode := '0';
-				new_crb_runmode := '0';
+				cra_runmode_reg <= '0';
+				crb_runmode_reg <= '0';
 			end if;
 			
-			cra_runmode <= new_cra_runmode;
-			crb_runmode <= new_crb_runmode;
 
 			if enable = '1' then
+
+				cra_runmode <= cra_runmode_reg;
+				crb_runmode <= crb_runmode_reg;
 				--
 				-- process timer A
 				--
@@ -539,9 +536,8 @@ begin
 					loadTimerA <= '1';
 					timerAPulse <= '1';
 					timerAToggle <= not timerAToggle;
-					if (new_cra_runmode or cra_runmode) = '1' then
+					if (cra_runmode_reg or cra_runmode) = '1' then
 						cra_start <= '0';
-						newTimerA := (others => '0');
 					end if;
 				end if;
 				if forceTimerA = '1' then
@@ -577,9 +573,8 @@ begin
 					loadTimerB <= '1';
 					timerBPulse <= '1';
 					timerBToggle <= not timerBToggle;
-					if (new_crb_runmode or crb_runmode) = '1' then
+					if (crb_runmode_reg or crb_runmode) = '1' then
 						crb_start <= '0';
-						newTimerB := (others => '0');
 					end if;
 				end if;
 				if forceTimerB = '1' then
