@@ -85,6 +85,9 @@ entity fpga64_sid_iec is
 		-- joystick interface
 		joyA        : in  unsigned(6 downto 0);
 		joyB        : in  unsigned(6 downto 0);
+		-- 4 player interface
+		joyC			: in  unsigned(6 downto 0);
+		joyD			: in  unsigned(6 downto 0);
 
 		-- serial port, for connection to pheripherals
 		serioclk    : out std_logic;
@@ -829,7 +832,10 @@ div1m: process(clk32)				-- this process devides 32 MHz to 1MHz (for the SID)
 	end process;
 
 	cia2_pai(5 downto 0) <= cia2_pao(5 downto 0);
-	cia2_pbi(7 downto 0) <= cia2_pbo;
+	cia2_pbi(7 downto 6) <= cia2_pbo(7 downto 6);
+
+	-- Protovision 4 player interface
+	cia2_pbi(5 downto 0) <= not joyC(5 downto 0) when cia2_pbo(7) = '1' else not joyD(5 downto 0);
 
 -- -----------------------------------------------------------------------
 -- VIC bank to address lines

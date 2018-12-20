@@ -351,10 +351,14 @@ end component cartridge;
 
 	signal joyA : std_logic_vector(31 downto 0);
 	signal joyB : std_logic_vector(31 downto 0);
+	signal joyC : std_logic_vector(31 downto 0);
+	signal joyD : std_logic_vector(31 downto 0);
 	signal joyA_int : std_logic_vector(6 downto 0);
 	signal joyB_int : std_logic_vector(6 downto 0);
 	signal joyA_c64 : std_logic_vector(6 downto 0);
 	signal joyB_c64 : std_logic_vector(6 downto 0);
+	signal joyC_c64 : std_logic_vector(6 downto 0);
+	signal joyD_c64 : std_logic_vector(6 downto 0);
 	signal reset_key : std_logic;
 	signal cart_detach_key :std_logic;							-- cartridge detach key CTRL-D - LCA
 	
@@ -469,6 +473,8 @@ begin
 
 		joystick_0 => joyA,
 		joystick_1 => joyB,
+		joystick_2 => joyC,
+		joystick_3 => joyD,
 
 		conf_str => to_slv(CONF_STR),
 
@@ -557,6 +563,8 @@ begin
 	-- rearrange joystick contacta for c64
 	joyA_int <= joyA(6 downto 4) & joyA(0) & joyA(1) & joyA(2) & joyA(3);
 	joyB_int <= joyB(6 downto 4) & joyB(0) & joyB(1) & joyB(2) & joyB(3);
+	joyC_c64 <= joyC(6 downto 4) & joyC(0) & joyC(1) & joyC(2) & joyC(3);
+	joyD_c64 <= joyD(6 downto 4) & joyD(0) & joyD(1) & joyD(2) & joyD(3);
 
 	-- swap joysticks if requested
 	joyA_c64 <= joyB_int when status(3)='1' else joyA_int;
@@ -818,6 +826,8 @@ begin
 		ba => open,
 		joyA => unsigned(joyA_c64),
 		joyB => unsigned(joyB_c64),
+		joyC => unsigned(joyC_c64),
+		joyD => unsigned(joyD_c64),
 		serioclk => open,
 		ces => ces,
 		SIDclk => open,
