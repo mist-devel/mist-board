@@ -341,18 +341,16 @@ end
 
 // SPI receiver IO -> FPGA
 
-reg       spi_receiver_strobe_r;
-reg       spi_transfer_end_r;
-reg [7:0] spi_byte_in_r;
+reg       spi_receiver_strobe_r = 0;
+reg       spi_transfer_end_r = 1;
+reg [7:0] spi_byte_in;
 
 // Read at spi_sck clock domain, assemble bytes for transferring to clk_sys
 always@(posedge spi_sck or posedge SPI_SS_IO) begin
 
 	if(SPI_SS_IO == 1) begin
-		spi_receiver_strobe_r <= 0;
 		spi_transfer_end_r <= 1;
 	end else begin
-		if (bit_cnt) spi_receiver_strobe_r <= 0;
 		spi_transfer_end_r <= 0;
 
 		if(bit_cnt != 7)
@@ -360,8 +358,8 @@ always@(posedge spi_sck or posedge SPI_SS_IO) begin
 
 		// finished reading a byte, prepare to transfer to clk_sys
 		if(bit_cnt == 7) begin
-			spi_byte_in_r <= { sbuf, SPI_MOSI};
-			spi_receiver_strobe_r <= 1;
+			spi_byte_in <= { sbuf, SPI_MOSI};
+			spi_receiver_strobe_r <= ~spi_receiver_strobe_r;
 		end
 	end
 end
@@ -371,10 +369,8 @@ always @(posedge clk_sys) begin
 
 	reg       spi_receiver_strobe;
 	reg       spi_transfer_end;
-	reg [7:0] spi_byte_in;
 	reg       spi_receiver_strobeD;
 	reg       spi_transfer_endD;
-	reg [7:0] spi_byte_inD;
 	reg [7:0] acmd;
 	reg [7:0] abyte_cnt;   // counts bytes
 
@@ -383,12 +379,10 @@ always @(posedge clk_sys) begin
 	spi_receiver_strobe <= spi_receiver_strobeD;
 	spi_transfer_endD	<= spi_transfer_end_r;
 	spi_transfer_end	<= spi_transfer_endD;
-	spi_byte_inD <= spi_byte_in_r;
-	spi_byte_in <= spi_byte_inD;
 
 	if (~spi_transfer_endD & spi_transfer_end) begin
 		abyte_cnt <= 8'd0;
-	end else if (~spi_receiver_strobeD & spi_receiver_strobe) begin
+	end else if (spi_receiver_strobeD ^ spi_receiver_strobe) begin
 
 		if(abyte_cnt != 8'd255) 
 			abyte_cnt <= byte_cnt + 8'd1;
@@ -450,10 +444,8 @@ always @(posedge clk_sd) begin
 
 	reg       spi_receiver_strobe;
 	reg       spi_transfer_end;
-	reg [7:0] spi_byte_in;
 	reg       spi_receiver_strobeD;
 	reg       spi_transfer_endD;
-	reg [7:0] spi_byte_inD;
 	reg [7:0] acmd;
 	reg [7:0] abyte_cnt;   // counts bytes
 
@@ -462,8 +454,6 @@ always @(posedge clk_sd) begin
 	spi_receiver_strobe <= spi_receiver_strobeD;
 	spi_transfer_endD	<= spi_transfer_end_r;
 	spi_transfer_end	<= spi_transfer_endD;
-	spi_byte_inD <= spi_byte_in_r;
-	spi_byte_in <= spi_byte_inD;
 
 	if(sd_dout_strobe) begin
 		sd_dout_strobe<= 0;
@@ -484,7 +474,7 @@ always @(posedge clk_sd) begin
 		sd_dout_strobe <= 1'b0;
 		sd_din_strobe <= 1'b0;
 		sd_buff_addr<= 0;
-	end else if (~spi_receiver_strobeD & spi_receiver_strobe) begin
+	end else if (spi_receiver_strobeD ^ spi_receiver_strobe) begin
 
 		if(abyte_cnt != 8'd255) 
 			abyte_cnt <= byte_cnt + 8'd1;
