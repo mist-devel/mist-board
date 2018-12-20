@@ -78,14 +78,14 @@ architecture Behavioral of cia6526 is
 	signal timerA : unsigned(15 downto 0);
 	signal forceTimerA : std_logic;
 	signal loadTimerA : std_logic;
+	signal nextClkTimerA : std_logic;
 	signal clkTimerA : std_logic; -- internal timer clock
 
 	signal timerB: unsigned(15 downto 0);
 	signal forceTimerB : std_logic;
 	signal loadTimerB : std_logic;
+	signal nextClkTimerB : std_logic;
 	signal clkTimerB : std_logic; -- internal timer clock
-	
-	signal WR_Delay_offset : std_logic; -- adjustable WR signal delay - LCA jun17
 
 	-- Config register A
 	signal cra_start : std_logic;
@@ -176,15 +176,15 @@ begin
 		ppbd <= ddrb;
 		ppbo <= prb or (not ddrb);
 		if cra_pbon = '1' then
-			ppbo(6) <= timerAPulse or (not ddrb(6));
+			ppbo(6) <= timerAPulse;
 			if cra_outmode = '1' then
-				ppbo(6) <= timerAToggle or (not ddrb(6));
+				ppbo(6) <= timerAToggle;
 			end if;
 		end if;
 		if crb_pbon = '1' then
-			ppbo(7) <= timerBPulse or (not ddrb(7));
+			ppbo(7) <= timerBPulse;
 			if crb_outmode = '1' then
-				ppbo(7) <= timerBToggle or (not ddrb(7));
+				ppbo(7) <= timerBToggle;
 			end if;
 		end if;
 	end process;
@@ -456,48 +456,16 @@ begin
 -- -----------------------------------------------------------------------
 -- Timer A and B
 -- -----------------------------------------------------------------------
-
-
--- adjustable time delay jun17 - LCA
-
--- -----------------------------------------------------------------------
--- -----------------------------------------------------------------------
-
-	process(clk)
-		variable WR_delay : unsigned(15 downto 0);
-	begin
-		if rising_edge(clk) then
-			if (myWr = '0' or reset =  '1') then
-				WR_delay := "0000000000000000";
-				WR_Delay_offset <= '0';
---			end if;
-			elsif (myWr = '1' and (WR_delay < 31)) then
-				WR_delay := WR_delay + 1;
---			end if;
-			elsif (WR_delay > 8) then               -- adds a (1/32mhz * value) qualifier to WR signal in timers - LCA jun17
-				WR_Delay_offset <= '1';
-				else
-				WR_Delay_offset <= '0';
-			end if;
-		end if;		
-	end process;
 	
--- -----------------------------------------------------------------------
-
 	process(clk)
 		variable newTimerA : unsigned(15 downto 0);
-		variable nextClkTimerA : std_logic;
+		variable timerAInput : std_logic;
 		variable timerBInput : std_logic;
 		variable newTimerB : unsigned(15 downto 0);
-		variable nextClkTimerB : std_logic;
-		variable new_cra_runmode : std_logic;
-		variable new_crb_runmode : std_logic;
 	begin		
 		if rising_edge(clk) then
 			loadTimerA <= '0';
 			loadTimerB <= '0';
-			new_cra_runmode := cra_runmode;
-			new_crb_runmode := crb_runmode;
 			
 			if resetIrq then
 				intr_timerA <= '0';
@@ -505,7 +473,6 @@ begin
 			end if;
 
 			if myWr = '1' then
---			if (myWr = '1' and WR_Delay_offset = '1') then         -- x/32mhz offset to qualify WR signal LCA jun17
 				case addr is
 				when X"4" =>
 					talo <= di;
@@ -527,27 +494,28 @@ begin
 						timerAToggle <= timerAToggle or di(0);
 					end if;
 					cra_start <= di(0);
-					new_cra_runmode := di(3);
+					cra_runmode_reg <= di(3);
 				when X"F" =>
 					if crb_start = '0' then
 						-- Only set on rising edge
 						timerBToggle <= timerBToggle or di(0);
 					end if;
 					crb_start <= di(0);
-					new_crb_runmode := di(3);
+					crb_runmode_reg <= di(3);
 				when others => null;
 				end case;
 			end if;
 			
 			if reset = '1' then
-				new_cra_runmode := '0';
-				new_crb_runmode := '0';
+				cra_runmode_reg <= '0';
+				crb_runmode_reg <= '0';
 			end if;
 			
-			cra_runmode <= new_cra_runmode;
-			crb_runmode <= new_crb_runmode;
 
 			if enable = '1' then
+
+				cra_runmode <= cra_runmode_reg;
+				crb_runmode <= crb_runmode_reg;
 				--
 				-- process timer A
 				--
@@ -555,7 +523,10 @@ begin
 				newTimerA := timerA;
 				
 				-- CNT is not emulated so don't count when inmode = 1
-				nextClkTimerA := cra_start and (not cra_inmode);
+				timerAInput := not cra_inmode;
+
+				nextClkTimerA <= timerAInput and cra_start;
+				clkTimerA <= nextClkTimerA;
 				if clkTimerA = '1' then
 					newTimerA := newTimerA - 1;
 				end if;
@@ -565,14 +536,13 @@ begin
 					loadTimerA <= '1';
 					timerAPulse <= '1';
 					timerAToggle <= not timerAToggle;
-					if (new_cra_runmode or cra_runmode) = '1' then
+					if (cra_runmode_reg or cra_runmode) = '1' then
 						cra_start <= '0';
 					end if;
 				end if;
 				if forceTimerA = '1' then
 					loadTimerA <= '1';
 				end if;
-				clkTimerA <= nextClkTimerA;
 				timerA <= newTimerA;
 					
 				--
@@ -591,7 +561,9 @@ begin
 					-- CNT is not emulated so don't count
 					timerBInput := '0';
 				end if;
-				nextClkTimerB := timerBInput and crb_start;
+
+				nextClkTimerB <= timerBInput and crb_start;
+				clkTimerB <= nextClkTimerB;
 				if clkTimerB = '1' then
 					newTimerB := newTimerB - 1;
 				end if;				
@@ -601,14 +573,13 @@ begin
 					loadTimerB <= '1';
 					timerBPulse <= '1';
 					timerBToggle <= not timerBToggle;
-					if (new_crb_runmode or crb_runmode) = '1' then
+					if (crb_runmode_reg or crb_runmode) = '1' then
 						crb_start <= '0';
 					end if;
 				end if;
 				if forceTimerB = '1' then
 					loadTimerB <= '1';
 				end if;
-				clkTimerB <= nextClkTimerB;
 				timerB <= newTimerB;
 			end if;
 
