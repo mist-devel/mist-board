@@ -97,12 +97,6 @@ wire [7:0] jsB = joystick_swap?js0:js1;
 wire ps2_kbd_clk, ps2_kbd_data;
 wire ps2_mouse_clk, ps2_mouse_data;
 
-// generate ps2_clock
-wire ps2_clock = ps2_clk_div[10];  // ~12khz
-reg [10:0] ps2_clk_div;
-always @(posedge clk28)
-	ps2_clk_div <= ps2_clk_div + 7'd1;
-
 // -------------------------------------------------------------------------
 // ---------------- interface to the external sdram ------------------------
 // -------------------------------------------------------------------------
@@ -246,7 +240,6 @@ user_io #(.STRLEN(CONF_STR_LEN)) user_io (
 		.joystick_1     ( js1            ),
 		
       // ps2 interface
-      .ps2_clk        ( ps2_clock      ),
       .ps2_kbd_clk    ( ps2_kbd_clk    ),
       .ps2_kbd_data   ( ps2_kbd_data   ),
       .ps2_mouse_clk  ( ps2_mouse_clk  ),

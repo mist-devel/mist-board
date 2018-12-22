@@ -22,64 +22,64 @@
 
 // parameter STRLEN and the actual length of conf_str have to match
  
-module user_io #(parameter STRLEN=0) (
+module user_io #(parameter STRLEN=0, parameter PS2DIV=100) (
 	input [(8*STRLEN)-1:0] conf_str,
 
-	input 		       clk_sys, // clock for system-related messages (kbd, joy, etc...)
-	input              clk_sd,  // clock for SD-card related messages
+	input               clk_sys, // clock for system-related messages (kbd, joy, etc...)
+	input               clk_sd,  // clock for SD-card related messages
 
-	input 		       SPI_CLK,
-	input 		       SPI_SS_IO,
-	output reg	       SPI_MISO,
-	input 		       SPI_MOSI,
-	
-	output reg [7:0]   joystick_0,
-	output reg [7:0]   joystick_1,
-	output reg [15:0]  joystick_analog_0,
-	output reg [15:0]  joystick_analog_1,
-	output [1:0] 	    buttons,
-	output [1:0] 	    switches,
-	output 		       scandoubler_disable,
-	output             ypbpr,
-	output reg [31:0]  status,
+	input               SPI_CLK,
+	input               SPI_SS_IO,
+	output reg          SPI_MISO,
+	input               SPI_MOSI,
+
+	output reg [31:0]   joystick_0,
+	output reg [31:0]   joystick_1,
+	output reg [31:0]   joystick_2,
+	output reg [31:0]   joystick_3,
+	output reg [31:0]   joystick_4,
+	output reg [15:0]   joystick_analog_0,
+	output reg [15:0]   joystick_analog_1,
+	output [1:0]        buttons,
+	output [1:0]        switches,
+	output 		        scandoubler_disable,
+	output              ypbpr,
+	output reg [31:0]   status,
 
 	// connection to sd card emulation
-	input       [31:0] sd_lba,
-	input 		       sd_rd,
-	input 		       sd_wr,
-	output reg 	       sd_ack,
-	output reg         sd_ack_conf,
-	input 		       sd_conf,
-	input 		       sd_sdhc,
-	output reg   [7:0] sd_dout, // valid on rising edge of sd_dout_strobe
-	output reg 	       sd_dout_strobe,
-	input        [7:0] sd_din,
-	output reg 	       sd_din_strobe,
-	output reg   [8:0] sd_buff_addr,
-	
-	output reg         img_mounted, //rising edge if a new image is mounted
-	output reg  [31:0] img_size,    // size of image in bytes
+	input        [31:0] sd_lba,
+	input 		        sd_rd,
+	input 		        sd_wr,
+	output reg 	        sd_ack,
+	output reg          sd_ack_conf,
+	input 		        sd_conf,
+	input 		        sd_sdhc,
+	output reg    [7:0] sd_dout, // valid on rising edge of sd_dout_strobe
+	output reg 	        sd_dout_strobe,
+	input         [7:0] sd_din,
+	output reg 	        sd_din_strobe,
+	output reg    [8:0] sd_buff_addr,
+
+	output reg          img_mounted, //rising edge if a new image is mounted
+	output reg   [31:0] img_size,    // size of image in bytes
 
 	// ps2 keyboard emulation
-	input 		       ps2_clk, // 12-16khz provided by core
-	output 		       ps2_kbd_clk,
-	output reg 	       ps2_kbd_data,
-	output 		       ps2_mouse_clk,
-	output reg 	       ps2_mouse_data,
+	output              ps2_kbd_clk,
+	output reg          ps2_kbd_data,
+	output              ps2_mouse_clk,
+	output reg          ps2_mouse_data,
 
 	// serial com port 
-	input [7:0] 	       serial_data,
-	input 		       serial_strobe
+	input [7:0]         serial_data,
+	input               serial_strobe
 );
 
-reg [6:0]         sbuf;
-reg [7:0]         cmd;
+reg [6:0]     sbuf;
+reg [7:0]     cmd;
 reg [2:0] 	  bit_cnt;    // counts bits 0-7 0-7 ...
-reg [7:0]         byte_cnt;   // counts bytes
-reg [5:0]         joystick0;
-reg [5:0]         joystick1;
+reg [9:0]     byte_cnt;   // counts bytes
 reg [7:0] 	  but_sw;
-reg [2:0]         stick_idx;
+reg [2:0]     stick_idx;
 
 assign buttons = but_sw[1:0];
 assign switches = but_sw[3:2];
@@ -95,9 +95,18 @@ wire [7:0] sd_cmd = { 4'h5, sd_conf, sd_sdhc, sd_wr, sd_rd };
 wire spi_sck = SPI_CLK;
 
 // ---------------- PS2 ---------------------
-
 // 8 byte fifos to store ps2 bytes
 localparam PS2_FIFO_BITS = 3;
+
+reg ps2_clk;
+always @(negedge clk_sys) begin
+	integer cnt;
+	cnt <= cnt + 1'd1;
+	if(cnt == PS2DIV) begin
+		ps2_clk <= ~ps2_clk;
+		cnt <= 0;
+	end
+end
 
 // keyboard
 reg [7:0] ps2_kbd_fifo [(2**PS2_FIFO_BITS)-1:0];
@@ -277,9 +286,9 @@ end
 always@(posedge spi_sck or posedge SPI_SS_IO) begin
 	if(SPI_SS_IO == 1) begin
 		bit_cnt <= 0;
-	   byte_cnt <= 0;
+		byte_cnt <= 0;
 	end else begin
-		if((bit_cnt == 7)&&(byte_cnt != 8'd255)) 
+		if((bit_cnt == 7)&&(~&byte_cnt)) 
 			byte_cnt <= byte_cnt + 8'd1;
 
 		bit_cnt <= bit_cnt + 1'd1;
@@ -299,7 +308,7 @@ end
 
 always@(posedge spi_sck or posedge SPI_SS_IO) begin
 	reg [31:0] sd_lba_r;
-	
+
 	if(SPI_SS_IO == 1) begin
 		spi_byte_out <= core_type;
 	end else begin
@@ -307,24 +316,24 @@ always@(posedge spi_sck or posedge SPI_SS_IO) begin
 		if(bit_cnt == 7) begin
 			if(!byte_cnt) cmd <= {sbuf, SPI_MOSI};
 
-         spi_byte_out <= 0;
-         case({(!byte_cnt) ? {sbuf, SPI_MOSI} : cmd})
-				// reading config string
-            8'h14: if(byte_cnt < STRLEN) spi_byte_out <= conf_str[(STRLEN - byte_cnt - 1)<<3 +:8];
+			spi_byte_out <= 0;
+			case({(!byte_cnt) ? {sbuf, SPI_MOSI} : cmd})
+			// reading config string
+			8'h14: if(byte_cnt < STRLEN) spi_byte_out <= conf_str[(STRLEN - byte_cnt - 1)<<3 +:8];
 
-            // reading sd card status
-            8'h16: if(byte_cnt == 0) begin
+			// reading sd card status
+			8'h16: if(byte_cnt == 0) begin
 					spi_byte_out <= sd_cmd;
 					sd_lba_r <= sd_lba;
-            end
-            else if(byte_cnt < 5) spi_byte_out <= sd_lba_r[(4-byte_cnt)<<3 +:8];
+				end
+				else if(byte_cnt < 5) spi_byte_out <= sd_lba_r[(4-byte_cnt)<<3 +:8];
 
-            // reading sd card write data
-            8'h18: spi_byte_out <= sd_din;
-				8'h1b:
-					// send alternating flag byte and data
-					if(byte_cnt[0]) spi_byte_out <= serial_out_status;
-					else spi_byte_out <= serial_out_byte;
+			// reading sd card write data
+			8'h18: spi_byte_out <= sd_din;
+			8'h1b:
+				// send alternating flag byte and data
+				if(byte_cnt[0]) spi_byte_out <= serial_out_status;
+				else spi_byte_out <= serial_out_byte;
 			endcase
 		end
 	end
@@ -332,27 +341,25 @@ end
 
 // SPI receiver IO -> FPGA
 
-reg       spi_receiver_strobe_r;
-reg       spi_transfer_end_r;
-reg [7:0] spi_byte_in_r;
+reg       spi_receiver_strobe_r = 0;
+reg       spi_transfer_end_r = 1;
+reg [7:0] spi_byte_in;
 
 // Read at spi_sck clock domain, assemble bytes for transferring to clk_sys
 always@(posedge spi_sck or posedge SPI_SS_IO) begin
 
 	if(SPI_SS_IO == 1) begin
-		spi_receiver_strobe_r <= 0;
 		spi_transfer_end_r <= 1;
 	end else begin
-		spi_receiver_strobe_r <= 0;
 		spi_transfer_end_r <= 0;
 
 		if(bit_cnt != 7)
 			sbuf[6:0] <= { sbuf[5:0], SPI_MOSI };
 
 		// finished reading a byte, prepare to transfer to clk_sys
-      if(bit_cnt == 7) begin
-			spi_byte_in_r <= { sbuf, SPI_MOSI};
-			spi_receiver_strobe_r <= 1;
+		if(bit_cnt == 7) begin
+			spi_byte_in <= { sbuf, SPI_MOSI};
+			spi_receiver_strobe_r <= ~spi_receiver_strobe_r;
 		end
 	end
 end
@@ -362,10 +369,8 @@ always @(posedge clk_sys) begin
 
 	reg       spi_receiver_strobe;
 	reg       spi_transfer_end;
-	reg [7:0] spi_byte_in;
 	reg       spi_receiver_strobeD;
 	reg       spi_transfer_endD;
-	reg [7:0] spi_byte_inD;
 	reg [7:0] acmd;
 	reg [7:0] abyte_cnt;   // counts bytes
 
@@ -374,15 +379,13 @@ always @(posedge clk_sys) begin
 	spi_receiver_strobe <= spi_receiver_strobeD;
 	spi_transfer_endD	<= spi_transfer_end_r;
 	spi_transfer_end	<= spi_transfer_endD;
-	spi_byte_inD <= spi_byte_in_r;
-	spi_byte_in <= spi_byte_inD;
 
 	if (~spi_transfer_endD & spi_transfer_end) begin
 		abyte_cnt <= 8'd0;
-	end else if (~spi_receiver_strobeD & spi_receiver_strobe) begin
+	end else if (spi_receiver_strobeD ^ spi_receiver_strobe) begin
 
-		if(abyte_cnt != 8'd255) 
-			abyte_cnt <= byte_cnt + 8'd1;
+		if(~&abyte_cnt) 
+			abyte_cnt <= abyte_cnt + 8'd1;
 
 		if(abyte_cnt == 0) begin
 			acmd <= spi_byte_in;
@@ -390,8 +393,11 @@ always @(posedge clk_sys) begin
 			case(acmd)
 				// buttons and switches
 				8'h01: but_sw <= spi_byte_in;
-				8'h02: joystick_0 <= spi_byte_in;
-				8'h03: joystick_1 <= spi_byte_in;
+				8'h60: if (abyte_cnt < 5) joystick_0[(abyte_cnt-1)<<3 +:8] <= spi_byte_in;
+				8'h61: if (abyte_cnt < 5) joystick_1[(abyte_cnt-1)<<3 +:8] <= spi_byte_in;
+				8'h62: if (abyte_cnt < 5) joystick_2[(abyte_cnt-1)<<3 +:8] <= spi_byte_in;
+				8'h63: if (abyte_cnt < 5) joystick_3[(abyte_cnt-1)<<3 +:8] <= spi_byte_in;
+				8'h64: if (abyte_cnt < 5) joystick_4[(abyte_cnt-1)<<3 +:8] <= spi_byte_in;
 				8'h04: begin
 					// store incoming ps2 mouse bytes 
 					ps2_mouse_fifo[ps2_mouse_wptr] <= spi_byte_in;
@@ -405,7 +411,7 @@ always @(posedge clk_sys) begin
 
 				// joystick analog
 				8'h1a: begin
-					// first byte is joystick indes
+					// first byte is joystick index
 					if(abyte_cnt == 1)
 						stick_idx <= spi_byte_in[2:0];
 					else if(abyte_cnt == 2) begin
@@ -426,7 +432,7 @@ always @(posedge clk_sys) begin
 				8'h15: status <= spi_byte_in;
 
 				// status, 32bit version
-				8'h1e: if(abyte_cnt<6) status[(abyte_cnt-2)<<3 +:8] <= spi_byte_in;
+				8'h1e: if(abyte_cnt<5) status[(abyte_cnt-1)<<3 +:8] <= spi_byte_in;
 
 				endcase
 		end
@@ -438,10 +444,8 @@ always @(posedge clk_sd) begin
 
 	reg       spi_receiver_strobe;
 	reg       spi_transfer_end;
-	reg [7:0] spi_byte_in;
 	reg       spi_receiver_strobeD;
 	reg       spi_transfer_endD;
-	reg [7:0] spi_byte_inD;
 	reg [7:0] acmd;
 	reg [7:0] abyte_cnt;   // counts bytes
 
@@ -450,8 +454,6 @@ always @(posedge clk_sd) begin
 	spi_receiver_strobe <= spi_receiver_strobeD;
 	spi_transfer_endD	<= spi_transfer_end_r;
 	spi_transfer_end	<= spi_transfer_endD;
-	spi_byte_inD <= spi_byte_in_r;
-	spi_byte_in <= spi_byte_inD;
 
 	if(sd_dout_strobe) begin
 		sd_dout_strobe<= 0;
@@ -472,10 +474,10 @@ always @(posedge clk_sd) begin
 		sd_dout_strobe <= 1'b0;
 		sd_din_strobe <= 1'b0;
 		sd_buff_addr<= 0;
-	end else if (~spi_receiver_strobeD & spi_receiver_strobe) begin
+	end else if (spi_receiver_strobeD ^ spi_receiver_strobe) begin
 
-		if(abyte_cnt != 8'd255) 
-			abyte_cnt <= byte_cnt + 8'd1;
+		if(~&abyte_cnt) 
+			abyte_cnt <= abyte_cnt + 8'd1;
 
 		if(abyte_cnt == 0) begin
 			acmd <= spi_byte_in;
@@ -511,7 +513,7 @@ always @(posedge clk_sd) begin
 				8'h1c: img_mounted <= 1;
 
 				// send image info
-				8'h1d: if(abyte_cnt<6) img_size[(byte_cnt-2)<<3 +:8] <= spi_byte_in;
+				8'h1d: if(abyte_cnt<5) img_size[(abyte_cnt-1)<<3 +:8] <= spi_byte_in;
 			endcase
 		end
 	end

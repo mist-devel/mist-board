@@ -384,8 +384,8 @@ always @(posedge clk_sys) begin
 		abyte_cnt <= 8'd0;
 	end else if (spi_receiver_strobeD ^ spi_receiver_strobe) begin
 
-		if(abyte_cnt != 8'd255) 
-			abyte_cnt <= byte_cnt + 8'd1;
+		if(~&abyte_cnt) 
+			abyte_cnt <= abyte_cnt + 8'd1;
 
 		if(abyte_cnt == 0) begin
 			acmd <= spi_byte_in;
@@ -393,11 +393,11 @@ always @(posedge clk_sys) begin
 			case(acmd)
 				// buttons and switches
 				8'h01: but_sw <= spi_byte_in;
-				8'h60: if (abyte_cnt < 6) joystick_0[(abyte_cnt-2)<<3 +:8] <= spi_byte_in;
-				8'h61: if (abyte_cnt < 6) joystick_1[(abyte_cnt-2)<<3 +:8] <= spi_byte_in;
-				8'h62: if (abyte_cnt < 6) joystick_2[(abyte_cnt-2)<<3 +:8] <= spi_byte_in;
-				8'h63: if (abyte_cnt < 6) joystick_3[(abyte_cnt-2)<<3 +:8] <= spi_byte_in;
-				8'h64: if (abyte_cnt < 6) joystick_4[(abyte_cnt-2)<<3 +:8] <= spi_byte_in;
+				8'h60: if (abyte_cnt < 5) joystick_0[(abyte_cnt-1)<<3 +:8] <= spi_byte_in;
+				8'h61: if (abyte_cnt < 5) joystick_1[(abyte_cnt-1)<<3 +:8] <= spi_byte_in;
+				8'h62: if (abyte_cnt < 5) joystick_2[(abyte_cnt-1)<<3 +:8] <= spi_byte_in;
+				8'h63: if (abyte_cnt < 5) joystick_3[(abyte_cnt-1)<<3 +:8] <= spi_byte_in;
+				8'h64: if (abyte_cnt < 5) joystick_4[(abyte_cnt-1)<<3 +:8] <= spi_byte_in;
 				8'h04: begin
 					// store incoming ps2 mouse bytes 
 					ps2_mouse_fifo[ps2_mouse_wptr] <= spi_byte_in;
@@ -411,7 +411,7 @@ always @(posedge clk_sys) begin
 
 				// joystick analog
 				8'h1a: begin
-					// first byte is joystick indes
+					// first byte is joystick index
 					if(abyte_cnt == 1)
 						stick_idx <= spi_byte_in[2:0];
 					else if(abyte_cnt == 2) begin
@@ -432,7 +432,7 @@ always @(posedge clk_sys) begin
 				8'h15: status <= spi_byte_in;
 
 				// status, 32bit version
-				8'h1e: if(abyte_cnt<6) status[(abyte_cnt-2)<<3 +:8] <= spi_byte_in;
+				8'h1e: if(abyte_cnt<5) status[(abyte_cnt-1)<<3 +:8] <= spi_byte_in;
 
 				endcase
 		end
@@ -476,8 +476,8 @@ always @(posedge clk_sd) begin
 		sd_buff_addr<= 0;
 	end else if (spi_receiver_strobeD ^ spi_receiver_strobe) begin
 
-		if(abyte_cnt != 8'd255) 
-			abyte_cnt <= byte_cnt + 8'd1;
+		if(~&abyte_cnt) 
+			abyte_cnt <= abyte_cnt + 8'd1;
 
 		if(abyte_cnt == 0) begin
 			acmd <= spi_byte_in;
@@ -513,7 +513,7 @@ always @(posedge clk_sd) begin
 				8'h1c: img_mounted <= 1;
 
 				// send image info
-				8'h1d: if(abyte_cnt<6) img_size[(abyte_cnt-2)<<3 +:8] <= spi_byte_in;
+				8'h1d: if(abyte_cnt<5) img_size[(abyte_cnt-1)<<3 +:8] <= spi_byte_in;
 			endcase
 		end
 	end
