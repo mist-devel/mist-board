@@ -29,6 +29,7 @@ use IEEE.STD_LOGIC_1164.ALL;
 use IEEE.std_logic_unsigned.ALL;
 use IEEE.numeric_std.all;
 
+use work.mos6526.all;
 -- -----------------------------------------------------------------------
 
 entity fpga64_sid_iec is
@@ -367,12 +368,13 @@ begin
 			when CYCLE_VIC2 =>
 				enableVic <= '1';
 			when CYCLE_CPUE =>
-				enableCia <= '1';
 				enableVic <= '1';
 				if baLoc = '1'
 				or cpuWe = '1' then
 					enableCpu <= '1';
 				end if;
+			when CYCLE_CPUF =>
+				enableCia <= '1';
 			when others =>
 				null;
 			end case;
@@ -615,52 +617,56 @@ div1m: process(clk32)				-- this process devides 32 MHz to 1MHz (for the SID)
 -- -----------------------------------------------------------------------
 -- CIAs
 -- -----------------------------------------------------------------------
-	cia1: entity work.cia6526
+	cia1: mos6526
 		port map (
 			clk => clk32,
-			todClk => vicVSync,
-			reset => reset,
-			enable => enableCia,
-			cs => cs_cia1,
-			we => pulseWrIo,
-			rd => pulseRd,
+            phi2 => enableCia,
+            res_n => not reset,
+            cs_n => not cs_cia1,
+            rw => not cpuWe,
 
-			addr => cpuAddr(3 downto 0),
-			di => cpuDo,
-			do => cia1Do,
+            rs => std_logic_vector(cpuAddr)(3 downto 0),
+            db_in => std_logic_vector(cpuDo),
+            unsigned(db_out) => cia1Do,
 
-			ppai => cia1_pai,
-			ppao => cia1_pao,
-			ppbi => cia1_pbi,
-			ppbo => cia1_pbo,
+            pa_in => std_logic_vector(cia1_pai),
+            unsigned(pa_out) => cia1_pao,
+            pb_in => std_logic_vector(cia1_pbi),
+            unsigned(pb_out) => cia1_pbo,
 
-			flag_n => '1',
+            flag_n => '1',
+            sp_in => '1',
+            cnt_in => '1',
 
-			irq_n => irq_cia1
+            pc_n => open,
+            tod => vicVSync,
+            irq_n => irq_cia1
 		);
 
-	cia2: entity work.cia6526
+	cia2: mos6526
 		port map (
 			clk => clk32,
-			todClk => vicVSync,
-			reset => reset,
-			enable => enableCia,
-			cs => cs_cia2,
-			we => pulseWrIo,
-			rd => pulseRd,
+            phi2 => enableCia,
+            res_n => not reset,
+            cs_n => not cs_cia2,
+            rw => not cpuWe,
 
-			addr => cpuAddr(3 downto 0),
-			di => cpuDo,
-			do => cia2Do,
+            rs => std_logic_vector(cpuAddr)(3 downto 0),
+            db_in => std_logic_vector(cpuDo),
+            unsigned(db_out) => cia2Do,
 
-			ppai => cia2_pai,
-			ppao => cia2_pao,
-			ppbi => cia2_pbi,
-			ppbo => cia2_pbo,
+            pa_in => std_logic_vector(cia2_pai),
+            unsigned(pa_out) => cia2_pao,
+            pb_in => std_logic_vector(cia2_pbi),
+            unsigned(pb_out) => cia2_pbo,
 
-			flag_n => '1',
+            flag_n => '1',
+            sp_in => '1',
+            cnt_in => '1',
 
-			irq_n => irq_cia2
+            pc_n => open,
+            tod => vicVSync,
+            irq_n => irq_cia2
 		);
 
 -- -----------------------------------------------------------------------
