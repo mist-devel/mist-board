@@ -53,9 +53,7 @@ reg [7:0] crb;
 reg        flag_n_prev;
 
 reg [15:0] timer_a;
-reg [ 1:0] timer_a_out;
 reg [15:0] timer_b;
-reg [ 1:0] timer_b_out;
 
 reg        tod_prev;
 reg        tod_run;
@@ -141,10 +139,8 @@ always @(posedge clk) begin
       end
     endcase
   if (phi2) begin
-    pb_out[7]   <= crb[1] ? crb[2] ? timer_b_out[1] | ~ddrb[7] :
-                   timer_b_out[0] | ~ddrb[7] : prb[7] | ~ddrb[7];
-    pb_out[6]   <= cra[1] ? cra[2] ? timer_a_out[1] | ~ddrb[6] :
-                   timer_a_out[0] | ~ddrb[7] : prb[6] | ~ddrb[6];
+    pb_out[7]   <= crb[1] ? (crb[2] ? timerBff ^ timerBoverflow : timerBoverflow) : prb[7] | ~ddrb[7];
+    pb_out[6]   <= cra[1] ? (cra[2] ? timerAff ^ timerAoverflow : timerAoverflow) : prb[6] | ~ddrb[6];
     pb_out[5:0] <= prb[5:0] | ~ddrb[5:0];
   end
 end
@@ -163,93 +159,135 @@ always @(posedge clk) begin
 end
 
 // Timer A
+reg countA0, countA1, countA2, countA3, loadA1, oneShotA0;
+reg timerAff;
+wire timerAin = cra[5] ? countA1 : 1'b1;
+wire [15:0] newTimerAVal = countA3 ? (timer_a - 1'b1) : timer_a;
+wire timerAoverflow = !newTimerAVal & countA2;
+
 always @(posedge clk) begin
+
   if (!res_n) begin
     ta_lo          <= 8'hff;
     ta_hi          <= 8'hff;
     cra            <= 8'h00;
     timer_a        <= 16'h0000;
-    timer_a_out[1] <= 1'b0;
+    timerAff       <= 1'b0;
     int_data[0]    <= 1'b0;
   end
-  else if (!cs_n && !rw)
-    case (rs)
-      4'h4: ta_lo <= db_in;
-      4'h5: ta_hi <= db_in;
-      4'he: begin
-        cra            <= db_in;
-        timer_a_out[1] <= timer_a_out[1] | db_in[0];
+  else begin
+    if (phi2) begin
+      countA0 <= cnt_in && ~cnt_in_prev;
+      countA1 <= countA0;
+      countA2 <= timerAin & cra[0];
+      countA3 <= countA2;
+      loadA1 <= cra[4];
+      cra[4] <= 0;
+      oneShotA0 <= cra[3];
+      timer_a <= newTimerAVal;
+      if (timerAoverflow) begin
+        timerAff <= ~timerAff;
+        int_data[0] <= 1'b1;
+        timer_a <= {ta_hi, ta_lo};
+        countA3 <= 0;
+        if (cra[3] | oneShotA0) begin
+            cra[0] <= 0;
+            countA2 <= 0;
+        end
       end
-      default: begin
-        ta_lo          <= ta_lo;
-        ta_hi          <= ta_hi;
-        cra            <= cra;
-        timer_a_out[1] <= timer_a_out[1];
+
+      if (loadA1) begin
+        timer_a <= {ta_hi, ta_lo};
+        countA3 <= 0;
       end
-    endcase
-  timer_a_out[0] <= phi2 ? 1'b0 : timer_a_out[0];
-  if (phi2 && cra[0] && !cra[4]) begin
-    if (!cra[5]) timer_a <= timer_a - 1'b1;
-    else timer_a <= (cnt_in && !cnt_in_prev) ? timer_a - 1'b1 : timer_a;
-    if (!timer_a) begin
-      cra[0]      <= ~cra[3];
-      int_data[0] <= 1'b1;
-      timer_a     <= {ta_hi, ta_lo};
-      timer_a_out <= {~timer_a_out[1], 1'b1};
     end
+    if (int_reset[1]) int_data[0] <= 1'b0;
+
+    if (!cs_n && !rw)
+      case (rs)
+        4'h4: ta_lo <= db_in;
+        4'h5:
+        begin
+            ta_hi <= db_in;
+            if (~cra[0]) begin
+                timer_a <= {db_in, ta_lo};
+                countA3 <= 0;
+            end
+        end
+        4'he:
+        begin
+            cra   <= db_in;
+            timerAff <= timerAff | (db_in[0] & ~cra[0]);
+        end
+        default: ;
+      endcase;
   end
-  if ((phi2 && cra[4]) || (!cra[0] && !cs_n && !rw && rs == 4'h5)) begin
-    cra[4]  <= 1'b0;
-    timer_a <= {ta_hi, ta_lo};
-  end
-  if (int_reset[1]) int_data[0] <= 1'b0;
 end
 
 // Timer B
+reg countB0, countB1, countB2, countB3, loadB1, oneShotB0;
+reg timerBff;
+wire timerBin = crb[6] ? timerAoverflow & (~crb[5] | cnt_in) : (~crb[5] | countB1);
+wire [15:0] newTimerBVal = countB3 ? (timer_b - 1'b1) : timer_b;
+wire timerBoverflow = !newTimerBVal & countB2;
+
 always @(posedge clk) begin
+
   if (!res_n) begin
     tb_lo          <= 8'hff;
     tb_hi          <= 8'hff;
     crb            <= 8'h00;
     timer_b        <= 16'h0000;
-    timer_b_out[1] <= 1'b0;
+    timerBff       <= 1'b0;
     int_data[1]    <= 1'b0;
   end
-  else if (!cs_n && !rw)
-    case (rs)
-      4'h6: tb_lo <= db_in;
-      4'h7: tb_hi <= db_in;
-      4'hf: begin
-        crb            <= db_in;
-        timer_b_out[1] <= timer_b_out[1] | db_in[0];
+  else begin
+    if (phi2) begin
+      countB0 <= cnt_in && ~cnt_in_prev;
+      countB1 <= countB0;
+      countB2 <= timerBin & crb[0];
+      countB3 <= countB2;
+      loadB1 <= crb[4];
+      crb[4] <= 0;
+      oneShotB0 <= crb[3];
+      timer_b <= newTimerBVal;
+      if (timerBoverflow) begin
+        timerBff <= ~timerBff;
+        int_data[1] <= 1'b1;
+        timer_b <= {tb_hi, tb_lo};
+        countB3 <= 0;
+        if (crb[3] | oneShotB0) begin
+            crb[0] <= 0;
+            countB2 <= 0;
+        end
       end
-      default: begin
-        tb_lo          <= tb_lo;
-        tb_hi          <= tb_hi;
-        crb            <= crb;
-        timer_b_out[1] <= timer_b_out[1];
+
+      if (loadB1) begin
+        timer_b <= {tb_hi, tb_lo};
+        countB3 <= 0;
       end
-    endcase
-  timer_b_out[0] <= phi2 ? 1'b0 : timer_b_out[0];
-  if (phi2 && crb[0] && !crb[4]) begin
-    case (crb[6:5])
-      2'b00: timer_b <= timer_b - 1'b1;
-      2'b01: timer_b <= (cnt_in && !cnt_in_prev) ? timer_b - 1'b1 : timer_b;
-      2'b10: timer_b <= timer_a_out[0] ? timer_b - 1'b1 : timer_b;
-      2'b11: timer_b <= (timer_a_out[0] && cnt_in) ? timer_b - 1'b1 : timer_b;
-    endcase
-    if (!timer_b) begin
-      crb[0]      <= ~crb[3];
-      int_data[1] <= 1'b1;
-		timer_b     <= {tb_hi, tb_lo};
-      timer_b_out <= {~timer_b_out[1], 1'b1};
     end
+    if (int_reset[1]) int_data[1] <= 1'b0;
+
+    if (!cs_n && !rw)
+      case (rs)
+        4'h6: tb_lo <= db_in;
+        4'h7:
+        begin
+            tb_hi <= db_in;
+            if (~crb[0]) begin
+                timer_b <= {db_in, tb_lo};
+                countB3 <= 0;
+            end
+        end
+        4'hf:
+        begin
+            crb   <= db_in;
+            timerBff <= timerBff | (db_in[0] & ~crb[0]);
+        end
+        default: ;
+      endcase;
   end
-  if ((phi2 && crb[4]) || (!crb[0] && !cs_n && !rw && rs == 4'h7)) begin
-    crb[4]  <= 1'b0;
-    timer_b <= {tb_hi, tb_lo};    
-  end
-  if (int_reset[1]) int_data[1] <= 1'b0;
 end
 
 // Time of Day
@@ -412,10 +450,10 @@ always @(posedge clk) begin
   if (!cra[6] && cnt_in && !cnt_in_prev) cnt_pulsecnt <= cnt_pulsecnt + 1'b1;
   else if (cra[6] && !cra[3] && cra[0]) begin
     if (sp_transmit) begin
-      cnt_out <= timer_a_out[0] ? ~cnt_out : cnt_out;
+      cnt_out <= timerAoverflow ? ~cnt_out : cnt_out;
       if (!cnt_out && cnt_out_prev) cnt_pulsecnt <= cnt_pulsecnt + 1'b1;
     end
-    else cnt_out <= timer_a_out[0] ? 1'b1 : cnt_out;
+    else cnt_out <= timerAoverflow ? 1'b1 : cnt_out;
   end
 end
 
