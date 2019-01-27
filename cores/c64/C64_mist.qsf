@@ -156,7 +156,7 @@ set_global_assignment -name RESERVE_DCLK_AFTER_CONFIGURATION "USE AS REGULAR IO"
 set_global_assignment -name CYCLONEII_RESERVE_NCEO_AFTER_CONFIGURATION "USE AS REGULAR IO"
 set_global_assignment -name OPTIMIZE_HOLD_TIMING "ALL PATHS"
 set_global_assignment -name OPTIMIZE_MULTI_CORNER_TIMING ON
-set_global_assignment -name FITTER_EFFORT "STANDARD FIT"
+set_global_assignment -name FITTER_EFFORT "AUTO FIT"
 
 # Assembler Assignments
 # =====================
@@ -165,7 +165,7 @@ set_global_assignment -name USE_CONFIGURATION_DEVICE OFF
 
 # SignalTap II Assignments
 # ========================
-set_global_assignment -name ENABLE_SIGNALTAP ON
+set_global_assignment -name ENABLE_SIGNALTAP OFF
 set_global_assignment -name USE_SIGNALTAP_FILE stp1.stp
 
 # Power Estimation Assignments
@@ -337,7 +337,8 @@ set_global_assignment -name VHDL_FILE rtl/fpga64_rgbcolor.vhd
 set_global_assignment -name VHDL_FILE rtl/fpga64_keyboard_matrix_mark_mcdougall.vhd
 set_global_assignment -name VHDL_FILE rtl/fpga64_bustiming.vhd
 set_global_assignment -name VHDL_FILE rtl/fpga64_buslogic_roms_mmu.vhd
-set_global_assignment -name VHDL_FILE rtl/cia6526.vhd
+set_global_assignment -name VERILOG_FILE rtl/mos6526.v
+set_global_assignment -name VHDL_FILE rtl/mos6526.vhd
 set_global_assignment -name VHDL_FILE rtl/cpu_6510.vhd
 set_global_assignment -name VERILOG_FILE rtl/cartridge.v
 set_global_assignment -name VHDL_FILE rtl/rom_c64_chargen.vhd
