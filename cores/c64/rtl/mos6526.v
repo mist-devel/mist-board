@@ -1,3 +1,9 @@
+// MOS6526
+// by Rayne
+// Timers & Interrupts are rewritten by slingshot
+// Passes all CIA Timer tests
+// TODO: check if Flag and Serial port interrupts are still working
+
 module mos6526 (
   input  wire       clk,
   input  wire       phi2,
@@ -45,6 +51,7 @@ reg [6:0] tod_min;
 reg [5:0] tod_hr;
 
 reg [7:0] sdr;
+reg [4:0] imr;
 reg [4:0] icr;
 reg [7:0] cra;
 reg [7:0] crb;
@@ -73,8 +80,7 @@ reg        cnt_in_prev;
 reg        cnt_out_prev;
 reg [ 2:0] cnt_pulsecnt;
 
-reg [ 4:0] int_data;
-reg [ 1:0] int_reset;
+reg        int_reset;
 
 // Register Decoding
 always @(posedge clk) begin
@@ -99,7 +105,7 @@ always @(posedge clk) begin
                       {tod_latch[23], 2'h0, tod_latch[22:18]} :
                       {tod_hr[5], 2'h0, tod_hr[4:0]};
       4'hc: db_out <= sdr;
-      4'hd: db_out <= {~irq_n, 2'b00, int_data};
+      4'hd: db_out <= {~irq_n, 2'b00, icr};
       4'he: db_out <= {cra[7:5], 1'b0, cra[3:0]};
       4'hf: db_out <= {crb[7:5], 1'b0, crb[3:0]};
     endcase
@@ -147,8 +153,8 @@ end
 
 // FLAG Input
 always @(posedge clk) begin
-  if (!res_n || int_reset[1]) int_data[4] <= 1'b0;
-  else if (!flag_n && flag_n_prev) int_data[4] <= 1'b1;
+  if (!res_n || int_reset) icr[4] <= 1'b0;
+  else if (!flag_n && flag_n_prev) icr[4] <= 1'b1;
   if (phi2) flag_n_prev <= flag_n;
 end
 
@@ -173,10 +179,11 @@ always @(posedge clk) begin
     cra            <= 8'h00;
     timer_a        <= 16'h0000;
     timerAff       <= 1'b0;
-    int_data[0]    <= 1'b0;
+    icr[0]         <= 1'b0;
   end
   else begin
     if (phi2) begin
+      if (int_reset) icr[0] <= 0;
       countA0 <= cnt_in && ~cnt_in_prev;
       countA1 <= countA0;
       countA2 <= timerAin & cra[0];
@@ -187,7 +194,7 @@ always @(posedge clk) begin
       timer_a <= newTimerAVal;
       if (timerAoverflow) begin
         timerAff <= ~timerAff;
-        int_data[0] <= 1'b1;
+        icr[0] <= 1;
         timer_a <= {ta_hi, ta_lo};
         countA3 <= 0;
         if (cra[3] | oneShotA0) begin
@@ -201,7 +208,6 @@ always @(posedge clk) begin
         countA3 <= 0;
       end
     end
-    if (int_reset[1]) int_data[0] <= 1'b0;
 
     if (!cs_n && !rw)
       case (rs)
@@ -239,10 +245,11 @@ always @(posedge clk) begin
     crb            <= 8'h00;
     timer_b        <= 16'h0000;
     timerBff       <= 1'b0;
-    int_data[1]    <= 1'b0;
+    icr[1]         <= 1'b0;
   end
   else begin
     if (phi2) begin
+      if (int_reset) icr[1] <= 0;
       countB0 <= cnt_in && ~cnt_in_prev;
       countB1 <= countB0;
       countB2 <= timerBin & crb[0];
@@ -253,7 +260,7 @@ always @(posedge clk) begin
       timer_b <= newTimerBVal;
       if (timerBoverflow) begin
         timerBff <= ~timerBff;
-        int_data[1] <= 1'b1;
+        icr[1] <= 1;
         timer_b <= {tb_hi, tb_lo};
         countB3 <= 0;
         if (crb[3] | oneShotB0) begin
@@ -267,7 +274,6 @@ always @(posedge clk) begin
         countB3 <= 0;
       end
     end
-    if (int_reset[1]) int_data[1] <= 1'b0;
 
     if (!cs_n && !rw)
       case (rs)
@@ -301,7 +307,7 @@ always @(posedge clk) begin
     tod_alarm   <= 24'h000000;
     tod_latch   <= 24'h000000;
     tod_latched <= 1'b0;
-    int_data[2] <= 1'b0;
+    icr[2] <= 1'b0;
   end
   else if (!cs_n && !rw)
     case (rs)
@@ -381,12 +387,15 @@ always @(posedge clk) begin
     end
   end
   else tod_count <= 3'h0;
-  if ({tod_hr, tod_min, tod_sec, tod_10ths} == tod_alarm) begin
-    tod_alarm_reg <= 1'b1;
-    int_data[2]   <= !tod_alarm_reg ? 1'b1 : int_data[2];
+
+  if (phi2) begin
+    if ({tod_hr, tod_min, tod_sec, tod_10ths} == tod_alarm) begin
+      tod_alarm_reg <= 1'b1;
+      icr[2]   <= !tod_alarm_reg ? 1'b1 : icr[2];
+    end
+    else tod_alarm_reg <= 1'b0;
+    if (int_reset) icr[2] <= 1'b0;
   end
-  else tod_alarm_reg <= 1'b0;
-  if (int_reset[1]) int_data[2] <= 1'b0;
 end
 
 // Serial Port Input/Output
@@ -398,7 +407,7 @@ always @(posedge clk) begin
     sp_received <= 1'b0;
     sp_transmit <= 1'b0;
     sp_shiftreg <= 8'h00;
-    int_data[3] <= 1'b0;
+    icr[3]      <= 1'b0;
   end
   else if (!cs_n && !rw)
     case (rs)
@@ -408,7 +417,7 @@ always @(posedge clk) begin
   if (!cra[6]) begin
     if (sp_received) begin
       sdr         <= sp_shiftreg;
-      int_data[3] <= 1'b1;
+      icr[3]      <= 1'b1;
       sp_received <= 1'b0;
       sp_shiftreg <= 8'h00;
     end
@@ -426,14 +435,14 @@ always @(posedge clk) begin
     end
     else if (!cnt_out && cnt_out_prev) begin
       if (cnt_pulsecnt == 3'h7) begin
-        int_data[3] <= 1'b1;
+        icr[3]      <= 1'b1;
         sp_transmit <= 1'b0;
       end
       sp_out      <= sp_shiftreg[7];
       sp_shiftreg <= {sp_shiftreg[6:0], 1'b0};
     end
   end
-  if (int_reset[1]) int_data[3] <= 1'b0;
+  if (int_reset) icr[3] <= 1'b0;
 end
 
 // CNT Input/Output
@@ -457,21 +466,29 @@ always @(posedge clk) begin
   end
 end
 
+reg [7:0] imr_reg;
 // Interrupt Control
 always @(posedge clk) begin
   if (!res_n) begin
-    icr       <= 5'h00;
+    imr       <= 5'h00;
     irq_n     <= 1'b1;
-    int_reset <= 2'b00;
+    int_reset <= 0;
   end
-  else if (!cs_n && !rw)
-    case (rs)
-      4'hd: icr <= db_in[7] ? icr | db_in[4:0] : icr & ~db_in[4:0];
-      default: icr <= icr;
-    endcase
-  else irq_n <= irq_n ? ~|(icr & int_data) : int_reset[1] ? 1'b1 : irq_n;
-  if (!cs_n && rw && rs == 4'hd) int_reset <= 2'b01;
-  else if (int_reset) int_reset <= {int_reset[0], 1'b0};
+  else begin
+    if (!cs_n && !rw)
+      case (rs)
+        4'hd: imr_reg <= db_in;
+      endcase
+
+    int_reset <= 0;
+    if (!cs_n && rw && rs == 4'hd) int_reset <= 1;
+
+    if (phi2) begin
+      imr <= imr_reg[7] ? imr | imr_reg[4:0] : imr & ~imr_reg[4:0];
+      irq_n <= irq_n ? ~|(imr & icr) : irq_n;
+      if (int_reset) irq_n <= 1;
+    end
+  end
 end
 
 endmodule
