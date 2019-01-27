@@ -92,10 +92,6 @@ wire [1:0] switches;
 wire        ps2_clk;
 wire        ps2_dat;
 
-// ~14khz clock generation
-reg [10:0]  clk_14k_div;
-wire        clk_14k = clk_14k_div[10] /* synthesis keep */; 
-
 // the top file should generate the correct clocks for the machine
 
 assign SDRAM_CLK = !clk_32m;
@@ -112,12 +108,11 @@ reg clk_12m;
 always @(posedge clk_24m)
 	clk_12m <= !clk_12m;
 
-//wire clk_osd = scandoubler_disable?clk_12m:clk_24m;
-wire clk_osd = scandoubler_disable?clk_12m:1;
+wire ce_pix = scandoubler_disable?clk_12m:1'd1;
 	
 osd #(0,0,4) OSD (
 	.clk_sys    ( clk_24m      ),
-   .ce_pix     ( clk_osd      ),
+	.ce_pix     ( ce_pix       ),
 
    // spi for OSD
    .sdi        ( SPI_DI       ),
@@ -135,7 +130,7 @@ osd #(0,0,4) OSD (
    .green_out  ( VGA_G        ),
    .blue_out   ( VGA_B        ),
    .hs_out     ( v_hs         ),
-   .vs_out     ( v_vs         ),
+   .vs_out     ( v_vs         )
 );
 
 wire v_hs, v_vs;
@@ -159,6 +154,8 @@ wire [7:0] sd_din;
 wire sd_din_strobe;
 wire [8:0] sd_buff_addr;
 wire sd_ack_conf;
+wire img_mounted;
+wire [31:0] img_size;
 
 wire [7:0] joystick_0;
 wire [7:0] joystick_1;
@@ -168,14 +165,15 @@ wire [15:0] joystick_analog_1;
 wire scandoubler_disable;
 
 user_io #(.STRLEN(CONF_STR_LEN)) user_io(
-   .conf_str      ( CONF_STR        ),
+	.conf_str      ( CONF_STR        ),
 	.clk_sys(clk_32m),
+	.clk_sd(clk_32m),
 
-   // the spi interface
-   .SPI_CLK     	( SPI_SCK         ),
-   .SPI_SS_IO     ( CONF_DATA0      ),
-   .SPI_MISO      ( SPI_DO          ),   // tristate handling inside user_io
-   .SPI_MOSI      ( SPI_DI          ),
+	// the spi interface
+	.SPI_CLK       ( SPI_SCK         ),
+	.SPI_SS_IO     ( CONF_DATA0      ),
+	.SPI_MISO      ( SPI_DO          ),   // tristate handling inside user_io
+	.SPI_MOSI      ( SPI_DI          ),
 	
 	// use mist joystick 1 as bbc primary joystick
 	.joystick_0        ( joystick_1 ),
@@ -183,28 +181,30 @@ user_io #(.STRLEN(CONF_STR_LEN)) user_io(
 	.joystick_analog_0 ( joystick_analog_1 ),
 	.joystick_analog_1 ( joystick_analog_0 ),
 
-   .status        ( status          ),
+	.status        ( status          ),
 	.switches      ( switches        ),
-   .buttons       ( buttons         ),
+	.buttons       ( buttons         ),
 	.scandoubler_disable ( scandoubler_disable ),
 
    // interface to embedded legacy sd card wrapper
-   .sd_lba     	( sd_lba				),
-   .sd_rd      	( sd_rd				),
-   .sd_wr      	( sd_wr				),
-   .sd_ack     	( sd_ack				),
-   .sd_conf    	( sd_conf			),
-   .sd_sdhc    	( sd_sdhc			),
-   .sd_dout    	( sd_dout			),
-   .sd_dout_strobe(sd_dout_strobe	),
-   .sd_din     	( sd_din				),
-   .sd_din_strobe (sd_din_strobe		),
-	.sd_buff_addr  (sd_buff_addr     ),
-	.sd_ack_conf   (sd_ack_conf      ),
+	.sd_lba     	( sd_lba        ),
+	.sd_rd      	( sd_rd         ),
+	.sd_wr      	( sd_wr         ),
+	.sd_ack     	( sd_ack        ),
+	.sd_conf    	( sd_conf       ),
+	.sd_sdhc    	( sd_sdhc       ),
+	.sd_dout    	( sd_dout       ),
+	.sd_dout_strobe ( sd_dout_strobe),
+	.sd_din     	( sd_din        ),
+	.sd_din_strobe  ( sd_din_strobe ),
+	.sd_buff_addr   ( sd_buff_addr  ),
+	.sd_ack_conf    ( sd_ack_conf   ),
 
-	.ps2_clk 		( clk_14k			), 
-	.ps2_kbd_clk	( ps2_clk			), 
-	.ps2_kbd_data	( ps2_dat			)
+	.img_mounted    ( img_mounted   ),
+	.img_size       ( img_size      ),
+
+	.ps2_kbd_clk	( ps2_clk       ), 
+	.ps2_kbd_data	( ps2_dat       )
 );
 
 // wire the sd card to the user port
@@ -215,20 +215,21 @@ wire sd_sdo;
 
  sd_card sd_card (
 	// connection to io controller
-	.clk(clk_32m),
-	.io_lba (sd_lba ),
-	.io_rd  (sd_rd),
-	.io_wr  (sd_wr),
-	.io_ack (sd_ack),
-	.io_ack_conf (sd_ack_conf      ),
-	.io_conf (sd_conf),
-	.io_sdhc (sd_sdhc),
-	.io_din (sd_dout),
-	.io_din_strobe (sd_dout_strobe),
-	.io_dout (sd_din),
-	.io_dout_strobe ( sd_din_strobe),
-	.io_buff_addr  (sd_buff_addr     ),
-   .allow_sdhc ( 1'b1),   // SDHC not supported
+	.clk_sys(clk_32m),
+	.sd_lba (sd_lba ),
+	.sd_rd  (sd_rd),
+	.sd_wr  (sd_wr),
+	.sd_ack (sd_ack),
+	.sd_ack_conf (sd_ack_conf      ),
+	.sd_conf (sd_conf),
+	.sd_sdhc (sd_sdhc),
+	.sd_buff_dout (sd_dout),
+	.sd_buff_wr (sd_dout_strobe),
+	.sd_buff_din (sd_din),
+	.sd_buff_addr  (sd_buff_addr     ),
+	.img_mounted (img_mounted),
+	.img_size (img_size),
+	.allow_sdhc ( 1'b1),
  
     // connection to local CPU
    .sd_cs   ( sd_cs          ),
@@ -456,9 +457,6 @@ wire [1:0] video_g = scandoubler_disable?core_g:sd_g;
 wire [1:0] video_b = scandoubler_disable?core_b:sd_b;
 wire video_hs = scandoubler_disable?core_hs:sd_hs;
 wire video_vs = scandoubler_disable?core_vs:sd_vs;
-
-always @(posedge clk_32m)
-	clk_14k_div <= clk_14k_div + 'd1;
 
 // map 64k sideways ram to bank 4,5,6 and 7
 wire sideways_ram = 
