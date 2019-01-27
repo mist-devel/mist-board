@@ -149,12 +149,12 @@ architecture gideon of sid_regs is
         X"FF", X"FF", X"FF", X"FF", X"FF", X"FF", X"FF",  -- F7
         X"FF", X"FF" );                                   -- FE
          
-    signal address  : unsigned(7 downto 0);
 begin
     process(clock)
+        variable address: unsigned(7 downto 0);
     begin
         if rising_edge(clock) then
-            address  <= unsigned(address_remap(to_integer(addr)));
+            address  := unsigned(address_remap(to_integer(addr)));
             do_write <= wren;
             wdata_d  <= wdata;
 
@@ -211,6 +211,18 @@ begin
             when "00011100" => rdata <= env3;
             when others     => rdata <= (others => '0');
             end case;
+            if address(3) = '0' then
+                case address(2 downto 0) is
+                when "000" => rdata <= freq_lo(to_integer(address(7 downto 4)));
+                when "001" => rdata <= freq_hi(to_integer(address(7 downto 4)));
+                when "010" => rdata <= phase_lo(to_integer(address(7 downto 4)));
+                when "011" => rdata <= "0000" & phase_hi(to_integer(address(7 downto 4)));
+                when "100" => rdata <= control(to_integer(address(7 downto 4)));
+                when "101" => rdata <= att_dec(to_integer(address(7 downto 4)));
+                when "110" => rdata <= sust_rel(to_integer(address(7 downto 4)));
+                when others => null;
+                end case;
+            end if;
 
             if reset='1' then
 					 freq_lo  <= (others => (others => '0'));
