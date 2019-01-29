@@ -40,6 +40,9 @@ set_clock_groups -asynchronous -group [get_clocks {SPI_SCK}] -group [get_clocks 
 set_output_delay -clock [get_clocks {CLOCKS|altpll_component|auto_generated|pll1|clk[0]}] -max 0 [get_ports {VGA_*}]
 set_output_delay -clock [get_clocks {CLOCKS|altpll_component|auto_generated|pll1|clk[0]}] -min -5 [get_ports {VGA_*}]
 
+set_multicycle_path -to {VGA_*[*]} -setup 2
+set_multicycle_path -to {VGA_*[*]} -hold 1
+
 # SDRAM delays
 set_input_delay -clock [get_clocks {CLOCKS|altpll_component|auto_generated|pll1|clk[0]}] -max 6.4 [get_ports SDRAM_DQ[*]]
 set_input_delay -clock [get_clocks {CLOCKS|altpll_component|auto_generated|pll1|clk[0]}] -min 3.2 [get_ports SDRAM_DQ[*]]

@@ -1,3 +1,14 @@
 out/
+db/
+incremental_db/
+greybox_tmp
 PLLJ_PLLSPE_INFO.txt
 *.qws
+*.bak
+*.jdi
+*.sof
+*.done
+*.pin
+*.rpt
+*.smsg
+*.summary

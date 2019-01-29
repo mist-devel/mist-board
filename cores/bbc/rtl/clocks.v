@@ -109,7 +109,7 @@ begin : ttxt_clk_gen
    if (reset_n === 1'b 0) begin
 		ttxt_clken_counter <= {2{1'b 0}};  
    end else begin
-		ttxt_clken_counter <= ttxt_clken_counter + 1;   
+		ttxt_clken_counter <= ttxt_clken_counter + 1'd1;
    end
 end
 
