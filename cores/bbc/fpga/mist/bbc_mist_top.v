@@ -109,7 +109,8 @@ always @(posedge clk_24m)
 	clk_12m <= !clk_12m;
 
 wire ce_pix = scandoubler_disable?clk_12m:1'd1;
-	
+wire [5:0] osd_r_o, osd_g_o, osd_b_o;
+
 osd #(0,0,4) OSD (
 	.clk_sys    ( clk_24m      ),
 	.ce_pix     ( ce_pix       ),
@@ -123,22 +124,37 @@ osd #(0,0,4) OSD (
    .green_in   ( scandoubler_disable? {5{video_g[0]}} : {3{video_g}} ),
    .blue_in    ( scandoubler_disable? {5{video_b[0]}}  : {3{video_b}} ),
 	
-   .hs_in      ( video_hs      ),
-   .vs_in      ( video_vs      ),
+   .hs_in      ( video_hs     ),
+   .vs_in      ( video_vs     ),
 
-   .red_out    ( VGA_R        ),
-   .green_out  ( VGA_G        ),
-   .blue_out   ( VGA_B        ),
+   .red_out    ( osd_r_o      ),
+   .green_out  ( osd_g_o      ),
+   .blue_out   ( osd_b_o      ),
    .hs_out     ( v_hs         ),
    .vs_out     ( v_vs         )
+);
+
+wire [5:0] Y, Pb, Pr;
+
+rgb2ypbpr rgb2ypbpr
+(
+        .red   ( osd_r_o ),
+        .green ( osd_g_o ),
+        .blue  ( osd_b_o ),
+        .y     ( Y       ),
+        .pb    ( Pb      ),
+        .pr    ( Pr      )
 );
 
 wire v_hs, v_vs;
 
 // create composite sync for 15khz
 wire csync = !(v_vs ^ v_hs);
-assign VGA_HS = scandoubler_disable?csync:v_hs;
-assign VGA_VS = scandoubler_disable?1'b1:v_vs;
+assign VGA_HS = (scandoubler_disable || ypbpr) ?csync:v_hs;
+assign VGA_VS = (scandoubler_disable || ypbpr) ?1'b1:v_vs;
+assign VGA_R = ypbpr?Pr:osd_r_o;
+assign VGA_G = ypbpr? Y:osd_g_o;
+assign VGA_B = ypbpr?Pb:osd_b_o;
 
 // conections between user_io (implementing the SPIU communication 
 // to the io controller) and the legacy 
@@ -163,6 +179,7 @@ wire [15:0] joystick_analog_0;
 wire [15:0] joystick_analog_1;
 
 wire scandoubler_disable;
+wire ypbpr;
 
 user_io #(.STRLEN(CONF_STR_LEN)) user_io(
 	.conf_str      ( CONF_STR        ),
@@ -185,6 +202,7 @@ user_io #(.STRLEN(CONF_STR_LEN)) user_io(
 	.switches      ( switches        ),
 	.buttons       ( buttons         ),
 	.scandoubler_disable ( scandoubler_disable ),
+	.ypbpr         ( ypbpr           ),
 
    // interface to embedded legacy sd card wrapper
 	.sd_lba     	( sd_lba        ),
