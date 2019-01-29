@@ -4,6 +4,7 @@ use IEEE.std_logic_1164.all;
 package mos6526 is
 component mos6526
     PORT (
+	mode     : in  std_logic; -- '0' - 6256, '1' - 8521
 	clk      : in  std_logic;
 	phi2     : in  std_logic;
 	res_n    : in  std_logic;

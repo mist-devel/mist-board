@@ -5,6 +5,7 @@
 // TODO: check if Flag and Serial port interrupts are still working
 
 module mos6526 (
+  input  wire       mode, // 0 - 6526 "old", 1 - 8521 "new"
   input  wire       clk,
   input  wire       phi2,
   input  wire       res_n,
@@ -492,11 +493,11 @@ always @(posedge clk) begin
     int_reset <= 0;
     if (!cs_n && rw && rs == 4'hd) int_reset <= 1;
 
-    if (phi2) begin
+    if (phi2 | mode) begin
       imr <= imr_reg[7] ? imr | imr_reg[4:0] : imr & ~imr_reg[4:0];
       irq_n <= irq_n ? ~|(imr & icr) : irq_n;
-      if (int_reset) irq_n <= 1;
     end
+    if (phi2 & int_reset) irq_n <= 1;
   end
 end
 

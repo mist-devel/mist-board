@@ -108,7 +108,10 @@ entity fpga64_sid_iec is
 		iec_clk_i	: in  std_logic;
 		iec_atn_o	: out std_logic;
 --		iec_atn_i	: in  std_logic;
-		
+
+		-- CIA
+		cia_mode    : in std_logic;
+
 		disk_num    : out std_logic_vector(7 downto 0);
 
 		c64rom_addr : in std_logic_vector(13 downto 0);
@@ -619,6 +622,7 @@ div1m: process(clk32)				-- this process devides 32 MHz to 1MHz (for the SID)
 -- -----------------------------------------------------------------------
 	cia1: mos6526
 		port map (
+			mode => cia_mode,
 			clk => clk32,
             phi2 => enableCia,
             res_n => not reset,
@@ -645,6 +649,7 @@ div1m: process(clk32)				-- this process devides 32 MHz to 1MHz (for the SID)
 
 	cia2: mos6526
 		port map (
+			mode => cia_mode,
 			clk => clk32,
             phi2 => enableCia,
             res_n => not reset,
