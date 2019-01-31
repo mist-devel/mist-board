@@ -28,6 +28,7 @@ entity cpu_6510 is
 		nmi_n   : in  std_logic;
 		nmi_ack : out std_logic;
 		irq_n   : in  std_logic;
+		rdy     : in  std_logic;
 
 		di      : in  unsigned(7 downto 0);
 		do      : out unsigned(7 downto 0);
@@ -60,7 +61,7 @@ begin
 		Res_n   => not reset,
 		Enable  => enable,
 		Clk     => clk,
-		Rdy     => '1',
+		Rdy     => rdy,
 		Abort_n => '1',
 		IRQ_n   => irq_n,
 		NMI_n   => nmi_n,

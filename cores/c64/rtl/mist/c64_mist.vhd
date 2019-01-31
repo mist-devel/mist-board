@@ -134,6 +134,7 @@ constant CONF_STR : string :=
 	"OD,SID,6581,8580;"&
 	"O3,Joysticks,normal,swapped;"&
 	"O6,Audio filter,On,Off;"&
+	"O4,CIA Model,6256,8521;"&
 --	"OB,BIOS,C64,C64GS;" &
 	"T5,Reset & Detach Cartridge;";
 
@@ -842,6 +843,7 @@ begin
 		iec_data_i => c64_iec_data_i,
 		iec_clk_i  => c64_iec_clk_i,
 --		iec_atn_i  => not c64_iec_atn_i,
+		cia_mode => status(4),
 		disk_num => open,
 		c64rom_addr => ioctl_addr(13 downto 0),
 		c64rom_data => ioctl_data,

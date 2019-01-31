@@ -150,13 +150,14 @@ assign data_out = do_buf;
 //assign unsigned_audio = unsigned_filt[18:1];
 //assign audio_data     = filtered_audio[18:3];// + 15'h4000;//{1'b0, unsigned_audio[17:1]};
 
+reg [7:0] last_wr;
 always @(*) begin
 	case (addr)
 		  5'h19: do_buf = pot_x;
 		  5'h1a: do_buf = pot_y;
 		  5'h1b: do_buf = Misc_Osc3_Random;
 		  5'h1c: do_buf = Misc_Env3;
-		default: do_buf = 0;
+		default: do_buf = last_wr;
 	endcase
 end
 
@@ -192,6 +193,7 @@ always @(posedge clk) begin
 	end
 	else begin
 		if (we) begin
+			last_wr <= data_in;
 			case (addr)
 				5'h00: Voice_1_Freq_lo <= data_in;
 				5'h01: Voice_1_Freq_hi <= data_in;

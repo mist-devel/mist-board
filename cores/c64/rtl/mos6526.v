@@ -5,6 +5,7 @@
 // TODO: check if Flag and Serial port interrupts are still working
 
 module mos6526 (
+  input  wire       mode, // 0 - 6526 "old", 1 - 8521 "new"
   input  wire       clk,
   input  wire       phi2,
   input  wire       res_n,
@@ -409,40 +410,48 @@ always @(posedge clk) begin
     sp_shiftreg <= 8'h00;
     icr[3]      <= 1'b0;
   end
-  else if (!cs_n && !rw)
-    case (rs)
-      4'hc: sdr <= db_in;
-      default: sdr <= sdr;
-    endcase
-  if (!cra[6]) begin
-    if (sp_received) begin
-      sdr         <= sp_shiftreg;
-      icr[3]      <= 1'b1;
-      sp_received <= 1'b0;
-      sp_shiftreg <= 8'h00;
-    end
-    else if (cnt_in && !cnt_in_prev) begin
-      sp_shiftreg <= {sp_shiftreg[6:0], sp_in};
-      sp_received <= (cnt_pulsecnt == 3'h7) ? 1'b1 : sp_received;
-    end
-  end
-  else if (cra[6] && !cra[3] && cra[0]) begin
-    if (!cs_n && !rw && rs == 8'hc) sp_pending <= 1'b1;
-    if (sp_pending && !sp_transmit) begin
-      sp_pending  <= 1'b0;
-      sp_transmit <= 1'b1;
-      sp_shiftreg <= sdr;
-    end
-    else if (!cnt_out && cnt_out_prev) begin
-      if (cnt_pulsecnt == 3'h7) begin
-        icr[3]      <= 1'b1;
-        sp_transmit <= 1'b0;
+  else begin
+    if (!cs_n && !rw)
+      case (rs)
+        4'hc:
+          begin
+            sdr <= db_in;
+            sp_pending <= 1;
+          end
+      endcase
+
+    if (phi2) begin
+      if (int_reset) icr[3] <= 1'b0;
+
+      if (!cra[6]) begin // input
+        if (sp_received) begin
+          sdr         <= sp_shiftreg;
+          icr[3]      <= 1'b1;
+          sp_received <= 1'b0;
+          sp_shiftreg <= 8'h00;
+        end
+        else if (cnt_in && !cnt_in_prev) begin
+          sp_shiftreg <= {sp_shiftreg[6:0], sp_in};
+          sp_received <= (cnt_pulsecnt == 3'h7) ? 1'b1 : sp_received;
+        end
       end
-      sp_out      <= sp_shiftreg[7];
-      sp_shiftreg <= {sp_shiftreg[6:0], 1'b0};
+      else if (cra[6]) begin // output
+        if (sp_pending && !sp_transmit) begin
+          sp_pending  <= 1'b0;
+          sp_transmit <= 1'b1;
+          sp_shiftreg <= sdr;
+        end
+        else if (!cnt_out && cnt_out_prev) begin
+          if (cnt_pulsecnt == 3'h7) begin
+            icr[3]      <= 1'b1;
+            sp_transmit <= 1'b0;
+          end
+          sp_out      <= sp_shiftreg[7];
+          sp_shiftreg <= {sp_shiftreg[6:0], 1'b0};
+        end
+      end
     end
   end
-  if (int_reset) icr[3] <= 1'b0;
 end
 
 // CNT Input/Output
@@ -455,14 +464,15 @@ always @(posedge clk) begin
   else if (phi2) begin
     cnt_in_prev  <= cnt_in;
     cnt_out_prev <= cnt_out;
-  end
-  if (!cra[6] && cnt_in && !cnt_in_prev) cnt_pulsecnt <= cnt_pulsecnt + 1'b1;
-  else if (cra[6] && !cra[3] && cra[0]) begin
-    if (sp_transmit) begin
-      cnt_out <= timerAoverflow ? ~cnt_out : cnt_out;
-      if (!cnt_out && cnt_out_prev) cnt_pulsecnt <= cnt_pulsecnt + 1'b1;
+
+    if (!cra[6] && cnt_in && !cnt_in_prev) cnt_pulsecnt <= cnt_pulsecnt + 1'b1;
+    else if (cra[6]) begin
+      if (sp_transmit) begin
+        cnt_out <= timerAoverflow ? ~cnt_out : cnt_out;
+        if (!cnt_out && cnt_out_prev) cnt_pulsecnt <= cnt_pulsecnt + 1'b1;
+      end
+      else cnt_out <= timerAoverflow ? 1'b1 : cnt_out;
     end
-    else cnt_out <= timerAoverflow ? 1'b1 : cnt_out;
   end
 end
 
@@ -483,11 +493,11 @@ always @(posedge clk) begin
     int_reset <= 0;
     if (!cs_n && rw && rs == 4'hd) int_reset <= 1;
 
-    if (phi2) begin
+    if (phi2 | mode) begin
       imr <= imr_reg[7] ? imr | imr_reg[4:0] : imr & ~imr_reg[4:0];
       irq_n <= irq_n ? ~|(imr & icr) : irq_n;
-      if (int_reset) irq_n <= 1;
     end
+    if (phi2 & int_reset) irq_n <= 1;
   end
 end
 
