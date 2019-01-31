@@ -98,6 +98,7 @@ architecture gideon of sid_regs is
     signal sust_rel : byte_array_t(0 to 15)  := (others => (others => '0'));
     signal do_write : std_logic;
     signal wdata_d  : std_logic_vector(7 downto 0);
+    signal last_write : std_logic_vector(7 downto 0);
     signal filt_en_i: std_logic_vector(15 downto 0) := (others => '0');
     
     constant address_remap : byte_array_t(0 to 255) := (
@@ -159,6 +160,7 @@ begin
             wdata_d  <= wdata;
 
             if do_write='0' and wren='1' then
+                last_write <= wdata_d;
                 if address(3)='0' then -- Voice register
                     case address(2 downto 0) is
                     when "000" =>   freq_lo(to_integer(address(7 downto 4))) <= wdata_d;
@@ -209,20 +211,8 @@ begin
             when "00011010" => rdata <= poty;
             when "00011011" => rdata <= osc3;
             when "00011100" => rdata <= env3;
-            when others     => rdata <= (others => '0');
+            when others     => rdata <= last_write;
             end case;
-            if address(3) = '0' then
-                case address(2 downto 0) is
-                when "000" => rdata <= freq_lo(to_integer(address(7 downto 4)));
-                when "001" => rdata <= freq_hi(to_integer(address(7 downto 4)));
-                when "010" => rdata <= phase_lo(to_integer(address(7 downto 4)));
-                when "011" => rdata <= "0000" & phase_hi(to_integer(address(7 downto 4)));
-                when "100" => rdata <= control(to_integer(address(7 downto 4)));
-                when "101" => rdata <= att_dec(to_integer(address(7 downto 4)));
-                when "110" => rdata <= sust_rel(to_integer(address(7 downto 4)));
-                when others => null;
-                end case;
-            end if;
 
             if reset='1' then
 					 freq_lo  <= (others => (others => '0'));
