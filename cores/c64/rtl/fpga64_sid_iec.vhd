@@ -372,10 +372,7 @@ begin
 				enableVic <= '1';
 			when CYCLE_CPUE =>
 				enableVic <= '1';
-				if baLoc = '1'
-				or cpuWe = '1' then
-					enableCpu <= '1';
-				end if;
+				enableCpu <= '1';
 			when CYCLE_CPUF =>
 				enableCia <= '1';
 			when others =>
@@ -616,7 +613,7 @@ div1m: process(clk32)				-- this process devides 32 MHz to 1MHz (for the SID)
 		audio_data => audio_8580,
 		extfilter_en => extfilter_en
 ); 
-	
+
 -- -----------------------------------------------------------------------
 -- CIAs
 -- -----------------------------------------------------------------------
@@ -686,6 +683,7 @@ div1m: process(clk32)				-- this process devides 32 MHz to 1MHz (for the SID)
 			nmi_n => nmiLoc,
 			nmi_ack => nmi_ack,
 			irq_n => irqLoc,
+			rdy => baLoc,
 
 			di => cpuDi,
 			addr => cpuAddr,
