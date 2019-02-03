@@ -126,7 +126,7 @@ set_global_assignment -name MAX_CORE_JUNCTION_TEMP 85
 
 # Analysis & Synthesis Assignments
 # ================================
-set_global_assignment -name CYCLONEII_OPTIMIZATION_TECHNIQUE SPEED
+set_global_assignment -name CYCLONEII_OPTIMIZATION_TECHNIQUE BALANCED
 set_global_assignment -name FAMILY "Cyclone III"
 set_global_assignment -name TOP_LEVEL_ENTITY c64_mist
 set_global_assignment -name DEVICE_FILTER_PACKAGE TQFP
@@ -166,7 +166,7 @@ set_global_assignment -name USE_CONFIGURATION_DEVICE OFF
 # SignalTap II Assignments
 # ========================
 set_global_assignment -name ENABLE_SIGNALTAP OFF
-set_global_assignment -name USE_SIGNALTAP_FILE stp1.stp
+set_global_assignment -name USE_SIGNALTAP_FILE output_files/sid.stp
 
 # Power Estimation Assignments
 # ============================
@@ -320,6 +320,10 @@ set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to CONF_DATA0
 set_global_assignment -name PARTITION_NETLIST_TYPE SOURCE -section_id Top
 set_global_assignment -name PARTITION_FITTER_PRESERVATION_LEVEL PLACEMENT_AND_ROUTING -section_id Top
 set_global_assignment -name PARTITION_COLOR 16764057 -section_id Top
+set_global_assignment -name VERILOG_FILE rtl/sid8580/sid_voice.v
+set_global_assignment -name VERILOG_FILE rtl/sid8580/sid_filters.v
+set_global_assignment -name VERILOG_FILE rtl/sid8580/sid_envelope.v
+set_global_assignment -name VERILOG_FILE rtl/sid8580/sid8580.v
 set_global_assignment -name VERILOG_FILE rtl/mist/sigma_delta_dac.v
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/mist/video_mixer.sv
 set_global_assignment -name VERILOG_FILE rtl/mist/user_io.v
@@ -359,10 +363,6 @@ set_global_assignment -name VHDL_FILE rtl/sid/oscillator.vhd
 set_global_assignment -name VHDL_FILE rtl/sid/my_math_pkg.vhd
 set_global_assignment -name VHDL_FILE rtl/sid/mult_acc.vhd
 set_global_assignment -name VHDL_FILE rtl/sid/adsr_multi.vhd
-set_global_assignment -name SYSTEMVERILOG_FILE rtl/sid8580/sid_voice.sv
-set_global_assignment -name SYSTEMVERILOG_FILE rtl/sid8580/sid_filters.sv
-set_global_assignment -name SYSTEMVERILOG_FILE rtl/sid8580/sid_envelope.sv
-set_global_assignment -name SYSTEMVERILOG_FILE rtl/sid8580/sid8580.sv
 set_global_assignment -name VHDL_FILE rtl/c1541/via6522.vhd
 set_global_assignment -name VHDL_FILE rtl/c1541/spram.vhd
 set_global_assignment -name VHDL_FILE rtl/c1541/spi_controller.vhd
@@ -375,4 +375,6 @@ set_global_assignment -name VHDL_FILE rtl/t65/T65_Pack.vhd
 set_global_assignment -name VHDL_FILE rtl/t65/T65_MCode.vhd
 set_global_assignment -name VHDL_FILE rtl/t65/T65_ALU.vhd
 set_global_assignment -name VHDL_FILE rtl/t65/T65.vhd
+set_global_assignment -name AUTO_SHIFT_REGISTER_RECOGNITION OFF
+set_global_assignment -name SIGNALTAP_FILE output_files/sid.stp
 set_instance_assignment -name PARTITION_HIERARCHY root_partition -to | -section_id Top

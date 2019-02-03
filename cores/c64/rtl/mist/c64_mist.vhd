@@ -128,10 +128,10 @@ constant CONF_STR : string :=
 	"F,CRT,Load Cartridge;" &--3
 --	"F,TAP,Load File;"&--4
 --	"F,T64,Load File;"&--5
-	"OE,Disk Write,Enable,Disable;"&
+	"OF,Disk Write,Enable,Disable;"&
 	"O2,Video standard,PAL,NTSC;"&
 	"O8A,Scandoubler Fx,None,HQ2x-320,HQ2x-160,CRT 25%,CRT 50%;"&
-	"OD,SID,6581,8580;"&
+	"ODE,SID,6581 Mono,6581 Stereo,8580;"&
 	"O3,Joysticks,normal,swapped;"&
 	"O6,Audio filter,On,Off;"&
 	"O4,CIA Model,6256,8521;"&
@@ -436,7 +436,8 @@ end component cartridge;
 	signal hsync_out : std_logic;
 	signal vsync_out : std_logic;
 	
-	signal audio_data : std_logic_vector(17 downto 0);
+	signal audio_data_l : std_logic_vector(17 downto 0);
+	signal audio_data_r : std_logic_vector(17 downto 0);
 	
 	signal reset_counter    : integer;
 	signal reset_n          : std_logic;
@@ -780,14 +781,14 @@ begin
 		ce => sdram_ce
 	);
 
-   dac : sigma_delta_dac
-    port map (
-      clk => clk32,
-      ldatasum => audio_data(17 downto 3),
-		rdatasum => audio_data(17 downto 3),
+	dac : sigma_delta_dac
+	port map (
+		clk => clk32,
+		ldatasum => audio_data_l(17 downto 3),
+		rdatasum => audio_data_r(17 downto 3),
 		aleft => AUDIO_L,
 		aright => AUDIO_R
- 	);
+	);
 
 
 	fpga64 : entity work.fpga64_sid_iec
@@ -834,9 +835,10 @@ begin
 		SIDclk => open,
 		still => open,
 		idle => idle,
-		audio_data => audio_data,
+		audio_data_l => audio_data_l,
+		audio_data_r => audio_data_r,
 		extfilter_en => not status(6),
-		sid_ver => status(13),
+		sid_mode => status(14 downto 13),
 		iec_data_o => c64_iec_data_o,
 		iec_atn_o  => c64_iec_atn_o,
 		iec_clk_o  => c64_iec_clk_o,
@@ -852,7 +854,7 @@ begin
 		reset_key => reset_key
 	);
 
-	disk_readonly <= status(14);
+	disk_readonly <= status(15);
 
     c64_iec_data_i <= c1541_iec_data_o;
     c64_iec_clk_i <= c1541_iec_clk_o;

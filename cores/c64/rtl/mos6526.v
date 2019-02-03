@@ -96,15 +96,10 @@ always @(posedge clk) begin
       4'h5: db_out <= timer_a[15:8];
       4'h6: db_out <= timer_b[ 7:0];
       4'h7: db_out <= timer_b[15:8];
-      4'h8: db_out <= tod_latched ?
-                      {4'h0, tod_latch[3:0]} : {4'h0, tod_10ths};
-      4'h9: db_out <= tod_latched ?
-                      {1'b0, tod_latch[10:4]} : {1'b0, tod_sec};
-      4'ha: db_out <= tod_latched ?
-                      {1'b0, tod_latch[17:11]} : {1'b0, tod_min};
-      4'hb: db_out <= tod_latched ?
-                      {tod_latch[23], 2'h0, tod_latch[22:18]} :
-                      {tod_hr[5], 2'h0, tod_hr[4:0]};
+      4'h8: db_out <= {4'h0, tod_latch[3:0]};
+      4'h9: db_out <= {1'b0, tod_latch[10:4]};
+      4'ha: db_out <= {1'b0, tod_latch[17:11]};
+      4'hb: db_out <= {tod_latch[23], 2'h0, tod_latch[22:18]};
       4'hc: db_out <= sdr;
       4'hd: db_out <= {~irq_n, 2'b00, icr};
       4'he: db_out <= {cra[7:5], 1'b0, cra[3:0]};
@@ -310,17 +305,31 @@ always @(posedge clk) begin
     tod_latched <= 1'b0;
     icr[2] <= 1'b0;
   end
+  else if (!cs_n && rw)
+    case (rs)
+      4'h8: tod_latched <= 1'b0;
+      4'hb: tod_latched <= 1'b1;
+      default: tod_latched <= tod_latched;
+    endcase
   else if (!cs_n && !rw)
     case (rs)
       4'h8: if (crb[7]) tod_alarm[3:0] <= db_in[3:0];
-            else tod_10ths <= db_in[3:0];
+            else begin
+              tod_run   <= 1'b1;
+              tod_10ths <= db_in[3:0];
+            end
       4'h9: if (crb[7]) tod_alarm[10:4] <= db_in[6:0];
             else tod_sec <= db_in[6:0];
       4'ha: if (crb[7]) tod_alarm[17:11] <= db_in[6:0];
             else tod_min <= db_in[6:0];
       4'hb: if (crb[7]) tod_alarm[23:18] <= {db_in[7], db_in[4:0]};
-            else tod_hr <= {db_in[7], db_in[4:0]};
+            else begin
+              tod_run <= 1'b0;
+              if (db_in[4:0] == 5'h12) tod_hr <= {~db_in[7], db_in[4:0]};
+              else tod_hr <= {db_in[7], db_in[4:0]};
+            end
       default: begin
+        tod_run   <= tod_run;
         tod_10ths <= tod_10ths;
         tod_sec   <= tod_sec;
         tod_min   <= tod_min;
@@ -328,19 +337,6 @@ always @(posedge clk) begin
         tod_alarm <= tod_alarm;
       end
     endcase
-  if (!cs_n)
-    if (rs == 4'h8)
-      if (!rw) tod_run <= !crb[7] ? 1'b1 : tod_run;
-      else begin
-        tod_latched <= 1'b0;
-        tod_latch   <= 24'h000000;
-      end
-    else if (rs == 4'hb)
-      if (!rw) tod_run <= !crb[7] ? 1'b0 : tod_run;
-      else begin
-        tod_latched <= 1'b1;
-        tod_latch   <= {tod_hr, tod_min, tod_sec, tod_10ths};
-      end
   tod_prev <= tod;
   tod_tick <= 1'b0;
   if (tod_run) begin
@@ -370,19 +366,11 @@ always @(posedge clk) begin
           tod_hr[3:0]  <= tod_hr[3:0] + 1'b1;
         end
         if (tod_hr[3:0] == 4'h9 && tod_min == 7'h59 && tod_sec == 7'h59) begin
-          tod_hr[3:0] <= 4'h0;
-          tod_hr[4]   <= tod_hr[4] + 1'b1;
+          tod_hr[4]   <= 1'b1;
+          tod_hr[3:0] <= tod_hr[4] ? tod_hr[3:0] + 1'b1 : 4'h0;
         end
         if (tod_min == 7'h59 && tod_sec == 7'h59)
-          if (tod_hr[4:0] == 5'h11)
-            if (!tod_hr[5]) begin
-              tod_hr[5]   <= ~tod_hr[5];
-              tod_hr[3:0] <= tod_hr[3:0] + 1'b1;
-            end
-            else begin
-              tod_hr[5]   <= ~tod_hr[5];
-              tod_hr[4:0] <= 5'h00;
-            end
+          if (tod_hr[4:0] == 5'h11) tod_hr[5] <= ~tod_hr[5];
           else if (tod_hr[4:0] == 5'h12) tod_hr[4:0] <= 5'h01;
       end
     end
@@ -390,6 +378,7 @@ always @(posedge clk) begin
   else tod_count <= 3'h0;
 
   if (phi2) begin
+    if (!tod_latched) tod_latch <= {tod_hr, tod_min, tod_sec, tod_10ths};
     if ({tod_hr, tod_min, tod_sec, tod_10ths} == tod_alarm) begin
       tod_alarm_reg <= 1'b1;
       icr[2]   <= !tod_alarm_reg ? 1'b1 : icr[2];
