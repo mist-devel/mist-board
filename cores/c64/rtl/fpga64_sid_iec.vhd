@@ -270,8 +270,9 @@ architecture rtl of fpga64_sid_iec is
 	component sid8580
 		port (
 			reset    : in std_logic;
-			clk      : in std_logic;
-			ce_1m    : in std_logic;
+			cs       : in std_logic;
+			clk32    : in std_logic;
+			clk_1MHz : in std_logic;
 			we       : in std_logic;
 			addr     : in std_logic_vector(4 downto 0);
 			data_in  : in std_logic_vector(7 downto 0);
@@ -602,9 +603,10 @@ div1m: process(clk32)				-- this process devides 32 MHz to 1MHz (for the SID)
 	sid_8580 : sid8580
 	port map (
 		reset => reset,
-		clk => clk32,
-		ce_1m => clk_1MHz(31),
-		we => pulseWrRam and phi0_cpu and cs_sid,
+		clk32 => clk32,
+		clk_1MHz => clk_1MHz(31),
+		cs => cs_sid,
+		we => pulseWrRam and phi0_cpu,
 		addr => std_logic_vector(cpuAddr(4 downto 0)),
 		data_in => std_logic_vector(cpuDo),
 		data_out => sid_do8580,
@@ -612,7 +614,7 @@ div1m: process(clk32)				-- this process devides 32 MHz to 1MHz (for the SID)
 		pot_y => pot_y,
 		audio_data => audio_8580,
 		extfilter_en => extfilter_en
-); 
+);
 
 -- -----------------------------------------------------------------------
 -- CIAs
