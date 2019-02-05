@@ -128,10 +128,10 @@ constant CONF_STR : string :=
 	"F,CRT,Load Cartridge;" &--3
 --	"F,TAP,Load File;"&--4
 --	"F,T64,Load File;"&--5
-	"OF,Disk Write,Enable,Disable;"&
+	"OG,Disk Write,Enable,Disable;"&
 	"O2,Video standard,PAL,NTSC;"&
 	"O8A,Scandoubler Fx,None,HQ2x-320,HQ2x-160,CRT 25%,CRT 50%;"&
-	"ODE,SID,6581 Mono,6581 Stereo,8580;"&
+	"ODF,SID,6581 Mono,6581 Stereo,8580 Mono,8580 Stereo,Pseudo Stereo;"&
 	"O3,Joysticks,normal,swapped;"&
 	"O6,Audio filter,On,Off;"&
 	"O4,CIA Model,6256,8521;"&
@@ -838,7 +838,7 @@ begin
 		audio_data_l => audio_data_l,
 		audio_data_r => audio_data_r,
 		extfilter_en => not status(6),
-		sid_mode => status(14 downto 13),
+		sid_mode => status(15 downto 13),
 		iec_data_o => c64_iec_data_o,
 		iec_atn_o  => c64_iec_atn_o,
 		iec_clk_o  => c64_iec_clk_o,
@@ -854,7 +854,7 @@ begin
 		reset_key => reset_key
 	);
 
-	disk_readonly <= status(15);
+	disk_readonly <= status(16);
 
     c64_iec_data_i <= c1541_iec_data_o;
     c64_iec_clk_i <= c1541_iec_clk_o;
