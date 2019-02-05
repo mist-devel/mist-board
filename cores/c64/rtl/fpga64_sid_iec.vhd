@@ -590,7 +590,7 @@ div1m: process(clk32)				-- this process devides 32 MHz to 1MHz (for the SID)
 
 	sid_6581: entity work.sid_top
 	generic map (
-		g_num_voices => 16
+		g_num_voices => 11
 	)
 	port map (
 		clock => clk32,
