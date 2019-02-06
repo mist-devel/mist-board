@@ -511,8 +511,8 @@ begin
       DL <= (others => '0');
     elsif Clk'event and Clk = '1' then
       if (Enable = '1') then
-        NMI_entered <= '0';
         if (really_rdy = '1') then
+          NMI_entered <= '0';
           BusA_r <= BusA;
           BusB <= DI;
 

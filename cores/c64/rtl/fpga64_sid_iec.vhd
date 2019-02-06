@@ -100,7 +100,7 @@ entity fpga64_sid_iec is
 		audio_data_l: out std_logic_vector(17 downto 0);
 		audio_data_r: out std_logic_vector(17 downto 0);
 		extfilter_en: in  std_logic;
-		sid_mode    : in  std_logic_vector(1 downto 0);
+		sid_mode    : in  std_logic_vector(2 downto 0);
 
 		-- IEC
 		iec_data_o	: out std_logic;
@@ -189,11 +189,13 @@ architecture rtl of fpga64_sid_iec is
 	-- SID signals
 	signal sid_do : std_logic_vector(7 downto 0);
 	signal sid_do6581 : std_logic_vector(7 downto 0);
-	signal sid_do8580 : std_logic_vector(7 downto 0);
+	signal sid_do8580_l : std_logic_vector(7 downto 0);
+	signal sid_do8580_r : std_logic_vector(7 downto 0);
 	signal second_sid_en: std_logic;
 
 	-- CIA signals
-	signal enableCia : std_logic;
+	signal enableCia_p : std_logic;
+	signal enableCia_n : std_logic;
 	signal cia1Do: unsigned(7 downto 0);
 	signal cia2Do: unsigned(7 downto 0);
 
@@ -268,7 +270,8 @@ architecture rtl of fpga64_sid_iec is
 	signal voice_r      : signed(17 downto 0);
 	signal pot_x        : std_logic_vector(7 downto 0);
 	signal pot_y        : std_logic_vector(7 downto 0);
-	signal audio_8580 : std_logic_vector(15 downto 0);
+	signal audio_8580_l : std_logic_vector(15 downto 0);
+	signal audio_8580_r : std_logic_vector(15 downto 0);
 
 	component sid8580
 		port (
@@ -368,7 +371,8 @@ begin
 	begin
 		if rising_edge(clk32) then
 			enableVic <= '0';
-			enableCia <= '0';
+			enableCia_n <= '0';
+			enableCia_p <= '0';
 			enableCpu <= '0';
 
 			case sysCycle is
@@ -377,14 +381,16 @@ begin
 			when CYCLE_CPUE =>
 				enableVic <= '1';
 				enableCpu <= '1';
+			when CYCLE_CPUC =>
+				enableCia_n <= '1';
 			when CYCLE_CPUF =>
-				enableCia <= '1';
+				enableCia_p <= '1';
 			when others =>
 				null;
 			end case;
 		end if;
 	end process;
-	
+
 	hSync <= vicHSync;
 	vSync <= vicVSync;
 
@@ -575,11 +581,14 @@ div1m: process(clk32)				-- this process devides 32 MHz to 1MHz (for the SID)
 	end process;
 
 	audio_data_l <= std_logic_vector(voice_l) when sid_mode(1)='0' else
-	                (audio_8580 & "00");
-	audio_data_r <= std_logic_vector(voice_l) when sid_mode="00" else
-	                std_logic_vector(voice_r) when sid_mode="01" else
-	                (audio_8580 & "00");
-	sid_do <= sid_do6581 when sid_mode(1)='0' else sid_do8580;
+	                (audio_8580_l & "00");
+	audio_data_r <= std_logic_vector(voice_l) when sid_mode="000" else
+	                std_logic_vector(voice_r) when sid_mode="001" else
+	                (audio_8580_r & "00")     when sid_mode="011" else
+					(audio_8580_l & "00");
+	sid_do <= sid_do6581 when sid_mode(1)='0' else
+	          sid_do8580_l when second_sid_en='0' else
+			  sid_do8580_r;
 
 	pot_x <= X"FF" when ((cia1_pao(7) and JoyA(5)) or (cia1_pao(6) and JoyB(5))) = '0' else X"00";
 	pot_y <= X"FF" when ((cia1_pao(7) and JoyA(6)) or (cia1_pao(6) and JoyB(6))) = '0' else X"00";
@@ -590,7 +599,7 @@ div1m: process(clk32)				-- this process devides 32 MHz to 1MHz (for the SID)
 
 	sid_6581: entity work.sid_top
 	generic map (
-		g_num_voices => 16
+		g_num_voices => 11
 	)
 	port map (
 		clock => clk32,
@@ -614,19 +623,35 @@ div1m: process(clk32)				-- this process devides 32 MHz to 1MHz (for the SID)
 		sample_right => voice_r
 	);
 
-	sid_8580 : sid8580
+	sid_8580_l : sid8580
 	port map (
 		reset => reset,
 		clk32 => clk32,
 		clk_1MHz => clk_1MHz(31),
-		cs => cs_sid,
+		cs => cs_sid and not second_sid_en,
 		we => pulseWrRam and phi0_cpu,
 		addr => std_logic_vector(cpuAddr(4 downto 0)),
 		data_in => std_logic_vector(cpuDo),
-		data_out => sid_do8580,
+		data_out => sid_do8580_l,
 		pot_x => pot_x,
 		pot_y => pot_y,
-		audio_data => audio_8580,
+		audio_data => audio_8580_l,
+		extfilter_en => extfilter_en
+	);
+
+	sid_8580_r : sid8580
+	port map (
+		reset => reset,
+		clk32 => clk32,
+		clk_1MHz => clk_1MHz(31),
+		cs => cs_sid and second_sid_en,
+		we => pulseWrRam and phi0_cpu,
+		addr => std_logic_vector(cpuAddr(4 downto 0)),
+		data_in => std_logic_vector(cpuDo),
+		data_out => sid_do8580_r,
+		pot_x => pot_x,
+		pot_y => pot_y,
+		audio_data => audio_8580_r,
 		extfilter_en => extfilter_en
 );
 
@@ -637,7 +662,8 @@ div1m: process(clk32)				-- this process devides 32 MHz to 1MHz (for the SID)
 		port map (
 			mode => cia_mode,
 			clk => clk32,
-            phi2 => enableCia,
+            phi2_p => enableCia_p,
+            phi2_n => enableCia_n,
             res_n => not reset,
             cs_n => not cs_cia1,
             rw => not cpuWe,
@@ -664,7 +690,8 @@ div1m: process(clk32)				-- this process devides 32 MHz to 1MHz (for the SID)
 		port map (
 			mode => cia_mode,
 			clk => clk32,
-            phi2 => enableCia,
+            phi2_p => enableCia_p,
+            phi2_n => enableCia_n,
             res_n => not reset,
             cs_n => not cs_cia2,
             rw => not cpuWe,

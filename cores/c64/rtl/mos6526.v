@@ -5,9 +5,10 @@
 // TODO: check if Flag and Serial port interrupts are still working
 
 module mos6526 (
-  input  wire       mode, // 0 - 6526 "old", 1 - 8521 "new"
+  input  wire       mode,   // 0 - 6526 "old", 1 - 8521 "new"
   input  wire       clk,
-  input  wire       phi2,
+  input  wire       phi2_p, // Phi 2 positive edge
+  input  wire       phi2_n, // Phi 2 negative edge
   input  wire       res_n,
   input  wire       cs_n,
   input  wire       rw,
@@ -83,10 +84,13 @@ reg [ 2:0] cnt_pulsecnt;
 
 reg        int_reset;
 
+wire       rd = phi2_n & !cs_n & rw;
+wire       wr = phi2_n & !cs_n & !rw;
+
 // Register Decoding
 always @(posedge clk) begin
   if (!res_n) db_out <= 8'h00;
-  else if (!cs_n && rw)
+  else if (rd)
     case (rs)
       4'h0: db_out <= pa_in;
       4'h1: db_out <= pb_in;
@@ -113,7 +117,7 @@ always @(posedge clk) begin
     pra  <= 8'h00;
     ddra <= 8'h00;
   end
-  else if (!cs_n && !rw)
+  else if (wr)
     case (rs)
       4'h0: pra  <= db_in;
       4'h2: ddra <= db_in;
@@ -122,7 +126,7 @@ always @(posedge clk) begin
         ddra <= ddra;
 		end
     endcase
-  if (phi2) pa_out <= pra | ~ddra;
+  if (phi2_p) pa_out <= pra | ~ddra;
 end
 
 // Port B Output
@@ -131,7 +135,7 @@ always @(posedge clk) begin
     prb  <= 8'h00;
     ddrb <= 8'h00;
   end
-  else if (!cs_n && !rw)
+  else if (wr)
     case (rs)
       4'h1: prb  <= db_in;
       4'h3: ddrb <= db_in;
@@ -140,7 +144,7 @@ always @(posedge clk) begin
         ddrb <= ddrb;
       end
     endcase
-  if (phi2) begin
+  if (phi2_p) begin
     pb_out[7]   <= crb[1] ? (crb[2] ? timerBff ^ timerBoverflow : timerBoverflow) : prb[7] | ~ddrb[7];
     pb_out[6]   <= cra[1] ? (cra[2] ? timerAff ^ timerAoverflow : timerAoverflow) : prb[6] | ~ddrb[6];
     pb_out[5:0] <= prb[5:0] | ~ddrb[5:0];
@@ -151,13 +155,13 @@ end
 always @(posedge clk) begin
   if (!res_n || int_reset) icr[4] <= 1'b0;
   else if (!flag_n && flag_n_prev) icr[4] <= 1'b1;
-  if (phi2) flag_n_prev <= flag_n;
+  if (phi2_p) flag_n_prev <= flag_n;
 end
 
 // Port Control Output
 always @(posedge clk) begin
   if (!cs_n && rs == 4'h1) pc_n <= 1'b0;
-  else pc_n <= phi2 ? 1'b1 : pc_n;
+  else pc_n <= phi2_p ? 1'b1 : pc_n;
 end
 
 // Timer A
@@ -178,7 +182,7 @@ always @(posedge clk) begin
     icr[0]         <= 1'b0;
   end
   else begin
-    if (phi2) begin
+    if (phi2_p) begin
       if (int_reset) icr[0] <= 0;
       countA0 <= cnt_in && ~cnt_in_prev;
       countA1 <= countA0;
@@ -205,7 +209,7 @@ always @(posedge clk) begin
       end
     end
 
-    if (!cs_n && !rw)
+    if (wr)
       case (rs)
         4'h4: ta_lo <= db_in;
         4'h5:
@@ -244,7 +248,7 @@ always @(posedge clk) begin
     icr[1]         <= 1'b0;
   end
   else begin
-    if (phi2) begin
+    if (phi2_p) begin
       if (int_reset) icr[1] <= 0;
       countB0 <= cnt_in && ~cnt_in_prev;
       countB1 <= countB0;
@@ -271,7 +275,7 @@ always @(posedge clk) begin
       end
     end
 
-    if (!cs_n && !rw)
+    if (wr)
       case (rs)
         4'h6: tb_lo <= db_in;
         4'h7:
@@ -305,13 +309,13 @@ always @(posedge clk) begin
     tod_latched <= 1'b0;
     icr[2] <= 1'b0;
   end
-  else if (!cs_n && rw)
+  else if (rd)
     case (rs)
       4'h8: tod_latched <= 1'b0;
       4'hb: tod_latched <= 1'b1;
       default: tod_latched <= tod_latched;
     endcase
-  else if (!cs_n && !rw)
+  else if (wr)
     case (rs)
       4'h8: if (crb[7]) tod_alarm[3:0] <= db_in[3:0];
             else begin
@@ -377,7 +381,7 @@ always @(posedge clk) begin
   end
   else tod_count <= 3'h0;
 
-  if (phi2) begin
+  if (phi2_p) begin
     if (!tod_latched) tod_latch <= {tod_hr, tod_min, tod_sec, tod_10ths};
     if ({tod_hr, tod_min, tod_sec, tod_10ths} == tod_alarm) begin
       tod_alarm_reg <= 1'b1;
@@ -400,7 +404,7 @@ always @(posedge clk) begin
     icr[3]      <= 1'b0;
   end
   else begin
-    if (!cs_n && !rw)
+    if (wr)
       case (rs)
         4'hc:
           begin
@@ -409,7 +413,7 @@ always @(posedge clk) begin
           end
       endcase
 
-    if (phi2) begin
+    if (phi2_p) begin
       if (int_reset) icr[3] <= 1'b0;
 
       if (!cra[6]) begin // input
@@ -450,7 +454,7 @@ always @(posedge clk) begin
     cnt_out_prev <= 1'b1;
     cnt_pulsecnt <= 3'h0;
   end
-  else if (phi2) begin
+  else if (phi2_p) begin
     cnt_in_prev  <= cnt_in;
     cnt_out_prev <= cnt_out;
 
@@ -474,19 +478,17 @@ always @(posedge clk) begin
     int_reset <= 0;
   end
   else begin
-    if (!cs_n && !rw)
-      case (rs)
-        4'hd: imr_reg <= db_in;
-      endcase
+    if (wr && rs == 4'hd) imr_reg <= db_in;
+    if (rd && rs == 4'hd) int_reset <= 1;
 
-    int_reset <= 0;
-    if (!cs_n && rw && rs == 4'hd) int_reset <= 1;
-
-    if (phi2 | mode) begin
+    if (phi2_p | mode) begin
       imr <= imr_reg[7] ? imr | imr_reg[4:0] : imr & ~imr_reg[4:0];
       irq_n <= irq_n ? ~|(imr & icr) : irq_n;
     end
-    if (phi2 & int_reset) irq_n <= 1;
+    if (phi2_p & int_reset) begin
+      irq_n <= 1;
+	  int_reset <= 0;
+    end
   end
 end
 

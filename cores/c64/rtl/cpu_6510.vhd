@@ -94,15 +94,17 @@ begin
 		end if;
 	end process;
 
-	process(ioDir, ioData, diIO)
+	process(clk)
 	begin
-		for i in 0 to 7 loop
-			if ioDir(i) = '0' then
-				currentIO(i) <= std_logic(diIO(i));
-			else
-				currentIO(i) <= ioData(i);
-			end if;
-		end loop;
+		if rising_edge(clk) then
+			for i in 0 to 7 loop
+				if ioDir(i) = '0' then
+					currentIO(i) <= std_logic(diIO(i));
+				else
+					currentIO(i) <= ioData(i);
+				end if;
+			end loop;
+		end if;
 	end process;
 	
 	-- Cunnect zee wires
