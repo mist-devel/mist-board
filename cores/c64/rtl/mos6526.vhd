@@ -6,7 +6,8 @@ component mos6526
     PORT (
 	mode     : in  std_logic; -- '0' - 6256, '1' - 8521
 	clk      : in  std_logic;
-	phi2     : in  std_logic;
+	phi2_p   : in  std_logic;
+	phi2_n   : in  std_logic;
 	res_n    : in  std_logic;
 	cs_n     : in  std_logic;
 	rw       : in  std_logic; -- '1' - read, '0' - write

@@ -194,7 +194,8 @@ architecture rtl of fpga64_sid_iec is
 	signal second_sid_en: std_logic;
 
 	-- CIA signals
-	signal enableCia : std_logic;
+	signal enableCia_p : std_logic;
+	signal enableCia_n : std_logic;
 	signal cia1Do: unsigned(7 downto 0);
 	signal cia2Do: unsigned(7 downto 0);
 
@@ -370,7 +371,8 @@ begin
 	begin
 		if rising_edge(clk32) then
 			enableVic <= '0';
-			enableCia <= '0';
+			enableCia_n <= '0';
+			enableCia_p <= '0';
 			enableCpu <= '0';
 
 			case sysCycle is
@@ -379,14 +381,16 @@ begin
 			when CYCLE_CPUE =>
 				enableVic <= '1';
 				enableCpu <= '1';
+			when CYCLE_CPUC =>
+				enableCia_n <= '1';
 			when CYCLE_CPUF =>
-				enableCia <= '1';
+				enableCia_p <= '1';
 			when others =>
 				null;
 			end case;
 		end if;
 	end process;
-	
+
 	hSync <= vicHSync;
 	vSync <= vicVSync;
 
@@ -658,7 +662,8 @@ div1m: process(clk32)				-- this process devides 32 MHz to 1MHz (for the SID)
 		port map (
 			mode => cia_mode,
 			clk => clk32,
-            phi2 => enableCia,
+            phi2_p => enableCia_p,
+            phi2_n => enableCia_n,
             res_n => not reset,
             cs_n => not cs_cia1,
             rw => not cpuWe,
@@ -685,7 +690,8 @@ div1m: process(clk32)				-- this process devides 32 MHz to 1MHz (for the SID)
 		port map (
 			mode => cia_mode,
 			clk => clk32,
-            phi2 => enableCia,
+            phi2_p => enableCia_p,
+            phi2_n => enableCia_n,
             res_n => not reset,
             cs_n => not cs_cia2,
             rw => not cpuWe,
