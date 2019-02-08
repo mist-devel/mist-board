@@ -31,7 +31,8 @@ module vidc_dmachannel
 (
 	input			clkcpu,
 	input			clkdev,
-	
+	input			cedev,
+
 	input			rst,
 		
 	// dma bus
@@ -76,6 +77,7 @@ vidc_fifo #(.FIFO_SIZE(FIFO_SIZE)) VIDEO_FIFO(
 	.rst	( rst		),
 	.wr_clk	( clkcpu	),
 	.rd_clk	( clkdev	),
+	.rd_ce	( cedev	),
 	.wr_en	( ak & load	), 
 	.rd_en	( dev_ak	),
 

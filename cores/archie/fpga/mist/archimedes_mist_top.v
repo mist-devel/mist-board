@@ -77,13 +77,11 @@ wire [7:0] kbd_in_data;
 wire kbd_in_strobe;
 
 // generated clocks
-wire clk_pix;
-wire clk_pix2x;
+wire clk_pix = clk_50m;
+wire ce_pix;
 wire clk_32m /* synthesis keep */ ;
 wire clk_128m /* synthesis keep */ ;
-wire clk_24m /* synthesis keep */ ;
-wire clk_25m /* synthesis keep */ ;
-wire clk_36m /* synthesis keep */ ;
+wire clk_50m /* synthesis keep */ ;
 //wire clk_8m  /* synthesis keep */ ;
 
 wire pll_ready;
@@ -118,32 +116,31 @@ clockgen CLOCKS(
 	.inclk0	(CLOCK_27[0]),
 	.c0		(clk_32m),
 	.c1		(clk_128m), 
-	.c2 		(clk_24m), 
-	.c3    	(clk_25m),
-	.c4		(clk_36m),
+	.c2 	(clk_50m),
 	.locked	(pll_ready)  // pll locked output
 );
 
-osd #(0,100,4) OSD (
-   .pclk       ( clk_pix          ),
+osd #(0,0,4) OSD (
+   .clk_sys    ( clk_pix      ),
 
    // spi for OSD
-   .sdi        ( SPI_DI       ),
-   .sck        ( SPI_SCK      ),
-   .ss         ( SPI_SS3      ),
+   .SPI_DI     ( SPI_DI       ),
+   .SPI_SCK    ( SPI_SCK      ),
+   .SPI_SS3    ( SPI_SS3      ),
 
-   .red_in     ( {core_r, 2'b00} ),
-   .green_in   ( {core_g, 2'b00} ),
-   .blue_in    ( {core_b, 2'b00} ),
-   .hs_in      ( core_hs       ),
-   .vs_in      ( core_vs       ),
+   .R_in       ( {core_r, 2'b00} ),
+   .G_in       ( {core_g, 2'b00} ),
+   .B_in       ( {core_b, 2'b00} ),
+   .HSync      ( core_hs      ),
+   .VSync      ( core_vs      ),
 
-   .red_out    ( VGA_R        ),
-   .green_out  ( VGA_G        ),
-   .blue_out   ( VGA_B        ),
-   .hs_out     ( VGA_HS       ),
-   .vs_out     ( VGA_VS       )
+   .R_out      ( VGA_R         ),
+   .G_out      ( VGA_G         ),
+   .B_out      ( VGA_B         )
 );
+
+assign VGA_HS = core_hs;
+assign VGA_VS = core_vs;
 
 // de-multiplex spi outputs from user_io and data_io
 assign SPI_DO = (CONF_DATA0==0)?user_io_sdo:(SPI_SS2==0)?data_io_sdo:1'bZ;
@@ -216,8 +213,8 @@ wire 			i2c_din, i2c_dout, i2c_clock;
 archimedes_top ARCHIMEDES(
 	
 	.CLKCPU_I	( clk_32m			),
-	.CLKPIX2X_I	( clk_pix2x			), // pixel clock x 2
-	.CLKPIX_O	( clk_pix			), // pixel clock for OSD
+	.CLKPIX_I	( clk_pix			), // pixel clock for OSD
+	.CEPIX_O	( ce_pix			),
 	
 	.RESET_I	(~ram_ready | loader_active),
 	
@@ -310,7 +307,7 @@ i2cSlaveTop CMOS (
 );
 
 audio	AUDIO	(
-	.clk			( clk_pix2x		),
+	.clk			( clk_pix		),
 	.rst			( ~pll_ready	),
 	.audio_data_l 	( coreaud_l		),
 	.audio_data_r 	( coreaud_r		),
@@ -341,10 +338,5 @@ assign ram_data_in		= loader_active ? loader_data : core_data_out;
 assign core_ack_in  	= loader_active ? 1'b0 : ram_ack;
 
 assign DRAM_CLK = clk_128m;
-
-assign clk_pix2x = pixbaseclk_select == 2'b00 ? clk_24m :
-					  pixbaseclk_select == 2'b01 ? clk_25m :
-					  pixbaseclk_select == 2'b10 ? clk_36m : clk_24m;
-
 
 endmodule // archimedes_papoliopro_top
