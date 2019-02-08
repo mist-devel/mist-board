@@ -59,18 +59,6 @@ module archimedes_mist_top(
   input          CONF_DATA0  // SPI_SS for user_io
 );
 
-// the configuration string is returned to the io controller to allow
-// it to control the menu on the OSD 
-parameter CONF_STR = {
-        "ARCHIE;ARCH;",
-		  "O1,MODE,8bbp,4bbp,2bbp,1bbp;",
-        "T2,Start;",
-        "T3,Select;",
-        "T4,Reset;"
-};
-
-parameter CONF_STR_LEN = 12+28+9+10+9;
-
 wire [7:0] kbd_out_data;
 wire kbd_out_strobe;
 wire [7:0] kbd_in_data;
@@ -146,11 +134,10 @@ assign VGA_VS = core_vs;
 assign SPI_DO = (CONF_DATA0==0)?user_io_sdo:(SPI_SS2==0)?data_io_sdo:1'bZ;
 
 wire user_io_sdo;
-user_io #(.STRLEN(CONF_STR_LEN)) user_io(
-   .conf_str      ( CONF_STR        ),
+user_io user_io(
    // the spi interface
-
-   .SPI_CLK     	(SPI_SCK          ),
+   .clk_sys       ( clk_32m         ),
+   .SPI_CLK       (SPI_SCK          ),
    .SPI_SS_IO     (CONF_DATA0       ),
    .SPI_MISO      (user_io_sdo           ),   // tristate handling inside user_io
    .SPI_MOSI      (SPI_DI           ),
