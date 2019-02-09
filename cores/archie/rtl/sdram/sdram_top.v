@@ -32,7 +32,7 @@ module sdram_top (
 	input			sd_clk,		// sdram is accessed at 128MHz
 	input			sd_rst,		// reset the sdram controller.
 	output			sd_cke,		// clock enable.
-	inout [15:0]	sd_dq,		// 16 bit bidirectional data bus
+	inout  [15:0]	sd_dq,		// 16 bit bidirectional data bus
 	output [12:0]	sd_addr,	// 13 bit multiplexed address bus
 	output reg[1:0]	sd_dqm = 2'b00,		// two byte masks
 	output reg[1:0]	sd_ba = 2'b00,		// two banks
@@ -111,7 +111,7 @@ localparam CYCLE_CAS0 		= CYCLE_RFSH_START  + RASCAS_DELAY;
 localparam CYCLE_CAS1 		= CYCLE_CAS0 + 4'd1;		
 localparam CYCLE_CAS2 		= CYCLE_CAS1 + 4'd1;		
 localparam CYCLE_CAS3 		= CYCLE_CAS2 + 4'd1;				
-localparam CYCLE_READ0	   	= CYCLE_CAS0 + CAS_LATENCY + 4'd2;
+localparam CYCLE_READ0	   	= CYCLE_CAS0 + CAS_LATENCY + 4'd1;
 localparam CYCLE_READ1	   	= CYCLE_READ0+ 1'd1;
 localparam CYCLE_READ2	   	= CYCLE_READ1+ 1'd1;
 localparam CYCLE_READ3	   	= CYCLE_READ2+ 1'd1;
@@ -130,8 +130,6 @@ always @(posedge sd_clk) begin
 	sd_we	<= wb_we;
 	sd_cmd	<= CMD_INHIBIT;
 	
-	if (sd_ready) begin 
-	   
 	   if (wb_stb & wb_cyc & ~wb_ack) begin 
 	      
 			sd_stb	<= wb_stb;
@@ -349,21 +347,6 @@ always @(posedge sd_clk) begin
 			sd_burst <= 1'b0;
 		
 		end
-		
-	end else begin 
-
-
-	   
-	   sd_stb	<= 1'b0;
-       sd_cyc	<= 1'b0;
-	   sd_burst <= 1'b0;
-		
-		sd_cycle 	<= 4'd0;
-		sd_done		<= 1'b0;
-	
-	end 
-
-	
 end
 
 reg wb_burst;

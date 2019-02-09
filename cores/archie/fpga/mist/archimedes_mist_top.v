@@ -105,6 +105,7 @@ clockgen CLOCKS(
 	.c0		(clk_32m),
 	.c1		(clk_128m), 
 	.c2 	(clk_50m),
+	.c3		(DRAM_CLK),
 	.locked	(pll_ready)  // pll locked output
 );
 
@@ -323,7 +324,5 @@ assign ram_stb			= loader_active ? loader_stb : core_stb_out;
 assign ram_cyc			= loader_active ? loader_stb : core_stb_out;
 assign ram_data_in		= loader_active ? loader_data : core_data_out;
 assign core_ack_in  	= loader_active ? 1'b0 : ram_ack;
-
-assign DRAM_CLK = clk_128m;
 
 endmodule // archimedes_papoliopro_top
