@@ -29,9 +29,9 @@
 module vidc(
 	
 	    input 	 		clkcpu, // cpu bus clock domain
-	    input 	 		clkpix2x, // pixel clock domain
-        output			clkpix,
-		
+		input			clkpix,
+		output reg		cepix_hi,
+
 		// "wishbone" interface
 	    input 	 	 	rst_i,
         input			vidw, 	// write to a register.		
@@ -54,6 +54,7 @@ module vidc(
 	    output [3:0] 	video_r,
 	    output [3:0] 	video_g,
 	    output [3:0] 	video_b,
+	output		  video_en,
 		 
 		output [15:0] 	audio_l,
 	    output [15:0] 	audio_r
@@ -102,12 +103,28 @@ wire		snd_load;
 wire		currq_int;
 wire		vidrq_int;
 
-// produce the correct pixel clock by dividing. 
-vidc_divider CLOCKS(
-	.clkpix2x	( clkpix2x		),
-	.clk_select	( vidc_cr[1:0]	),
-	.clkpix		( clkpix			)
-);
+reg      cepix;
+
+always @(negedge clkpix) begin
+	reg [2:0] div6 = 0;
+	reg [1:0] div4 = 0;
+
+	div4 <= div4 + 1'd1;
+	div6 <= div6 + 1'd1;
+	if(div6 == 5) div6 <= 0;
+
+	case(vidc_cr[1:0])
+		0: cepix <= !div6;
+		1: cepix <= !div4;
+		2: cepix <= ((div6 == 0) || (div6 == 3));
+		3: cepix <= !div4[0];
+	endcase
+	
+	case(vidc_cr[0])
+		0: cepix_hi <= ((div6 == 0) || (div6 == 3));
+		1: cepix_hi <= !div4[0];
+	endcase
+end
 
 vidc_timing TIMING(
 	
@@ -115,7 +132,8 @@ vidc_timing TIMING(
 	.wr			( vidw		),
 	.cpu_dat 	( cpu_dat	),
 
-	.clkpix		( clkpix		),
+	.clkvid		( clkpix		),
+	.cevid		( cepix		),
 	.rst			( rst_i		),
 	
 	.o_hsync		( hsync		),
@@ -132,6 +150,7 @@ vidc_dmachannel VIDEODMA (
 	.rst		( flybk | rst_i	),
 	.clkcpu		( clkcpu		),
 	.clkdev		( clkpix		),
+	.cedev		( cepix		),
 	
 	.cpu_data	( viddat		),
 	.ak			( vidak			),
@@ -151,6 +170,7 @@ vidc_dmachannel #(.FIFO_SIZE(2)) CURSORDMA (
 	.rst		( flybk | rst_i	),
 	.clkcpu		( clkcpu		),
 	.clkdev		( clkpix		),
+	.cedev		( cepix		),
 	
 	.cpu_data	( viddat		),
 	
@@ -171,6 +191,7 @@ vidc_dmachannel SOUNDDMA (
 	.rst		( rst_i			),
 	.clkcpu		( clkcpu		),
 	.clkdev		( clkpix		),
+	.cedev		( cepix		),
 	
 	.cpu_data	( viddat		),
 	.ak			( sndak			),
@@ -191,6 +212,7 @@ vidc_audio AUDIOMIXER(
     .cpu_data   ( cpu_dat   ),
     
     .aud_clk    ( clkpix    ),
+    .aud_ce     ( cepix     ),
     .aud_rst    ( rst_i     ),
     .aud_data   ( snd_sam_data ),
     .aud_en     ( snd_sam_en ),
@@ -268,6 +290,7 @@ end
 // this simulates the DAC.
 always @(posedge clkpix) begin
 
+  if(cepix) begin
 	cur_enabled_r <= cur_enabled;
 	pix_load 		<= pix_ack;
 	csr_load			<= csr_ack;
@@ -301,7 +324,7 @@ always @(posedge clkpix) begin
 			end
 			
 			2'b10: begin
-				pix_data_latch <= {4'b00, pix_data_latch[7:4]};
+					pix_data_latch <= {4'b0000, pix_data_latch[7:4]};
 				pix_shift_count <= pix_shift_count + 3'd4;
 			end
 			
@@ -327,11 +350,11 @@ always @(posedge clkpix) begin
 	
 	if (csr_load) begin 
 		
-		csr_load_count <= csr_load_count + 'd1;
+		csr_load_count <= csr_load_count + 1'd1;
 		csr_data_latch <= csr_data;
 	
 	end
-
+  end
 end
 
 // eqn is CE + DE + ABC + BCD (where {E,D} = {vidc_cr[3:2]} and {C,B,A} = pix_shift_count)
@@ -343,7 +366,6 @@ wire [3:0] pix_lookup = vidc_cr[3:2] == 2'b00 ? {3'd0, pix_data_latch[0]} :
 								vidc_cr[3:2] == 2'b01 ? {2'd0, pix_data_latch[1:0]} : pix_data_latch[3:0];
 
 wire [1:0] csr_lookup = csr_data_latch[1:0];
-								
 								
 wire [12:0] vidc_colour = cur_enabled & (csr_lookup != 2'd0) ? cur_palette[csr_lookup]   :
 								  enabled_d2 ? vidc_palette[pix_lookup] : 
@@ -361,6 +383,8 @@ assign	video_g[1:0] 	= vidc_colour[5:4];
 
 assign 	video_b[3]	= hicolour ? pix_data_latch[7] : vidc_colour[11];
 assign	video_b[2:0]	= vidc_colour[10:8];
+
+assign video_en     = enabled;
 
 // this demux's the two dma channels that share the vidrq. 
 assign vidrq = hsync ? vidrq_int : ~vid_load & currq_int;

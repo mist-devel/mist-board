@@ -37,6 +37,7 @@ module vidc_fifo #(
 		input[31:0]	din,
 		
 		input 		rd_clk,
+		input 		rd_ce,
 		input 		rd_en,
 		output reg [7:0]	dout,
 		
@@ -107,21 +108,22 @@ wire [7:0] q;
 
 always @(posedge rd_clk) begin
 
-	if (rst) begin
-	
-		rd_ptr <= 'd0;
-		dout <= 8'd0;
+	if(rd_ce) begin
+		if (rst) begin
 		
-	end else if (rd_en) begin
+			rd_ptr <= 'd0;
+			dout <= 8'd0;
 
-		if (~empty) begin 
-			rd_ptr <= rd_ptr + 'd1;
-			dout <= q;
-		end else begin 
-			dout <= 'd0;
+		end else if (rd_en) begin
+
+			if (~empty) begin
+				rd_ptr <= rd_ptr + 1'd1;
+				dout <= q;
+			end else begin
+				dout <= 'd0;
+			end
 		end
 	end
-	
 end
 
 assign empty = !full & space == 'd0;

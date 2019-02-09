@@ -59,31 +59,17 @@ module archimedes_mist_top(
   input          CONF_DATA0  // SPI_SS for user_io
 );
 
-// the configuration string is returned to the io controller to allow
-// it to control the menu on the OSD 
-parameter CONF_STR = {
-        "ARCHIE;ARCH;",
-		  "O1,MODE,8bbp,4bbp,2bbp,1bbp;",
-        "T2,Start;",
-        "T3,Select;",
-        "T4,Reset;"
-};
-
-parameter CONF_STR_LEN = 12+28+9+10+9;
-
 wire [7:0] kbd_out_data;
 wire kbd_out_strobe;
 wire [7:0] kbd_in_data;
 wire kbd_in_strobe;
 
 // generated clocks
-wire clk_pix;
-wire clk_pix2x;
+wire clk_pix = clk_50m;
+wire ce_pix;
 wire clk_32m /* synthesis keep */ ;
 wire clk_128m /* synthesis keep */ ;
-wire clk_24m /* synthesis keep */ ;
-wire clk_25m /* synthesis keep */ ;
-wire clk_36m /* synthesis keep */ ;
+wire clk_50m /* synthesis keep */ ;
 //wire clk_8m  /* synthesis keep */ ;
 
 wire pll_ready;
@@ -110,7 +96,7 @@ wire [7:0] joyA;
 wire [7:0] joyB;
 wire [1:0] buttons;
 wire [1:0] switches;
-
+wire       ypbpr;
 
 // the top file should generate the correct clocks for the machine
 
@@ -118,48 +104,66 @@ clockgen CLOCKS(
 	.inclk0	(CLOCK_27[0]),
 	.c0		(clk_32m),
 	.c1		(clk_128m), 
-	.c2 		(clk_24m), 
-	.c3    	(clk_25m),
-	.c4		(clk_36m),
+	.c2 	(clk_50m),
+	.c3		(DRAM_CLK),
 	.locked	(pll_ready)  // pll locked output
 );
 
-osd #(0,100,4) OSD (
-   .pclk       ( clk_pix          ),
+wire [5:0] osd_r_o, osd_g_o, osd_b_o;
+
+osd #(0,0,4) OSD (
+   .clk_sys    ( clk_pix      ),
 
    // spi for OSD
-   .sdi        ( SPI_DI       ),
-   .sck        ( SPI_SCK      ),
-   .ss         ( SPI_SS3      ),
+   .SPI_DI     ( SPI_DI       ),
+   .SPI_SCK    ( SPI_SCK      ),
+   .SPI_SS3    ( SPI_SS3      ),
 
-   .red_in     ( {core_r, 2'b00} ),
-   .green_in   ( {core_g, 2'b00} ),
-   .blue_in    ( {core_b, 2'b00} ),
-   .hs_in      ( core_hs       ),
-   .vs_in      ( core_vs       ),
+   .R_in       ( {core_r, 2'b00} ),
+   .G_in       ( {core_g, 2'b00} ),
+   .B_in       ( {core_b, 2'b00} ),
+   .HSync      ( core_hs      ),
+   .VSync      ( core_vs      ),
 
-   .red_out    ( VGA_R        ),
-   .green_out  ( VGA_G        ),
-   .blue_out   ( VGA_B        ),
-   .hs_out     ( VGA_HS       ),
-   .vs_out     ( VGA_VS       )
+   .R_out      ( osd_r_o      ),
+   .G_out      ( osd_g_o      ),
+   .B_out      ( osd_b_o      )
 );
+
+wire [5:0] Y, Pb, Pr;
+
+rgb2ypbpr rgb2ypbpr
+(
+	.red   ( osd_r_o ),
+	.green ( osd_g_o ),
+	.blue  ( osd_b_o ),
+	.y     ( Y       ),
+	.pb    ( Pb      ),
+	.pr    ( Pr      )
+);
+
+assign VGA_R = ypbpr?Pr:osd_r_o;
+assign VGA_G = ypbpr? Y:osd_g_o;
+assign VGA_B = ypbpr?Pb:osd_b_o;
+wire   CSync = ~(core_hs ^ core_vs);
+assign VGA_HS = ypbpr ? CSync : core_hs;
+assign VGA_VS = ypbpr? 1'b1 : core_vs;
 
 // de-multiplex spi outputs from user_io and data_io
 assign SPI_DO = (CONF_DATA0==0)?user_io_sdo:(SPI_SS2==0)?data_io_sdo:1'bZ;
 
 wire user_io_sdo;
-user_io #(.STRLEN(CONF_STR_LEN)) user_io(
-   .conf_str      ( CONF_STR        ),
+user_io user_io(
    // the spi interface
-
-   .SPI_CLK     	(SPI_SCK          ),
+   .clk_sys       ( clk_32m         ),
+   .SPI_CLK       (SPI_SCK          ),
    .SPI_SS_IO     (CONF_DATA0       ),
    .SPI_MISO      (user_io_sdo           ),   // tristate handling inside user_io
    .SPI_MOSI      (SPI_DI           ),
 
    .SWITCHES      (switches         ),
    .BUTTONS       (buttons          ),
+   .ypbpr         (ypbpr            ),
 
    .JOY0          (joyA             ),
    .JOY1          (joyB             ),
@@ -216,8 +220,8 @@ wire 			i2c_din, i2c_dout, i2c_clock;
 archimedes_top ARCHIMEDES(
 	
 	.CLKCPU_I	( clk_32m			),
-	.CLKPIX2X_I	( clk_pix2x			), // pixel clock x 2
-	.CLKPIX_O	( clk_pix			), // pixel clock for OSD
+	.CLKPIX_I	( clk_pix			), // pixel clock for OSD
+	.CEPIX_O	( ce_pix			),
 	
 	.RESET_I	(~ram_ready | loader_active),
 	
@@ -310,7 +314,7 @@ i2cSlaveTop CMOS (
 );
 
 audio	AUDIO	(
-	.clk			( clk_pix2x		),
+	.clk			( clk_pix		),
 	.rst			( ~pll_ready	),
 	.audio_data_l 	( coreaud_l		),
 	.audio_data_r 	( coreaud_r		),
@@ -339,12 +343,5 @@ assign ram_stb			= loader_active ? loader_stb : core_stb_out;
 assign ram_cyc			= loader_active ? loader_stb : core_stb_out;
 assign ram_data_in		= loader_active ? loader_data : core_data_out;
 assign core_ack_in  	= loader_active ? 1'b0 : ram_ack;
-
-assign DRAM_CLK = clk_128m;
-
-assign clk_pix2x = pixbaseclk_select == 2'b00 ? clk_24m :
-					  pixbaseclk_select == 2'b01 ? clk_25m :
-					  pixbaseclk_select == 2'b10 ? clk_36m : clk_24m;
-
 
 endmodule // archimedes_papoliopro_top

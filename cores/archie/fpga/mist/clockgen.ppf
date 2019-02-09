@@ -7,7 +7,6 @@
 <pin name="c1" direction="output" scope="external" source="clock"  />
 <pin name="c2" direction="output" scope="external" source="clock"  />
 <pin name="c3" direction="output" scope="external" source="clock"  />
-<pin name="c4" direction="output" scope="external" source="clock"  />
 <pin name="locked" direction="output" scope="external"  />
 
 </global>

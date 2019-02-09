@@ -22,124 +22,156 @@
 
 // parameter STRLEN and the actual length of conf_str have to match
 
-module user_io #(parameter STRLEN=0) (
-	input [(8*STRLEN)-1:0] conf_str,
+module user_io (
+        input            clk_sys,
+        input            SPI_CLK,
+        input            SPI_SS_IO,
+        output reg       SPI_MISO,
+        input            SPI_MOSI,
 
-	input      		SPI_CLK,
-	input      		SPI_SS_IO,
-	output     		reg SPI_MISO,
-	input      		SPI_MOSI,
-	
-	output [7:0] 	JOY0,
-	output [7:0] 	JOY1,
-	output [1:0] 	BUTTONS,
-	output [1:0] 	SWITCHES,
+        output     [7:0] JOY0,
+        output     [7:0] JOY1,
+        output           ypbpr,
 
-	input [7:0]    kbd_out_data,
-	input          kbd_out_strobe,
-	
-	output [7:0]   kbd_in_data,
-	output reg     kbd_in_strobe
+        input      [7:0] kbd_out_data,
+        input            kbd_out_strobe,
+
+        output reg [7:0] kbd_in_data,
+        output reg       kbd_in_strobe,
+
+        output     [1:0] BUTTONS,
+        output     [1:0] SWITCHES
 );
 
-// kbd in data is valid on rising edge of kbd_in_strobe
-assign kbd_in_data = { sbuf, SPI_MOSI };
+reg [6:0]     sbuf;
+reg [7:0]     cmd;
+reg [2:0]     bit_cnt;    // counts bits 0-7 0-7 ...
+reg [9:0]     byte_cnt;   // counts bytes
+reg [7:0]     but_sw;
 
-reg [6:0]         sbuf;
-reg [7:0]         cmd;
-reg [2:0] 	      bit_cnt;    // counts bits 0-7 0-7 ...
-reg [7:0]         byte_cnt;   // counts bytes
-reg [7:0]         joystick0;
-reg [7:0]         joystick1;
-reg [3:0] 	      but_sw;
+reg [31:0]    joystick_0;
+reg [31:0]    joystick_1;
+reg [31:0]    joystick_2;
+reg [31:0]    joystick_3;
+reg [31:0]    joystick_4;
 
-assign JOY0 = joystick0;
-assign JOY1 = joystick1;
-assign BUTTONS = but_sw[1:0];
+assign JOY0 = joystick_0[7:0];
+assign JOY1 = joystick_1[7:0];
+
+assign BUTTONS  = but_sw[1:0];
 assign SWITCHES = but_sw[3:2];
-
+assign ypbpr = but_sw[5];
 // this variant of user_io is for the achie core (type == a6) only
 wire [7:0] core_type = 8'ha6;
-
-reg kbd_out_data_available;
-always @(posedge kbd_out_strobe or posedge kbd_out_ack) begin
-	if(kbd_out_ack)  kbd_out_data_available <= 1'b0;
-	else             kbd_out_data_available <= 1'b1;
-end
+reg  [7:0] spi_byte_out;
 
 wire [7:0] kbd_out_status = { 4'ha, 3'b000, kbd_out_data_available };
+reg kbd_out_data_available = 0;
 
-// drive MISO only when transmitting core id
-always@(negedge SPI_CLK or posedge SPI_SS_IO) begin
-	if(SPI_SS_IO == 1) begin
-	   SPI_MISO <= 1'bZ;
-	end else begin
-		// first byte returned is always core type, further bytes are 
-		// command dependent
-      if(byte_cnt == 0) begin
-		  SPI_MISO <= core_type[~bit_cnt];
-		end else begin
-			// reading keyboard data
-		   if(cmd == 8'h04) begin
-				if(byte_cnt == 1)	SPI_MISO <= kbd_out_status[~bit_cnt];
-				else					SPI_MISO <= kbd_out_data[~bit_cnt];
-			end
-			
-			// reading config string
-		   if(cmd == 8'h14) begin
-				// returning a byte from string
-				if(byte_cnt < STRLEN + 1)
-					SPI_MISO <= conf_str[{STRLEN - byte_cnt,~bit_cnt}];
-				else
-					SPI_MISO <= 1'b0;
-			end
-		end
-   end
+// SPI bit and byte counters
+always@(posedge SPI_CLK or posedge SPI_SS_IO) begin
+    if(SPI_SS_IO == 1) begin
+        bit_cnt <= 0;
+        byte_cnt <= 0;
+    end else begin
+        if((bit_cnt == 7)&&(~&byte_cnt)) begin
+            byte_cnt <= byte_cnt + 8'd1;
+            if (!byte_cnt) cmd <= {sbuf, SPI_MOSI};
+        end
+        bit_cnt <= bit_cnt + 1'd1;
+    end
 end
 
-// SPI receiver
-reg kbd_out_ack;
+always@(negedge SPI_CLK or posedge SPI_SS_IO) begin
+    if(SPI_SS_IO == 1) begin
+        SPI_MISO <= 1'bZ;
+	end else begin
+        // first byte returned is always core type, further bytes are 
+        // command dependent
+        if(byte_cnt == 0) begin
+            SPI_MISO <= core_type[~bit_cnt];
+        end else begin
+            // reading keyboard data
+            if(cmd == 8'h04) begin
+                if(byte_cnt == 1) SPI_MISO <= kbd_out_status[~bit_cnt];
+                else              SPI_MISO <= kbd_out_data[~bit_cnt];
+            end
+        end
+    end
+end
+
+// SPI receiver IO -> FPGA
+
+reg       spi_receiver_strobe_r = 0;
+reg       spi_transfer_end_r = 1;
+reg [7:0] spi_byte_in;
+
+// Read at spi_sck clock domain, assemble bytes for transferring to clk_sys
 always@(posedge SPI_CLK or posedge SPI_SS_IO) begin
 
-	if(SPI_SS_IO == 1) begin
-	   bit_cnt <= 3'd0;
-	   byte_cnt <= 8'd0;
-		kbd_out_ack <= 1'b0;
-		kbd_in_strobe <= 1'b0;
-	end else begin
-		kbd_out_ack <= 1'b0;
-		kbd_in_strobe <= 1'b0;
+    if(SPI_SS_IO == 1) begin
+        spi_transfer_end_r <= 1;
+    end else begin
+        spi_transfer_end_r <= 0;
 
-		bit_cnt <= bit_cnt + 3'd1;
-		if(bit_cnt == 7) byte_cnt <= byte_cnt + 8'd1;
-		else       		  sbuf[6:0] <= { sbuf[5:0], SPI_MOSI };
+        if(bit_cnt != 7)
+            sbuf[6:0] <= { sbuf[5:0], SPI_MOSI };
 
-		// finished reading command byte
-      if(bit_cnt == 7) begin
-			if(byte_cnt == 0)
-				cmd <= { sbuf, SPI_MOSI};
-
-			if(byte_cnt != 0) begin
-			
-				if(cmd == 8'h01)
-					but_sw <= { sbuf[2:0], SPI_MOSI }; 
-
-				if(cmd == 8'h02)
-					joystick0 <= { sbuf, SPI_MOSI };
-				 
-				if(cmd == 8'h03)
-					joystick1 <= { sbuf, SPI_MOSI };
-					
-				// KBD_OUT status byte has been read
-				if((cmd == 8'h04) && (byte_cnt == 1))
-					kbd_out_ack <= 1'b1;
-					
-				// KBD_IN data byte
-				if((cmd == 8'h05) && (byte_cnt == 1))
-					kbd_in_strobe <= 1'b1;
-			end
-		end
-	end
+            // finished reading a byte, prepare to transfer to clk_sys
+            if(bit_cnt == 7) begin
+                spi_byte_in <= { sbuf, SPI_MOSI};
+                spi_receiver_strobe_r <= ~spi_receiver_strobe_r;
+            end
+    end
 end
-   
+
+// Process bytes from SPI at the clk_sys domain
+always @(posedge clk_sys) begin
+
+    reg       spi_receiver_strobe;
+    reg       spi_transfer_end;
+    reg       spi_receiver_strobeD;
+    reg       spi_transfer_endD;
+    reg [7:0] acmd;
+    reg [7:0] abyte_cnt;   // counts bytes
+
+    kbd_in_strobe <= 0;
+
+    //synchronize between SPI and sys clock domains
+    spi_receiver_strobeD <= spi_receiver_strobe_r;
+    spi_receiver_strobe <= spi_receiver_strobeD;
+    spi_transfer_endD       <= spi_transfer_end_r;
+    spi_transfer_end        <= spi_transfer_endD;
+
+    // strobe is set whenever a valid byte has been received
+    if (~spi_transfer_endD & spi_transfer_end) begin
+        abyte_cnt <= 8'd0;
+    end else if (spi_receiver_strobeD ^ spi_receiver_strobe) begin
+
+        if(~&abyte_cnt)
+            abyte_cnt <= abyte_cnt + 8'd1;
+
+        if(abyte_cnt == 0) begin
+            acmd <= spi_byte_in;
+        end else begin
+            case(acmd)
+                // buttons and switches
+                8'h01: but_sw <= spi_byte_in;
+                8'h60: if (abyte_cnt < 5) joystick_0[(abyte_cnt-1)<<3 +:8] <= spi_byte_in;
+                8'h61: if (abyte_cnt < 5) joystick_1[(abyte_cnt-1)<<3 +:8] <= spi_byte_in;
+                8'h62: if (abyte_cnt < 5) joystick_2[(abyte_cnt-1)<<3 +:8] <= spi_byte_in;
+                8'h63: if (abyte_cnt < 5) joystick_3[(abyte_cnt-1)<<3 +:8] <= spi_byte_in;
+                8'h64: if (abyte_cnt < 5) joystick_4[(abyte_cnt-1)<<3 +:8] <= spi_byte_in;
+
+                8'h04: if (abyte_cnt == 1) kbd_out_data_available <= 0;
+                8'h05: if (abyte_cnt == 1) begin
+                           kbd_in_strobe <= 1;
+                           kbd_in_data <= spi_byte_in;
+                       end
+            endcase
+        end
+    end
+    if (kbd_out_strobe) kbd_out_data_available <= 1;
+end
+
 endmodule

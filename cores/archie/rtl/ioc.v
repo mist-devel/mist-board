@@ -88,18 +88,17 @@ wire read_request 	= (wb_bank == 3'b000) & wb_stb & wb_cyc & !wb_we;
 // keyboard input is valid on rising edge of kbd_in_strobe. Latch data then
 // and set irq
 reg [7:0] kbd_in_data_latch;
-always @(posedge kbd_in_strobe) 
-	kbd_in_data_latch <= kbd_in_data;
-
-// input data irq is cleared when cpu reads input port
 reg kbd_in_irq_ack;
-	
 reg kbd_in_irq;
-always @(posedge kbd_in_strobe or posedge kbd_in_irq_ack) begin
-	if(kbd_in_irq_ack) kbd_in_irq <= 1'b0;
-	else               kbd_in_irq <= 1'b1;
+// input data irq is cleared when cpu reads input port
+always @(posedge clkcpu or posedge kbd_in_irq_ack) begin
+	if (kbd_in_irq_ack) kbd_in_irq <= 0;
+	else if (kbd_in_strobe) begin
+		kbd_in_data_latch <= kbd_in_data;
+		kbd_in_irq <= 1;
+	end
 end
-	
+
 // faked kbd tx timing
 reg[4:0] txcount = 5'd0;
 wire txdone = txcount == 5'd0 /* synthesis keep */;

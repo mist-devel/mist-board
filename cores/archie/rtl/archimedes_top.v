@@ -23,8 +23,8 @@ module archimedes_top(
 
 	// base CPU Clock
 	input 			CLKCPU_I,
-	input 			CLKPIX2X_I,
-	output			CLKPIX_O,
+	input			CLKPIX_I,
+	output			CEPIX_O,
 	
 	input 			RESET_I, 
 	
@@ -51,6 +51,7 @@ module archimedes_top(
 	output  [3:0]	VIDEO_R,
 	output  [3:0]	VIDEO_G,
 	output  [3:0]	VIDEO_B,
+	output			VIDEO_EN,
 	
 	// VIDC Enhancer selection.
 	// These are from external latch C
@@ -85,8 +86,6 @@ module archimedes_top(
 	output [15:0]	AUDIO_R
 	
 );		      
-
-(*KEEP="TRUE"*)wire por_reset; 
 
 // cpu bus
 (*KEEP="TRUE"*)wire [31:0] cpu_address /* synthesis keep */;
@@ -141,19 +140,24 @@ a23_core ARM(
 	.i_irq		( cpu_irq		),
 	.i_firq		( cpu_firq		),
 	
-	.i_system_rdy(~por_reset	)
+	.i_system_rdy(~RESET_I	)
 );
+
+wire sirq_n;
+wire ram_cs;
+wire vid_we;
+wire snd_ack, snd_req;
 
 memc MEMC(
 	
 	.clkcpu			( CLKCPU_I		),
-	.rst_i			( por_reset		),
+	.rst_i			( RESET_I		),
 	
-	.spvmd			(cpu_spvmd),
+	.spvmd			( cpu_spvmd		),
 
 	// cpu interface
 	.cpu_address	( cpu_address[25:0]	),
-	.cpu_cyc	    ( cpu_cyc		),
+	.cpu_cyc	   	( cpu_cyc		),
 	.cpu_stb		( cpu_stb		),
 	.cpu_we			( cpu_we		),
 	.cpu_sel		( cpu_sel		),
@@ -190,13 +194,13 @@ memc MEMC(
 
 vidc VIDC(
 
-	  .clkpix2x	( CLKPIX2X_I	),
-	  .clkpix	( CLKPIX_O		),
-	  .clkcpu	( CLKCPU_I		),  
+	  .clkpix	( CLKPIX_I	),
+	  .cepix_hi	( CEPIX_O	),
+
+	  .clkcpu	( CLKCPU_I	),
+	  .rst_i	( RESET_I),
 	  
-	  .rst_i(por_reset),  
-	  
-	  .cpu_dat(cpu_dat_o),
+	  .cpu_dat	( cpu_dat_o	),
 
 	  // memc 
 	  .flybk		( vid_flybk	),
@@ -214,7 +218,8 @@ vidc VIDC(
 	  .video_r	( VIDEO_R	),
 	  .video_g	( VIDEO_G	),
 	  .video_b	( VIDEO_B	),
-	  
+	  .video_en ( VIDEO_EN  ),
+
 	  // audio signals
 	  .audio_l	( AUDIO_L	),
 	  .audio_r	( AUDIO_R	)
@@ -230,17 +235,19 @@ wire [15:0]	pod_dat_i;
 wire floppy_firq;
 wire floppy_drq;
 
+wire ioc_clk2m_en, ioc_clk8m_en;
+
 ioc IOC(
 
 	.clkcpu		( CLKCPU_I				), 
 	.clk2m_en	( ioc_clk2m_en			),
 	.clk8m_en	( ioc_clk8m_en			),
 	
-	.por		( por_reset				),
+	.por		( RESET_I				),
 	.ir			( vid_flybk				),
 	
 	.fh			( {floppy_firq, floppy_drq}),
-	
+
 	.il			( {6'b1111, sirq_n, 1'b1 }),
 	
 	.c_in		( ioc_cin 				),
@@ -257,15 +264,15 @@ ioc IOC(
 
 	.wb_dat_i	( cpu_dat_o[23:16]	),
 	.wb_dat_o	( ioc_dat_o				),
-	.wb_bank		( cpu_address[18:16]	), 
+	.wb_bank	( cpu_address[18:16]	), 
 	
-	.irq			( cpu_irq				),
-	.firq			( cpu_firq				),
+	.irq		( cpu_irq				),
+	.firq		( cpu_firq				),
 	
-	.kbd_out_data   ( KBD_OUT_DATA   ),
-	.kbd_out_strobe ( KBD_OUT_STROBE ),
-	.kbd_in_data    ( KBD_IN_DATA    ),
-	.kbd_in_strobe  ( KBD_IN_STROBE  )
+	.kbd_out_data	( KBD_OUT_DATA		),
+	.kbd_out_strobe	( KBD_OUT_STROBE	),
+	.kbd_in_data	( KBD_IN_DATA		),
+	.kbd_in_strobe	( KBD_IN_STROBE		)
 );
 
 wire 	podules_en = ioc_cs & ioc_select[4];
@@ -312,8 +319,8 @@ fdc1772 FDC1772 (
 	.wb_we			( cpu_we  & floppy_en	),
 
 	.wb_dat_o		( floppy_dat_o			),
-	.wb_dat_i		( cpu_dat_o[23:16]		),
-	.wb_adr			( cpu_address[15:2]		), 
+	.wb_dat_i		( cpu_dat_o[23:16]	),
+	.wb_adr			( cpu_address[15:2]	),
 	
 	.floppy_firq	( floppy_firq			),
 	.floppy_drq		( floppy_drq			),
@@ -321,7 +328,7 @@ fdc1772 FDC1772 (
 	.dio_status_out( FDC_DIO_STATUS_OUT ),
 	.dio_status_in ( FDC_DIO_STATUS_IN  ),
 	.dio_in_strobe ( FDC_DIN_STROBE     ),
-	.dio_in        ( FDC_DIN           ),
+	.dio_in        ( FDC_DIN           	),
 	
 	.floppy_drive	( floppy_drive			),
 	.floppy_motor	( floppy_motor			),
@@ -360,12 +367,6 @@ latches LATCHES(
 	.syncpol		( VIDSYNCPOL_O			)
 );
 
-por POR(
-	.clk		( CLKCPU_I				),
-	.rst_i		( RESET_I				),
-	.rst_o		( por_reset				)
-);
-	
 
 assign MEM_DAT_O	= 	cpu_dat_o;
 

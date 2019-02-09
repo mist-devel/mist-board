@@ -34,7 +34,7 @@ module sdram_init(
 	input				sd_rst,
 	output	reg [3:0] 	sd_cmd,
 	output 	reg [12:0]	sd_a,    // 13 bit multiplexed address bus
-	output 				sd_rdy
+	output 	reg			sd_rdy
 );
 
 `include "sdram_defines.v"
@@ -49,8 +49,8 @@ initial begin
 	t			= 4'd0;
 	reset 		= 5'h1f;
 	sd_a		= 13'd0;
-	sd_cmd 		= CMD_INHIBIT; 
-
+	sd_cmd 		= CMD_INHIBIT;
+	sd_rdy      = 0;
 end
 
 always @(posedge sd_clk) begin
@@ -62,11 +62,12 @@ always @(posedge sd_clk) begin
 		t			<= 4'd0;
 		reset 	<= 5'h1f;
 		sd_a		<= 13'd0;
+		sd_rdy  <= 0;
 	
-	end else if (!sd_rdy) begin
+	end else begin
 	
-		t <= t + 4'd1;
-		
+		if (!sd_rdy) t <= t + 4'd1;
+
 		if (t ==4'hF) begin 
 			reset <= reset - 5'd1;		
 		end
@@ -89,13 +90,12 @@ always @(posedge sd_clk) begin
 				sd_cmd 		<= CMD_LOAD_MODE;
 				sd_a 		<= MODE;
 			end
-			
+
+			if(reset == 0) sd_rdy <= 1;
 		end
 		
 	end
 	
 end
-
-assign	sd_rdy	= reset == 5'd0;
 
 endmodule

@@ -37,6 +37,7 @@ module vidc_audio
 
  // audio/data side of the bus
  input             aud_clk,
+ input             aud_ce,
  input             aud_rst,
  input [7:0]       aud_data,
  output reg        aud_en,
@@ -71,7 +72,7 @@ initial begin
    
   channel = 3'd0;
         
-  aud_delay_count   = 8'd11111111;
+  aud_delay_count   = 8'b11111111;
   aud_1mhz_count 	= 5'd0;
    
 end
@@ -99,46 +100,43 @@ always @(posedge cpu_clk) begin
    end
    
 end
-                 
+
+reg [7:0] aud_data_l, aud_data_r;
+always @(posedge aud_clk) begin
+	aud_left  <= mulaw_table[aud_data_l];
+	aud_right <= mulaw_table[aud_data_r];
+end
+
 always @(posedge aud_clk) begin
 
-   aud_en <= 1'b0;
-   aud_1mhz_count <= aud_1mhz_count + 1;
-   if (aud_rst) begin
+	if(aud_ce) begin
+		aud_en <= 1'b0;
+		aud_1mhz_count <= aud_1mhz_count + 1'd1;
+		if (aud_rst) begin
 
-      channel <= 3'd0;
-      
-      aud_delay_count   <= 8'd11111111;
-      aud_1mhz_count 	<= 5'd0;
+			channel <= 3'd0;
 
-   end else if (aud_1mhz_en) begin
-     
-      aud_1mhz_count 	<= 5'd0;
-      aud_delay_count <= aud_delay_count - 1;
-      
-      if (aud_delay_count == 8'd0) begin
+			aud_delay_count   <= 8'b11111111;
+			aud_1mhz_count 	<= 5'd0;
 
-         channel <= channel + 'd1;
+		end else if (aud_1mhz_en) begin
 
-         if ((vidc_mixer[2] == 1'b0) | (channel[1:0] == 2'b00)) begin
+			aud_1mhz_count 	<= 5'd0;
+			aud_delay_count <= aud_delay_count - 1'd1;
 
-            aud_left <= mulaw_table[aud_data];
+			if (aud_delay_count == 8'd0) begin
 
-         end
+				channel <= channel + 1'd1;
 
-         if (vidc_mixer[2] == 1'b1) begin
+				if ((vidc_mixer[2] == 1'b0) | (channel[1:0] == 2'b00)) aud_data_l <= aud_data;
+				if (vidc_mixer[2] == 1'b1)                             aud_data_r <= aud_data;
 
-            aud_right <= mulaw_table[aud_data];
-            
-         end       
+				aud_en <= 1'b1;
+				aud_delay_count <= vidc_sfr[7:0];
 
-         aud_en <= 1'b1;
-         aud_delay_count <= vidc_sfr[7:0];
-         
-      end
-      
-   end
-   
+			end
+		end
+	end
 end
 
 // this is the trigger for the 1mhz enable pulse.

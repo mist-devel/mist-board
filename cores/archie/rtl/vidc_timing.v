@@ -33,9 +33,10 @@ module vidc_timing(
 		input 			wr, 		// write to video register.
 		input [31:0]	cpu_dat,	// data to write (data bus).
 		
-		input 			clkpix,
-		input				rst,
-				
+		input 			clkvid,
+		input			cevid,
+		input			rst,
+
 		output reg o_vsync,
 		output reg o_hsync, 
 
@@ -135,12 +136,12 @@ always @(posedge clkcpu) begin
 				VIDEO_VDER: 	vidc_vder <= cpu_dat[23:14];
 				
 				// horizontal timing
-				VIDEO_HCR: 		vidc_hcr  <= {cpu_dat[23:14], 1'b0};
-				VIDEO_HSWR: 	vidc_hswr <= {cpu_dat[23:14], 1'b0};
-				VIDEO_HBSR: 	vidc_hbsr <= {cpu_dat[23:14], 1'b0};
-				VIDEO_HBER: 	vidc_hber <= {cpu_dat[23:14], 1'b0};
-				VIDEO_HDSR: 	vidc_hdsr <= {cpu_dat[23:14], 1'b0};
-				VIDEO_HDER: 	vidc_hder <= {cpu_dat[23:14], 1'b0};
+				VIDEO_HCR: 		vidc_hcr  <= {cpu_dat[22:14], 1'b0};
+				VIDEO_HSWR: 	vidc_hswr <= {cpu_dat[22:14], 1'b0};
+				VIDEO_HBSR: 	vidc_hbsr <= {cpu_dat[22:14], 1'b0};
+				VIDEO_HBER: 	vidc_hber <= {cpu_dat[22:14], 1'b0};
+				VIDEO_HDSR: 	vidc_hdsr <= {cpu_dat[22:14], 1'b0};
+				VIDEO_HDER: 	vidc_hder <= {cpu_dat[22:14], 1'b0};
 				
 				VIDEO_HCSR: 	vidc_hcsr <= cpu_dat[23:13];
 					
@@ -163,39 +164,34 @@ wire vflyback = (vcount >= vidc_vber);
 wire vcursor = (vcount >= vidc_vcsr) & (vcount < vidc_vcer);
 wire hcursor = ({1'b0, hcount} >= vidc_hcsr);
 	 	 
-always @(posedge clkpix) begin
+always @(posedge clkvid) begin
 
-	o_flyback 	<= vflyback;
-	o_enabled 	<= hdisplay && vdisplay; 
-	o_border 	<= hborder && vborder; 
-	o_vsync 		<= ~((vcount <= vidc_vswr) & !rst);
-	o_hsync 		<= ~((hcount < vidc_hswr) & !rst);
-	
-	o_cursor <= hcursor & vcursor;
-	
-	// video frame control
+	if (cevid) begin
+		o_flyback 	<= vflyback;
+		o_enabled 	<= hdisplay && vdisplay;
+		o_border 	<= hborder && vborder;
+		o_vsync 	<= ~((vcount <= vidc_vswr) & !rst);
+		o_hsync 	<= ~((hcount < vidc_hswr) & !rst);
 
-	if (hcount < vidc_hcr) begin
-	
-		hcount <= hcount + 9'd1;
-		
-	end else begin
-		
-		// horizontal refresh time.
-		hcount <= 10'd0;
-		
-		if (vcount < vidc_vcr) begin
-		
-			vcount <= vcount + 9'd1;
-			
+		o_cursor <= hcursor & vcursor;
+
+		// video frame control
+
+		if (hcount < vidc_hcr) begin
+			hcount <= hcount + 9'd1;
 		end else begin
-			// vertical refresh time
-			vcount <= 10'd0;
-			
+			// horizontal refresh time.
+			hcount <= 0;
+
+			if (vcount < vidc_vcr) begin
+				vcount <= vcount + 9'd1;
+			end else begin
+				// vertical refresh time
+				vcount <= 0;
+
+			end
 		end
 	end
-
 end
-
 
 endmodule
