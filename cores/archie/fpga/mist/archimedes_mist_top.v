@@ -96,7 +96,7 @@ wire [7:0] joyA;
 wire [7:0] joyB;
 wire [1:0] buttons;
 wire [1:0] switches;
-
+wire       ypbpr;
 
 // the top file should generate the correct clocks for the machine
 
@@ -108,6 +108,8 @@ clockgen CLOCKS(
 	.c3		(DRAM_CLK),
 	.locked	(pll_ready)  // pll locked output
 );
+
+wire [5:0] osd_r_o, osd_g_o, osd_b_o;
 
 osd #(0,0,4) OSD (
    .clk_sys    ( clk_pix      ),
@@ -123,13 +125,29 @@ osd #(0,0,4) OSD (
    .HSync      ( core_hs      ),
    .VSync      ( core_vs      ),
 
-   .R_out      ( VGA_R         ),
-   .G_out      ( VGA_G         ),
-   .B_out      ( VGA_B         )
+   .R_out      ( osd_r_o      ),
+   .G_out      ( osd_g_o      ),
+   .B_out      ( osd_b_o      )
 );
 
-assign VGA_HS = core_hs;
-assign VGA_VS = core_vs;
+wire [5:0] Y, Pb, Pr;
+
+rgb2ypbpr rgb2ypbpr
+(
+	.red   ( osd_r_o ),
+	.green ( osd_g_o ),
+	.blue  ( osd_b_o ),
+	.y     ( Y       ),
+	.pb    ( Pb      ),
+	.pr    ( Pr      )
+);
+
+assign VGA_R = ypbpr?Pr:osd_r_o;
+assign VGA_G = ypbpr? Y:osd_g_o;
+assign VGA_B = ypbpr?Pb:osd_b_o;
+wire   CSync = ~(core_hs ^ core_vs);
+assign VGA_HS = ypbpr ? CSync : core_hs;
+assign VGA_VS = ypbpr? 1'b1 : core_vs;
 
 // de-multiplex spi outputs from user_io and data_io
 assign SPI_DO = (CONF_DATA0==0)?user_io_sdo:(SPI_SS2==0)?data_io_sdo:1'bZ;
@@ -145,6 +163,7 @@ user_io user_io(
 
    .SWITCHES      (switches         ),
    .BUTTONS       (buttons          ),
+   .ypbpr         (ypbpr            ),
 
    .JOY0          (joyA             ),
    .JOY1          (joyB             ),
