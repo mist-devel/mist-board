@@ -58,7 +58,7 @@ module gb_mist (
    output [5:0] 	VGA_B
 );
 
-assign LED = 1'b0;   // light led
+assign LED = ~dio_download;
 
 // mix both joysticks to allow the user to use any
 wire [7:0] joystick = joystick_0 | joystick_1;
@@ -83,22 +83,22 @@ wire [1:0] buttons;
 // include user_io module for arm controller communication
 user_io #(.STRLEN(CONF_STR_LEN)) user_io ( 
       .conf_str   ( CONF_STR   ),
-
+      .clk_sys    ( clk64      ),
       .SPI_CLK    ( SPI_SCK    ),
       .SPI_SS_IO  ( CONF_DATA0 ),
       .SPI_MISO   ( SPI_DO     ),
       .SPI_MOSI   ( SPI_DI     ),
 
       .status     ( status     ),
-		.buttons    ( buttons    ),
-               
+      .buttons    ( buttons    ),
+
       .joystick_0 ( joystick_0 ),
       .joystick_1 ( joystick_1 )
 );
 
 wire reset = (reset_cnt != 0);
 reg [9:0] reset_cnt;
-always @(posedge clk4) begin
+always @(posedge clk64) begin
 	if(status[0] || status[3] || buttons[1] || !pll_locked || dio_download)
 		reset_cnt <= 10'd1023;
 	else
@@ -120,8 +120,8 @@ sdram sdram (
    .sd_cas         ( SDRAM_nCAS                ),
 
     // system interface
-   .clk            ( clk32                     ),
-   .clkref         ( clk4                      ),
+   .clk            ( clk64                     ),
+   .sync           ( clk8                      ),
    .init           ( !pll_locked               ),
 
    // cpu interface
@@ -187,7 +187,7 @@ reg mbc1_ram_enable;
 reg mbc1_mode;
 reg [4:0] mbc1_rom_bank_reg;
 reg [1:0] mbc1_ram_bank_reg;
-always @(posedge clk4) begin
+always @(posedge clk64) begin
 	if(reset) begin
 		mbc1_rom_bank_reg <= 5'd1;
 		mbc1_ram_bank_reg <= 2'd0;
@@ -244,7 +244,7 @@ wire [8:0] mbc_bank =
 	mbc1?mbc1_addr:                  // MBC1, 16k bank 0, 16k bank 1-127 + ram
 	{7'b0000000, cart_addr[14:13]};  // no MBC, 32k linear address
 
-always @(posedge clk4) begin
+always @(posedge clk64) begin
 	if(!pll_locked) begin
 		cart_mbc_type <= 8'h00;
 		cart_rom_size <= 8'h00;
@@ -262,18 +262,19 @@ end
 
 // include ROM download helper
 data_io data_io (
+   .clk_sys ( clk64     ),
    // io controller spi interface
-   .sck ( SPI_SCK ),
-   .ss  ( SPI_SS2 ),
-   .sdi ( SPI_DI  ),
+   .SPI_SCK ( SPI_SCK ),
+   .SPI_SS2 ( SPI_SS2 ),
+   .SPI_DI  ( SPI_DI  ),
 
-   .downloading ( dio_download ),  // signal indicating an active rom download
-                 
+   .ioctl_download ( dio_download ),  // signal indicating an active rom download
+
    // external ram interface
-   .clk   ( clk4      ),
-   .wr    ( dio_write ),
-   .addr  ( dio_addr  ),
-   .data  ( dio_data  )
+   .ioctl_clkref ( clk8      ),
+   .ioctl_wr     ( dio_write ),
+   .ioctl_addr   ( dio_addr  ),
+   .ioctl_dout   ( dio_data  )
 );
 
 // select appropriate byte from 16 bit word returned by cart
@@ -294,10 +295,10 @@ wire [15:0] audio_right;
 // the gameboy itself
 gb gb (
 	.reset	    ( reset        ),
-	.clk         ( clk4         ),   // the whole gameboy runs on 4mhnz
+	.clk        ( clk4         ),   // the whole gameboy runs on 4mhnz
 
-	.fast_boot   ( status[2]    ),
-	.joystick    ( joystick     ),
+	.fast_boot   ( status[2]   ),
+	.joystick    ( joystick    ),
 
 	// interface to the "external" game cartridge
 	.cart_addr   ( cart_addr   ),
@@ -309,7 +310,7 @@ gb gb (
 	// audio
 	.audio_l 	( audio_left	),
 	.audio_r 	( audio_right	),
-	
+
 	// interface to the lcd
 	.lcd_clkena   ( lcd_clkena ),
 	.lcd_data     ( lcd_data   ),
@@ -318,11 +319,11 @@ gb gb (
 );
 
 sigma_delta_dac dac (
-	.clk			( clk32 					),
+	.clk		( clk64 			),
 	.ldatasum	( audio_left[15:1]	),
 	.rdatasum	( audio_right[15:1]	),
-	.left			( AUDIO_L				),
-	.right		( AUDIO_R				)
+	.left		( AUDIO_L			),
+	.right		( AUDIO_R			)
 );
 
 // the lcd to vga converter
@@ -330,7 +331,8 @@ wire [5:0] video_r, video_g, video_b;
 wire video_hs, video_vs;
 
 lcd lcd (
-	 .pclk   ( clk8       ),
+	 .clk64  ( clk64      ),
+	 .pclk_en( ce_pix     ),
 	 .clk    ( clk4       ),
 
 	 .tint   ( status[1]  ),
@@ -350,46 +352,46 @@ lcd lcd (
 
 // include the on screen display
 osd #(16,0,4) osd (
-   .pclk       ( clk32       ),
+   .clk_sys    ( clk64       ),
 
    // spi for OSD
-   .sdi        ( SPI_DI       ),
-   .sck        ( SPI_SCK      ),
-   .ss         ( SPI_SS3      ),
+   .SPI_DI     ( SPI_DI       ),
+   .SPI_SCK    ( SPI_SCK      ),
+   .SPI_SS3    ( SPI_SS3      ),
 
-   .red_in     ( video_r      ),
-   .green_in   ( video_g      ),
-   .blue_in    ( video_b      ),
-   .hs_in      ( video_hs     ),
-   .vs_in      ( video_vs     ),
+   .R_in       ( video_r      ),
+   .G_in       ( video_g      ),
+   .B_in       ( video_b      ),
+   .HSync      ( video_hs     ),
+   .VSync      ( video_vs     ),
 
-   .red_out    ( VGA_R        ),
-   .green_out  ( VGA_G        ),
-   .blue_out   ( VGA_B        ),
-   .hs_out     ( VGA_HS       ),
-   .vs_out     ( VGA_VS       )
+   .R_out      ( VGA_R        ),
+   .G_out      ( VGA_G        ),
+   .B_out      ( VGA_B        )
 );
-				
-reg clk4;   // 4.194304 MHz CPU clock and GB pixel clock
-always @(posedge clk8) 
-	clk4 <= !clk4;
 
-reg clk8;   // 8.388608 MHz VGA pixel clock
-always @(posedge clk16) 
-	clk8 <= !clk8;
+assign VGA_HS = video_hs;
+assign VGA_VS = video_vs;
 
-reg clk16;   // 16.777216 MHz
-always @(posedge clk32) 
-	clk16 <= !clk16;
-				
-// 32 Mhz SDRAM clk
+wire clk4 = ce_cpu;
+wire clk8 = ce_pix;
+
+reg ce_pix, ce_cpu;
+always @(posedge clk64) begin
+	reg [3:0] div = 0;
+	div <= div + 1'd1;
+	ce_pix   <= !div[2:0];
+	ce_cpu   <= !div[3:0];
+end
+
 wire pll_locked;
-wire clk32;
+wire clk64;
 pll pll (
 	 .inclk0(CLOCK_27[0]),
-	 .c0(clk32),        // 2*16.777216 MHz
-	 .c1(SDRAM_CLK),    // same phase shifted
+	 .c0(clk64),        // 4*16.777216 MHz
 	 .locked(pll_locked)
 );
+
+assign SDRAM_CLK = ~clk64;
 
 endmodule

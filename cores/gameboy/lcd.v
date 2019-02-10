@@ -4,6 +4,7 @@
 // The gameboy lcd runs from a shift register which is filled at 4194304 pixels/sec
 
 module lcd (
+	input   clk64,
 	input   clk,
 	input   clkena,
 	input [1:0] data,
@@ -12,7 +13,7 @@ module lcd (
 	input tint,
 	
 	// pixel clock
-   input  pclk,
+	input  pclk_en,
 	input  on,
 	
    // VGA output
@@ -50,7 +51,7 @@ always @(posedge clk) begin
 		p_toggle <= !p_toggle;
 	end
 end
-		
+
 // 
 parameter H   = 160;    // width of visible area
 parameter HFP = 24;     // unused time before hsync
@@ -69,7 +70,8 @@ reg[9:0] v_cnt;         // vertical pixel counter
 
 // horizontal pixel counter
 reg [1:0] last_mode_h;
-always@(posedge pclk) begin
+always@(posedge clk64) begin
+  if (pclk_en) begin
 	last_mode_h <= mode;
 	
 	if(h_cnt==H+HFP+HS+HBP-1)   h_cnt <= 0;
@@ -83,11 +85,13 @@ always@(posedge pclk) begin
 	// end of hblank
 	if((mode == 2'b10) && (last_mode_h == 2'b00))
 		h_cnt <= 0;
+  end
 end
 
 // veritical pixel counter
 reg [1:0] last_mode_v;
-always@(posedge pclk) begin
+always@(posedge clk64) begin
+  if (pclk_en) begin
 	// the vertical counter is processed at the begin of each hsync
 	if(h_cnt == H+HFP+HS+HBP-1) begin
 		if(v_cnt==VS+VFP+V+VBP-1)  v_cnt <= 0; 
@@ -105,6 +109,7 @@ always@(posedge pclk) begin
 		if((mode != 2'b01) && (last_mode_v == 2'b01))
 			v_cnt <= 616-4;
 	end
+  end
 end
 
 // -------------------------------------------------------------------------------
@@ -114,7 +119,8 @@ reg blank;
 reg [1:0] pixel_reg;
 reg [7:0] shift_reg_rptr;
 
-always@(posedge pclk) begin
+always@(posedge clk64) begin
+  if (pclk_en) begin
 	// visible area?
 	if((v_cnt < V) && (h_cnt < H)) begin
 		blank <= 1'b0;
@@ -124,6 +130,7 @@ always@(posedge pclk) begin
 		blank <= 1'b1;
 		shift_reg_rptr <= 8'd0;
 	end
+  end
 end
 
 wire [1:0] pixel = on?pixel_reg:2'b00;

@@ -140,7 +140,7 @@ set_location_assignment PIN_43 -to SDRAM_CLK
 
 
 set_global_assignment -name ENABLE_SIGNALTAP OFF
-set_global_assignment -name USE_SIGNALTAP_FILE stp1.stp
+set_global_assignment -name USE_SIGNALTAP_FILE output_files/clk.stp
 set_global_assignment -name CYCLONEII_RESERVE_NCEO_AFTER_CONFIGURATION "USE AS REGULAR IO"
 set_global_assignment -name RESERVE_DATA0_AFTER_CONFIGURATION "USE AS REGULAR IO"
 set_global_assignment -name RESERVE_DATA1_AFTER_CONFIGURATION "USE AS REGULAR IO"
@@ -148,7 +148,7 @@ set_global_assignment -name RESERVE_FLASH_NCE_AFTER_CONFIGURATION "USE AS REGULA
 set_global_assignment -name RESERVE_DCLK_AFTER_CONFIGURATION "USE AS REGULAR IO"
 set_global_assignment -name OPTIMIZE_HOLD_TIMING "ALL PATHS"
 set_global_assignment -name OPTIMIZE_MULTI_CORNER_TIMING ON
-set_global_assignment -name FITTER_EFFORT "FAST FIT"
+set_global_assignment -name FITTER_EFFORT "AUTO FIT"
 set_global_assignment -name POWER_PRESET_COOLING_SOLUTION "23 MM HEAT SINK WITH 200 LFPM AIRFLOW"
 set_global_assignment -name POWER_BOARD_THERMAL_MODEL "NONE (CONSERVATIVE)"
 set_global_assignment -name PARTITION_NETLIST_TYPE SOURCE -section_id Top
@@ -157,12 +157,36 @@ set_global_assignment -name PARTITION_COLOR 16764057 -section_id Top
 set_instance_assignment -name CURRENT_STRENGTH_NEW "MAXIMUM CURRENT" -to VGA_*
 set_global_assignment -name VERILOG_INPUT_VERSION VERILOG_2001
 set_global_assignment -name VERILOG_SHOW_LMF_MAPPING_MESSAGES OFF
+set_global_assignment -name PHYSICAL_SYNTHESIS_COMBO_LOGIC ON
+set_global_assignment -name PHYSICAL_SYNTHESIS_REGISTER_RETIMING ON
+set_global_assignment -name PHYSICAL_SYNTHESIS_ASYNCHRONOUS_SIGNAL_PIPELINING ON
+set_global_assignment -name PHYSICAL_SYNTHESIS_REGISTER_DUPLICATION ON
+set_global_assignment -name PHYSICAL_SYNTHESIS_COMBO_LOGIC_FOR_AREA ON
+set_global_assignment -name PHYSICAL_SYNTHESIS_MAP_LOGIC_TO_MEMORY_FOR_AREA ON
+set_global_assignment -name TIMEQUEST_MULTICORNER_ANALYSIS ON
+set_global_assignment -name PROJECT_OUTPUT_DIRECTORY output_files
+set_global_assignment -name ENABLE_CONFIGURATION_PINS OFF
+set_global_assignment -name ENABLE_NCE_PIN OFF
+set_global_assignment -name ENABLE_BOOT_SEL_PIN OFF
+set_global_assignment -name VERILOG_FILE gb_mist.v
+set_global_assignment -name SYSTEMVERILOG_FILE sdram.sv
 set_global_assignment -name VERILOG_FILE sigma_delta_dac.v
 set_global_assignment -name VHDL_FILE gbc_snd.vhd
 set_global_assignment -name VERILOG_FILE data_io.v
-set_global_assignment -name VERILOG_FILE sdram.v
 set_global_assignment -name VERILOG_FILE user_io.v
 set_global_assignment -name VERILOG_FILE osd.v
+set_global_assignment -name QIP_FILE pll.qip
+set_global_assignment -name VERILOG_FILE gb.v
+set_global_assignment -name VERILOG_FILE lcd.v
+set_global_assignment -name QIP_FILE boot_rom.qip
+set_global_assignment -name VERILOG_FILE video.v
+set_global_assignment -name VERILOG_FILE sprites.v
+set_global_assignment -name VERILOG_FILE sprite.v
+set_global_assignment -name VERILOG_FILE sprite_sort.v
+set_global_assignment -name VERILOG_FILE timer.v
+set_global_assignment -name QIP_FILE iram.qip
+set_global_assignment -name QIP_FILE vram.qip
+set_global_assignment -name QIP_FILE zpram.qip
 set_global_assignment -name VHDL_FILE t80/T80.vhd
 set_global_assignment -name VHDL_FILE t80/Z80.vhd
 set_global_assignment -name VHDL_FILE t80/T80_Reg.vhd
@@ -170,18 +194,4 @@ set_global_assignment -name VHDL_FILE t80/T80_Pack.vhd
 set_global_assignment -name VHDL_FILE t80/T80_ALU.vhd
 set_global_assignment -name VHDL_FILE t80/GBse.vhd
 set_global_assignment -name VHDL_FILE t80/T80_MCode.vhd
-set_global_assignment -name QIP_FILE pll.qip
-set_global_assignment -name VERILOG_FILE gb.v
-set_global_assignment -name VERILOG_FILE lcd.v
-set_global_assignment -name QIP_FILE boot_rom.qip
-set_global_assignment -name SIGNALTAP_FILE stp1.stp
-set_global_assignment -name VERILOG_FILE gb_mist.v
-set_global_assignment -name QIP_FILE vram.qip
-set_global_assignment -name QIP_FILE iram.qip
-set_global_assignment -name VERILOG_FILE video.v
-set_global_assignment -name QIP_FILE zpram.qip
-set_global_assignment -name VERILOG_FILE sprites.v
-set_global_assignment -name VERILOG_FILE sprite.v
-set_global_assignment -name VERILOG_FILE sprite_sort.v
-set_global_assignment -name VERILOG_FILE timer.v
 set_instance_assignment -name PARTITION_HIERARCHY root_partition -to | -section_id Top
