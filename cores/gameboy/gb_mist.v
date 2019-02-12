@@ -68,17 +68,19 @@ wire [7:0] joystick_1;
 // the configuration string is returned to the io controller to allow
 // it to control the menu on the OSD 
 parameter CONF_STR = {
-        "GAMEBOY;GB;",
+        "GAMEBOY;;",
+        "F,GBCGB ,Load;",
         "O1,LCD color,white,yellow;",
         "O2,Boot,Normal,Fast;",
         "T3,Reset"
 };
 
-parameter CONF_STR_LEN = 11+26+20+8;  
+parameter CONF_STR_LEN = 9+14+26+20+8;
 
 // the status register is controlled by the on screen display (OSD)
 wire [7:0] status;
 wire [1:0] buttons;
+wire       isGBC = dio_index[7:6] == 0;
 
 // include user_io module for arm controller communication
 user_io #(.STRLEN(CONF_STR_LEN)) user_io ( 
@@ -145,6 +147,7 @@ wire dio_download;
 wire [23:0] dio_addr;
 wire [15:0] dio_data;
 wire dio_write;
+wire [7:0] dio_index;
 
 // TODO: RAM bank
 // http://fms.komkon.org/GameBoy/Tech/Carts.html
@@ -202,7 +205,7 @@ wire [3:0] mbc5_ram_bank = mbc_ram_bank_reg & ram_mask;
 
 // in mode 0 (16/8 mode) the ram bank select signals are the upper rom address lines 
 // in mode 1 (4/32 mode) the upper two rom address lines are 2'b00
-wire [6:0] mbc1_rom_bank_mode = { mbc1_mode?2'b00:mbc_ram_bank_reg, mbc_rom_bank_reg};
+wire [6:0] mbc1_rom_bank_mode = { mbc1_mode?2'b00:mbc_ram_bank_reg[1:0], mbc_rom_bank_reg[4:0]};
 // mask address lines to enable proper mirroring
 wire [6:0] mbc1_rom_bank = mbc1_rom_bank_mode & rom_mask[6:0];
 wire [3:0] mbc2_rom_bank = mbc_rom_bank_reg[3:0] & rom_mask[3:0];  //16
@@ -265,6 +268,8 @@ end
 reg [7:0] cart_mbc_type;
 reg [7:0] cart_rom_size;
 reg [7:0] cart_ram_size;
+reg [7:0] cart_cgb_flag;
+wire      isGBC_game = (cart_cgb_flag == 8'h80 || cart_cgb_flag == 8'hC0);
 
 // only write sdram if the write attept comes from the cart ram area
 wire cart_ram_wr = cart_wr && mbc_ram_enable && ((cart_addr[15:13] == 3'b101 && ~mbc2) || (cart_addr[15:9] == 7'b1010000 && mbc2));
@@ -317,10 +322,12 @@ always @(posedge clk64) begin
 		cart_mbc_type <= 8'h00;
 		cart_rom_size <= 8'h00;
 		cart_ram_size <= 8'h00;
+		cart_cgb_flag <= 8'h00;
 	end else begin
 		if(dio_download && dio_write) begin
 			// cart is stored in 16 bit wide sdram, so addresses are shifted right
 			case(dio_addr)
+				24'h142: cart_cgb_flag <= dio_data[15:8];
 				24'ha3:  cart_mbc_type <= dio_data[7:0];                 // $147
 				24'ha4: { cart_rom_size, cart_ram_size } <= dio_data;    // $148/$149
 			endcase
@@ -340,6 +347,7 @@ data_io data_io (
 
    // external ram interface
    .ioctl_clkref ( clk8      ),
+   .ioctl_index  ( dio_index ),
    .ioctl_wr     ( dio_write ),
    .ioctl_addr   ( dio_addr  ),
    .ioctl_dout   ( dio_data  )
@@ -353,12 +361,21 @@ wire cart_rd;
 wire cart_wr;
 
 wire lcd_clkena;
-wire [1:0] lcd_data;
+wire [14:0] lcd_data;
 wire [1:0] lcd_mode;
 wire lcd_on;
 
 wire [15:0] audio_left;
 wire [15:0] audio_right;
+
+wire [11:0] bios_addr;
+wire  [7:0] bios_do;
+
+gbc_bios gbc_bios (
+	.clock		( clk64        ),
+	.address	( bios_addr	   ),
+	.q			( bios_do      )
+);
 
 // the gameboy itself
 gb gb (
@@ -368,6 +385,8 @@ gb gb (
 
 	.fast_boot   ( status[2]   ),
 	.joystick    ( joystick    ),
+	.isGBC       ( isGBC       ),
+	.isGBC_game  ( isGBC_game  ),
 
 	// interface to the "external" game cartridge
 	.cart_addr   ( cart_addr   ),
@@ -375,6 +394,10 @@ gb gb (
 	.cart_wr     ( cart_wr     ),
 	.cart_do     ( cart_do     ),
 	.cart_di     ( cart_di     ),
+
+	//gbc bios interface
+	.gbc_bios_addr ( bios_addr  ),
+	.gbc_bios_do   ( bios_do    ),
 
 	// audio
 	.audio_l 	( audio_left	),
@@ -400,11 +423,12 @@ wire [5:0] video_r, video_g, video_b;
 wire video_hs, video_vs;
 
 lcd lcd (
-	 .clk64  ( clk64      ),
+	 .clk    ( clk64      ),
 	 .pclk_en( ce_pix     ),
-	 .clk    ( clk4       ),
+	 .clk4_en( clk4       ),
 
 	 .tint   ( status[1]  ),
+	 .isGBC  ( isGBC      ),
 
 	 // serial interface
 	 .clkena ( lcd_clkena ),

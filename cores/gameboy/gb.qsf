@@ -187,6 +187,7 @@ set_global_assignment -name VERILOG_FILE sprite.v
 set_global_assignment -name VERILOG_FILE sprite_sort.v
 set_global_assignment -name VERILOG_FILE timer.v
 set_global_assignment -name QIP_FILE boot_rom.qip
+set_global_assignment -name QIP_FILE gbc_bios.qip
 set_global_assignment -name VHDL_FILE t80/T80.vhd
 set_global_assignment -name VHDL_FILE t80/Z80.vhd
 set_global_assignment -name VHDL_FILE t80/T80_Reg.vhd
