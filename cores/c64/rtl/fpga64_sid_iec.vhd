@@ -86,9 +86,6 @@ entity fpga64_sid_iec is
 		-- joystick interface
 		joyA        : in  unsigned(6 downto 0);
 		joyB        : in  unsigned(6 downto 0);
-		-- 4 player interface
-		joyC			: in  unsigned(6 downto 0);
-		joyD			: in  unsigned(6 downto 0);
 
 		-- serial port, for connection to pheripherals
 		serioclk    : out std_logic;
@@ -109,6 +106,22 @@ entity fpga64_sid_iec is
 		iec_clk_i	: in  std_logic;
 		iec_atn_o	: out std_logic;
 --		iec_atn_i	: in  std_logic;
+
+		-- user port
+		cnt1_in		: in std_logic := '1';
+		cnt1_out	: out std_logic;
+		cnt2_in		: in std_logic := '1';
+		cnt2_out	: out std_logic;
+		sp1_in		: in std_logic := '1';
+		sp1_out		: out std_logic;
+		sp2_in		: in std_logic := '1';
+		sp2_out		: out std_logic;
+		flag2_n		: in std_logic := '1';
+		pc2_n		: out std_logic;
+		pa2_in		: in std_logic;
+		pa2_out		: out std_logic;
+		pb_in 		: in std_logic_vector(7 downto 0);
+		pb_out		: out std_logic_vector(7 downto 0);
 
 		-- CIA
 		cia_mode    : in std_logic;
@@ -204,18 +217,14 @@ architecture rtl of fpga64_sid_iec is
 	signal theScanCode: unsigned(7 downto 0);
 
 	-- I/O
-	signal cia1_pai: unsigned(7 downto 0);
-	signal cia1_pao: unsigned(7 downto 0);
-	signal cia1_pad: unsigned(7 downto 0);
-	signal cia1_pbi: unsigned(7 downto 0);
-	signal cia1_pbo: unsigned(7 downto 0);
-	signal cia1_pbd: unsigned(7 downto 0);
-	signal cia2_pai: unsigned(7 downto 0);
-	signal cia2_pao: unsigned(7 downto 0);
-	signal cia2_pad: unsigned(7 downto 0);
-	signal cia2_pbi: unsigned(7 downto 0);
-	signal cia2_pbo: unsigned(7 downto 0);
-	signal cia2_pbd: unsigned(7 downto 0);
+	signal cia1_pai: std_logic_vector(7 downto 0);
+	signal cia1_pao: std_logic_vector(7 downto 0);
+	signal cia1_pbi: std_logic_vector(7 downto 0);
+	signal cia1_pbo: std_logic_vector(7 downto 0);
+	signal cia2_pai: std_logic_vector(7 downto 0);
+	signal cia2_pao: std_logic_vector(7 downto 0);
+	signal cia2_pbi: std_logic_vector(7 downto 0);
+	signal cia2_pbo: std_logic_vector(7 downto 0);
 
 	signal debugWE: std_logic := '0';
 	signal debugData: unsigned(7 downto 0) := (others => '0');
@@ -677,9 +686,11 @@ div1m: process(clk32)				-- this process devides 32 MHz to 1MHz (for the SID)
             pb_in => std_logic_vector(cia1_pbi),
             unsigned(pb_out) => cia1_pbo,
 
-            flag_n => '1',
-            sp_in => '1',
-            cnt_in => '1',
+            flag_n => flag2_n,
+            sp_in => sp1_in,
+            sp_out => sp1_out,
+            cnt_in => cnt1_in,
+            cnt_out => cnt1_out,
 
             pc_n => open,
             tod => vicVSync,
@@ -705,11 +716,13 @@ div1m: process(clk32)				-- this process devides 32 MHz to 1MHz (for the SID)
             pb_in => std_logic_vector(cia2_pbi),
             unsigned(pb_out) => cia2_pbo,
 
-            flag_n => '1',
-            sp_in => '1',
-            cnt_in => '1',
+            flag_n => flag2_n,
+            sp_in => sp2_in,
+            sp_out => sp2_out,
+            cnt_in => cnt2_in,
+            cnt_out => cnt2_out,
 
-            pc_n => open,
+            pc_n => pc2_n,
             tod => vicVSync,
             irq_n => irq_cia2
 		);
@@ -757,11 +770,11 @@ div1m: process(clk32)				-- this process devides 32 MHz to 1MHz (for the SID)
 
 			joyA => (not joyA(4 downto 0)),
 			joyB => (not joyB(4 downto 0)),
-			pai => cia1_pao,
-			pbi => cia1_pbo,
-			pao => cia1_pai,
-			pbo => cia1_pbi,
-			
+			pai => unsigned(cia1_pao),
+			pbi => unsigned(cia1_pbo),
+			std_logic_vector(pao) => cia1_pai,
+			std_logic_vector(pbo) => cia1_pbi,
+
 			videoKey => videoKey,
 			traceKey => open,
 			trace2Key => trace2Key,
@@ -808,7 +821,7 @@ div1m: process(clk32)				-- this process devides 32 MHz to 1MHz (for the SID)
 	iec_data_o <= cia2_pao(5);
 	iec_clk_o <= cia2_pao(4);
 	iec_atn_o <= cia2_pao(3);
-	ramDataOut <= "00" & cia2_pao(5 downto 3) & "000" when sysCycle >= CYCLE_IEC0 and sysCycle <= CYCLE_IEC3 else cpuDo;
+	ramDataOut <= "00" & unsigned(cia2_pao)(5 downto 3) & "000" when sysCycle >= CYCLE_IEC0 and sysCycle <= CYCLE_IEC3 else cpuDo;
 	ramAddr <= systemAddr when (phi0_cpu = '1') or (phi0_vic = '1') else (others => '0');
 	ramWe <= '0' when sysCycle = CYCLE_IEC2 or sysCycle = CYCLE_IEC3 else not systemWe;
 	ramCE <= '0' when sysCycle /= CYCLE_IDLE0 and sysCycle /= CYCLE_IDLE1 and sysCycle /= CYCLE_IDLE2 and 
@@ -884,10 +897,10 @@ div1m: process(clk32)				-- this process devides 32 MHz to 1MHz (for the SID)
 	end process;
 
 	cia2_pai(5 downto 0) <= cia2_pao(5 downto 0);
-	cia2_pbi(7 downto 6) <= cia2_pbo(7 downto 6);
-
-	-- Protovision 4 player interface
-	cia2_pbi(5 downto 0) <= not joyC(5 downto 0) when cia2_pbo(7) = '1' else not joyD(5 downto 0);
+	cia2_pai(2) <= pa2_in;
+	pa2_out <= cia2_pao(2);
+	cia2_pbi <= pb_in;
+	pb_out <= cia2_pbo;
 
 -- -----------------------------------------------------------------------
 -- VIC bank to address lines

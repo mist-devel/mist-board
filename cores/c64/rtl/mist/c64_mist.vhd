@@ -424,6 +424,11 @@ end component cartridge;
 	signal c1541_iec_data_i : std_logic;
 	signal c1541_iec_clk_i  : std_logic;
 
+	signal pa2_in	: std_logic;
+	signal pa2_out	: std_logic;
+	signal pb_in	: std_logic_vector(7 downto 0);
+	signal pb_out	: std_logic_vector(7 downto 0);
+
 	signal tv15Khz_mode   : std_logic;
 	signal ypbpr          : std_logic;
 	signal ntsc_init_mode : std_logic := '0';
@@ -944,8 +949,6 @@ begin
 		ba => open,
 		joyA => unsigned(joyA_c64),
 		joyB => unsigned(joyB_c64),
-		joyC => unsigned(joyC_c64),
-		joyD => unsigned(joyD_c64),
 		serioclk => open,
 		ces => ces,
 		SIDclk => open,
@@ -961,6 +964,10 @@ begin
 		iec_data_i => c64_iec_data_i,
 		iec_clk_i  => c64_iec_clk_i,
 --		iec_atn_i  => not c64_iec_atn_i,
+		pa2_in => pa2_in,
+		pa2_out => pa2_out,
+		pb_in => pb_in,
+		pb_out => pb_out,
 		cia_mode => status(4),
 		disk_num => open,
 		c64rom_addr => ioctl_addr(13 downto 0),
@@ -969,6 +976,12 @@ begin
 --		cart_detach_key => cart_detach_key,
 		reset_key => reset_key
 	);
+
+	-- connect user port
+	pa2_in <= pa2_out;
+	pb_in(7 downto 6) <= pb_out(7 downto 6);
+	-- Protovision 4 player interface
+	pb_in(5 downto 0) <= not joyC_c64(5 downto 0) when pb_out(7) = '1' else not joyD_c64(5 downto 0);
 
 	disk_readonly <= status(16);
 
