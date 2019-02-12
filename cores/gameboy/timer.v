@@ -22,7 +22,6 @@
 module timer (
 	input  reset,
    input  clk,    // 4 Mhz cpu clock
-
 	output reg irq,
 	
 	// cpu register interface
@@ -45,9 +44,17 @@ module timer (
 // clk_div[8] = 8khz
 // clk_div[9] = 4khz
 
+wire resetdiv = cpu_sel && cpu_wr && (cpu_addr == 2'b00); //resetdiv also resets internal counter
+
 reg [9:0] clk_div;
-always @(posedge clk)
-	clk_div <= clk_div + 10'd1;
+always @(posedge clk or posedge resetdiv)
+	if(resetdiv)
+	  clk_div <= 10'd6;
+	else
+		if (reset)
+		     clk_div <= 10'd6;
+		  else
+	        clk_div <= clk_div + 10'd1;
 
 reg [7:0] div;
 reg [7:0] tma;
@@ -56,12 +63,13 @@ reg [2:0] tac;
 
 always @(posedge clk) begin
 	if(reset) begin
-		tima <= 8'h00;
-		tma <= 8'h00;
-		tac <= 8'h00;
-		irq <= 1'b0;
+		tima <= 0;
+		tma <= 0;
+		tac <= 0;
+		irq <= 0;
+		div <= 0;
 	end else begin
-		irq <= 1'b0;
+		irq <= 0;
 
 		if(clk_div[7:0] == 0)   // 16kHz
 			div <= div + 8'd1;
@@ -98,6 +106,6 @@ assign cpu_do =
 	(cpu_addr == 2'b00)?div:
 	(cpu_addr == 2'b01)?tima:
 	(cpu_addr == 2'b10)?tma:
-	{5'b00000, tac};
+	{5'b11111, tac};
 	
 endmodule

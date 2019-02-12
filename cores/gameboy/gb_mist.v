@@ -296,6 +296,7 @@ wire [15:0] audio_right;
 gb gb (
 	.reset	    ( reset        ),
 	.clk        ( clk4         ),   // the whole gameboy runs on 4mhnz
+	.clk2x      ( clk8         ),
 
 	.fast_boot   ( status[2]   ),
 	.joystick    ( joystick    ),

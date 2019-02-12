@@ -21,6 +21,7 @@
 
 module sprites (
 	input clk,
+	input clk_reg,
 	input size16,
 
 	// pixel position input which the current pixel is generated for
@@ -33,11 +34,16 @@ module sprites (
 	output pixel_cmap,
 	output pixel_prio,
 	
+	//gbc
+	output [2:0] pixel_cmap_gbc,
+	output tile_vbank,
+	
 	input sort,
 	input [3:0] index,          // index of sprite which video wants to read data for
 	output [10:0] addr,
 	input [1:0] dvalid,
 	input [7:0] data,
+	input [7:0] data1,
 
 	// oam memory interface
 	input oam_wr,
@@ -79,6 +85,9 @@ wire [5:0] sprite_idx_array [SPRITES-1:0];
 wire [5:0] prio_index = sprite_idx_array[index];
 assign addr = sprite_addr[prio_index];
 
+//gbc
+wire [2:0] sprite_pixel_cmap_gbc [SPRITES-1:0];
+wire sprite_tile_vbank [SPRITES-1:0];
 
 generate
 genvar i;
@@ -87,7 +96,7 @@ for(i=0;i<SPRITES;i=i+1) begin : spr
 	assign sprite_idx_array[i] = sprite_idx[6*i+5:6*i];
 
 	sprite sprite (
-		.clk      ( clk     ),
+		.clk      ( clk_reg ),
 		.size16   ( size16  ),
 
 		.v_cnt    ( v_cnt   ),
@@ -97,11 +106,17 @@ for(i=0;i<SPRITES;i=i+1) begin : spr
 		.addr     ( sprite_addr[i] ),
 		.ds       ( (prio_index == i)?dvalid:2'b00),
 		.data     ( data     ),
+		.data_1   ( data1    ),
 
 		.pixel_cmap   ( sprite_pixel_cmap[i] ),
 		.pixel_prio   ( sprite_pixel_prio[i] ),
 		.pixel_active ( sprite_pixel_active[i] ),
 		.pixel_data   ( sprite_pixel_data[i] ),
+		
+		
+	   //gbc
+	   .pixel_cmap_gbc ( sprite_pixel_cmap_gbc[i] ),
+	   .tile_vbank     ( sprite_tile_vbank[i]     ),		
 	
 		.oam_wr   ( oam_wr && (oam_addr[7:2] == i) ),
 		.oam_addr ( oam_addr[1:0] ),
@@ -171,6 +186,35 @@ assign pixel_cmap =
 	sprite_pixel_active[spr9]?sprite_pixel_cmap[spr9]:
 	1'b0;
 
+// get the colormap of the leftmost sprite gbc
+assign pixel_cmap_gbc =
+	sprite_pixel_active[spr0]?sprite_pixel_cmap_gbc[spr0]:
+	sprite_pixel_active[spr1]?sprite_pixel_cmap_gbc[spr1]:
+	sprite_pixel_active[spr2]?sprite_pixel_cmap_gbc[spr2]:
+	sprite_pixel_active[spr3]?sprite_pixel_cmap_gbc[spr3]:
+	sprite_pixel_active[spr4]?sprite_pixel_cmap_gbc[spr4]:
+	sprite_pixel_active[spr5]?sprite_pixel_cmap_gbc[spr5]:
+	sprite_pixel_active[spr6]?sprite_pixel_cmap_gbc[spr6]:
+	sprite_pixel_active[spr7]?sprite_pixel_cmap_gbc[spr7]:
+	sprite_pixel_active[spr8]?sprite_pixel_cmap_gbc[spr8]:
+	sprite_pixel_active[spr9]?sprite_pixel_cmap_gbc[spr9]:
+	1'b0;
+
+// get the tile vbank of the leftmost sprite
+assign tile_vbank =
+	sprite_pixel_active[spr0]?sprite_tile_vbank[spr0]:
+	sprite_pixel_active[spr1]?sprite_tile_vbank[spr1]:
+	sprite_pixel_active[spr2]?sprite_tile_vbank[spr2]:
+	sprite_pixel_active[spr3]?sprite_tile_vbank[spr3]:
+	sprite_pixel_active[spr4]?sprite_tile_vbank[spr4]:
+	sprite_pixel_active[spr5]?sprite_tile_vbank[spr5]:
+	sprite_pixel_active[spr6]?sprite_tile_vbank[spr6]:
+	sprite_pixel_active[spr7]?sprite_tile_vbank[spr7]:
+	sprite_pixel_active[spr8]?sprite_tile_vbank[spr8]:
+	sprite_pixel_active[spr9]?sprite_tile_vbank[spr9]:
+	1'b0;
+	
+	
 // get the priority of the leftmost sprite
 assign pixel_prio =
 	sprite_pixel_active[spr0]?sprite_pixel_prio[spr0]:

@@ -22,6 +22,8 @@
 module video (
 	input  reset,
    input  clk,    // 4 Mhz cpu clock
+	input  clk_reg,
+	input  isGBC,
 	
 	// cpu register adn oam interface
 	input  cpu_sel_oam,
@@ -34,7 +36,7 @@ module video (
 	// output to lcd
 	output lcd_on,
 	output lcd_clkena,
-	output [1:0] lcd_data,
+	output [14:0] lcd_data,
 	output reg irq,
 	
 	// vram connection
@@ -42,6 +44,9 @@ module video (
 	output vram_rd,
 	output [12:0] vram_addr,
 	input [7:0] vram_data,
+	
+	// vram connection bank1 (GBC)
+	input [7:0] vram1_data,
 
 	// dma connection
 	output dma_rd,
@@ -51,6 +56,7 @@ module video (
 
 localparam STAGE2  = 9'd250;   // oam + disp + pause
 localparam OAM_LEN = 80;
+localparam OAM_LEN16 = OAM_LEN/16;
 
 wire sprite_pixel_active;
 wire [1:0] sprite_pixel_data;
@@ -58,8 +64,12 @@ wire sprite_pixel_cmap;
 wire sprite_pixel_prio;
 
 wire [7:0] oam_do;
-wire [3:0] sprite_index = h_cnt[7:4]-(OAM_LEN/16);   // memory io starts at h_cnt == 16
+wire [3:0] sprite_index = h_cnt[7:4] - OAM_LEN16[3:0];   // memory io starts at h_cnt == 16
 wire [10:0] sprite_addr;
+
+//gbc
+wire [2:0] sprite_pixel_cmap_gbc;
+wire sprite_tile_vbank;
 
 // "data strobe" for the two bytes each sprite line consists of
 wire [1:0] sprite_dvalid = {
@@ -68,6 +78,7 @@ wire [1:0] sprite_dvalid = {
 
 sprites sprites (
 	.clk      ( clk          ),
+	.clk_reg  ( clk_reg      ),
 	.size16   ( lcdc_spr_siz ),
 	
 	.v_cnt    ( v_cnt        ),
@@ -79,10 +90,15 @@ sprites sprites (
 	.pixel_cmap   ( sprite_pixel_cmap   ),
 	.pixel_prio   ( sprite_pixel_prio   ),
 
-	.index    ( sprite_index ),
-	.addr     ( sprite_addr  ),
-	.dvalid   ( sprite_dvalid),
-	.data     ( vram_data    ),
+	.index    ( sprite_index                ),
+	.addr     ( sprite_addr                 ),
+	.dvalid   ( sprite_dvalid               ),
+	.data     ( vram_data                   ),
+	.data1    ( isGBC?vram1_data:vram_data  ),
+	
+	//gbc
+	.pixel_cmap_gbc ( sprite_pixel_cmap_gbc ),
+	.tile_vbank     ( sprite_tile_vbank     ),
 	
 	.oam_wr   ( oam_wr       ),
 	.oam_addr ( oam_addr     ),
@@ -119,7 +135,7 @@ reg [7:0] scx;
 reg [7:0] scx_r;   // stable over line
 
 // ff44 line counter
-reg [7:0] ly;
+wire [7:0] ly = v_cnt;
 
 // ff45 line counter compare
 wire lyc_match = (ly == lyc);
@@ -134,6 +150,22 @@ reg [7:0] wy_r;   // stable over entire image
 reg [7:0] wx;
 reg [7:0] wx_r;   // stable over line
 
+
+//ff68-ff6A GBC
+//FF68 - BCPS/BGPI  - Background Palette Index
+reg [5:0] bgpi; //Bit 0-5   Index (00-3F)
+reg bgpi_ai;    //Bit 7     Auto Increment  (0=Disabled, 1=Increment after Writing)
+
+//FF69 - BCPD/BGPD - Background Palette Data
+reg[7:0] bgpd [63:0]; //64 bytes
+
+//FF6A - OCPS/OBPI - Sprite Palette Index
+reg [5:0] obpi; //Bit 0-5   Index (00-3F)
+reg obpi_ai;    //Bit 7     Auto Increment  (0=Disabled, 1=Increment after Writing)
+
+//FF6B - OCPD/OBPD - Sprite Palette Data
+reg[7:0] obpd [63:0]; //64 bytes
+
 // --------------------------------------------------------------------
 // ----------------------------- DMA engine ---------------------------
 // --------------------------------------------------------------------
@@ -144,12 +176,12 @@ assign dma_rd = dma_active;
 reg dma_active;
 reg [7:0] dma;
 reg [9:0] dma_cnt;     // dma runs 4*160 clock cycles = 160us @ 4MHz
-always @(posedge clk) begin
+always @(posedge clk_reg) begin
 	if(reset)
 		dma_active <= 1'b0;
 	else begin
 		// writing the dma register engages the dma engine
-		if(cpu_sel_reg && cpu_wr && (cpu_addr[3:0] == 4'h6)) begin
+		if(cpu_sel_reg && cpu_wr && (cpu_addr == 8'h46)) begin
 			dma_active <= 1'b1;
 			dma_cnt <= 10'd0;
 		end else if(dma_cnt != 160*4-1)
@@ -163,11 +195,12 @@ end
 // ------------------------------- IRQs -------------------------------
 // --------------------------------------------------------------------
 
-always @(posedge clk) begin
+always @(posedge clk_reg) begin  //TODO: have to check if this is correct
 	irq <= 1'b0;
-
+	
+	//TODO: investigate and fix timing of lyc=ly
 	// lyc=ly coincidence
-	if(stat[6] && (h_cnt == 0) && lyc_match)
+	if(stat[6] && (h_cnt == 1) && lyc_match)
 		irq <= 1'b1;
 		
 	// begin of oam phase
@@ -186,32 +219,65 @@ end
 // --------------------------------------------------------------------
 // --------------------- CPU register interface -----------------------
 // --------------------------------------------------------------------
-
-always @(posedge clk) begin
+integer ii=0;
+always @(posedge clk_reg) begin
 	if(reset) begin
 		lcdc <= 8'h00;  // screen must be off since dmg rom writes to vram
 		scy <= 8'h00;
 		scx <= 8'h00;
 		wy <= 8'h00;
 		wx <= 8'h00;
+		stat <= 8'h00;
 		bgp <= 8'hfc;
 		obp0 <= 8'hff;
 		obp1 <= 8'hff;
+		
+		bgpi <= 6'h0;
+		obpi <= 6'h0;
+		bgpi_ai <= 1'b0;
+		obpi_ai <= 1'b0;
+				
+		for (ii=0;ii<64;ii=ii+1)begin
+			bgpd[ii] <= 8'h00;
+			obpd[ii] <= 8'h00;
+		end
+		
 	end else begin
 		if(cpu_sel_reg && cpu_wr) begin
-			case(cpu_addr[3:0]) 
-				4'h0:	lcdc <= cpu_di;
-				4'h1:	stat <= cpu_di;
-				4'h2:	scy <= cpu_di;
-				4'h3:	scx <= cpu_di;
+			case(cpu_addr) 
+				8'h40:	lcdc <= cpu_di;
+				8'h41:	stat <= cpu_di;
+				8'h42:	scy <= cpu_di;
+				8'h43:	scx <= cpu_di;
 				// a write to 4 is supposed to reset the v_cnt
-				4'h5:	lyc <= cpu_di;
-				4'h6:	dma <= cpu_di;
-				4'h7:	bgp <= cpu_di;
-				4'h8:	obp0 <= cpu_di;
-				4'h9:	obp1 <= cpu_di;
-				4'ha:	wy <= cpu_di;
-				4'hb:	wx <= cpu_di;
+				8'h45:	lyc <= cpu_di;
+				8'h46:	dma <= cpu_di;
+				8'h47:	bgp <= cpu_di;
+				8'h48:	obp0 <= cpu_di;
+				8'h49:	obp1 <= cpu_di;
+				8'h4a:	wy <= cpu_di;
+				8'h4b:	wx <= cpu_di;
+				
+				//gbc
+				8'h68: begin
+							bgpi <= cpu_di[5:0];
+							bgpi_ai <= cpu_di[7];
+						 end
+				8'h69: begin
+							bgpd[bgpi] <= cpu_di;
+							if (bgpi_ai)
+							  bgpi <= bgpi + 6'h1;
+						 end
+				8'h6A: begin
+							obpi <= cpu_di[5:0];
+							obpi_ai <= cpu_di[7];
+						 end
+				8'h6B: begin
+							obpd[obpi] <= cpu_di;
+							if (obpi_ai)
+							  obpi <= obpi + 6'h1;
+						 end
+
 			endcase
 		end
 	end
@@ -219,18 +285,24 @@ end
 
 assign cpu_do = 
 	cpu_sel_oam?oam_do:
-	(cpu_addr[3:0] == 4'h0)?lcdc:
-	(cpu_addr[3:0] == 4'h1)?{stat[7:3], lyc_match, mode}:
-	(cpu_addr[3:0] == 4'h2)?scy:
-	(cpu_addr[3:0] == 4'h3)?scx:
-	(cpu_addr[3:0] == 4'h4)?ly:
-	(cpu_addr[3:0] == 4'h5)?lyc:
-	(cpu_addr[3:0] == 4'h6)?dma:
-	(cpu_addr[3:0] == 4'h7)?bgp:
-	(cpu_addr[3:0] == 4'h8)?obp0:
-	(cpu_addr[3:0] == 4'h9)?obp1:
-	(cpu_addr[3:0] == 4'ha)?wy:
-	(cpu_addr[3:0] == 4'hb)?wx:
+	(cpu_addr == 8'h40)?lcdc:
+	(cpu_addr == 8'h41)?{1'b1,stat[6:3], lyc_match, mode}:
+	(cpu_addr == 8'h42)?scy:
+	(cpu_addr == 8'h43)?scx:
+	(cpu_addr == 8'h44)?ly:
+	(cpu_addr == 8'h45)?lyc:
+	(cpu_addr == 8'h46)?dma:
+	(cpu_addr == 8'h47)?bgp:
+	(cpu_addr == 8'h48)?obp0:
+	(cpu_addr == 8'h49)?obp1:
+	(cpu_addr == 8'h4a)?wy:
+	(cpu_addr == 8'h4b)?wx:
+	isGBC?
+		(cpu_addr == 8'h68)?{bgpi_ai,1'd0,bgpi}:
+		(cpu_addr == 8'h69)?bgpd[bgpi]:
+		(cpu_addr == 8'h6a)?{obpi_ai,1'd0,obpi}:
+		(cpu_addr == 8'h6b)?obpd[obpi]:
+		8'hff:
 	8'hff;
 	
 // --------------------------------------------------------------------
@@ -240,36 +312,51 @@ assign cpu_do =
 assign lcd_data = stage2_data;
 assign lcd_clkena = stage2_clkena;
 
-reg [1:0] stage2_data;
+reg [14:0] stage2_data;
 reg stage2_clkena;
 
 reg [1:0] stage2_buffer [159:0];
+reg [3:0] stage2_bgp_buffer_pix [159:0]; //GBC keep record of palette used for tile and priority
+
 reg [7:0] stage2_wptr;
 reg [7:0] stage2_rptr;
 
-// apply bg palette
-wire [1:0] stage2_bg_pix = (!lcdc_bg_ena && !window_ena)?2'b11:  // background off?
-	(stage2_buffer[stage2_rptr] == 2'b00)?bgp[1:0]:
-	(stage2_buffer[stage2_rptr] == 2'b01)?bgp[3:2]:
-	(stage2_buffer[stage2_rptr] == 2'b10)?bgp[5:4]:
-	bgp[7:6];
 
+wire [5:0] palette_index = (stage2_bgp_buffer_pix[stage2_rptr][2:0] << 3) + (stage2_buffer[stage2_rptr]<<1); //gbc
+
+
+// apply bg palette
+wire [14:0] stage2_bg_pix = (!lcdc_bg_ena && !window_ena)?15'h7FFF:  // background off?
+	isGBC?{bgpd[palette_index+1][6:0],bgpd[palette_index]}: //gbc
+	(stage2_buffer[stage2_rptr] == 2'b00)?{13'd0,bgp[1:0]}:
+	(stage2_buffer[stage2_rptr] == 2'b01)?{13'd0,bgp[3:2]}:
+	(stage2_buffer[stage2_rptr] == 2'b10)?{13'd0,bgp[5:4]}:
+	{13'd0,bgp[7:6]};
+
+	
+	
 // apply sprite palette
+
+wire [5:0] sprite_palette_index = (sprite_pixel_cmap_gbc << 3) + (sprite_pixel_data<<1); //gbc
+
 wire [7:0] obp = sprite_pixel_cmap?obp1:obp0;
-wire [1:0] sprite_pix = 
-	(sprite_pixel_data == 2'b00)?obp[1:0]:
-	(sprite_pixel_data == 2'b01)?obp[3:2]:
-	(sprite_pixel_data == 2'b10)?obp[5:4]:
-	obp[7:6];
+wire [14:0] sprite_pix = isGBC?{obpd[sprite_palette_index+1][6:0],obpd[sprite_palette_index]}: //gbc
+							 (sprite_pixel_data == 2'b00)?{13'd0,obp[1:0]}:
+							 (sprite_pixel_data == 2'b01)?{13'd0,obp[3:2]}:
+							 (sprite_pixel_data == 2'b10)?{13'd0,obp[5:4]}:
+							 {13'd0,obp[7:6]};
 
 // a sprite pixel is visible if
 // - sprites are enabled
 // - there's a sprite at the current position
 // - the sprites prioroty bit is 0, or
-// - the prites priority is 1 and the backrgound color is 00
+// - the sprites priority is 1 and the backrgound color is 00
+// - GBC : BG priority is 0 
+
+wire bg_piority = isGBC&&stage2_bgp_buffer_pix[stage2_rptr][3];
 	
 wire sprite_pixel_visible = 
-	sprite_pixel_active && lcdc_spr_ena && 
+	sprite_pixel_active && lcdc_spr_ena && (~bg_piority) &&
 	((!sprite_pixel_prio) || (stage2_buffer[stage2_rptr] == 2'b00));
 	
 always @(posedge clk) begin
@@ -280,6 +367,7 @@ always @(posedge clk) begin
 
 	if(stage1_clkena) begin
 		stage2_buffer[stage2_wptr] <= stage1_data;
+		stage2_bgp_buffer_pix[stage2_wptr] <= {bg_tile_attr_old[7],bg_tile_attr_old[2:0]};  //GBC: buffer palette and Priority Bit
 		stage2_wptr <= stage2_wptr + 8'd1;
 	end
 	
@@ -289,7 +377,7 @@ always @(posedge clk) begin
 		if(sprite_pixel_visible) stage2_data <= sprite_pix;
 		else							 stage2_data <= stage2_bg_pix;
 		
-		stage2_rptr <= stage2_rptr + 8'd1;
+		stage2_rptr <= stage2_rptr + 8'd1;		
 	end
 end
 
@@ -303,31 +391,53 @@ reg window_ena;
 reg [7:0] tile_shift_0;
 reg [7:0] tile_shift_1;
 
+reg [7:0] tile_shift_0_x;
+reg [7:0] tile_shift_1_x;
+
+
 reg [7:0] bg_tile;
 reg [7:0] bg_tile_data0;
 reg [7:0] bg_tile_data1;
 
+
 wire stage1_clkena = !vblank && hdvalid;
-wire [1:0] stage1_data = { tile_shift_1[7], tile_shift_0[7] };
+wire [1:0] stage1_data = (isGBC&&bg_tile_attr_old[5])?{ tile_shift_1_x[0], tile_shift_0_x[0] }:{ tile_shift_1[7], tile_shift_0[7] }; 
+
+wire [7:0] vram_gbc_data = bg_tile_attr_new[3]?vram1_data:vram_data; //gbc check tile bank
+reg [7:0] bg_tile_attr_old,bg_tile_attr_new; //GBC
 
 // read data half a clock cycle after ram has been selected
 always @(posedge clk) begin
-
+	
 	// every memory access is two pixel cycles
 	if(h_cnt[0]) begin
 		if(bg_tile_map_rd) bg_tile <= vram_data;
-		if(bg_tile_data0_rd) bg_tile_data0 <= vram_data;
-		if(bg_tile_data1_rd) bg_tile_data1 <= vram_data;
+		
+		if (isGBC) begin
+			if(bg_tile_map_rd) bg_tile_attr_new <= vram1_data; //get tile attr from vram bank1
+			if(bg_tile_data0_rd) bg_tile_data0 <= vram_gbc_data;
+		   if(bg_tile_data1_rd) bg_tile_data1 <= vram_gbc_data; 
+		end else begin
+			if(bg_tile_data0_rd) bg_tile_data0 <= vram_data;
+		   if(bg_tile_data1_rd) bg_tile_data1 <= vram_data;	
+		end
+		
 		// sprite data is evaluated inside the sprite engine
 	end
 	
 	// shift bg/window pixels out 
 	if(bg_tile_obj_rd && h_cnt[0]) begin
+	   bg_tile_attr_old <= bg_tile_attr_new;
 		tile_shift_0 <= bg_tile_data0;
 		tile_shift_1 <= bg_tile_data1;
-	end else begin 
+		tile_shift_0_x <= bg_tile_data0;
+		tile_shift_1_x <= bg_tile_data1;
+	end else begin
 		tile_shift_0 <= { tile_shift_0[6:0], 1'b0 };
 		tile_shift_1 <= { tile_shift_1[6:0], 1'b0 };
+		//GBC x-flip
+		tile_shift_0_x <= { 1'b0,tile_shift_0_x[7:1]}; 
+		tile_shift_1_x <= { 1'b0,tile_shift_1_x[7:1]};
 	end
 end
 
@@ -338,10 +448,12 @@ wire bg_tile_a12 = !lcdc_tile_data_sel?(~bg_tile[7]):1'b0;
 
 wire tile_map_sel = window_ena?lcdc_win_tile_map_sel:lcdc_bg_tile_map_sel;
 
+wire [2:0] tile_line_gbc = bg_tile_attr_new[6]? (3'b111 - tile_line): tile_line; //GBC: check if flipped y
+
 assign vram_addr =
 	bg_tile_map_rd?{2'b11, tile_map_sel, bg_tile_map_addr}:
-	bg_tile_data0_rd?{bg_tile_a12, bg_tile, tile_line, 1'b0}:
-	bg_tile_data1_rd?{bg_tile_a12, bg_tile, tile_line, 1'b1}:
+	bg_tile_data0_rd?{bg_tile_a12, bg_tile, isGBC?tile_line_gbc:tile_line, 1'b0}:
+	bg_tile_data1_rd?{bg_tile_a12, bg_tile, isGBC?tile_line_gbc:tile_line, 1'b1}:
 	{1'b0, sprite_addr, h_cnt[3]};
 
 reg [9:0] bg_tile_map_addr;
@@ -434,6 +546,7 @@ wire bg_tile_obj_rd = (!vblank) && (!hblank) && (h_cnt[2:1] == 2'b11);
 // Mode 10:  oam
 // Mode 11:  oam and vram
 assign mode = 
+   !lcdc_on?2'b00:
 	vblank?2'b01:
 	oam?2'b10:
 	hblank?2'b00:
@@ -449,63 +562,70 @@ wire [2:0] tile_line = window_ena?win_line[2:0]:bg_line[2:0];
 
 wire win_start = lcdc_win_ena && (v_cnt >= wy_r) && de && (wx_r >= 7) && (pcnt == wx_r-8);
 
+
+
 // each memory access takes two cycles
-always @(negedge clk) begin
-	// this ly change h_cnt is wrong!!!
-	if(h_cnt == 0)
-		ly <= (v_cnt >= 153)?(v_cnt-8'd153):(v_cnt+8'd1);
+always @(negedge clk or negedge lcdc_on) begin
 
-	if(h_cnt != 455) begin
-		h_cnt <= h_cnt + 9'd1;
-
-		// make sure sginals don't change during the line
-		// latch at latest possible moment (one clock before display starts)
-		if(h_cnt == OAM_LEN-2) begin
-			scx_r <= scx;
-			wx_r <= wx;
-			scy_r <= scy;
-		end
-
-		// increment address at the end of each 8-pixel-cycle. But don't
-		// increment while waiting for current cycle to end due to window start
-		if(!hblank && h_cnt[2:0] == 3'b111 && (skip <= 8))
-			bg_tile_map_addr[4:0] <= bg_tile_map_addr[4:0] + 10'd1;
-
-		// begin of line
-		if(h_cnt == OAM_LEN-1) begin
-			// set tile map address for this line, assume there is no window
-			bg_tile_map_addr[9:5] <= bg_line[7:3];
-			bg_tile_map_addr[4:0] <= scx_r[7:3];
+	if (!lcdc_on) begin // don't increase counters if lcdoff 
+		//reset counters
+		h_cnt <= 9'd0;  
+		v_cnt <= 8'd0;
 		
-			// special case wx < 8: line starts with window, no background 
-			// visible at all
-			if(lcdc_win_ena && (v_cnt >= wy_r) && (wx_r < 8)) begin
+	end else begin
+	
+		if(h_cnt != 455) begin
+			h_cnt <= h_cnt + 9'd1;
+	
+			// make sure sginals don't change during the line
+			// latch at latest possible moment (one clock before display starts)
+			if(h_cnt == OAM_LEN-2) begin
+				scx_r <= scx;
+				wx_r <= wx;
+				scy_r <= scy;
+			end
+	
+			// increment address at the end of each 8-pixel-cycle. But don't
+			// increment while waiting for current cycle to end due to window start
+			if(!hblank && h_cnt[2:0] == 3'b111 && (skip <= 8))
+				bg_tile_map_addr[4:0] <= bg_tile_map_addr[4:0] + 1'd1;
+	
+			// begin of line
+			if(h_cnt == OAM_LEN-1) begin
+				// set tile map address for this line, assume there is no window
+				bg_tile_map_addr[9:5] <= bg_line[7:3];
+				bg_tile_map_addr[4:0] <= scx_r[7:3];
+			
+				// special case wx < 8: line starts with window, no background 
+				// visible at all
+				if(lcdc_win_ena && (v_cnt >= wy_r) && (wx_r < 8)) begin
+					window_ena <= 1'b1;
+					bg_tile_map_addr[9:5] <= win_line[7:3];
+					bg_tile_map_addr[4:0] <= 5'd0;           // window always start with its very left
+				end
+			end
+			
+			// check if the window starts here
+			if(win_start) begin
 				window_ena <= 1'b1;
 				bg_tile_map_addr[9:5] <= win_line[7:3];
 				bg_tile_map_addr[4:0] <= 5'd0;           // window always start with its very left
 			end
-		end
+		end else begin
+			window_ena <= 1'b0;   // next line starts with background
 		
-		// check if the window starts here
-		if(win_start) begin
-			window_ena <= 1'b1;
-			bg_tile_map_addr[9:5] <= win_line[7:3];
-			bg_tile_map_addr[4:0] <= 5'd0;           // window always start with its very left
-		end
-	end else begin
-		window_ena <= 1'b0;   // next line starts with background
-	
-		// end of line reached
-		h_cnt <= 9'd0;
-			
-		if(v_cnt != 153)
-			v_cnt <= v_cnt + 8'd1;
-		else begin
-			// start of new image
-			v_cnt <= 8'd0;
-			
-			// make sure sginals don't change during the image
-			wy_r <= wy;
+			// end of line reached
+			h_cnt <= 9'd0;
+				
+			if(v_cnt != 153)
+				v_cnt <= v_cnt + 8'd1;
+			else begin
+				// start of new image
+				v_cnt <= 8'd0;
+				
+				// make sure sginals don't change during the image
+				wy_r <= wy;
+			end
 		end
 	end
 end

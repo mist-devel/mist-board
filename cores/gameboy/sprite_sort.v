@@ -87,7 +87,7 @@ generate
 		always @(posedge clk) begin
 			if(load) begin
 				values[i] <= in[i];
-				index[i] <= i;
+				index[i] <= i[5:0];
 			end else begin
 				values[i] <= sort_val[i];
 				index[i] <= sort_idx[i];
