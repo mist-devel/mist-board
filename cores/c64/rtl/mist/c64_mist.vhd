@@ -126,8 +126,9 @@ constant CONF_STR : string :=
 	"S,D64,Mount Disk;"&
 	"F,PRG,Load File;"&
 	"F,CRT,Load Cartridge;" &--3
---	"F,TAP,Load File;"&--4
---	"F,T64,Load File;"&--5
+	"F,ROM,Load Kernal;"&
+--	"F,TAP,Load File;"&--5
+--	"F,T64,Load File;"&--6
 	"OG,Disk Write,Enable,Disable;"&
 	"O2,Video standard,PAL,NTSC;"&
 	"O8A,Scandoubler Fx,None,HQ2x-320,HQ2x-160,CRT 25%,CRT 50%;"&
@@ -368,6 +369,7 @@ end component cartridge;
 	
 	signal c1541rom_wr   : std_logic;
 	signal c64rom_wr     : std_logic;
+	signal c64rom_addr   : std_logic_vector(13 downto 0);
 
 	signal joyA : std_logic_vector(31 downto 0);
 	signal joyB : std_logic_vector(31 downto 0);
@@ -682,7 +684,7 @@ begin
 						end if;
 					end if;
 					
-					if ioctl_index = 4 then
+					if ioctl_index = 5 then
 						if ioctl_addr = 0 then
 							ioctl_load_addr <= '0' & X"200000";
 							ioctl_ram_data <= ioctl_data;
@@ -721,7 +723,8 @@ begin
 		end if;
 	end process;
 
-	c64rom_wr   <= ioctl_wr when (ioctl_index = 0) and (ioctl_addr(14) = '0') and (ioctl_download = '1') else '0';
+	c64rom_wr   <= ioctl_wr when (((ioctl_index = 0) and (ioctl_addr(14) = '0')) or (ioctl_index = 4)) and (ioctl_download = '1') else '0';
+	c64rom_addr <= ioctl_addr(13 downto 0) when ioctl_index = 0 else '1' & ioctl_addr(12 downto 0);
 	c1541rom_wr <= ioctl_wr when (ioctl_index = 0) and (ioctl_addr(14) = '1') and (ioctl_download = '1') else '0';
 
 	process(c64_clk)
@@ -856,7 +859,8 @@ begin
 			if status(0)='1' or pll_locked = '0' then
 				reset_counter <= 1000000;
 				reset_n <= '0';
-			elsif buttons(1)='1' or status(5)='1' or reset_key = '1' or reset_crt='1' or (ioctl_download='1' and ioctl_index = 3) then
+			elsif buttons(1)='1' or status(5)='1' or reset_key = '1' or reset_crt='1' or
+			(ioctl_download='1' and (ioctl_index = 3 or ioctl_index = 4)) then
 				reset_counter <= 255;
 				reset_n <= '0';
 			elsif ioctl_download ='1' then
@@ -970,7 +974,7 @@ begin
 		pb_out => pb_out,
 		cia_mode => status(4),
 		disk_num => open,
-		c64rom_addr => ioctl_addr(13 downto 0),
+		c64rom_addr => c64rom_addr,
 		c64rom_data => ioctl_data,
 		c64rom_wr => c64rom_wr,
 --		cart_detach_key => cart_detach_key,
