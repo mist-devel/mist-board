@@ -68,7 +68,10 @@ entity c64_mist is port
    SPI_DI     : in    std_logic;
    SPI_SS2    : in    std_logic;
    SPI_SS3    : in    std_logic;
-   CONF_DATA0 : in    std_logic
+   CONF_DATA0 : in    std_logic;
+
+   UART_RX    : in    std_logic;
+   UART_TX    : out   std_logic
 );
 end c64_mist;
 
@@ -133,8 +136,9 @@ constant CONF_STR : string :=
 	"O2,Video standard,PAL,NTSC;"&
 	"O8A,Scandoubler Fx,None,HQ2x-320,HQ2x-160,CRT 25%,CRT 50%;"&
 	"ODF,SID,6581 Mono,6581 Stereo,8580 Mono,8580 Stereo,Pseudo Stereo;"&
-	"O3,Joysticks,normal,swapped;"&
 	"O6,Audio filter,On,Off;"&
+	"O3,Joysticks,normal,swapped;"&
+	"O7,Userport,4-player IF,UART;"&
 	"O4,CIA Model,6256,8521;"&
 --	"OB,BIOS,C64,C64GS;" &
 	"T5,Reset & Detach Cartridge;";
@@ -427,9 +431,10 @@ end component cartridge;
 	signal c1541_iec_clk_i  : std_logic;
 
 	signal pa2_in	: std_logic;
-	signal pa2_out	: std_logic;
+	signal pa2_out  : std_logic;
 	signal pb_in	: std_logic_vector(7 downto 0);
 	signal pb_out	: std_logic_vector(7 downto 0);
+	signal flag2_n  : std_logic;
 
 	signal tv15Khz_mode   : std_logic;
 	signal ypbpr          : std_logic;
@@ -972,6 +977,7 @@ begin
 		pa2_out => pa2_out,
 		pb_in => pb_in,
 		pb_out => pb_out,
+		flag2_n => flag2_n,
 		cia_mode => status(4),
 		disk_num => open,
 		c64rom_addr => c64rom_addr,
@@ -982,10 +988,27 @@ begin
 	);
 
 	-- connect user port
-	pa2_in <= pa2_out;
-	pb_in(7 downto 6) <= pb_out(7 downto 6);
-	-- Protovision 4 player interface
-	pb_in(5 downto 0) <= not joyC_c64(5 downto 0) when pb_out(7) = '1' else not joyD_c64(5 downto 0);
+	process (pa2_out, pb_out, joyC_c64, joyD_c64, UART_RX, status)
+	begin
+		pa2_in <= pa2_out;
+		if status(7) = '0' then
+			-- Protovision 4 player interface
+			flag2_n <= '1';
+			UART_TX <= '0';
+			pb_in(7 downto 6) <= pb_out(7 downto 6);
+			if pb_out(7) = '1' then
+				pb_in(5 downto 0) <= not joyC_c64(5 downto 0);
+			else
+				pb_in(5 downto 0) <= not joyD_c64(5 downto 0);
+			end if;
+		else
+			-- UART
+			pb_in(7 downto 1) <= pb_out(7 downto 1);
+			flag2_n <= UART_RX;
+			pb_in(0) <= UART_RX;
+			UART_TX <= pa2_out;
+		end if;
+	end process;
 
 	disk_readonly <= status(16);
 

@@ -55,6 +55,8 @@ set_multicycle_path -from {video_mixer:vmixer|scandoubler:scandoubler|Hq2x:Hq2x|
 set_multicycle_path -to {VGA_*[*]} -setup 4
 set_multicycle_path -to {VGA_*[*]} -hold 3
 
+set_false_path -from [get_ports {UART_RX}]
+set_false_path -to [get_ports {UART_TX}]
 set_false_path -to [get_ports {AUDIO_L}]
 set_false_path -to [get_ports {AUDIO_R}]
 set_false_path -to [get_ports {LED}]
