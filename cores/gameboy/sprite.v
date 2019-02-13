@@ -32,11 +32,16 @@ module sprite (
 	output [10:0] addr,
    input [1:0] ds,
 	input [7:0] data,
+	input [7:0] data_1,
 
 	output pixel_active,
 	output pixel_cmap,
 	output pixel_prio,
 	output [1:0] pixel_data,
+	
+	//gbc
+	output [2:0] pixel_cmap_gbc,
+	output tile_vbank,
 	
 	input oam_wr,
 	input [1:0] oam_addr,
@@ -53,8 +58,8 @@ reg [7:0] data0;
 reg [7:0] data1;
 
 always @(posedge clk) begin
-	if(ds[0]) data0 <= data;
-	if(ds[1]) data1 <= data;
+	if(ds[0]) data0 <= flags[3]?data_1:data;
+	if(ds[1]) data1 <= flags[3]?data_1:data;
 end
 
 wire [7:0] height = size16?8'd16:8'd8;
@@ -63,15 +68,15 @@ wire v_visible = (v_cnt + 8'd16 >= y_pos) && (v_cnt + 8'd16 < y_pos + height);
 wire visible = v_visible && (h_cnt + 8'd8 >= x_pos) && (h_cnt < x_pos);
 
 // x position within sprite, mirror horizontally if required
-wire [2:0] col_n = h_cnt - x_pos;
-wire [2:0] col = flags[1]?col_n:~col_n;
+wire [7:0] col_n = h_cnt - x_pos;
+wire [2:0] col = flags[5]?col_n[2:0]:~col_n[2:0];
 
 assign pixel_data = { data1[col], data0[col] };
 assign pixel_active = (pixel_data != 0) && visible;
 
 // y position within sprite, mirror vertically if required
-wire [3:0] row_n = v_cnt - y_pos;
-wire [3:0] row = flags[2]?~row_n:row_n;
+wire [7:0] row_n = v_cnt - y_pos;
+wire [3:0] row = flags[6]?~row_n[3:0]:row_n[3:0];
 
 // 16 pixel tall sprites use one more rwo counter bit and the lsb
 // of the tile index is ignored
@@ -79,13 +84,16 @@ wire [10:0] addr8  = { tile , row[2:0]};
 wire [10:0] addr16 = { tile[7:1] , row};
 assign addr = size16?addr16:addr8;
 
-assign pixel_cmap = flags[0];
-assign pixel_prio = flags[3];
+assign pixel_cmap = flags[4];
+assign pixel_prio = flags[7];
+
+assign pixel_cmap_gbc = flags[2:0];
+assign tile_vbank = flags[3];
 
 reg [7:0] y_pos;
 reg [7:0] x_pos;
 reg [7:0] tile;
-reg [3:0] flags;
+reg [7:0] flags;
 
 always @(posedge clk) begin
 	if(oam_wr) begin
@@ -93,7 +101,7 @@ always @(posedge clk) begin
 			0: y_pos <= oam_di;
 			1: x_pos <= oam_di;
 			2: tile  <= oam_di;
-			3: flags <= oam_di[7:4];
+			3: flags <= oam_di;
 		endcase
 	end
 end
@@ -102,6 +110,6 @@ assign oam_do =
 	(oam_addr == 0)?y_pos:
 	(oam_addr == 1)?x_pos:
 	(oam_addr == 2)?tile:
-	{ flags, 4'h0 };
+	 flags;
 
 endmodule

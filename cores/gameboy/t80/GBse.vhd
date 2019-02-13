@@ -93,6 +93,7 @@ entity GBse is
 		RFSH_n          : out std_logic;
 		HALT_n          : out std_logic;
 		BUSAK_n         : out std_logic;
+		STOP            : out std_logic;
 		A               : out std_logic_vector(15 downto 0);
 		DI              : in  std_logic_vector(7 downto 0);
 		DO              : out std_logic_vector(7 downto 0)
@@ -133,6 +134,7 @@ begin
 			Write      => Write,
 			RFSH_n     => RFSH_n,
 			HALT_n     => HALT_n,
+			Stop       => STOP,
 			WAIT_n     => Wait_n,
 			INT_n      => INT_n,
 			NMI_n      => NMI_n,
