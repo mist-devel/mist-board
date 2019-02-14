@@ -70,8 +70,8 @@ set_input_delay -clock [get_clocks {CLOCKS|altpll_component|auto_generated|pll1|
 # Set Output Delay
 #**************************************************************
 
-set_output_delay -clock [get_clocks {CLOCKS|altpll_component|auto_generated|pll1|clk[1]}] -max 1.5 [get_ports {DRAM_D* DRAM_A* DRAM_BA* DRAM_n* DRAM_CKE}]
-set_output_delay -clock [get_clocks {CLOCKS|altpll_component|auto_generated|pll1|clk[1]}] -min -0.8 [get_ports {DRAM_D* DRAM_A* DRAM_BA* DRAM_n* DRAM_CKE}]
+set_output_delay -clock [get_clocks {CLOCKS|altpll_component|auto_generated|pll1|clk[1]}] -max 1.5 [get_ports {DRAM_A* DRAM_BA* DRAM_CAS_N DRAM_CKE DRAM_CS_N DRAM_D* DRAM_RAS_N DRAM_WE_N}]
+set_output_delay -clock [get_clocks {CLOCKS|altpll_component|auto_generated|pll1|clk[1]}] -min -0.8 [get_ports {DRAM_A* DRAM_BA* DRAM_CAS_N DRAM_CKE DRAM_CS_N DRAM_D* DRAM_RAS_N DRAM_WE_N}]
 set_output_delay -clock [get_clocks {CLOCKS|altpll_component|auto_generated|pll1|clk[3]}] -max 1.5 [get_ports DRAM_CLK]
 set_output_delay -clock [get_clocks {CLOCKS|altpll_component|auto_generated|pll1|clk[3]}] -min -0.8 [get_ports DRAM_CLK]
 
