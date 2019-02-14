@@ -127,7 +127,7 @@ set_global_assignment -name MAX_CORE_JUNCTION_TEMP 85
 
 # Analysis & Synthesis Assignments
 # ================================
-set_global_assignment -name CYCLONEII_OPTIMIZATION_TECHNIQUE SPEED
+set_global_assignment -name CYCLONEII_OPTIMIZATION_TECHNIQUE BALANCED
 set_global_assignment -name FAMILY "Cyclone III"
 set_global_assignment -name TOP_LEVEL_ENTITY c16_mist
 set_global_assignment -name DEVICE_FILTER_PACKAGE TQFP
@@ -144,7 +144,7 @@ set_global_assignment -name PHYSICAL_SYNTHESIS_ASYNCHRONOUS_SIGNAL_PIPELINING ON
 set_global_assignment -name PHYSICAL_SYNTHESIS_REGISTER_DUPLICATION ON
 set_global_assignment -name PHYSICAL_SYNTHESIS_COMBO_LOGIC_FOR_AREA ON
 set_global_assignment -name PHYSICAL_SYNTHESIS_MAP_LOGIC_TO_MEMORY_FOR_AREA ON
-set_global_assignment -name PHYSICAL_SYNTHESIS_EFFORT EXTRA
+set_global_assignment -name PHYSICAL_SYNTHESIS_EFFORT NORMAL
 set_global_assignment -name DEVICE EP3C25E144C8
 set_global_assignment -name CYCLONEIII_CONFIGURATION_SCHEME "PASSIVE SERIAL"
 set_global_assignment -name FORCE_CONFIGURATION_VCCIO ON
@@ -324,8 +324,6 @@ set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to CONF_DATA0
 set_global_assignment -name VERILOG_INPUT_VERSION VERILOG_2001
 set_global_assignment -name VERILOG_SHOW_LMF_MAPPING_MESSAGES OFF
 set_global_assignment -name VHDL_FILE gen_ram.vhd
-set_global_assignment -name QIP_FILE pll_ntsc.qip
-set_global_assignment -name QIP_FILE pll_pal.qip
 set_global_assignment -name VERILOG_FILE data_io.v
 set_global_assignment -name VERILOG_FILE sdram.v
 set_global_assignment -name VERILOG_FILE osd.v
@@ -353,4 +351,10 @@ set_global_assignment -name VHDL_FILE t65/T65_ALU.vhd
 set_global_assignment -name VHDL_FILE t65/T65.vhd
 set_global_assignment -name SIGNALTAP_FILE output_files/stp1.stp
 set_global_assignment -name SYSTEMVERILOG_FILE rgb2ypbpr.sv
+set_global_assignment -name QIP_FILE pll_c1541.qip
+set_global_assignment -name QIP_FILE pll_c16.qip
+set_global_assignment -name QIP_FILE rom_reconfig_pal.qip
+set_global_assignment -name QIP_FILE rom_reconfig_ntsc.qip
+set_global_assignment -name QIP_FILE pll_reconfig.qip
+set_global_assignment -name ENABLE_DRC_SETTINGS ON
 set_instance_assignment -name PARTITION_HIERARCHY root_partition -to | -section_id Top

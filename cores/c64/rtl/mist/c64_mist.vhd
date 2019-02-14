@@ -68,7 +68,10 @@ entity c64_mist is port
    SPI_DI     : in    std_logic;
    SPI_SS2    : in    std_logic;
    SPI_SS3    : in    std_logic;
-   CONF_DATA0 : in    std_logic
+   CONF_DATA0 : in    std_logic;
+
+   UART_RX    : in    std_logic;
+   UART_TX    : out   std_logic
 );
 end c64_mist;
 
@@ -126,14 +129,16 @@ constant CONF_STR : string :=
 	"S,D64,Mount Disk;"&
 	"F,PRG,Load File;"&
 	"F,CRT,Load Cartridge;" &--3
---	"F,TAP,Load File;"&--4
---	"F,T64,Load File;"&--5
+	"F,ROM,Load Kernal;"&
+--	"F,TAP,Load File;"&--5
+--	"F,T64,Load File;"&--6
 	"OG,Disk Write,Enable,Disable;"&
 	"O2,Video standard,PAL,NTSC;"&
 	"O8A,Scandoubler Fx,None,HQ2x-320,HQ2x-160,CRT 25%,CRT 50%;"&
 	"ODF,SID,6581 Mono,6581 Stereo,8580 Mono,8580 Stereo,Pseudo Stereo;"&
-	"O3,Joysticks,normal,swapped;"&
 	"O6,Audio filter,On,Off;"&
+	"O3,Joysticks,normal,swapped;"&
+	"O7,Userport,4-player IF,UART;"&
 	"O4,CIA Model,6256,8521;"&
 --	"OB,BIOS,C64,C64GS;" &
 	"T5,Reset & Detach Cartridge;";
@@ -255,9 +260,9 @@ component cartridge port
 	IOE			: in  std_logic;									-- IOE signal &DE00
 	IOF			: in  std_logic;									-- IOF signal &DF00
 
-	clk32			: in  std_logic;									-- 32mhz clock source
-	reset			: in  std_logic;									-- reset signal
-	reset_out	: out std_logic;									-- reset signal
+	clk32		: in  std_logic;							-- 32mhz clock source
+	reset		: in  std_logic;							-- reset signal
+	reset_out	: out std_logic;							-- reset signal
 
 	cart_id		: in  std_logic_vector(15 downto 0);		-- cart ID or cart type
 	cart_exrom  : in  std_logic_vector(7 downto 0);			-- CRT file EXROM status
@@ -289,8 +294,27 @@ component cartridge port
 
 end component cartridge;
 
-	signal pll_locked_in: std_logic_vector(1 downto 0);
-	signal pll_locked: std_logic;
+	signal pll_locked_in : std_logic_vector(1 downto 0);
+	signal pll_locked : std_logic;
+	signal pll_areset : std_logic;
+	signal pll_scanclk : std_logic;
+	signal pll_scandata : std_logic;
+	signal pll_scanclkena : std_logic;
+	signal pll_configupdate : std_logic;
+	signal pll_scandataout : std_logic;
+	signal pll_scandone : std_logic;
+	signal pll_rom_address : std_logic_vector(7 downto 0);
+	signal pll_write_rom_ena : std_logic;
+	signal pll_write_from_rom : std_logic;
+	signal pll_reconfig : std_logic;
+	signal pll_reconfig_busy : std_logic;
+	signal pll_reconfig_reset : std_logic;
+	signal pll_reconfig_state : std_logic_vector(1 downto 0) := "00";
+	signal pll_reconfig_timeout : integer;
+	signal q_reconfig_pal : std_logic_vector(0 downto 0);
+	signal q_reconfig_ntsc : std_logic_vector(0 downto 0);
+	signal pll_rom_q : std_logic;
+
 	signal c1541_reset: std_logic;
 	signal idle: std_logic;
 	signal ces: std_logic_vector(3 downto 0);
@@ -349,6 +373,7 @@ end component cartridge;
 	
 	signal c1541rom_wr   : std_logic;
 	signal c64rom_wr     : std_logic;
+	signal c64rom_addr   : std_logic_vector(13 downto 0);
 
 	signal joyA : std_logic_vector(31 downto 0);
 	signal joyB : std_logic_vector(31 downto 0);
@@ -405,18 +430,27 @@ end component cartridge;
 	signal c1541_iec_data_i : std_logic;
 	signal c1541_iec_clk_i  : std_logic;
 
+	signal pa2_in	: std_logic;
+	signal pa2_out  : std_logic;
+	signal pb_in	: std_logic_vector(7 downto 0);
+	signal pb_out	: std_logic_vector(7 downto 0);
+	signal flag2_n  : std_logic;
+
 	signal tv15Khz_mode   : std_logic;
 	signal ypbpr          : std_logic;
-	signal ntsc_init_mode : std_logic;
+	signal ntsc_init_mode : std_logic := '0';
+	signal ntsc_init_mode_d: std_logic;
+	signal ntsc_init_mode_d2: std_logic;
+	signal ntsc_init_mode_d3: std_logic;
 
 	alias  c64_addr_int : unsigned is unsigned(c64_addr);
 	alias  c64_data_in_int   : unsigned is unsigned(c64_data_in);
 	signal c64_data_in16: std_logic_vector(15 downto 0);
 	alias  c64_data_out_int   : unsigned is unsigned(c64_data_out);
 
-	signal clk_ram : std_logic;
-	signal clk32 : std_logic;
-	signal clk16 : std_logic;
+	signal c64_clk : std_logic;	-- 31.527mhz (PAL), 32.727mhz(NTSC) clock source
+	signal clk_ram : std_logic; -- 2 x c64_clk
+	signal clk32   : std_logic; -- 32mhz
 	signal ce_8  : std_logic;
 	signal ce_4  : std_logic;
 	signal hq2x160 : std_logic;
@@ -465,7 +499,7 @@ begin
 	user_io_d : user_io
 	generic map (STRLEN => CONF_STR'length)
 	port map (
-		clk_sys => clk32,
+		clk_sys => c64_clk,
 		clk_sd  => clk32,
 
 		SPI_CLK => SPI_SCK,
@@ -503,7 +537,7 @@ begin
 
 	data_io_d: data_io
 	port map (
-		clk_sys => clk32,
+		clk_sys => c64_clk,
 		SPI_SCK => SPI_SCK,
 		SPI_SS2 => SPI_SS2,
 		SPI_DI => SPI_DI,
@@ -530,7 +564,7 @@ begin
 		mem_ce => not ram_ce,
 		mem_ce_out => mem_ce,
 
-	 	clk32 => clk32,			
+		clk32 => c64_clk,
 		reset => reset_n,
 		reset_out => reset_crt,
 		
@@ -579,9 +613,9 @@ begin
 	sdram_ce <= mem_ce when iec_cycle='0' else ioctl_iec_cycle_used;
 	sdram_we <= not ram_we when iec_cycle='0' else ioctl_iec_cycle_used;
 
-	process(clk32)
+	process(c64_clk)
 	begin
-		if falling_edge(clk32) then
+		if falling_edge(c64_clk) then
 
 			old_download <= ioctl_download;
 			iec_cycleD <= iec_cycle;
@@ -655,7 +689,7 @@ begin
 						end if;
 					end if;
 					
-					if ioctl_index = 4 then
+					if ioctl_index = 5 then
 						if ioctl_addr = 0 then
 							ioctl_load_addr <= '0' & X"200000";
 							ioctl_ram_data <= ioctl_data;
@@ -694,13 +728,13 @@ begin
 		end if;
 	end process;
 
-	c64rom_wr   <= ioctl_wr when (ioctl_index = 0) and (ioctl_addr(14) = '0') and (ioctl_download = '1') else '0';
+	c64rom_wr   <= ioctl_wr when (((ioctl_index = 0) and (ioctl_addr(14) = '0')) or (ioctl_index = 4)) and (ioctl_download = '1') else '0';
+	c64rom_addr <= ioctl_addr(13 downto 0) when ioctl_index = 0 else '1' & ioctl_addr(12 downto 0);
 	c1541rom_wr <= ioctl_wr when (ioctl_index = 0) and (ioctl_addr(14) = '1') and (ioctl_download = '1') else '0';
 
-	process(clk32)
+	process(c64_clk)
 	begin
-		if rising_edge(clk32) then
-			clk16 <= not clk16;
+		if rising_edge(c64_clk) then
 			clkdiv <= std_logic_vector(unsigned(clkdiv)+1);
 			if(clkdiv(1 downto 0) = "00") then
 				ce_8 <= '1';
@@ -717,25 +751,121 @@ begin
 
 	ntsc_init_mode <= status(2);
 
-   -- second  to generate 64mhz clock and phase shifted ram clock	
-	pll : entity work.pll
+	pll_rom_pal : entity work.rom_reconfig_pal
 	port map(
-		inclk0 => CLOCK_27,
-		c0 => clk_ram,
-		c1 => SDRAM_CLK,
-		c2 => clk32,
-		locked => pll_locked
+		address => pll_rom_address,
+		clock => clk32,
+		rden => pll_write_rom_ena,
+		q => q_reconfig_pal
+	);
+
+	pll_rom_ntsc : entity work.rom_reconfig_ntsc
+	port map(
+		address => pll_rom_address,
+		clock => clk32,
+		rden => pll_write_rom_ena,
+		q => q_reconfig_ntsc
+	);
+
+	pll_rom_q <= q_reconfig_pal(0) when ntsc_init_mode_d2 = '0' else q_reconfig_ntsc(0);
+
+	pll_c64_reconfig : entity work.pll_c64_reconfig
+	port map (
+		busy => pll_reconfig_busy,
+		clock  => clk32,
+		counter_param => (others => '0'),
+		counter_type => (others => '0'),
+		data_in => (others => '0'),
+		pll_areset => pll_areset,
+		pll_areset_in  => '0',
+		pll_configupdate => pll_configupdate,
+		pll_scanclk => pll_scanclk,
+		pll_scanclkena => pll_scanclkena,
+		pll_scandata => pll_scandata,
+		pll_scandataout => pll_scandataout,
+        pll_scandone => pll_scandone,
+		read_param => '0',
+        reconfig => pll_reconfig,
+		reset => pll_reconfig_reset,
+		reset_rom_address => '0',
+		rom_address_out => pll_rom_address,
+		rom_data_in => pll_rom_q,
+		write_from_rom => pll_write_from_rom,
+		write_param  => '0',
+        write_rom_ena => pll_write_rom_ena
 	);
 
 	process(clk32)
 	begin
 		if rising_edge(clk32) then
+			ntsc_init_mode_d <= ntsc_init_mode;
+			ntsc_init_mode_d2 <= ntsc_init_mode_d;
+			pll_write_from_rom <= '0';
+			pll_reconfig <= '0';
+			pll_reconfig_reset <= '0';
+			case pll_reconfig_state is
+			when "00" =>
+				ntsc_init_mode_d3 <= ntsc_init_mode_d2;
+				if ntsc_init_mode_d3 /= ntsc_init_mode_d2 then
+					pll_write_from_rom <= '1';
+					pll_reconfig_state <= "01";
+				end if;
+			when "01" =>
+				pll_reconfig_state <= "10";
+			when "10" =>
+				if pll_reconfig_busy = '0' then
+					pll_reconfig <= '1';
+					pll_reconfig_state <= "11";
+					pll_reconfig_timeout <= 1000;
+				end if;
+			when "11" =>
+				pll_reconfig_timeout <= pll_reconfig_timeout - 1;
+				if pll_reconfig_timeout = 1 then
+					pll_reconfig_reset <= '1'; -- sometimes pll reconfig stuck in busy state
+					pll_reconfig_state <= "00";
+				end if;
+				if pll_reconfig = '0' and pll_reconfig_busy = '0' then
+					pll_reconfig_state <= "00";
+				end if;
+			when others => null;
+			end case;
+		end if;
+	end process;
+
+	-- clock for C64 and SDRAM
+	pll : entity work.pll_c64
+	port map(
+		inclk0 => CLOCK_27,
+		c0 => c64_clk,
+		c1 => clk_ram,
+		areset => pll_areset,
+		scanclk => pll_scanclk,
+		scandata => pll_scandata,
+		scanclkena => pll_scanclkena,
+		configupdate => pll_configupdate,
+		scandataout => pll_scandataout,
+		scandone => pll_scandone
+	);
+	SDRAM_CLK <= not clk_ram;
+
+	-- clock for 1541
+	pll_2 : entity work.pll
+	port map(
+		inclk0 => CLOCK_27,
+		c0 => clk32,
+		locked => pll_locked
+	);
+
+	process(c64_clk)
+	begin
+		if rising_edge(c64_clk) then
 			-- Reset by:
 			-- Button at device, IO controller reboot, OSD or FPGA startup
 			if status(0)='1' or pll_locked = '0' then
 				reset_counter <= 1000000;
 				reset_n <= '0';
-			elsif buttons(1)='1' or status(5)='1' or reset_key = '1' or reset_crt='1' or (ioctl_download='1' and ioctl_index = 3) then
+			elsif buttons(1)='1' or status(5)='1' or reset_key = '1' or reset_crt='1' or
+			(ioctl_download='1' and (ioctl_index = 3 or ioctl_index = 4)) then
 				reset_counter <= 255;
 				reset_n <= '0';
 			elsif ioctl_download ='1' then
@@ -783,7 +913,7 @@ begin
 
 	dac : sigma_delta_dac
 	port map (
-		clk => clk32,
+		clk => c64_clk,
 		ldatasum => audio_data_l(17 downto 3),
 		rdatasum => audio_data_r(17 downto 3),
 		aleft => AUDIO_L,
@@ -793,7 +923,7 @@ begin
 
 	fpga64 : entity work.fpga64_sid_iec
 	port map(
-		clk32 => clk32,
+		clk32 => c64_clk,
 		reset_n => reset_n,
 		c64gs => status(11),-- not enough BRAM
 		kbd_clk => not ps2_clk,
@@ -828,8 +958,6 @@ begin
 		ba => open,
 		joyA => unsigned(joyA_c64),
 		joyB => unsigned(joyB_c64),
-		joyC => unsigned(joyC_c64),
-		joyD => unsigned(joyD_c64),
 		serioclk => open,
 		ces => ces,
 		SIDclk => open,
@@ -845,14 +973,42 @@ begin
 		iec_data_i => c64_iec_data_i,
 		iec_clk_i  => c64_iec_clk_i,
 --		iec_atn_i  => not c64_iec_atn_i,
+		pa2_in => pa2_in,
+		pa2_out => pa2_out,
+		pb_in => pb_in,
+		pb_out => pb_out,
+		flag2_n => flag2_n,
 		cia_mode => status(4),
 		disk_num => open,
-		c64rom_addr => ioctl_addr(13 downto 0),
+		c64rom_addr => c64rom_addr,
 		c64rom_data => ioctl_data,
 		c64rom_wr => c64rom_wr,
 --		cart_detach_key => cart_detach_key,
 		reset_key => reset_key
 	);
+
+	-- connect user port
+	process (pa2_out, pb_out, joyC_c64, joyD_c64, UART_RX, status)
+	begin
+		pa2_in <= pa2_out;
+		if status(7) = '0' then
+			-- Protovision 4 player interface
+			flag2_n <= '1';
+			UART_TX <= '0';
+			pb_in(7 downto 6) <= pb_out(7 downto 6);
+			if pb_out(7) = '1' then
+				pb_in(5 downto 0) <= not joyC_c64(5 downto 0);
+			else
+				pb_in(5 downto 0) <= not joyD_c64(5 downto 0);
+			end if;
+		else
+			-- UART
+			pb_in(7 downto 1) <= pb_out(7 downto 1);
+			flag2_n <= UART_RX;
+			pb_in(0) <= UART_RX;
+			UART_TX <= pa2_out;
+		end if;
+	end process;
 
 	disk_readonly <= status(16);
 
@@ -863,12 +1019,12 @@ begin
 	c1541_iec_data_i <= c64_iec_data_o;
 	c1541_iec_clk_i  <= c64_iec_clk_o;
 
-	process(clk32, reset_n)
+	process(c64_clk, reset_n)
 		variable reset_cnt : integer range 0 to 32000000;
 	begin
 		if reset_n = '0' then
 			reset_cnt := 100000;
-		elsif rising_edge(clk32) then
+		elsif rising_edge(c64_clk) then
 			if reset_cnt /= 0 then
 				reset_cnt := reset_cnt - 1;
 			end if;
@@ -887,7 +1043,7 @@ begin
 		clk32 => clk32,
 		reset => c1541_reset,
 
-		c1541rom_clk => clk32,
+		c1541rom_clk => c64_clk,
 		c1541rom_addr => ioctl_addr(13 downto 0),
 		c1541rom_data => ioctl_data,
 		c1541rom_wr => c1541rom_wr,
@@ -918,7 +1074,7 @@ begin
 
 	comp_sync : entity work.composite_sync
 	port map(
-		clk32 => clk32,
+		clk32 => c64_clk,
 		hsync => hsync,
 		vsync => vsync,
 		ntsc  => ntsc_init_mode,
@@ -935,9 +1091,9 @@ begin
 	hq2x <= status(9) xor status(8);
 	ce_pix_actual <= ce_4 when hq2x160='1' else ce_8;
 	
-	process(clk32)
+	process(c64_clk)
 	begin
-		if rising_edge(clk32) then
+		if rising_edge(c64_clk) then
 			if((old_vsync = '0') and (vsync_out = '1')) then
 				if(status(10 downto 8)="010") then
 					hq2x160 <= '1';

@@ -141,8 +141,9 @@ end
 reg [9:0] v_cnt;
 reg [9:0] vs_low, vs_high;
 wire vs_pol = vs_high < vs_low;
-wire [9:0] v_dsp_width = vs_pol?vs_low:vs_high;
-wire [9:0] v_dsp_ctr = { 1'b0, v_dsp_width[9:1] };
+wire [9:0] v_dsp_height = vs_pol?vs_low:vs_high;
+wire [9:0] v_dsp_ctr = { 1'b0, v_dsp_height[9:1] };
+wire doublescan = (v_dsp_height>350);
 
 always @(posedge clk_sys) begin
 	reg hsD, vsD;
@@ -172,8 +173,8 @@ end
 // area in which OSD is being displayed
 wire [9:0] h_osd_start = h_dsp_ctr + OSD_X_OFFSET - (OSD_WIDTH >> 1);
 wire [9:0] h_osd_end   = h_dsp_ctr + OSD_X_OFFSET + (OSD_WIDTH >> 1) - 1;
-wire [9:0] v_osd_start = v_dsp_ctr + OSD_Y_OFFSET - (OSD_HEIGHT >> 1);
-wire [9:0] v_osd_end   = v_dsp_ctr + OSD_Y_OFFSET + (OSD_HEIGHT >> 1) - 1;
+wire [9:0] v_osd_start = v_dsp_ctr + OSD_Y_OFFSET - (doublescan ? OSD_HEIGHT : OSD_HEIGHT >> 1);
+wire [9:0] v_osd_end   = v_dsp_ctr + OSD_Y_OFFSET + (doublescan ? OSD_HEIGHT : OSD_HEIGHT >> 1) - 1;
 
 reg h_osd_active, v_osd_active;
 always @(posedge clk_sys) begin
@@ -189,14 +190,12 @@ end
 
 wire osd_de = osd_enable && h_osd_active && v_osd_active;
 
-wire [7:0] osd_hcnt = h_cnt - h_osd_start + 7'd1;  // one pixel offset for osd_byte register
-wire [6:0] osd_vcnt = v_cnt - v_osd_start;
-
-wire osd_pixel = osd_byte[osd_vcnt[3:1]];
+wire [9:0] osd_hcnt = h_cnt - h_osd_start + 7'd1;  // one pixel offset for osd_byte register
+wire [9:0] osd_vcnt = v_cnt - v_osd_start;
 
 reg [7:0] osd_byte; 
-always @(posedge clk_sys)
-  if (ce_pix) osd_byte <= osd_buffer[{osd_vcnt[6:4], osd_hcnt}];
+always @(posedge clk_sys) if(ce_pix) osd_byte <= osd_buffer[{doublescan ? osd_vcnt[7:5] : osd_vcnt[6:4], osd_hcnt[7:0]}];
+wire osd_pixel = osd_byte[doublescan ? osd_vcnt[4:2] : osd_vcnt[3:1]];
 
 wire [2:0] osd_color = OSD_COLOR;
 assign red_out   = !osd_de?red_in:  {osd_pixel, osd_pixel, osd_color[2], red_in[5:3]  };

@@ -134,7 +134,6 @@ set_location_assignment PIN_80 -to AUDIO_R
 set_instance_assignment -name CURRENT_STRENGTH_NEW "MAXIMUM CURRENT" -to DRAM_*
 set_instance_assignment -name CURRENT_STRENGTH_NEW "MAXIMUM CURRENT" -to VGA_*
 set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to DRAM_*
-set_instance_assignment -name FAST_OUTPUT_ENABLE_REGISTER ON -to DRAM_*
 
 set_global_assignment -name ENABLE_SIGNALTAP OFF
 set_global_assignment -name USE_SIGNALTAP_FILE signal_tap.stp
@@ -219,4 +218,6 @@ set_global_assignment -name VERILOG_FILE ../../rtl/amber/a23_alu.v
 set_global_assignment -name VERILOG_FILE ../../rtl/archimedes_top.v
 set_global_assignment -name VERILOG_FILE ../../rtl/sdram/sdram_top.v
 set_global_assignment -name VERILOG_FILE ../../rtl/sdram/sdram_init.v
+set_instance_assignment -name FAST_INPUT_REGISTER ON -to DRAM_DQ[*]
+set_instance_assignment -name FAST_OUTPUT_ENABLE_REGISTER ON -to DRAM_DQ[*]
 set_instance_assignment -name PARTITION_HIERARCHY root_partition -to | -section_id Top
