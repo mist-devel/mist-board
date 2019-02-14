@@ -8,13 +8,11 @@
 --
 -- c1541_logic    from : Mark McDougall
 -- spi_controller from : Michel Stempin, Stephen A. Edwards
--- via6522        from : Arnim Laeuger, Mark McDougall, MikeJ
+-- via6522        from : Gideon Zweijtzer  <gideon.zweijtzer@gmail.com>
 -- T65            from : Daniel Wallner, MikeJ, ehenciak
 --
--- c1541_logic    modified for : slow down CPU (EOI ack missed by real c64)
---                             : remove iec internal OR wired
---                             : synched atn_in (sometime no IRQ with real c64)
--- spi_controller modified for : sector start and size adapted + busy signal
+-- c1541_logic    modified for  : remove iec internal OR wired
+-- spi_controller replaced with mist_sd_card
 -- via6522        modified for : no modification
 --
 --
@@ -35,6 +33,7 @@ port(
 	
 	disk_num : in std_logic_vector(9 downto 0);
 	disk_change : in std_logic;
+	disk_readonly : in std_logic;
 
 	iec_atn_i  : in std_logic;
 	iec_data_i : in std_logic;
@@ -111,6 +110,9 @@ signal track_modified   : std_logic;
 signal sector_offset    : std_logic;
 signal save_track_stage : std_logic_vector(3 downto 0);
 
+signal wps_flag : std_logic;
+signal change_timer : integer;
+
 signal dbg_sector : std_logic_vector(4 downto 0); 
 signal dbg_adr_fetch : std_logic_vector(15 downto 0); 
 
@@ -173,7 +175,7 @@ begin
     freq            => freq,     -- motor frequency
     sync_n          => sync_n,   -- reading SYNC bytes
     byte_n          => byte_n,   -- byte ready
-    wps_n           => '1',      -- write-protect sense (0 = protected)
+    wps_n           => not wps_flag,      -- write-protect sense (0 = protected)
     tr00_sense_n    => '1',      -- track 0 sense (unused?)
     act             => act,      -- activity LED
 
@@ -267,7 +269,22 @@ port map
 --
 --	dbg_state => dbg_sd_state
 --);
-	
+
+wps_flag <= disk_readonly when change_timer = 0 else not disk_readonly;
+
+process (clk32,reset)
+begin
+	if reset = '1' then
+		change_timer <= 0;
+	elsif rising_edge(clk32) then
+		if disk_change = '1' then
+			change_timer <= 1000000;
+		elsif change_timer /= 0 then
+			change_timer <= change_timer - 1;
+		end if;
+	end if;
+end process;
+
 process (clk32)
 begin
 	if rising_edge(clk32) then
