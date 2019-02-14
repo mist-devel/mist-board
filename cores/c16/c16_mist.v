@@ -71,13 +71,14 @@ module c16_mist (
 parameter CONF_STR = {
         "C16;PRG;",
 		  "S,D64,Mount Disk;",
+        "F,ROM,Load Kernal;",
         "O2,Scanlines,Off,On;",
         "O3,Joysticks,Normal,Swapped;",
 		  "O4,Memory,64k,16k;",
         "T5,Reset;"
 };
 
-parameter CONF_STR_LEN = 8+17+20+28+18+9;
+parameter CONF_STR_LEN = 8+17+18+20+28+18+9;
 
 // the status register is controlled by the on screen display (OSD)
 wire [7:0] status;
@@ -276,7 +277,7 @@ wire [7:0] ioctl_data;
 wire [4:0] ioctl_index;
 wire ioctl_downloading;
 
-wire rom_download = ioctl_downloading && (ioctl_index == 5'd0);
+wire rom_download = ioctl_downloading && ((ioctl_index == 5'd0) || (ioctl_index == 5'd3));
 wire prg_download = ioctl_downloading && (ioctl_index == 5'd1);
 
 // halt cpu when it's done with the current cycle
@@ -510,9 +511,9 @@ always @(negedge clk28) begin
 	if(ioctl_rom_wr && !last_ioctl_rom_wr) begin
 		rom_dl_data  <= ioctl_data;
 		rom_dl_addr  <= ioctl_addr[13:0];
-		c1541_dl_wr  <= !ioctl_addr[15:14];
-		kernal_dl_wr <= ioctl_addr[15:14] == 2'd1;
-		basic_dl_wr  <= ioctl_addr[15:14] == 2'd2;
+		c1541_dl_wr  <= !ioctl_addr[15:14] && ioctl_index == 5'd0;
+		kernal_dl_wr <= ioctl_addr[15:14] == 2'd1 || ioctl_index == 5'd3;
+		basic_dl_wr  <= ioctl_addr[15:14] == 2'd2 && ioctl_index == 5'd0;
 	end else
 		{ kernal_dl_wr, basic_dl_wr, c1541_dl_wr } <= 0;
 end
