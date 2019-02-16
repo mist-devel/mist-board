@@ -44,22 +44,21 @@ always @(posedge clk) begin
 			shift_reg[shift_reg_wptr] <= data;
 			shift_reg_wptr <= {p_toggle, shift_reg_wptr[7:0] + 1'd1};
 		end
+	end
 
-		last_mode_in <= mode;
-
-		// reset write pointer at end of hsync phase
-		if((mode != 2'b00) && (last_mode_in == 2'b00)) begin
-			shift_reg_wptr <= 0;
-			p_toggle <= !p_toggle;
-		end
+	last_mode_in <= mode;
+	// reset write pointer at end of hsync phase
+	if((mode != 2'b00) && (last_mode_in == 2'b00)) begin
+		shift_reg_wptr <= {!p_toggle, 8'd0};
+		p_toggle <= !p_toggle;
 	end
 end
 
 // 
 parameter H   = 160;    // width of visible area
-parameter HFP = 24;     // unused time before hsync
+parameter HFP = 18;     // unused time before hsync
 parameter HS  = 20;     // width of hsync
-parameter HBP = 24;     // unused time after hsync
+parameter HBP = 30;     // unused time after hsync
 // total = 228
 
 parameter V   = 576;    // height of visible area
@@ -131,7 +130,7 @@ always@(posedge clk) begin
 		shift_reg_rptr <= {!p_toggle, shift_reg_rptr[7:0] + 1'd1};
 	end else begin
 		blank <= 1'b1;
-		shift_reg_rptr <= 0;
+		shift_reg_rptr <= {!p_toggle, 8'd0};
 	end
   end
 end
