@@ -70,17 +70,18 @@ wire [7:0] joystick_1;
 parameter CONF_STR = {
         "GAMEBOY;;",
         "F,GBCGB ,Load;",
+        "O4,Mode,Auto,Color;",
         "O1,LCD color,white,yellow;",
         "O2,Boot,Normal,Fast;",
         "T3,Reset"
 };
 
-parameter CONF_STR_LEN = 9+14+26+20+8;
+parameter CONF_STR_LEN = 9+14+19+26+20+8;
 
 // the status register is controlled by the on screen display (OSD)
 wire [7:0] status;
 wire [1:0] buttons;
-wire       isGBC = dio_index[7:6] == 0;
+wire       isGBC = (dio_index[7:6] == 0) || status[4];
 
 // include user_io module for arm controller communication
 user_io #(.STRLEN(CONF_STR_LEN)) user_io ( 
