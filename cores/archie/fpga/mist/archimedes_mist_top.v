@@ -86,6 +86,7 @@ wire [15:0]	coreaud_l, coreaud_r;
 wire 			loader_active /* synthesis keep */ ;
 wire 			loader_we /* synthesis keep */ ;
 reg			loader_stb = 1'b0 /* synthesis keep */ ;
+reg         rom_ready = 0;
 (*KEEP="TRUE"*)wire [3:0]	loader_sel /* synthesis keep */ ;
 (*KEEP="TRUE"*)wire [23:0]	loader_addr /* synthesis keep */ ;
 (*KEEP="TRUE"*)wire [31:0]	loader_data /* synthesis keep */ ;
@@ -223,7 +224,7 @@ archimedes_top ARCHIMEDES(
 	.CLKPIX_I	( clk_pix			), // pixel clock for OSD
 	.CEPIX_O	( ce_pix			),
 	
-	.RESET_I	(~ram_ready | loader_active),
+	.RESET_I	(~ram_ready | ~rom_ready),
 	
 	.MEM_ACK_I	( core_ack_in		),
 	.MEM_DAT_I	( core_data_in		),
@@ -323,7 +324,10 @@ audio	AUDIO	(
 );
 
 always @(posedge clk_32m) begin 
+	reg loader_active_old;
+    loader_active_old <= loader_active;
 
+    if (loader_active_old & ~loader_active) rom_ready <= 1;
 	if (loader_we) begin 
 	
 		loader_stb <= 1'b1;
