@@ -97,6 +97,7 @@ wire [7:0] joyA;
 wire [7:0] joyB;
 wire [1:0] buttons;
 wire [1:0] switches;
+wire       scandoubler_disable;
 wire       ypbpr;
 
 // the top file should generate the correct clocks for the machine
@@ -147,8 +148,8 @@ assign VGA_R = ypbpr?Pr:osd_r_o;
 assign VGA_G = ypbpr? Y:osd_g_o;
 assign VGA_B = ypbpr?Pb:osd_b_o;
 wire   CSync = ~(core_hs ^ core_vs);
-assign VGA_HS = ypbpr ? CSync : core_hs;
-assign VGA_VS = ypbpr? 1'b1 : core_vs;
+assign VGA_HS = (scandoubler_disable | ypbpr) ? CSync : core_hs;
+assign VGA_VS = (scandoubler_disable | ypbpr) ? 1'b1 : core_vs;
 
 // de-multiplex spi outputs from user_io and data_io
 assign SPI_DO = (CONF_DATA0==0)?user_io_sdo:(SPI_SS2==0)?data_io_sdo:1'bZ;
@@ -162,12 +163,13 @@ user_io user_io(
    .SPI_MISO      (user_io_sdo           ),   // tristate handling inside user_io
    .SPI_MOSI      (SPI_DI           ),
 
-   .SWITCHES      (switches         ),
-   .BUTTONS       (buttons          ),
-   .ypbpr         (ypbpr            ),
+	.SWITCHES      (switches         ),
+	.BUTTONS       (buttons          ),
+	.scandoubler_disable(scandoubler_disable),
+	.ypbpr         (ypbpr            ),
 
-   .JOY0          (joyA             ),
-   .JOY1          (joyB             ),
+	.JOY0          (joyA             ),
+	.JOY1          (joyB             ),
 
 	.kbd_out_data   ( kbd_out_data   ),
 	.kbd_out_strobe ( kbd_out_strobe ),
