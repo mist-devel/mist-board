@@ -65,14 +65,14 @@ wire [7:0] kbd_in_data;
 wire kbd_in_strobe;
 
 // generated clocks
-wire clk_pix = clk_50m;
+wire clk_pix;
 wire ce_pix;
 wire clk_32m /* synthesis keep */ ;
 wire clk_128m /* synthesis keep */ ;
-wire clk_50m /* synthesis keep */ ;
 //wire clk_8m  /* synthesis keep */ ;
 
 wire pll_ready;
+wire pll_vidc_ready;
 wire ram_ready;
 
 // core's raw video 
@@ -105,11 +105,133 @@ wire       ypbpr;
 clockgen CLOCKS(
 	.inclk0	(CLOCK_27[0]),
 	.c0		(clk_32m),
-	.c1		(clk_128m), 
-	.c2 	(clk_50m),
+	.c1		(clk_128m),
+//	.c2     (clk_50m),
 	.c3		(DRAM_CLK),
 	.locked	(pll_ready)  // pll locked output
 );
+
+pll_vidc CLOCKS_VIDC(
+	.inclk0	(CLOCK_27[0]),
+	.c0		(clk_pix),
+	.areset(pll_areset),
+	.scanclk(pll_scanclk),
+	.scandata(pll_scandata),
+	.scanclkena(pll_scanclkena),
+	.configupdate(pll_configupdate),
+	.scandataout(pll_scandataout),
+	.scandone(pll_scandone),
+	.locked	(pll_vidc_ready)  // pll locked output
+);
+
+wire       pll_reconfig_busy;
+wire       pll_areset;
+wire       pll_configupdate;
+wire       pll_scanclk;
+wire       pll_scanclkena;
+wire       pll_scandata;
+wire       pll_scandataout;
+wire       pll_scandone;
+reg        pll_reconfig_reset;
+wire [7:0] pll_rom_address;
+wire       pll_rom_q;
+reg        pll_write_from_rom;
+wire       pll_write_rom_ena;
+reg        pll_reconfig;
+wire       q_reconfig_25;
+wire       q_reconfig_24;
+wire       q_reconfig_36;
+
+rom_reconfig_25 rom_reconfig_25
+(
+	.address(pll_rom_address),
+	.clock(CLOCK_27[0]),
+	.rden(pll_write_rom_ena),
+	.q(q_reconfig_25)
+);
+
+rom_reconfig_24 rom_reconfig_24
+(
+	.address(pll_rom_address),
+	.clock(CLOCK_27[0]),
+	.rden(pll_write_rom_ena),
+	.q(q_reconfig_24)
+);
+
+rom_reconfig_36 rom_reconfig_36
+(
+	.address(pll_rom_address),
+	.clock(CLOCK_27[0]),
+	.rden(pll_write_rom_ena),
+	.q(q_reconfig_36)
+);
+
+assign pll_rom_q = pixbaseclk_select == 2'b01 ? q_reconfig_25 :
+                   pixbaseclk_select == 2'b10 ? q_reconfig_36 : q_reconfig_24;
+
+pll_reconfig pll_reconfig_inst
+(
+    .busy(pll_reconfig_busy),
+    .clock(CLOCK_27[0]),
+    .counter_param(0),
+    .counter_type(0),
+    .data_in(0),
+    .pll_areset(pll_areset),
+    .pll_areset_in(0),
+    .pll_configupdate(pll_configupdate),
+    .pll_scanclk(pll_scanclk),
+    .pll_scanclkena(pll_scanclkena),
+    .pll_scandata(pll_scandata),
+    .pll_scandataout(pll_scandataout),
+    .pll_scandone(pll_scandone),
+    .read_param(0),
+    .reconfig(pll_reconfig),
+    .reset(pll_reconfig_reset),
+    .reset_rom_address(0),
+    .rom_address_out(pll_rom_address),
+    .rom_data_in(pll_rom_q),
+    .write_from_rom(pll_write_from_rom),
+    .write_param(0),
+    .write_rom_ena(pll_write_rom_ena)
+);
+
+always @(posedge CLOCK_27[0]) begin
+    reg [1:0] pixbaseclk_select_d;
+    reg [1:0] pll_reconfig_state = 0;
+    reg [9:0] pll_reconfig_timeout;
+
+    pll_write_from_rom <= 0;
+    pll_reconfig <= 0;
+    pll_reconfig_reset <= 0;
+    case (pll_reconfig_state)
+    2'b00:
+    begin
+        pixbaseclk_select_d <= pixbaseclk_select;
+        if (pixbaseclk_select_d != pixbaseclk_select) begin
+            pll_write_from_rom <= 1;
+            pll_reconfig_state <= 2'b01;
+        end
+    end
+    2'b01: pll_reconfig_state <= 2'b10;
+    2'b10:
+        if (~pll_reconfig_busy) begin
+            pll_reconfig <= 1;
+            pll_reconfig_state <= 2'b11;
+            pll_reconfig_timeout <= 10'd1000;
+        end
+    2'b11:
+    begin
+        pll_reconfig_timeout <= pll_reconfig_timeout - 1'd1;
+        if (pll_reconfig_timeout == 10'd1) begin
+            // pll_reconfig stuck in busy state
+            pll_reconfig_reset <= 1;
+            pll_reconfig_state <= 2'b00;
+        end
+        if (~pll_reconfig & ~pll_reconfig_busy) pll_reconfig_state <= 2'b00;
+    end
+    default: ;
+    endcase
+end
 
 wire [5:0] osd_r_o, osd_g_o, osd_b_o;
 
@@ -148,8 +270,9 @@ assign VGA_R = ypbpr?Pr:osd_r_o;
 assign VGA_G = ypbpr? Y:osd_g_o;
 assign VGA_B = ypbpr?Pb:osd_b_o;
 wire   CSync = ~(core_hs ^ core_vs);
-assign VGA_HS = (scandoubler_disable | ypbpr) ? CSync : core_hs;
-assign VGA_VS = (scandoubler_disable | ypbpr) ? 1'b1 : core_vs;
+//24 MHz modes get composite sync automatically
+assign VGA_HS = ((pixbaseclk_select[0] == pixbaseclk_select[1]) | ypbpr) ? CSync : core_hs;
+assign VGA_VS = ((pixbaseclk_select[0] == pixbaseclk_select[1]) | ypbpr) ? 1'b1 : core_vs;
 
 // de-multiplex spi outputs from user_io and data_io
 assign SPI_DO = (CONF_DATA0==0)?user_io_sdo:(SPI_SS2==0)?data_io_sdo:1'bZ;
