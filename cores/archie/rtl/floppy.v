@@ -25,7 +25,7 @@ module floppy (
 	input 	     step_in,
 	input 	     step_out,
 
-	output 	     dclk,         // data clock 
+	output 	     dclk_en,      // data clock enable
 	output [6:0] track,        // number of track under head
 	output [3:0] sector,       // number of sector under head, 0 = no sector
 	output 	     sector_hdr,   // valid sector header under head
@@ -37,7 +37,7 @@ module floppy (
 
 // The sysclock is the value all floppy timings are derived from. 
 // Default: 8 MHz
-localparam SYS_CLK = 8000000;  
+parameter SYS_CLK = 8000000;
 
 assign sector_hdr = (sec_state == SECTOR_STATE_HDR);
 assign sector_data = (sec_state == SECTOR_STATE_DATA);
@@ -70,7 +70,7 @@ assign ready = select && (rate == RATE) && (step_busy == 0);
 // Index pulse generation. Pulse starts with the begin of index_pulse_start
 // and lasts INDEX_PULSE_CYCLES system clock cycles
 localparam INDEX_PULSE_CYCLES = INDEX_PULSE_LEN * SYS_CLK / 1000;
-reg [15:0] index_pulse_cnt;   
+reg [18:0] index_pulse_cnt;
 always @(posedge clk) begin
    if(index_pulse_start && (index_pulse_cnt == INDEX_PULSE_CYCLES-1)) begin
       index <= 1'b0;
@@ -92,7 +92,7 @@ reg [6:0] current_track = 7'd0;
 
 reg step_inD;
 reg step_outD;
-reg [17:0] step_busy;
+reg [19:0] step_busy;
    
 always @(posedge clk) begin
    step_inD <= step_in;
@@ -136,7 +136,8 @@ reg [1:0] sec_state;
 reg [9:0] sec_byte_cnt;  // counting bytes within sectors
 reg [3:0] current_sector = SECTOR_BASE;
   
-always @(posedge byte_clk) begin
+always @(posedge clk) begin
+	if (byte_clk_en) begin
    if(index_pulse_start) begin
       sec_byte_cnt <= SECTOR_GAP_LEN-1;
       sec_state <= SECTOR_STATE_GAP;     // track starts with gap
@@ -170,6 +171,8 @@ always @(posedge byte_clk) begin
       end else
 	sec_byte_cnt <= sec_byte_cnt - 10'd1;
    end
+
+   end
 end
    
 // ================================================================
@@ -179,24 +182,31 @@ end
 // An ed floppy at 300rpm with 1MBit/s has max 31.250 bytes/track
 // thus we need to support up to 31250 events
 reg [14:0] byte_cnt;
-reg 	   index_pulse_start;   
-always @(posedge byte_clk) begin
-   index_pulse_start <= 1'b0;
+reg 	   index_pulse_start;
+always @(posedge clk) begin
+	if (byte_clk_en) begin
+		index_pulse_start <= 1'b0;
 
-   if(byte_cnt == BPT-1) begin
-      byte_cnt <= 0;
-      index_pulse_start <= 1'b1;      
-   end else
-     byte_cnt <= byte_cnt + 1;
+		if(byte_cnt == BPT-1) begin
+			byte_cnt <= 0;
+			index_pulse_start <= 1'b1;
+		end else
+			byte_cnt <= byte_cnt + 1;
+	end
 end
 
 // Make byte clock from bit clock.
 // When a DD disk spins at 300RPM every 32us a byte passes the disk head
-assign dclk = byte_clk;
-wire byte_clk = clk_cnt2[2];
+assign dclk_en = byte_clk_en;
+reg byte_clk_en;
 reg [2:0] clk_cnt2;
-always @(posedge data_clk)
-  clk_cnt2 <= clk_cnt2 + 1;
+always @(posedge clk) begin
+	byte_clk_en <= 0;
+	if (data_clk_en) begin
+		clk_cnt2 <= clk_cnt2 + 1;
+		if (clk_cnt2 == 3'b011) byte_clk_en <= 1;
+	end
+end
 
 // ================================================================
 // ===================== SPIN VIRTUAL DISK ========================
@@ -246,11 +256,14 @@ end
 // speed and reaches the full rate when the disk rotates at 300RPM. No
 // valid data can be read until the disk has reached it's full speed.
 reg data_clk;
+reg data_clk_en;
 reg [31:0] clk_cnt;
 always @(posedge clk) begin
+   data_clk_en <= 0;
    if(clk_cnt + rate > SYS_CLK/2) begin
       clk_cnt <= clk_cnt - (SYS_CLK/2 - rate);
       data_clk <= !data_clk;
+      if (~data_clk) data_clk_en <= 1;
    end else
      clk_cnt <= clk_cnt + rate;
 end   
