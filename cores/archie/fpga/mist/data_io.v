@@ -30,15 +30,15 @@ module data_io #(parameter ADDR_WIDTH=24, START_ADDR = 0) (
 	input 			    sdi,
 	output reg 		    sdo,
 
-	output 			    downloading, // signal indicating an active download
+	output reg downloading, // signal indicating an active download
 	output [ADDR_WIDTH-1:0]     size, // number of bytes in input buffer
 
-        // additional signals for floppy emulation
+	// additional signals for floppy emulation
 	input [31:0] 		    fdc_status_out,
 	output reg [31:0] 	    fdc_status_in,
 	output reg 		    fdc_data_in_strobe,
-	output [7:0] 		    fdc_data_in,
-							   
+	output reg [7:0] 	    fdc_data_in,
+
 	// external ram interface
 	input 			    clk,
 	output reg 		    wr,
@@ -47,12 +47,6 @@ module data_io #(parameter ADDR_WIDTH=24, START_ADDR = 0) (
 	output [31:0] 		    d
 );
 
-// filter spi clock. the 8 bit gate delay is ~2.5ns in total
-wire [7:0] spi_sck_D = { spi_sck_D[6:0], sck } /* synthesis keep */;
-wire spi_sck = (spi_sck && spi_sck_D != 8'h00) || (!spi_sck && spi_sck_D == 8'hff);
-
-assign fdc_data_in = { sbuf, sdi };
-   
 (*KEEP="TRUE"*)assign sel = a[1:0] == 	2'b00 ? 4'b0001 :
 								a[1:0] == 	2'b01 ? 4'b0010 :
 								a[1:0] == 	2'b10 ? 4'b0100 : 4'b1000;
@@ -69,11 +63,10 @@ assign size = addr - START_ADDR;
 reg [6:0]      sbuf;
 reg [7:0]      cmd;
 reg [7:0]      data;
-reg [4:0]      cnt;
+reg [2:0]      bit_cnt;
 reg [2:0]      byte_cnt;
 
 reg [ADDR_WIDTH-1:0] addr;
-reg rclk;
 
 localparam UIO_FILE_TX         = 8'h53;
 localparam UIO_FILE_TX_DAT     = 8'h54;
@@ -81,92 +74,127 @@ localparam UIO_FDC_GET_STATUS  = 8'h55;
 localparam UIO_FDC_TX_DATA     = 8'h56;
 localparam UIO_FDC_SET_STATUS  = 8'h57;
 
-assign downloading = downloading_reg;
-reg downloading_reg = 1'b0;
-
 // data_io has its own SPI interface to the io controller
-always@(posedge spi_sck, posedge ss) begin
-	if(ss == 1'b1) begin
-		cnt <= 5'd0;
-		byte_cnt <= 3'd0;
-		fdc_data_in_strobe <= 1'b0;
+
+// SPI bit and byte counters
+always@(posedge sck or posedge ss) begin
+	if(ss == 1) begin
+		bit_cnt <= 0;
+		byte_cnt <= 0;
+		cmd <= 0;
 	end else begin
-		rclk <= 1'b0;
-		fdc_data_in_strobe <= 1'b0;
-
-		// don't shift in last bit. It is evaluated directly
-		// when writing to ram
-		if(cnt != 15)
-			sbuf <= { sbuf[5:0], sdi};
-
-		// increase target address after write
-		if(rclk)
-			addr <= addr + 1;
-	 
-		// count 0-7 8-15 8-15 ... 
-		if(cnt < 15) 	
-			cnt <= cnt + 4'd1;
-		else begin	
-			cnt <= 5'd8;
-			if(byte_cnt != 7)
-				byte_cnt <= byte_cnt + 3'd1;
+		if((&bit_cnt)&&(~&byte_cnt)) begin
+			byte_cnt <= byte_cnt + 1'd1;
+			if (!byte_cnt) cmd <= {sbuf, sdi};
 		end
-		
-		// finished command byte
-      if(cnt == 7)
-			cmd <= {sbuf, sdi};
-
-		// prepare/end transmission
-		if((cmd == UIO_FILE_TX) && (cnt == 15)) begin
-			// prepare
-			if(sdi) begin
-				addr <= START_ADDR;
-				downloading_reg <= 1'b1; 
-			end else
-				downloading_reg <= 1'b0; 
-		end
-		
-		// command 0x54: UIO_FILE_TX
-		if((cmd == UIO_FILE_TX_DAT) && (cnt == 15)) begin
-			data <= {sbuf, sdi};
-			rclk <= 1'b1;
-			a <= addr;
-		end
-		
-		// command 0x56: UIO_FDC_TX_DATA
-		if((cmd == UIO_FDC_TX_DATA) && (cnt == 15))
-			fdc_data_in_strobe <= 1'b1;
-	   
-		// command 0x57: UIO_FDC_SET_STATUS
-		if((cmd == UIO_FDC_SET_STATUS) && (cnt == 15)) begin
-		   if(byte_cnt == 0) fdc_status_in[31:24] <= { sbuf, sdi};
-		   if(byte_cnt == 1) fdc_status_in[23:16] <= { sbuf, sdi};
-		   if(byte_cnt == 2) fdc_status_in[15:8]  <= { sbuf, sdi};
-		   if(byte_cnt == 3) fdc_status_in[7:0]   <= { sbuf, sdi};
-		end
+		bit_cnt <= bit_cnt + 1'd1;
 	end
 end
-   
-always@(negedge spi_sck or posedge ss) begin
-   if(ss == 1) begin
-      sdo <= 1'bZ;
-   end else begin
+
+always@(negedge sck or posedge ss) begin
+	if(ss == 1) begin
+		sdo <= 1'bZ;
+	end else begin
 		if(cmd == UIO_FDC_GET_STATUS)
-			sdo <= fdc_status_out[{~byte_cnt[1:0],~(cnt[2:0])}];
+			sdo <= fdc_status_out[{4-byte_cnt,~bit_cnt}];
 		else
 			sdo <= 1'b0;
-   end
+	end
 end
 
-reg rclkD, rclkD2;
-always@(posedge clk) begin
-	// bring rclk from spi clock domain into core clock domain
-	rclkD <= rclk;
-	rclkD2 <= rclkD;
-	wr <= 1'b0;
-	
-	if(rclkD && !rclkD2) 
-		wr <= 1'b1;
+// SPI receiver IO -> FPGA
+
+reg       spi_receiver_strobe_r = 0;
+reg       spi_transfer_end_r = 1;
+reg [7:0] spi_byte_in;
+
+// Read at spi_sck clock domain, assemble bytes for transferring to clk_sys
+always@(posedge sck or posedge ss) begin
+
+	if(ss == 1) begin
+		spi_transfer_end_r <= 1;
+	end else begin
+		spi_transfer_end_r <= 0;
+
+		if(&bit_cnt) begin
+			// finished reading a byte, prepare to transfer to clk_sys
+			spi_byte_in <= { sbuf, sdi};
+			spi_receiver_strobe_r <= ~spi_receiver_strobe_r;
+		end else
+			sbuf[6:0] <= { sbuf[5:0], sdi };
+	end
+end
+
+// Process bytes from SPI at the clk_sys domain
+always @(posedge clk) begin
+
+	reg       spi_receiver_strobe;
+	reg       spi_transfer_end;
+	reg       spi_receiver_strobeD;
+	reg       spi_transfer_endD;
+	reg [7:0] acmd;
+	reg [3:0] abyte_cnt;   // counts bytes
+
+	fdc_data_in_strobe <= 0;
+	wr <= 0;
+
+	//synchronize between SPI and sys clock domains
+	spi_receiver_strobeD <= spi_receiver_strobe_r;
+	spi_receiver_strobe <= spi_receiver_strobeD;
+	spi_transfer_endD       <= spi_transfer_end_r;
+	spi_transfer_end        <= spi_transfer_endD;
+
+	// strobe is set whenever a valid byte has been received
+	if (~spi_transfer_endD & spi_transfer_end) begin
+		abyte_cnt <= 8'd0;
+	end else if (spi_receiver_strobeD ^ spi_receiver_strobe) begin
+
+		if(~&abyte_cnt)
+			abyte_cnt <= abyte_cnt + 8'd1;
+
+		if(!abyte_cnt) begin
+			acmd <= spi_byte_in;
+		end else begin
+			case(acmd)
+			UIO_FILE_TX:
+			begin
+				// prepare 
+				if(spi_byte_in) begin
+					addr <= START_ADDR;
+					downloading <= 1; 
+				end else begin
+					a <= addr;
+					downloading <= 0;
+				end
+			end
+
+			// transfer
+			UIO_FILE_TX_DAT:
+			begin
+				a <= addr;
+				addr <= addr + 1'd1;
+				data <= spi_byte_in;
+				wr <= 1;
+			end
+
+			// command 0x56: UIO_FDC_TX_DATA
+			UIO_FDC_TX_DATA:
+			begin
+				fdc_data_in_strobe <= 1'b1;
+				fdc_data_in <= spi_byte_in;
+			end
+
+			// command 0x57: UIO_FDC_SET_STATUS
+			UIO_FDC_SET_STATUS:
+			begin
+				if (abyte_cnt == 1) fdc_status_in[31:24] <= spi_byte_in;
+				if (abyte_cnt == 2) fdc_status_in[23:16] <= spi_byte_in;
+				if (abyte_cnt == 3) fdc_status_in[15: 8] <= spi_byte_in;
+				if (abyte_cnt == 4) fdc_status_in[ 7: 0] <= spi_byte_in;
+			end
+			endcase
+		end
+	end
 end
 
 endmodule

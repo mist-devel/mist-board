@@ -68,7 +68,6 @@ assign ypbpr = but_sw[5];
 wire [7:0] core_type = 8'ha6;
 reg  [7:0] spi_byte_out;
 
-wire [7:0] kbd_out_status = { 4'ha, 3'b000, kbd_out_data_available };
 reg kbd_out_data_available = 0;
 
 // SPI bit and byte counters
@@ -76,8 +75,9 @@ always@(posedge SPI_CLK or posedge SPI_SS_IO) begin
     if(SPI_SS_IO == 1) begin
         bit_cnt <= 0;
         byte_cnt <= 0;
+        cmd <= 0;
     end else begin
-        if((bit_cnt == 7)&&(~&byte_cnt)) begin
+        if((&bit_cnt)&&(~&byte_cnt)) begin
             byte_cnt <= byte_cnt + 8'd1;
             if (!byte_cnt) cmd <= {sbuf, SPI_MOSI};
         end
@@ -86,9 +86,14 @@ always@(posedge SPI_CLK or posedge SPI_SS_IO) begin
 end
 
 always@(negedge SPI_CLK or posedge SPI_SS_IO) begin
+    reg [7:0] kbd_out_status;
+    reg [7:0] kbd_out_data_r;
+
     if(SPI_SS_IO == 1) begin
         SPI_MISO <= 1'bZ;
 	end else begin
+        kbd_out_status <= { 4'ha, 3'b000, kbd_out_data_available };
+        kbd_out_data_r <= kbd_out_data;
         // first byte returned is always core type, further bytes are 
         // command dependent
         if(byte_cnt == 0) begin
@@ -97,7 +102,7 @@ always@(negedge SPI_CLK or posedge SPI_SS_IO) begin
             // reading keyboard data
             if(cmd == 8'h04) begin
                 if(byte_cnt == 1) SPI_MISO <= kbd_out_status[~bit_cnt];
-                else              SPI_MISO <= kbd_out_data[~bit_cnt];
+                else              SPI_MISO <= kbd_out_data_r[~bit_cnt];
             end
         end
     end
@@ -117,14 +122,12 @@ always@(posedge SPI_CLK or posedge SPI_SS_IO) begin
     end else begin
         spi_transfer_end_r <= 0;
 
-        if(bit_cnt != 7)
-            sbuf[6:0] <= { sbuf[5:0], SPI_MOSI };
-
+        if(&bit_cnt) begin
             // finished reading a byte, prepare to transfer to clk_sys
-            if(bit_cnt == 7) begin
-                spi_byte_in <= { sbuf, SPI_MOSI};
-                spi_receiver_strobe_r <= ~spi_receiver_strobe_r;
-            end
+            spi_byte_in <= { sbuf, SPI_MOSI};
+            spi_receiver_strobe_r <= ~spi_receiver_strobe_r;
+        end else
+            sbuf[6:0] <= { sbuf[5:0], SPI_MOSI };
     end
 end
 
@@ -154,7 +157,7 @@ always @(posedge clk_sys) begin
         if(~&abyte_cnt)
             abyte_cnt <= abyte_cnt + 8'd1;
 
-        if(abyte_cnt == 0) begin
+        if(!abyte_cnt) begin
             acmd <= spi_byte_in;
         end else begin
             case(acmd)
