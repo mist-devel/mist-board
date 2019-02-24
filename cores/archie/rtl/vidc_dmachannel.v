@@ -93,10 +93,11 @@ vidc_fifo #(.FIFO_SIZE(FIFO_SIZE)) VIDEO_FIFO(
 // DMA interface control
 // this is in the cpu clock domain. 
 always @(posedge clkcpu) begin
-
+	reg rstD, rstD2;
 	ak_r	<=	ak;
-
-	if (rst == 1'b1) begin
+	rstD <= rst;
+	rstD2 <= rstD;
+	if (rstD2 == 1'b1) begin
 	
 		// do reset logic 
 		dma_count 	<= 2'd0;	

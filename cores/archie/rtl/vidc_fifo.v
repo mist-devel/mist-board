@@ -75,11 +75,14 @@ end
 reg [BYTE_WIDTH-1:0] rd_ptr_r;
 
 always @(posedge wr_clk) begin
+	reg rstD, rstD2;
 
 	rd_ptr_r	<= rd_ptr;
 	space 		<= {rd_ptr_r[BYTE_WIDTH-1:2]} - wr_ptr;
+	rstD <= rst;
+	rstD2 <= rstD;
 	
-	if (rst) begin
+	if (rstD2) begin
 
 		wr_ptr 	<= 'd0;
 		full   	<= 1'b0;
@@ -108,8 +111,12 @@ wire [7:0] q;
 
 always @(posedge rd_clk) begin
 
+    reg rstD, rstD2;
+
+    rstD <= rst;
+	rstD2 <= rstD;
 	if(rd_ce) begin
-		if (rst) begin
+		if (rstD2) begin
 		
 			rd_ptr <= 'd0;
 			dout <= 8'd0;
