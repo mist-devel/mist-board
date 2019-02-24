@@ -387,8 +387,8 @@ archimedes_top ARCHIMEDES(
 	.KBD_IN_DATA    ( kbd_in_data    ),
 	.KBD_IN_STROBE  ( kbd_in_strobe  ),
 	
-	.JOYSTICK0		( joyA[4:0]		),
-	.JOYSTICK1		( joyB[4:0]		),
+	.JOYSTICK0		( ~{joyB[4], joyB[0], joyB[1], joyB[2], joyB[3]} ),
+	.JOYSTICK1		( ~{joyA[4], joyA[0], joyA[1], joyA[2], joyA[3]} ),
 	.VIDBASECLK_O	( pixbaseclk_select ),
 	.VIDSYNCPOL_O	( )
 );
