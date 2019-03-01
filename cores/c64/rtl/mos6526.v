@@ -2,6 +2,7 @@
 // by Rayne
 // Timers & Interrupts are rewritten by slingshot
 // Passes all Lorenz CIA Timer tests
+// Passes all "new" CIA tests from VICE, except dd0dtest
 
 module mos6526 (
   input  wire       mode,   // 0 - 6526 "old", 1 - 8521 "new"
@@ -215,7 +216,11 @@ always @(posedge clk) begin
 
     if (wr)
       case (rs)
-        4'h4: ta_lo <= db_in;
+        4'h4:
+        begin
+            ta_lo <= db_in;
+            if (timerAoverflow) timer_a <= {ta_hi, db_in};
+        end
         4'h5:
         begin
             ta_hi <= db_in;
@@ -281,7 +286,11 @@ always @(posedge clk) begin
 
     if (wr)
       case (rs)
-        4'h6: tb_lo <= db_in;
+        4'h6:
+        begin
+            tb_lo <= db_in;
+            if (timerBoverflow) timer_b <= {tb_hi, db_in};
+        end
         4'h7:
         begin
             tb_hi <= db_in;
