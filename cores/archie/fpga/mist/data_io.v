@@ -31,6 +31,7 @@ module data_io #(parameter ADDR_WIDTH=24, START_ADDR = 0) (
 
 	output reg downloading, // signal indicating an active download
 	output [ADDR_WIDTH-1:0]     size, // number of bytes in input buffer
+	output reg [7:0] index, // menu index
 
 	// external ram interface
 	input 			    clk,
@@ -54,7 +55,6 @@ assign size = addr - START_ADDR;
 // this core supports only the display related OSD commands
 // of the minimig
 reg [6:0]      sbuf;
-reg [7:0]      cmd;
 reg [7:0]      data;
 reg [2:0]      bit_cnt;
 reg [2:0]      byte_cnt;
@@ -63,7 +63,7 @@ reg [ADDR_WIDTH-1:0] addr;
 
 localparam UIO_FILE_TX         = 8'h53;
 localparam UIO_FILE_TX_DAT     = 8'h54;
-
+localparam UIO_FILE_INDEX      = 8'h55;
 // data_io has its own SPI interface to the io controller
 
 // SPI bit and byte counters
@@ -71,11 +71,9 @@ always@(posedge sck or posedge ss) begin
 	if(ss == 1) begin
 		bit_cnt <= 0;
 		byte_cnt <= 0;
-		cmd <= 0;
 	end else begin
 		if((&bit_cnt)&&(~&byte_cnt)) begin
 			byte_cnt <= byte_cnt + 1'd1;
-			if (!byte_cnt) cmd <= {sbuf, sdi};
 		end
 		bit_cnt <= bit_cnt + 1'd1;
 	end
@@ -124,7 +122,7 @@ always @(posedge clk) begin
 
 	// strobe is set whenever a valid byte has been received
 	if (~spi_transfer_endD & spi_transfer_end) begin
-		abyte_cnt <= 8'd0;
+		abyte_cnt <= 0;
 	end else if (spi_receiver_strobeD ^ spi_receiver_strobe) begin
 
 		if(~&abyte_cnt)
@@ -154,6 +152,9 @@ always @(posedge clk) begin
 				data <= spi_byte_in;
 				wr <= 1;
 			end
+
+			// index
+			UIO_FILE_INDEX: index <= spi_byte_in;
 			endcase;
 		end
 	end

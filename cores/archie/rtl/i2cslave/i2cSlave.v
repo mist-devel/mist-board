@@ -44,20 +44,18 @@
 //
 `include "i2cSlave_define.v"
 
-
 module i2cSlave (
-  clk,
-  rst,
-  sdaIn,
-  sdaOut,
-  scl
+  input clk,
+  input rst,
+  input sdaIn,
+  output sdaOut,
+  input scl,
+  
+  // parallel write
+  input we,
+  input [7:0] addr,
+  input [7:0] data
 );
-
-input clk;
-input rst;
-input sdaIn;
-output sdaOut;
-input scl;
 
 // local wires and regs
 reg sdaDeb;
@@ -154,9 +152,9 @@ end
 
 registerInterface u_registerInterface(
   .clk(clk),
-  .addr(regAddr),
-  .dataIn(dataToRegIF),
-  .writeEn(writeEn),
+  .addr(we ? addr : regAddr),
+  .dataIn(we ? data : dataToRegIF),
+  .writeEn(writeEn | we),
   .dataOut(dataFromRegIF)
 );
 

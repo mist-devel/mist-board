@@ -83,8 +83,10 @@ wire			core_hs, core_vs;
 wire [15:0]	coreaud_l, coreaud_r;
 
 // data loading 
-wire 			loader_active /* synthesis keep */ ;
-wire 			loader_we /* synthesis keep */ ;
+wire        downloading;
+wire        loader_active = downloading && (dio_index == 1 || dio_index == 2);
+wire [7:0]  dio_index;
+wire 		loader_we /* synthesis keep */ ;
 reg			loader_stb = 1'b0 /* synthesis keep */ ;
 reg         rom_ready = 0;
 (*KEEP="TRUE"*)wire [3:0]	loader_sel /* synthesis keep */ ;
@@ -289,7 +291,6 @@ wire  [8:0] sd_buff_addr;
 wire  [1:0] img_mounted;
 wire [31:0] img_size;
 
-// de-multiplex spi outputs from user_io and data_io
 assign SPI_DO = (CONF_DATA0==0)?user_io_sdo:1'bZ;
 
 wire user_io_sdo;
@@ -336,8 +337,9 @@ DATA_IO  (
 	.ss				( SPI_SS2			),
 	.sdi				( SPI_DI				),
 
-	.downloading	( loader_active	),
+	.downloading	( downloading	),
 	.size				(						),
+	.index          ( dio_index ),
 
 	// ram interface
    .clk     		( clk_32m			),
@@ -463,7 +465,10 @@ i2cSlaveTop CMOS (
 	.rst		( ~pll_ready	),
 	.sdaIn	    ( i2c_din		),
 	.sdaOut	    ( i2c_dout		),
-	.scl		( i2c_clock		)
+	.scl		( i2c_clock		),
+	.we			( downloading && dio_index == 3 && loader_we ),
+	.addr		( loader_addr[7:0] ),
+	.data		( loader_data[7:0] )
 );
 
 audio	AUDIO	(
