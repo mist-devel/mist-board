@@ -274,8 +274,23 @@ wire   CSync = ~(core_hs ^ core_vs);
 assign VGA_HS = ((pixbaseclk_select[0] == pixbaseclk_select[1]) | ypbpr) ? CSync : core_hs;
 assign VGA_VS = ((pixbaseclk_select[0] == pixbaseclk_select[1]) | ypbpr) ? 1'b1 : core_vs;
 
+wire [31:0] sd_lba;
+wire  [1:0] sd_rd;
+wire  [1:0] sd_wr;
+wire        sd_ack;
+wire        sd_ack_conf;
+wire        sd_conf;
+wire        sd_sdhc = 1'b1;
+wire  [7:0] sd_dout;
+wire        sd_dout_strobe;
+wire  [7:0] sd_din;
+wire        sd_din_strobe;
+wire  [8:0] sd_buff_addr;
+wire  [1:0] img_mounted;
+wire [31:0] img_size;
+
 // de-multiplex spi outputs from user_io and data_io
-assign SPI_DO = (CONF_DATA0==0)?user_io_sdo:(SPI_SS2==0)?data_io_sdo:1'bZ;
+assign SPI_DO = (CONF_DATA0==0)?user_io_sdo:1'bZ;
 
 wire user_io_sdo;
 user_io user_io(
@@ -297,30 +312,34 @@ user_io user_io(
 	.kbd_out_data   ( kbd_out_data   ),
 	.kbd_out_strobe ( kbd_out_strobe ),
 	.kbd_in_data    ( kbd_in_data    ),
-	.kbd_in_strobe  ( kbd_in_strobe  )
+	.kbd_in_strobe  ( kbd_in_strobe  ),
+
+	.sd_lba         ( sd_lba         ),
+	.sd_rd          ( sd_rd          ),
+	.sd_wr          ( sd_wr          ),
+	.sd_ack         ( sd_ack         ),
+	.sd_ack_conf    ( sd_ack_conf    ),
+	.sd_conf        ( sd_conf        ),
+	.sd_sdhc        ( sd_sdhc        ),
+	.sd_dout        ( sd_dout        ),
+	.sd_dout_strobe ( sd_dout_strobe ),
+	.sd_din         ( sd_din         ),
+	.sd_din_strobe  ( sd_din_strobe  ),
+	.sd_buff_addr   ( sd_buff_addr   ),
+	.img_mounted    ( img_mounted    ),
+	.img_size       ( img_size       )
 );
 
-wire data_io_sdo;
-wire [31:0] fdc_status_out;
-wire [31:0] fdc_status_in;
-wire [7:0] fdc_data_in;
-wire fdc_data_in_strobe;
 data_io # ( .START_ADDR(26'h40_0000) )
 DATA_IO  (
 	.sck				( SPI_SCK 			),
 	.ss				( SPI_SS2			),
 	.sdi				( SPI_DI				),
-	.sdo				( data_io_sdo		),
 
 	.downloading	( loader_active	),
 	.size				(						),
 
-	.fdc_status_out( fdc_status_out  ),
-	.fdc_status_in ( fdc_status_in   ),
-	.fdc_data_in_strobe ( fdc_data_in_strobe ),
-	.fdc_data_in   ( fdc_data_in     ),
-	
-   // ram interface
+	// ram interface
    .clk     		( clk_32m			),
 	.wr    			( loader_we			),
 	.a					( loader_addr		),
@@ -377,16 +396,24 @@ archimedes_top ARCHIMEDES(
 	
 	.DEBUG_LED	( LED					),
 
-	.FDC_DIO_STATUS_OUT ( fdc_status_out  ),
-	.FDC_DIO_STATUS_IN  ( fdc_status_in  ),
-	.FDC_DIN_STROBE ( fdc_data_in_strobe  ),
-	.FDC_DIN        ( fdc_data_in  ),
-	
+	.img_mounted    ( img_mounted    ),
+	.img_size       ( img_size       ),
+	.img_wp         ( 0              ),
+	.sd_lba         ( sd_lba         ),
+	.sd_rd          ( sd_rd          ),
+	.sd_wr          ( sd_wr          ),
+	.sd_ack         ( sd_ack         ),
+	.sd_buff_addr   ( sd_buff_addr   ),
+	.sd_dout        ( sd_dout        ),
+	.sd_din         ( sd_din         ),
+	.sd_dout_strobe ( sd_dout_strobe ),
+	.sd_din_strobe  ( sd_din_strobe  ),
+
 	.KBD_OUT_DATA   ( kbd_out_data   ),
 	.KBD_OUT_STROBE ( kbd_out_strobe ),
 	.KBD_IN_DATA    ( kbd_in_data    ),
 	.KBD_IN_STROBE  ( kbd_in_strobe  ),
-	
+
 	.JOYSTICK0		( ~{joyB[4], joyB[0], joyB[1], joyB[2], joyB[3]} ),
 	.JOYSTICK1		( ~{joyA[4], joyA[0], joyA[1], joyA[2], joyA[3]} ),
 	.VIDBASECLK_O	( pixbaseclk_select ),

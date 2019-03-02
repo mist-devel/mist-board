@@ -28,16 +28,9 @@ module data_io #(parameter ADDR_WIDTH=24, START_ADDR = 0) (
 	input 			    sck,
 	input 			    ss,
 	input 			    sdi,
-	output reg 		    sdo,
 
 	output reg downloading, // signal indicating an active download
 	output [ADDR_WIDTH-1:0]     size, // number of bytes in input buffer
-
-	// additional signals for floppy emulation
-	input [31:0] 		    fdc_status_out,
-	output reg [31:0] 	    fdc_status_in,
-	output reg 		    fdc_data_in_strobe,
-	output reg [7:0] 	    fdc_data_in,
 
 	// external ram interface
 	input 			    clk,
@@ -70,9 +63,6 @@ reg [ADDR_WIDTH-1:0] addr;
 
 localparam UIO_FILE_TX         = 8'h53;
 localparam UIO_FILE_TX_DAT     = 8'h54;
-localparam UIO_FDC_GET_STATUS  = 8'h55;
-localparam UIO_FDC_TX_DATA     = 8'h56;
-localparam UIO_FDC_SET_STATUS  = 8'h57;
 
 // data_io has its own SPI interface to the io controller
 
@@ -88,17 +78,6 @@ always@(posedge sck or posedge ss) begin
 			if (!byte_cnt) cmd <= {sbuf, sdi};
 		end
 		bit_cnt <= bit_cnt + 1'd1;
-	end
-end
-
-always@(negedge sck or posedge ss) begin
-	if(ss == 1) begin
-		sdo <= 1'bZ;
-	end else begin
-		if(cmd == UIO_FDC_GET_STATUS)
-			sdo <= fdc_status_out[{4-byte_cnt,~bit_cnt}];
-		else
-			sdo <= 1'b0;
 	end
 end
 
@@ -135,7 +114,6 @@ always @(posedge clk) begin
 	reg [7:0] acmd;
 	reg [3:0] abyte_cnt;   // counts bytes
 
-	fdc_data_in_strobe <= 0;
 	wr <= 0;
 
 	//synchronize between SPI and sys clock domains
@@ -176,23 +154,7 @@ always @(posedge clk) begin
 				data <= spi_byte_in;
 				wr <= 1;
 			end
-
-			// command 0x56: UIO_FDC_TX_DATA
-			UIO_FDC_TX_DATA:
-			begin
-				fdc_data_in_strobe <= 1'b1;
-				fdc_data_in <= spi_byte_in;
-			end
-
-			// command 0x57: UIO_FDC_SET_STATUS
-			UIO_FDC_SET_STATUS:
-			begin
-				if (abyte_cnt == 1) fdc_status_in[31:24] <= spi_byte_in;
-				if (abyte_cnt == 2) fdc_status_in[23:16] <= spi_byte_in;
-				if (abyte_cnt == 3) fdc_status_in[15: 8] <= spi_byte_in;
-				if (abyte_cnt == 4) fdc_status_in[ 7: 0] <= spi_byte_in;
-			end
-			endcase
+			endcase;
 		end
 	end
 end

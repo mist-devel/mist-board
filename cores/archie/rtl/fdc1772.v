@@ -48,36 +48,52 @@ module fdc1772 (
 		output reg [7:0]  wb_dat_o, // bd 
 
 		// place any signals that need to be passed up to the top after here.
-		output [31:0] dio_status_out,
-		input [31:0]  dio_status_in,
-		input 	      dio_in_strobe,
-		input [7:0]   dio_in 	     
+		input      [1:0] img_mounted, // signaling that new image has been mounted
+		input            img_wp,      // write protect. latched at img_mounted
+		input     [31:0] img_size,    // size of image in bytes
+		output    [31:0] sd_lba,
+		output reg [1:0] sd_rd,
+		output reg [1:0] sd_wr,
+		input            sd_ack,
+		input      [8:0] sd_buff_addr,
+		input      [7:0] sd_dout,
+		output     [7:0] sd_din,
+		input            sd_dout_strobe,
+		input            sd_din_strobe
 );
 
-localparam CLK = 8000000;
+localparam CLK = 32000000;
+localparam CLK_EN = 8000000;
 
 // -------------------------------------------------------------------------
 // --------------------- IO controller status handling ---------------------
 // -------------------------------------------------------------------------
 
-// sector only needs 4 bits and track only needs 7 bits. We thus encode side and
-// floppy_drive into the upper bits
-assign dio_status_out = { 5'b10100, fifo_rptr==0, fifo_wptr==0, busy,
-	cmd, floppy_side, track[6:0], floppy_drive, sector[3:0] };
+assign sd_lba = { 4'd10*track[6:0] + (floppy_side ? 0 : 4'd5) + sector[3:0], s_odd };
 
-// input status encodes information about all four possible floppy drives
-// in 4*8 bits
-wire [7:0] floppy_status =
-	   (floppy_drive == 4'b1110)?dio_status_in[31:24]:
-	   (floppy_drive == 4'b1101)?dio_status_in[23:16]:
-	   (floppy_drive == 4'b1011)?dio_status_in[15:8]:
-	   (floppy_drive == 4'b0111)?dio_status_in[7:0]:
-	   8'h00;
+reg [1:0] floppy_ready = 0;
+reg [1:0] floppy_wp = 1;
 
-wire floppy_present = floppy_status[0];
-wire floppy_write_protected = 1'b1; // will be floppy_status[1] in the future
+wire         floppy_present = (floppy_drive == 4'b1110)?floppy_ready[0]:
+	                          (floppy_drive == 4'b1101)?floppy_ready[1]:0;
 
-   
+wire floppy_write_protected = (floppy_drive == 4'b1110)?floppy_wp[0]:
+	                          (floppy_drive == 4'b1101)?floppy_wp[1]:1;
+
+always @(posedge clkcpu) begin
+	reg [1:0] img_mountedD;
+
+	img_mountedD <= img_mounted;
+	if (~img_mountedD[0] && img_mounted[0]) begin
+		floppy_ready[0] <= |img_size;
+		floppy_wp[0] <= img_wp;
+	end
+	if (~img_mountedD[1] && img_mounted[1]) begin
+		floppy_ready[1] <= |img_size;
+		floppy_wp[1] <= img_wp;
+	end
+end
+
 // -------------------------------------------------------------------------
 // ---------------------------- IRQ/DRQ handling ---------------------------
 // -------------------------------------------------------------------------
@@ -102,12 +118,11 @@ assign floppy_firq = irq;
 reg drq;
 reg drq_set;
 
-reg cpu_read_data;
+reg cpu_rw_data;
 always @(posedge clkcpu)
-  cpu_read_data <= wb_stb && wb_cyc && !wb_we && 
-		   (wb_adr[3:2] == FDC_REG_DATA);
+  cpu_rw_data <= wb_stb && wb_cyc && (wb_adr[3:2] == FDC_REG_DATA);
 
-wire drq_clr = !floppy_reset || cpu_read_data;
+wire drq_clr = !floppy_reset || cpu_rw_data;
 
 always @(posedge clkcpu or posedge drq_clr) begin
    if(drq_clr) drq <= 1'b0;
@@ -131,7 +146,7 @@ wire fd0_sector_hdr;
 wire fd0_sector_data;
 wire fd0_dclk;
 
-floppy #(.SYS_CLK(32000000)) floppy0 (
+floppy #(.SYS_CLK(CLK)) floppy0 (
 		.clk         ( clkcpu          ),
 
 		// control signals into floppy
@@ -161,7 +176,7 @@ wire fd1_sector_hdr;
 wire fd1_sector_data;
 wire fd1_dclk;
 
-floppy #(.SYS_CLK(32000000)) floppy1 (
+floppy #(.SYS_CLK(CLK)) floppy1 (
 		.clk         ( clkcpu          ),
 
 		// control signals into floppy
@@ -191,7 +206,7 @@ wire fd2_sector_hdr;
 wire fd2_sector_data;
 wire fd2_dclk;
 
-floppy #(.SYS_CLK(32000000)) floppy2 (
+floppy #(.SYS_CLK(CLK)) floppy2 (
 		.clk         ( clkcpu          ),
 
 		// control signals into floppy
@@ -221,7 +236,7 @@ wire fd3_sector_hdr;
 wire fd3_sector_data;
 wire fd3_dclk;
 
-floppy #(.SYS_CLK(32000000)) floppy3 (
+floppy #(.SYS_CLK(CLK)) floppy3 (
 		.clk         ( clkcpu          ),
 
 		// control signals into floppy
@@ -313,15 +328,15 @@ wire motor_spin_up_done = (!motor_on) || (motor_on && (motor_spin_up_sequence ==
 // ---------------------------- step handling ------------------------------
 
 localparam STEP_PULSE_LEN = 1;
-localparam STEP_PULSE_CLKS = (STEP_PULSE_LEN * CLK)/1000;
+localparam STEP_PULSE_CLKS = (STEP_PULSE_LEN * CLK_EN)/1000;
 reg [15:0] step_pulse_cnt;
 
 // the step rate is only valid for command type I
 wire [15:0] step_rate_clk = 
-	   (cmd[1:0]==2'b00)?(2*CLK/1000-1):    // 2ms
-	   (cmd[1:0]==2'b01)?(3*CLK/1000-1):    // 3ms
-	   (cmd[1:0]==2'b10)?(5*CLK/1000-1):    // 5ms
-	   (6*CLK/1000-1);                      // 6ms
+	   (cmd[1:0]==2'b00)?(2*CLK_EN/1000-1):    // 2ms
+	   (cmd[1:0]==2'b01)?(3*CLK_EN/1000-1):    // 3ms
+	   (cmd[1:0]==2'b10)?(5*CLK_EN/1000-1):    // 5ms
+	   (6*CLK_EN/1000-1);                      // 6ms
 	   
 reg [15:0] step_rate_cnt;
 
@@ -330,19 +345,20 @@ wire step_busy = (step_rate_cnt != 0);
 reg [7:0] step_to;
 
 always @(posedge clkcpu) begin
+
    irq_set <= 0;
+   sd_card_read <= 0;
+   sd_card_write <= 0;
    if(!floppy_reset) begin
       motor_on <= 1'b0;
       busy <= 1'b0;
       step_in <= 1'b0;
       step_out <= 1'b0;
       irq_set <= 1'b0;
-      data_read_start_set <= 1'b0;
-      data_read_done_clr <= 1'b0;
+      data_transfer_start <= 1'b0;
    end else if (clk8m_en) begin
       irq_set <= 1'b0;
-      data_read_start_set <= 1'b0;
-      data_read_done_clr <= 1'b0;
+      data_transfer_start <= 1'b0;
 
       // disable step signal after 1 msec
       if(step_pulse_cnt != 0) 
@@ -411,16 +427,27 @@ always @(posedge clkcpu) begin
 		end else begin
 			// read sector
 			if(cmd[7:5] == 3'b100) begin
+				if (sd_state == SD_IDLE && fifo_cpuptr == 0) sd_card_read <= 1;
 				// we are busy until the right sector header passes under 
 				// the head and the arm7 has delivered at least one byte
 				// (one byte is sufficient as the arm7 is much faster and
 				// all further bytes will arrive in time)
 				if(fd_ready && fd_sector_hdr && 
-					(fd_sector == sector) && (fifo_wptr != 0))
-					data_read_start_set <= 1'b1;
+					(fd_sector == sector) && (sd_buff_addr != 0))
+					data_transfer_start <= 1'b1;
 
-				if(data_read_done) begin
-					data_read_done_clr <= 1'b1;
+				if(data_transfer_done) begin
+					busy <= 1'b0;
+					motor_timeout_index <= MOTOR_IDLE_COUNTER - 1;
+					irq_set <= 1'b1; // emit irq when command done
+				end
+			end
+
+			// write sector
+			if(cmd[7:5] == 3'b101) begin
+				if (fifo_cpuptr == 0) data_transfer_start <= 1'b1;
+				if (data_transfer_done) sd_card_write <= 1;
+				if (sd_card_write_done) begin
 					busy <= 1'b0;
 					motor_timeout_index <= MOTOR_IDLE_COUNTER - 1;
 					irq_set <= 1'b1; // emit irq when command done
@@ -441,10 +468,9 @@ always @(posedge clkcpu) begin
 			if(cmd[7:4] == 4'b1100) begin
 				// we are busy until the next setor header passes under the head
 				if(fd_ready && fd_sector_hdr)
-					data_read_start_set <= 1'b1;
+					data_transfer_start <= 1'b1;
 
-				if(data_read_done) begin
-					data_read_done_clr <= 1'b1;
+				if(data_transfer_done) begin
 					busy <= 1'b0;
 					motor_timeout_index <= MOTOR_IDLE_COUNTER - 1;
 					irq_set <= 1'b1; // emit irq when command done
@@ -473,64 +499,127 @@ end
 
 // floppy delivers data at a floppy generated rate (usually 250kbit/s), so the start and stop
 // signals need to be passed forth and back from cpu clock domain to floppy data clock domain
-reg data_read_start_set;
-
-reg data_read_done_clr;
-reg data_read_done;
+reg data_transfer_start;
+reg data_transfer_done;
 
 // ==================================== FIFO ==================================
-   
+
 // 1 kB buffer used to receive a sector as fast as possible from from the io
 // controller. The internal transfer afterwards then runs at 250000 Bit/s
-reg [7:0] fifo [1023:0];
-reg [10:0] fifo_rptr;
-reg [10:0] fifo_wptr;
+reg [10:0] fifo_cpuptr;
+reg        s_odd; //odd sector
+wire [7:0] fifo_q;
 
-// -------------------- data write -----------------------
-   
-always @(posedge clkcpu or posedge cmd_rx) begin
-   if(cmd_rx)
-     fifo_wptr <= 11'd0;
-   else begin
-      if(dio_in_strobe && (fifo_wptr != 11'd1024)) begin
-			fifo[fifo_wptr] <= dio_in;
-			fifo_wptr <= fifo_wptr + 11'd1;
-      end
-   end
-end
-   
-// -------------------- data read -----------------------
+fdc1772_dpram fifo
+(
+	.clock(clkcpu),
 
-reg [10:0] data_read_cnt;
+	.address_a({s_odd, sd_buff_addr}),
+	.data_a(sd_dout),
+	.wren_a(sd_dout_strobe & sd_ack),
+	.q_a(sd_din),
+
+	.address_b(fifo_cpuptr),
+	.data_b(data_in),
+	.wren_b(data_in_strobe),
+	.q_b(fifo_q)
+);
+
+// ------------------ SD card control ------------------------
+localparam SD_IDLE = 0;
+localparam SD_READ = 1;
+localparam SD_WRITE = 2;
+
+reg [1:0] sd_state;
+reg       sd_card_write;
+reg       sd_card_read;
+reg       sd_card_write_done;
+
 always @(posedge clkcpu) begin
-   reg data_read_start_setD;
+	reg sd_ackD;
+
+	sd_ackD <= sd_ack;
+	if (sd_ack) {sd_rd, sd_wr} <= 0;
+	if (clk8m_en) sd_card_write_done <= 0;
+
+	case (sd_state)
+	SD_IDLE:
+	begin
+		s_odd <= 0;
+		if (sd_card_read) begin
+			sd_rd <= ~{ floppy_drive[1], floppy_drive[0] };
+			sd_state <= SD_READ;
+		end
+		else if (sd_card_write) begin
+			sd_wr <= ~{ floppy_drive[1], floppy_drive[0] };
+			sd_state <= SD_WRITE;
+		end
+	end
+
+	SD_READ:
+	begin
+		if (sd_ackD & ~sd_ack) begin
+			if (s_odd) sd_state <= SD_IDLE;
+			else begin
+				s_odd <= 1;
+				sd_rd <= ~{ floppy_drive[1], floppy_drive[0] };
+			end
+		end
+	end
+
+	SD_WRITE:
+	begin
+		if (sd_ackD & ~sd_ack) begin
+			if (s_odd) begin
+				sd_state <= SD_IDLE;
+				sd_card_write_done <= 1;
+			end else begin
+				s_odd <= 1;
+				sd_wr <= ~{ floppy_drive[1], floppy_drive[0] };
+			end
+		end
+	end
+
+	default: ;
+	endcase
+end
+
+// -------------------- CPU data read/write -----------------------
+
+always @(posedge clkcpu) begin
+   reg        data_transfer_startD;
+   reg [10:0] data_transfer_cnt;
+
    // reset fifo read pointer on reception of a new command
    if(cmd_rx)
-     fifo_rptr <= 11'd0;
+     fifo_cpuptr <= 11'd0;
 
    drq_set <= 1'b0;
-   if (data_read_done_clr) data_read_done <= 0;
-   data_read_start_setD <= data_read_start_set;
+   if (clk8m_en) data_transfer_done <= 0;
+   data_transfer_startD <= data_transfer_start;
    // received request to read data
-   if(~data_read_start_setD & data_read_start_set) begin
+   if(~data_transfer_startD & data_transfer_start) begin
 
       // read_address command has 6 data bytes
       if(cmd[7:4] == 4'b1100)
-			data_read_cnt <= 11'd6+11'd1;
+			data_transfer_cnt <= 11'd6+11'd1;
 
-      // read sector has 1024 data bytes
-      if(cmd[7:5] == 3'b100)
-			data_read_cnt <= 11'd1024+11'd1;
+      // read/write sector has 1024 data bytes
+      if(cmd[7:6] == 2'b10)
+			data_transfer_cnt <= 11'd1024+11'd1;
    end
 
+   // write sector data arrived from CPU
+   if(cmd[7:5] == 3'b101 && data_in_strobe) fifo_cpuptr <= fifo_cpuptr + 1'd1;
+
    if(fd_dclk_en) begin
-      if(data_read_cnt != 0) begin
-			if(data_read_cnt != 1) begin
+      if(data_transfer_cnt != 0) begin
+			if(data_transfer_cnt != 1) begin
 				drq_set <= 1'b1;
 				
 				// read_address
 				if(cmd[7:4] == 4'b1100) begin
-					case(data_read_cnt)
+					case(data_transfer_cnt)
 						7: data_out <= fd_track;
 						6: data_out <= { 7'b0000000, floppy_side };
 						5: data_out <= fd_sector;
@@ -542,17 +631,17 @@ always @(posedge clkcpu) begin
 	    
 				// read sector
 				if(cmd[7:5] == 3'b100) begin
-					if(fifo_rptr != 11'd1024) begin
-						data_out <= fifo[fifo_rptr];
-						fifo_rptr <= fifo_rptr + 11'd1;
+					if(fifo_cpuptr != 11'd1024) begin
+						data_out <= fifo_q;
+						fifo_cpuptr <= fifo_cpuptr + 11'd1;
 					end
 				end
 			end
 	    
 			// count down and stop after last byte
-			data_read_cnt <= data_read_cnt - 11'd1;
-			if(data_read_cnt == 1)
-				data_read_done <= 1'b1;
+			data_transfer_cnt <= data_transfer_cnt - 11'd1;
+			if(data_transfer_cnt == 1)
+				data_transfer_done <= 1'b1;
 		end
    end
 end
@@ -605,7 +694,8 @@ end
 reg cmd_rx;
 reg cmd_rx_i;
 reg last_stb;
-   
+reg data_in_strobe;
+
 always @(posedge clkcpu) begin
    if(!floppy_reset) begin
       // clear internal registers
@@ -617,7 +707,9 @@ always @(posedge clkcpu) begin
       cmd_rx_i <= 1'b0;
       cmd_rx <= 1'b0;
       last_stb <= 1'b0;
+      data_in_strobe <= 0;
    end else begin
+      data_in_strobe <= 0;
       last_stb <= wb_stb;
 
 		// cmd_rx is delayed to make sure all signals (the cmd!) are stable when
@@ -667,7 +759,7 @@ always @(posedge clkcpu) begin
             end
 
             if(wb_dat_i[7:5] == 3'b101) begin                // write sector
-				end
+            end
             
             // ------------- TYPE III commands ------------
             if(wb_dat_i[7:4] == 4'b1100) begin               // read address
@@ -690,10 +782,49 @@ always @(posedge clkcpu) begin
          if(wb_adr[3:2] == FDC_REG_SECTOR)                   // sector register
            sector <= wb_dat_i;
 
-         if(wb_adr[3:2] == FDC_REG_DATA)                     // data register
+         if(wb_adr[3:2] == FDC_REG_DATA) begin               // data register
+           data_in_strobe <= 1;
            data_in <= wb_dat_i;
+         end
       end
    end
+end
+
+endmodule
+
+module fdc1772_dpram #(parameter DATAWIDTH=8, ADDRWIDTH=10)
+(
+        input                   clock,
+
+        input   [ADDRWIDTH-1:0] address_a,
+        input   [DATAWIDTH-1:0] data_a,
+        input                   wren_a,
+        output reg [DATAWIDTH-1:0] q_a,
+
+        input   [ADDRWIDTH-1:0] address_b,
+        input   [DATAWIDTH-1:0] data_b,
+        input                   wren_b,
+        output reg [DATAWIDTH-1:0] q_b
+);
+
+reg [DATAWIDTH-1:0] ram[0:(1<<ADDRWIDTH)-1];
+
+always @(posedge clock) begin
+        if(wren_a) begin
+                ram[address_a] <= data_a;
+                q_a <= data_a;
+        end else begin
+                q_a <= ram[address_a];
+        end
+end
+
+always @(posedge clock) begin
+        if(wren_b) begin
+                ram[address_b] <= data_b;
+                q_b <= data_b;
+        end else begin
+                q_b <= ram[address_b];
+        end
 end
 
 endmodule

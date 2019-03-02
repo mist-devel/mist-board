@@ -67,10 +67,18 @@ module archimedes_top(
 	output			DEBUG_LED,
 	
 	// floppy connections to external controller
-	output [31:0]  FDC_DIO_STATUS_OUT,
-	input [31:0]   FDC_DIO_STATUS_IN,
-	input [7:0]    FDC_DIN,
-	input          FDC_DIN_STROBE,
+	input     [1:0] img_mounted, // signaling that new image has been mounted
+	input           img_wp,      // write protect. latched at img_mounted
+	input    [31:0] img_size,    // size of image in bytes
+	output   [31:0] sd_lba,
+	output    [1:0] sd_rd,
+	output    [1:0] sd_wr,
+	input           sd_ack,
+	input     [8:0] sd_buff_addr,
+	input     [7:0] sd_dout,
+	output    [7:0] sd_din,
+	input           sd_dout_strobe,
+	input           sd_din_strobe,
 
 	// connection to keyboard controller
 	output [7:0]   KBD_OUT_DATA,
@@ -324,17 +332,25 @@ fdc1772 FDC1772 (
 	
 	.floppy_firq	( floppy_firq			),
 	.floppy_drq		( floppy_drq			),
-	
-	.dio_status_out( FDC_DIO_STATUS_OUT ),
-	.dio_status_in ( FDC_DIO_STATUS_IN  ),
-	.dio_in_strobe ( FDC_DIN_STROBE     ),
-	.dio_in        ( FDC_DIN           	),
-	
+
+	.img_mounted    ( img_mounted           ),
+	.img_size       ( img_size              ),
+	.img_wp         ( 0                     ),
+	.sd_lba         ( sd_lba                ),
+	.sd_rd          ( sd_rd                 ),
+	.sd_wr          ( sd_wr                 ),
+	.sd_ack         ( sd_ack                ),
+	.sd_buff_addr   ( sd_buff_addr          ),
+	.sd_dout        ( sd_dout               ),
+	.sd_din         ( sd_din                ),
+	.sd_dout_strobe ( sd_dout_strobe        ),
+	.sd_din_strobe  ( sd_din_strobe         ),
+
 	.floppy_drive	( floppy_drive			),
 	.floppy_motor	( floppy_motor			),
 	.floppy_inuse	( floppy_inuse			),
 	.floppy_side	( floppy_side 			),
-	.floppy_density( floppy_density		),
+	.floppy_density ( floppy_density		),
 	.floppy_reset	( floppy_reset			)
 );
 
