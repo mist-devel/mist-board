@@ -46,29 +46,27 @@
 
 
 module i2cSlaveTop (
-  clk,
-  rst,
-  sdaIn,
-  sdaOut,
-  scl
+  input clk,
+  input rst,
+  input sdaIn,
+  output sdaOut,
+  input scl,
+  
+  // parallel write
+  input we,
+  input [7:0] addr,
+  input [7:0] data
 );
-input clk;
-input rst;
-input sdaIn;
-output sdaOut;
-input scl;
-
 
 i2cSlave u_i2cSlave(
   .clk(clk),
   .rst(rst),
   .sdaIn(sdaIn),
   .sdaOut(sdaOut),
-  .scl(scl)
+  .scl(scl),
+  .we(we),
+  .addr(addr),
+  .data(data)
 );
 
-
 endmodule
-
-
- 
