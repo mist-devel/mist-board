@@ -109,8 +109,13 @@ always @(posedge clkcpu)
 wire irq_clr = !floppy_reset || cpu_read_status;
    
 always @(posedge clkcpu or posedge irq_clr) begin
-   if(irq_clr) irq <= 1'b0;
-   else if(irq_set) irq <= 1'b1;
+	reg irq_setD;
+
+	if(irq_clr) irq <= 1'b0;
+	else begin
+		irq_setD <= irq_set;
+		if(~irq_setD & irq_set) irq <= 1'b1;
+	end
 end
    
 assign floppy_firq = irq;
@@ -345,18 +350,21 @@ wire step_busy = (step_rate_cnt != 0);
 reg [7:0] step_to;
 
 always @(posedge clkcpu) begin
+   reg data_transfer_can_start;
 
-   irq_set <= 0;
-   sd_card_read <= 0;
-   sd_card_write <= 0;
    if(!floppy_reset) begin
       motor_on <= 1'b0;
       busy <= 1'b0;
       step_in <= 1'b0;
       step_out <= 1'b0;
       irq_set <= 1'b0;
+      sd_card_read <= 0;
+      sd_card_write <= 0;
       data_transfer_start <= 1'b0;
+      data_transfer_can_start <= 0;
    end else if (clk8m_en) begin
+      sd_card_read <= 0;
+      sd_card_write <= 0;
       irq_set <= 1'b0;
       data_transfer_start <= 1'b0;
 
@@ -427,14 +435,15 @@ always @(posedge clkcpu) begin
 		end else begin
 			// read sector
 			if(cmd[7:5] == 3'b100) begin
-				if (sd_state == SD_IDLE && fifo_cpuptr == 0) sd_card_read <= 1;
+				if (fifo_cpuptr == 0) sd_card_read <= 1;
 				// we are busy until the right sector header passes under 
-				// the head and the arm7 has delivered at least one byte
-				// (one byte is sufficient as the arm7 is much faster and
-				// all further bytes will arrive in time)
-				if(fd_ready && fd_sector_hdr && 
-					(fd_sector == sector) && (sd_buff_addr != 0))
-					data_transfer_start <= 1'b1;
+				// the head and the sd-card controller indicates the sector
+				// is in the fifo
+				if(sd_card_done) data_transfer_can_start <= 1;
+				if(fd_ready && fd_sector_hdr && (fd_sector == sector) && data_transfer_can_start) begin
+					data_transfer_can_start <= 0;
+					data_transfer_start <= 1;
+				end
 
 				if(data_transfer_done) begin
 					busy <= 1'b0;
@@ -447,7 +456,7 @@ always @(posedge clkcpu) begin
 			if(cmd[7:5] == 3'b101) begin
 				if (fifo_cpuptr == 0) data_transfer_start <= 1'b1;
 				if (data_transfer_done) sd_card_write <= 1;
-				if (sd_card_write_done) begin
+				if (sd_card_done) begin
 					busy <= 1'b0;
 					motor_timeout_index <= MOTOR_IDLE_COUNTER - 1;
 					irq_set <= 1'b1; // emit irq when command done
@@ -533,24 +542,28 @@ localparam SD_WRITE = 2;
 reg [1:0] sd_state;
 reg       sd_card_write;
 reg       sd_card_read;
-reg       sd_card_write_done;
+reg       sd_card_done;
 
 always @(posedge clkcpu) begin
 	reg sd_ackD;
+	reg sd_card_readD;
+	reg sd_card_writeD;
 
+	sd_card_readD <= sd_card_read;
+	sd_card_writeD <= sd_card_write;
 	sd_ackD <= sd_ack;
 	if (sd_ack) {sd_rd, sd_wr} <= 0;
-	if (clk8m_en) sd_card_write_done <= 0;
+	if (clk8m_en) sd_card_done <= 0;
 
 	case (sd_state)
 	SD_IDLE:
 	begin
 		s_odd <= 0;
-		if (sd_card_read) begin
+		if (~sd_card_readD & sd_card_read) begin
 			sd_rd <= ~{ floppy_drive[1], floppy_drive[0] };
 			sd_state <= SD_READ;
 		end
-		else if (sd_card_write) begin
+		else if (~sd_card_writeD & sd_card_write) begin
 			sd_wr <= ~{ floppy_drive[1], floppy_drive[0] };
 			sd_state <= SD_WRITE;
 		end
@@ -559,8 +572,10 @@ always @(posedge clkcpu) begin
 	SD_READ:
 	begin
 		if (sd_ackD & ~sd_ack) begin
-			if (s_odd) sd_state <= SD_IDLE;
-			else begin
+			if (s_odd) begin
+				sd_state <= SD_IDLE;
+				sd_card_done <= 1; // to be on the safe side now, can be issued earlier
+			end else begin
 				s_odd <= 1;
 				sd_rd <= ~{ floppy_drive[1], floppy_drive[0] };
 			end
@@ -572,7 +587,7 @@ always @(posedge clkcpu) begin
 		if (sd_ackD & ~sd_ack) begin
 			if (s_odd) begin
 				sd_state <= SD_IDLE;
-				sd_card_write_done <= 1;
+				sd_card_done <= 1;
 			end else begin
 				s_odd <= 1;
 				sd_wr <= ~{ floppy_drive[1], floppy_drive[0] };
