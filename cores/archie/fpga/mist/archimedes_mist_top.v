@@ -147,7 +147,7 @@ wire       q_reconfig_36;
 rom_reconfig_25 rom_reconfig_25
 (
 	.address(pll_rom_address),
-	.clock(CLOCK_27[0]),
+	.clock(clk_32m),
 	.rden(pll_write_rom_ena),
 	.q(q_reconfig_25)
 );
@@ -155,7 +155,7 @@ rom_reconfig_25 rom_reconfig_25
 rom_reconfig_24 rom_reconfig_24
 (
 	.address(pll_rom_address),
-	.clock(CLOCK_27[0]),
+	.clock(clk_32m),
 	.rden(pll_write_rom_ena),
 	.q(q_reconfig_24)
 );
@@ -163,7 +163,7 @@ rom_reconfig_24 rom_reconfig_24
 rom_reconfig_36 rom_reconfig_36
 (
 	.address(pll_rom_address),
-	.clock(CLOCK_27[0]),
+	.clock(clk_32m),
 	.rden(pll_write_rom_ena),
 	.q(q_reconfig_36)
 );
@@ -174,7 +174,7 @@ assign pll_rom_q = pixbaseclk_select == 2'b01 ? q_reconfig_25 :
 pll_reconfig pll_reconfig_inst
 (
     .busy(pll_reconfig_busy),
-    .clock(CLOCK_27[0]),
+    .clock(clk_32m),
     .counter_param(0),
     .counter_type(0),
     .data_in(0),
@@ -197,7 +197,7 @@ pll_reconfig pll_reconfig_inst
     .write_rom_ena(pll_write_rom_ena)
 );
 
-always @(posedge CLOCK_27[0]) begin
+always @(posedge clk_32m) begin
     reg [1:0] pixbaseclk_select_d;
     reg [1:0] pll_reconfig_state = 0;
     reg [9:0] pll_reconfig_timeout;
