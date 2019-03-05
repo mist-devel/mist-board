@@ -69,8 +69,7 @@ module ioc(
 		input            kbd_in_strobe
 );
 
-reg [3:0] 	clk2m_count;
-reg [1:0] 	clk8m_count;
+reg [4:0]   clken_counter;
 
 wire [7:0]	irqa_dout, irqb_dout, firq_dout;
 wire			irqa_req, irqb_req, firq_req;
@@ -229,9 +228,6 @@ initial begin
 
 	ctrl_state = 6'h3F;
 
-	clk8m_count = 'd0;
-	clk2m_count = 'd0;
-
 	ir_r = 1'b1;
 	
 end
@@ -253,10 +249,10 @@ always @(posedge clkcpu) begin
 		
 	end
 
-	// increment the clock counters.
-	clk2m_count <= clk2m_count + 1'd1;
-	clk8m_count <= clk8m_count + 1'd1;
-	
+	// increment the clock counter. 42 MHz clkcpu assumed.
+	clken_counter <= clken_counter + 1'd1;
+	if (clken_counter == 20) clken_counter <= 0;
+
 	if (write_request & ctrl_selected) begin 
 	
 		ctrl_state <= wb_dat_i[5:0];
@@ -288,9 +284,8 @@ assign ctrl_dout = { ir, 1'b1, c_in & c_out };
 
 assign ir_edge = ~ir_r & ir;
 
-// pulse the 2mhz & 8mhz clock enable line high when all the bits are set. 
-assign clk2m_en = &clk2m_count;
-assign clk8m_en = &clk8m_count;
+assign clk2m_en = !clken_counter;
+assign clk8m_en = clken_counter == 0 || clken_counter == 5 || clken_counter == 10 || clken_counter == 15;
 
 assign wb_dat_o = 	read_request ?
 					(ctrl_selected ?  ctrl_dout :
