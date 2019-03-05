@@ -86,7 +86,6 @@ reg [9:0]		vidc_hber; // horizontal border end
 
 // cursor registers 
 reg [10:0]		vidc_hcsr; // horizontal cursor start
-reg [10:0]		vidc_hcer; // horizontal cursor start
 reg [9:0]		vidc_vcsr; // vertical cursor start
 reg [9:0]		vidc_vcer; // vertical cursor end
 
@@ -113,7 +112,6 @@ initial begin
 	vidc_hber	= 10'd0; // horizontal border end
 	
 	vidc_hcsr	= 11'd0; // horizontal cursor start
-	vidc_hcer	= 11'd0; // horizontal cursor end
 	vidc_vcsr	= 10'd0;  // vertical cursor start
 	vidc_vcer	= 10'd0;  // vertical cursor end
 
