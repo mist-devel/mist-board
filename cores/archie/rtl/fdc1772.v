@@ -75,10 +75,10 @@ reg [1:0] floppy_ready = 0;
 reg [1:0] floppy_wp = 1;
 
 wire         floppy_present = (floppy_drive == 4'b1110)?floppy_ready[0]:
-	                          (floppy_drive == 4'b1101)?floppy_ready[1]:0;
+	                          (floppy_drive == 4'b1101)?floppy_ready[1]:1'b0;
 
 wire floppy_write_protected = (floppy_drive == 4'b1110)?floppy_wp[0]:
-	                          (floppy_drive == 4'b1101)?floppy_wp[1]:1;
+	                          (floppy_drive == 4'b1101)?floppy_wp[1]:1'b1;
 
 always @(posedge clkcpu) begin
 	reg [1:0] img_mountedD;
@@ -319,7 +319,7 @@ wire fd_track0 = (fd_track == 0);
 // reached full speed for 5 rotations (800ms spin-up time + 5*200ms =
 // 1.8sec) If the floppy is idle for 10 rotations (2 sec) then the
 // motor is switched off again
-localparam MOTOR_IDLE_COUNTER = 10;
+localparam MOTOR_IDLE_COUNTER = 4'd10;
 reg [3:0] motor_timeout_index;
 reg indexD;
 reg busy;
@@ -406,7 +406,7 @@ always @(posedge clkcpu) begin
 	    // all type 1 commands are step commands and step_to has been set
 	    if(fd_track == step_to) begin
 	       busy <= 1'b0;   // done if reached track 0
-	       motor_timeout_index <= MOTOR_IDLE_COUNTER - 1;
+	       motor_timeout_index <= MOTOR_IDLE_COUNTER - 1'd1;
 	       irq_set <= 1'b1; // emit irq when command done
 	    end else begin
 	       // do the step
@@ -430,7 +430,7 @@ always @(posedge clkcpu) begin
 		if(!floppy_present) begin
 			// no image selected -> send irq immediately
 			busy <= 1'b0;
-			motor_timeout_index <= MOTOR_IDLE_COUNTER - 1;
+			motor_timeout_index <= MOTOR_IDLE_COUNTER - 1'd1;
 			irq_set <= 1'b1; // emit irq when command done
 		end else begin
 			// read sector
@@ -447,7 +447,7 @@ always @(posedge clkcpu) begin
 
 				if(data_transfer_done) begin
 					busy <= 1'b0;
-					motor_timeout_index <= MOTOR_IDLE_COUNTER - 1;
+					motor_timeout_index <= MOTOR_IDLE_COUNTER - 1'd1;
 					irq_set <= 1'b1; // emit irq when command done
 				end
 			end
@@ -458,7 +458,7 @@ always @(posedge clkcpu) begin
 				if (data_transfer_done) sd_card_write <= 1;
 				if (sd_card_done) begin
 					busy <= 1'b0;
-					motor_timeout_index <= MOTOR_IDLE_COUNTER - 1;
+					motor_timeout_index <= MOTOR_IDLE_COUNTER - 1'd1;
 					irq_set <= 1'b1; // emit irq when command done
 				end
 			end
@@ -470,7 +470,7 @@ always @(posedge clkcpu) begin
 		if(!floppy_present) begin
 			// no image selected -> send irq immediately
 			busy <= 1'b0; 
-			motor_timeout_index <= MOTOR_IDLE_COUNTER - 1;
+			motor_timeout_index <= MOTOR_IDLE_COUNTER - 1'd1;
 			irq_set <= 1'b1; // emit irq when command done
 		end else begin
 			// read address
@@ -481,7 +481,7 @@ always @(posedge clkcpu) begin
 
 				if(data_transfer_done) begin
 					busy <= 1'b0;
-					motor_timeout_index <= MOTOR_IDLE_COUNTER - 1;
+					motor_timeout_index <= MOTOR_IDLE_COUNTER - 1'd1;
 					irq_set <= 1'b1; // emit irq when command done
 				end
 			end
@@ -692,7 +692,7 @@ localparam FDC_REG_SECTOR       = 2;
 localparam FDC_REG_DATA         = 3;
 
 // CPU register read
-always @(wb_stb, wb_cyc, wb_adr, wb_we) begin
+always @(*) begin
    wb_dat_o = 8'h00;
 
    if(wb_stb && wb_cyc && !wb_we) begin

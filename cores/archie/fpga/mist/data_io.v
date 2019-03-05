@@ -126,7 +126,7 @@ always @(posedge clk) begin
 	end else if (spi_receiver_strobeD ^ spi_receiver_strobe) begin
 
 		if(~&abyte_cnt)
-			abyte_cnt <= abyte_cnt + 8'd1;
+			abyte_cnt <= abyte_cnt + 1'd1;
 
 		if(!abyte_cnt) begin
 			acmd <= spi_byte_in;

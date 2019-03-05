@@ -79,9 +79,6 @@ reg [3:0] 	sd_cmd 	= 4'd0;   // current command sent to sd ram
 reg [9:0]	sd_refresh = 10'd0;
 reg			sd_auto_refresh = 1'b0; 
 
-wire 		sd_reading;
-wire		sd_writing;
-
 initial begin 
 	t			= 4'd0;
 	reset 		= 5'h1f;
@@ -331,10 +328,10 @@ always @(posedge wb_clk) begin
 		
 end
 
-assign burst_mode = wb_cti == 3'b010;
-assign can_burst = wb_adr[2] === 1'b0;
-assign sd_reading = sd_stb & sd_cyc & ~sd_we;
-assign sd_writing = sd_stb & sd_cyc & sd_we;
+wire burst_mode = wb_cti == 3'b010;
+wire can_burst = wb_adr[2] === 1'b0;
+wire sd_reading = sd_stb & sd_cyc & ~sd_we;
+wire sd_writing = sd_stb & sd_cyc & sd_we;
 
 // drive control signals according to current command
 assign sd_cs_n  = sd_cmd[3];

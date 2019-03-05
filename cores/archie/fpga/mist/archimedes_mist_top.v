@@ -237,7 +237,7 @@ end
 
 wire [5:0] osd_r_o, osd_g_o, osd_b_o;
 
-osd #(0,0,4) OSD (
+osd #(10'd0,10'd0,4) OSD (
    .clk_sys    ( clk_pix      ),
 
    // spi for OSD
@@ -331,7 +331,7 @@ user_io user_io(
 	.img_size       ( img_size       )
 );
 
-data_io # ( .START_ADDR(26'h40_0000) )
+data_io # ( .START_ADDR(24'h40_0000) )
 DATA_IO  (
 	.sck				( SPI_SCK 			),
 	.ss				( SPI_SS2			),

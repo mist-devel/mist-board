@@ -99,7 +99,7 @@ assign floppy_density = ext_latch_b[1];
 assign floppy_reset = ext_latch_b[3];
 
 assign wb_dat_o	= wb_adr == 14'h001e ? {3'b011, joy0} :
-				  wb_adr == 14'h001f ? {3'b011, joy1} : 32'hFFFFFFFF;
+				  wb_adr == 14'h001f ? {3'b011, joy1} : 8'hFF;
 
 assign baseclk = ext_latch_c[1:0];
 assign syncpol = ext_latch_c[3:2];

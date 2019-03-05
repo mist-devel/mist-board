@@ -201,8 +201,6 @@ set_global_assignment -name VERILOG_FILE ../../rtl/ioc_irq.v
 set_global_assignment -name VERILOG_FILE ../../rtl/ioc.v
 set_global_assignment -name VERILOG_FILE ../../rtl/amber/a23_barrel_shift.v
 set_global_assignment -name VERILOG_FILE ../../rtl/memc_translator.v
-set_global_assignment -name VERILOG_FILE ../../rtl/gdb/slgdb_debug.v
-set_global_assignment -name VERILOG_FILE ../../sw/testdata/screenbox.v
 set_global_assignment -name VERILOG_FILE ../../rtl/vidc_fifo.v
 set_global_assignment -name VERILOG_FILE ../../rtl/vidc_timing.v
 set_global_assignment -name VERILOG_FILE ../../rtl/vidc.v

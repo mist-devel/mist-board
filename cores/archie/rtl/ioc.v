@@ -254,8 +254,8 @@ always @(posedge clkcpu) begin
 	end
 
 	// increment the clock counters.
-	clk2m_count <= clk2m_count + 'd1;
-	clk8m_count <= clk8m_count + 'd1;
+	clk2m_count <= clk2m_count + 1'd1;
+	clk8m_count <= clk8m_count + 1'd1;
 	
 	if (write_request & ctrl_selected) begin 
 	
