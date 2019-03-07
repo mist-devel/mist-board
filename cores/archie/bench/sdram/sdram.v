@@ -54,7 +54,7 @@ sdram_top uut(
 	.wb_clk		( wb_clk		),
 	.wb_stb		( wb_stb		),
 	.wb_cyc		( wb_cyc		),
-	.wb_we		( wb_wr			),
+	.wb_we		( wb_we			),
 	.wb_ack		( wb_ack		),
 	.wb_sel		( wb_sel		),
 	.wb_adr		( wb_adr		),

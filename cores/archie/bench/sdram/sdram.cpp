@@ -17,7 +17,7 @@ vluint64_t main_time = 0;       // Current simulation time
 // This is a 64-bit integer to reduce wrap over issues and
 // allow modulus.  You can also use a double, if you wish.
 double sc_time_stamp () {       // Called by $time in Verilog
-    return main_time;           // converts to double, to match
+    return (double)main_time*3.8;      // converts to double, to match
     // what SystemC does
 }
 
@@ -30,10 +30,10 @@ void tick()
             uut->RESET = 0;   // Deassert reset
         }
 
-        uut->DRAM_CLK = uut->DRAM_CLK ? 0 : 1;       // Toggle clock
+        uut->DRAM_CLK = uut->DRAM_CLK ? 0 : 1;   // Toggle SDRAM clock
         DRAM_CLK.Update(uut->DRAM_CLK);
-        
-        if ((main_time % 4) == 0)
+
+        if ((main_time % 3) == 0)
         {
             uut->wb_clk = uut->wb_clk ? 0 : 1;       // Toggle clock
             wb_clk.Update(uut->wb_clk);
@@ -43,7 +43,7 @@ void tick()
 
         if (tfp != NULL)
         {
-            tfp->dump(main_time);
+            tfp->dump(main_time*3.8);
         }
 
         main_time++;            // Time passes...

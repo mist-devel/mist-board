@@ -88,7 +88,7 @@ end
 
 localparam CYCLE_RAS_START = 4'd1;  
 localparam CYCLE_RFSH_START = CYCLE_RAS_START; 
-localparam CYCLE_CAS0 		= CYCLE_RFSH_START  + RASCAS_DELAY; 
+localparam CYCLE_CAS0 		= CYCLE_RFSH_START  + RASCAS_DELAY;
 localparam CYCLE_CAS1 		= CYCLE_CAS0 + 4'd1;		
 localparam CYCLE_CAS2 		= CYCLE_CAS1 + 4'd1;		
 localparam CYCLE_CAS3 		= CYCLE_CAS2 + 4'd1;				
@@ -102,8 +102,18 @@ localparam CYCLE_RFSH_END	= CYCLE_RFSH_START + RFC_DELAY;
 
 localparam RAM_CLK		   = 128000000;
 localparam REFRESH_PERIOD  = (RAM_CLK / (16 * 8192)) - CYCLE_END;
+
+`ifdef VERILATOR
+reg [15:0] sd_q;
+assign sd_dq = (sd_writing && (sd_cycle == CYCLE_CAS1 || sd_cycle == CYCLE_CAS2)) ? sd_q : 16'bZZZZZZZZZZZZZZZZ;
+`endif
  
 always @(posedge sd_clk) begin 
+
+`ifndef VERILATOR
+		sd_dq <= 16'bZZZZZZZZZZZZZZZZ;
+`endif
+	sd_cmd <= CMD_NOP;
 
 	if (sd_rst) begin 
 		t			<= 4'd0;
@@ -111,7 +121,6 @@ always @(posedge sd_clk) begin
 		sd_addr	<= 13'd0;
 		sd_ready  <= 0;
 	end else begin
-		sd_dq <= 16'bZZZZZZZZZZZZZZZZ;
 		if (!sd_ready) begin
 			t <= t + 4'd1;
 
@@ -145,7 +154,6 @@ always @(posedge sd_clk) begin
 			// bring the wishbone bus signal into the ram clock domain.
 
 			sd_we	<= wb_we;
-			sd_cmd	<= CMD_INHIBIT;
 			if (wb_stb & wb_cyc & ~wb_ack) begin 
 				sd_stb	<= wb_stb;
 				sd_cyc	<= wb_cyc;
@@ -179,7 +187,6 @@ always @(posedge sd_clk) begin
 
 				// while the cycle is active count.
 				sd_cycle <= sd_cycle + 3'd1;
-				//sd_cmd		<= CMD_NOP;
 				case (sd_cycle)
 				CYCLE_RAS_START: begin 
 					sd_cmd 	<= CMD_ACTIVE;
@@ -203,7 +210,11 @@ always @(posedge sd_clk) begin
 						sd_cmd <= CMD_READ;
 					end else if (sd_writing) begin 
 						sd_cmd		<= CMD_WRITE;
-						sd_dq	 		<= wb_dat_i[15:0];
+`ifdef VERILATOR
+						sd_q		<= wb_dat_i[15:0];
+`else
+						sd_dq		<= wb_dat_i[15:0];
+`endif
 					end
 				end
 
@@ -219,7 +230,11 @@ always @(posedge sd_clk) begin
 						end
 					end else if (sd_writing) begin 
 						sd_cmd		<= CMD_WRITE;
+`ifdef VERILATOR
+						sd_q        <= wb_dat_i[31:16];
+`else
 						sd_dq 		<= wb_dat_i[31:16];
+`endif
 						sd_done		<= 1'b1;
 					end 
 				end
