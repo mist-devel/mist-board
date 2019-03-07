@@ -79,6 +79,10 @@ reg [3:0] 	sd_cmd 	= 4'd0;   // current command sent to sd ram
 reg [9:0]	sd_refresh = 10'd0;
 reg			sd_auto_refresh = 1'b0; 
 wire		sd_req = wb_stb & wb_cyc & ~wb_ack;
+reg  [11:0] sd_active_row[3:0];
+reg   [3:0] sd_bank_active;
+wire  [1:0] sd_bank = wb_adr[22:21];
+wire [11:0] sd_row = wb_adr[20:9];
 
 initial begin 
 	t			= 4'd0;
@@ -87,7 +91,8 @@ initial begin
 	sd_cmd 		= CMD_INHIBIT;
 end
 
-localparam CYCLE_RAS_START = 4'd0;  
+localparam CYCLE_PRECHARGE  = 4'd0;
+localparam CYCLE_RAS_START  = 4'd3;
 localparam CYCLE_RFSH_START = CYCLE_RAS_START; 
 localparam CYCLE_CAS0 		= CYCLE_RAS_START  + RASCAS_DELAY;
 localparam CYCLE_CAS1 		= CYCLE_CAS0 + 4'd1;		
@@ -168,12 +173,17 @@ always @(posedge sd_clk) begin
 			if ((sd_refresh > REFRESH_PERIOD) && (sd_cycle == 4'd0)) begin 
 				sd_auto_refresh <= 1'b1;
 				sd_refresh		<= 10'd0;
-				sd_cmd	<= CMD_AUTO_REFRESH;
+				sd_cmd			<= CMD_PRECHARGE;
+				sd_addr[10]		<= 1;
+				sd_bank_active	<= 0;
 			end else if (sd_auto_refresh) begin 
 				// while the cycle is active count.
 				sd_cycle <= sd_cycle + 3'd1;
 				case (sd_cycle) 
-				CYCLE_RFSH_END: begin 
+				CYCLE_RFSH_START: begin
+					sd_cmd <= CMD_AUTO_REFRESH;
+				end
+				CYCLE_RFSH_END: begin
 					// reset the count.
 					sd_auto_refresh <= 1'b0;
 					sd_cycle <= 4'd0;
@@ -185,10 +195,24 @@ always @(posedge sd_clk) begin
 				// while the cycle is active count.
 				sd_cycle <= sd_cycle + 3'd1;
 				case (sd_cycle)
+				CYCLE_PRECHARGE: begin
+					if (~sd_bank_active[sd_bank])
+						sd_cycle	<= CYCLE_RAS_START;
+					else if (sd_active_row[sd_bank] == sd_row)
+						sd_cycle	<= CYCLE_CAS0 - 1'd1; // FIXME: Why doesn't work without -1?
+					else begin
+						sd_cmd		<= CMD_PRECHARGE;
+						sd_addr[10] <= 0;
+						sd_ba		<= sd_bank;
+					end
+				end
+
 				CYCLE_RAS_START: begin 
 					sd_cmd 	<= CMD_ACTIVE;
-					sd_addr	<= { 1'b0, wb_adr[20:9] };
-					sd_ba 	<= wb_adr[22:21];
+					sd_addr	<= { 1'b0, sd_row };
+					sd_ba 	<= sd_bank;
+					sd_active_row[sd_bank] <= sd_row;
+					sd_bank_active[sd_bank] <= 1;
 
 					if(sd_reading) begin 
 						sd_dqm <= 2'b00;
@@ -201,7 +225,8 @@ always @(posedge sd_clk) begin
 				CYCLE_CAS0: begin 
 					// always, always read on a 32bit boundary and completely ignore the lsb of wb_adr.
 					sd_addr <= { 4'b0000, wb_adr[23], wb_adr[8:2], 1'b0 };  // no auto precharge
-					sd_dqm		<= ~wb_sel[1:0];
+					sd_dqm	<= ~wb_sel[1:0];
+					sd_ba 	<= sd_bank;
 
 					if (sd_reading) begin 
 						sd_cmd <= CMD_READ;
@@ -217,12 +242,11 @@ always @(posedge sd_clk) begin
 
 				CYCLE_CAS1: begin 
 					// now we access the second part of the 32 bit location.
-					sd_addr <= { 4'b0010, wb_adr[23], wb_adr[8:2], 1'b1 };  // auto precharge
+					sd_addr <= { 4'b0000, wb_adr[23], wb_adr[8:2], 1'b1 };  // no auto precharge
 					sd_dqm		<= ~wb_sel[3:2];
 					if (sd_reading) begin 
 						sd_cmd <= CMD_READ;
 						if (burst_mode & can_burst) begin 
-							sd_addr[10] <= 1'b0;
 							sd_burst <= 1'b1; 
 						end
 					end else if (sd_writing) begin
@@ -250,7 +274,7 @@ always @(posedge sd_clk) begin
 				CYCLE_CAS3: begin 
 					if (sd_burst) begin 
 						// always, always read on a 32bit boundary and completely ignore the lsb of wb_adr.
-						sd_addr	<= { 4'b0010, wb_adr[23], wb_adr[8:3], 2'b11 };  // no auto precharge
+						sd_addr	<= { 4'b0000, wb_adr[23], wb_adr[8:3], 2'b11 };  // no auto precharge
 						sd_dqm	<= ~wb_sel[3:2];
 						if (sd_reading) begin 
 							sd_cmd <= CMD_READ;
