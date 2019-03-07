@@ -78,6 +78,7 @@ reg [3:0] 	sd_cmd 	= 4'd0;   // current command sent to sd ram
 
 reg [9:0]	sd_refresh = 10'd0;
 reg			sd_auto_refresh = 1'b0; 
+wire		sd_req = wb_stb & wb_cyc & ~wb_ack;
 
 initial begin 
 	t			= 4'd0;
@@ -86,9 +87,9 @@ initial begin
 	sd_cmd 		= CMD_INHIBIT;
 end
 
-localparam CYCLE_RAS_START = 4'd1;  
+localparam CYCLE_RAS_START = 4'd0;  
 localparam CYCLE_RFSH_START = CYCLE_RAS_START; 
-localparam CYCLE_CAS0 		= CYCLE_RFSH_START  + RASCAS_DELAY;
+localparam CYCLE_CAS0 		= CYCLE_RAS_START  + RASCAS_DELAY;
 localparam CYCLE_CAS1 		= CYCLE_CAS0 + 4'd1;		
 localparam CYCLE_CAS2 		= CYCLE_CAS1 + 4'd1;		
 localparam CYCLE_CAS3 		= CYCLE_CAS2 + 4'd1;				
@@ -96,8 +97,7 @@ localparam CYCLE_READ0	   	= CYCLE_CAS0 + CAS_LATENCY + 4'd1;
 localparam CYCLE_READ1	   	= CYCLE_READ0+ 1'd1;
 localparam CYCLE_READ2	   	= CYCLE_READ1+ 1'd1;
 localparam CYCLE_READ3	   	= CYCLE_READ2+ 1'd1;
-localparam CYCLE_END	   	= 4'hF;
-localparam CYCLE_WR_END		= CYCLE_CAS1 + 4'd4;
+localparam CYCLE_END	   	= CYCLE_READ3+ 1'd1;
 localparam CYCLE_RFSH_END	= CYCLE_RFSH_START + RFC_DELAY; 
 
 localparam RAM_CLK		   = 128000000;
@@ -107,7 +107,7 @@ localparam REFRESH_PERIOD  = (RAM_CLK / (16 * 8192)) - CYCLE_END;
 reg [15:0] sd_q;
 assign sd_dq = (sd_writing && (sd_cycle == CYCLE_CAS1 || sd_cycle == CYCLE_CAS2)) ? sd_q : 16'bZZZZZZZZZZZZZZZZ;
 `endif
- 
+
 always @(posedge sd_clk) begin 
 
 `ifndef VERILATOR
@@ -154,7 +154,7 @@ always @(posedge sd_clk) begin
 			// bring the wishbone bus signal into the ram clock domain.
 
 			sd_we	<= wb_we;
-			if (wb_stb & wb_cyc & ~wb_ack) begin 
+			if (sd_req) begin 
 				sd_stb	<= wb_stb;
 				sd_cyc	<= wb_cyc;
 			end
@@ -168,14 +168,11 @@ always @(posedge sd_clk) begin
 			if ((sd_refresh > REFRESH_PERIOD) && (sd_cycle == 4'd0)) begin 
 				sd_auto_refresh <= 1'b1;
 				sd_refresh		<= 10'd0;
+				sd_cmd	<= CMD_AUTO_REFRESH;
 			end else if (sd_auto_refresh) begin 
 				// while the cycle is active count.
 				sd_cycle <= sd_cycle + 3'd1;
 				case (sd_cycle) 
-				CYCLE_RFSH_START: begin 
-					sd_cmd	<= CMD_AUTO_REFRESH;
-				end
-
 				CYCLE_RFSH_END: begin 
 					// reset the count.
 					sd_auto_refresh <= 1'b0;
@@ -183,7 +180,7 @@ always @(posedge sd_clk) begin
 				end
 				endcase
 
-			end else if (sd_cyc | (sd_cycle != 0)) begin 
+			end else if (sd_cyc | (sd_cycle != 0) | (sd_cycle == 0 && sd_req)) begin 
 
 				// while the cycle is active count.
 				sd_cycle <= sd_cycle + 3'd1;
@@ -228,14 +225,14 @@ always @(posedge sd_clk) begin
 							sd_addr[10] <= 1'b0;
 							sd_burst <= 1'b1; 
 						end
-					end else if (sd_writing) begin 
+					end else if (sd_writing) begin
 						sd_cmd		<= CMD_WRITE;
+						sd_done		<= ~sd_done;
 `ifdef VERILATOR
 						sd_q        <= wb_dat_i[31:16];
 `else
 						sd_dq 		<= wb_dat_i[31:16];
 `endif
-						sd_done		<= 1'b1;
 					end 
 				end
 				
@@ -257,28 +254,22 @@ always @(posedge sd_clk) begin
 						sd_dqm	<= ~wb_sel[3:2];
 						if (sd_reading) begin 
 							sd_cmd <= CMD_READ;
-						end  
+						end
 					end
 				end
 
 				CYCLE_READ0: begin 
-					if (sd_writing) begin
-						// if we are writing then the sd_done signal has been high for 
-						// enough clock cycles. we can end the cycle here. 
-						sd_done <= 1'b0;
-						sd_cycle <= 4'd0;
-						sd_cyc <= 1'b0;
-						sd_stb <= 1'b0;
-					end
 					if (sd_reading) begin 
 					        sd_dat[15:0] <= sd_dq;
-					end 
+					end else begin
+						if (sd_writing) sd_cycle <= CYCLE_END;
+					end
 				end
 
 				CYCLE_READ1: begin 
 					if (sd_reading) begin 
 						sd_dat[31:16] <= sd_dq;
-						sd_done			<= 1'b1;
+						sd_done <= ~sd_done;
 					end
 				end
 
@@ -296,13 +287,11 @@ always @(posedge sd_clk) begin
 
 				CYCLE_END: begin 
 					sd_burst <= 1'b0;
-					sd_done 	<= 1'b0;
 					sd_cyc <= 1'b0;
 					sd_stb <= 1'b0;
 				end
 				endcase
 			end else begin
-				sd_done		<= 1'd0;
 				sd_cycle 	<= 4'd0;
 				sd_burst <= 1'b0;
 			end
@@ -313,12 +302,14 @@ end
 reg wb_burst;
 
 always @(posedge wb_clk) begin 
+	reg sd_doneD;
 	
-	wb_ack	<= sd_done & ~wb_ack;
+	sd_doneD <= sd_done;
+	wb_ack	<= (sd_done ^ sd_doneD) & ~wb_ack;
 	
 	if (wb_stb & wb_cyc) begin 
 	
-		if (sd_done & ~wb_ack) begin 
+		if ((sd_done ^ sd_doneD) & ~wb_ack) begin 
 	
 			wb_dat_o <= sd_dat;
 			wb_burst <= burst_mode;
