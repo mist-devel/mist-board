@@ -74,7 +74,7 @@ use work.T80_Pack.all;
 
 entity GBse is
 	generic(
-		T2Write : integer := 0;  -- 0 => WR_n active in T3, /=0 => WR_n active in T2
+		T2Write : integer := 1;  -- 0 => WR_n active in T3, /=0 => WR_n active in T2
 		IOWait : integer := 1   -- 0 => Single cycle I/O, 1 => Std I/O cycle
 	);
 	port(
