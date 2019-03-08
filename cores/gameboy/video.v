@@ -38,6 +38,7 @@ module video (
 	output lcd_clkena,
 	output [14:0] lcd_data,
 	output reg irq,
+	output reg vblank_irq,
 	
 	// vram connection
 	output [1:0] mode,
@@ -57,6 +58,7 @@ module video (
 localparam STAGE2  = 9'd250;   // oam + disp + pause
 localparam OAM_LEN = 80;
 localparam OAM_LEN16 = OAM_LEN/16;
+localparam MODE3_OFFSET = 8'd16;
 
 wire sprite_pixel_active;
 wire [1:0] sprite_pixel_data;
@@ -108,7 +110,7 @@ sprites sprites (
 
 // give dma access to oam
 wire [7:0] oam_addr = dma_active?dma_addr[7:0]:cpu_addr;
-wire oam_wr = dma_active?(dma_cnt[1:0] == 2):(cpu_wr && cpu_sel_oam);
+wire oam_wr = dma_active?(dma_cnt[1:0] == 2):(cpu_wr && cpu_sel_oam && !(mode==3 || mode==2));
 wire [7:0] oam_di = dma_active?dma_data:cpu_di;
 
 
@@ -140,6 +142,7 @@ wire [7:0] ly = v_cnt;
 // ff45 line counter compare
 wire lyc_match = (ly == lyc);
 reg [7:0] lyc;
+reg lyc_changed=0;
 
 reg [7:0] bgp;
 reg [7:0] obp0;
@@ -195,12 +198,14 @@ end
 // ------------------------------- IRQs -------------------------------
 // --------------------------------------------------------------------
 
-always @(posedge clk_reg) begin  //TODO: have to check if this is correct
+always @(posedge clk_reg) begin
 	irq <= 1'b0;
+	vblank_irq <= 1'b0;
 	
-	//TODO: investigate and fix timing of lyc=ly
-	// lyc=ly coincidence
-	if(stat[6] && (h_cnt == 1) && lyc_match)
+	if(stat[6] && h_cnt == 0 && lyc_match)
+		irq <= 1'b1;
+		
+	if(stat[6] && lyc_changed == 1 && h_cnt > 0 && lyc_match)
 		irq <= 1'b1;
 		
 	// begin of oam phase
@@ -208,8 +213,11 @@ always @(posedge clk_reg) begin  //TODO: have to check if this is correct
 		irq <= 1'b1;
 
 	// begin of vblank
-	if(stat[4] && (h_cnt == 455) && (v_cnt == 143))
-		irq <= 1'b1;
+	if((h_cnt == 455) && (v_cnt == 143)) begin
+		if (stat[4])
+			irq <= 1'b1;
+		vblank_irq <= 1'b1;
+	end
 
 	// begin of hblank
 	if(stat[3] && (h_cnt == OAM_LEN + 160 + hextra))
@@ -243,6 +251,7 @@ always @(posedge clk_reg) begin
 		end
 		
 	end else begin
+	   lyc_changed<=0;
 		if(cpu_sel_reg && cpu_wr) begin
 			case(cpu_addr) 
 				8'h40:	lcdc <= cpu_di;
@@ -250,7 +259,10 @@ always @(posedge clk_reg) begin
 				8'h42:	scy <= cpu_di;
 				8'h43:	scx <= cpu_di;
 				// a write to 4 is supposed to reset the v_cnt
-				8'h45:	lyc <= cpu_di;
+				8'h45:	begin
+								lyc <= cpu_di;
+								lyc_changed<=1;
+							end
 				8'h46:	dma <= cpu_di;
 				8'h47:	bgp <= cpu_di;
 				8'h48:	obp0 <= cpu_di;
@@ -264,20 +276,23 @@ always @(posedge clk_reg) begin
 							bgpi_ai <= cpu_di[7];
 						 end
 				8'h69: begin
-							bgpd[bgpi] <= cpu_di;
-							if (bgpi_ai)
-							  bgpi <= bgpi + 6'h1;
+							if (mode != 3) begin
+								bgpd[bgpi] <= cpu_di;
+								if (bgpi_ai)
+									bgpi <= bgpi + 6'h1;
+							end
 						 end
 				8'h6A: begin
 							obpi <= cpu_di[5:0];
 							obpi_ai <= cpu_di[7];
 						 end
 				8'h6B: begin
-							obpd[obpi] <= cpu_di;
-							if (obpi_ai)
-							  obpi <= obpi + 6'h1;
+							if (mode != 3) begin
+								obpd[obpi] <= cpu_di;
+								if (obpi_ai)
+								  obpi <= obpi + 6'h1;
+							end
 						 end
-
 			endcase
 		end
 	end
@@ -299,9 +314,9 @@ assign cpu_do =
 	(cpu_addr == 8'h4b)?wx:
 	isGBC?
 		(cpu_addr == 8'h68)?{bgpi_ai,1'd0,bgpi}:
-		(cpu_addr == 8'h69)?bgpd[bgpi]:
+		(cpu_addr == 8'h69 && mode != 3)?bgpd[bgpi]:
 		(cpu_addr == 8'h6a)?{obpi_ai,1'd0,obpi}:
-		(cpu_addr == 8'h6b)?obpd[obpi]:
+		(cpu_addr == 8'h6b && mode != 3)?obpd[obpi]:
 		8'hff:
 	8'hff;
 	
@@ -351,14 +366,25 @@ wire [14:0] sprite_pix = isGBC?{obpd[sprite_palette_index+1][6:0],obpd[sprite_pa
 // - there's a sprite at the current position
 // - the sprites prioroty bit is 0, or
 // - the sprites priority is 1 and the backrgound color is 00
-// - GBC : BG priority is 0 
+// - GBC : BG priority is 0
+// - GBC : BG priority is 1 and the backrgound color is 00
 
 wire bg_piority = isGBC&&stage2_bgp_buffer_pix[stage2_rptr][3];
-	
-wire sprite_pixel_visible = 
-	sprite_pixel_active && lcdc_spr_ena && (~bg_piority) &&
-	((!sprite_pixel_prio) || (stage2_buffer[stage2_rptr] == 2'b00));
-	
+wire [1:0] bg_color = stage2_buffer[stage2_rptr];
+reg sprite_pixel_visible;
+
+always @(*) begin
+	sprite_pixel_visible = 1'b0;
+
+	if (sprite_pixel_active && lcdc_spr_ena) begin		// pixel active and sprites enabled
+		if (bg_color == 2'b00)													// background color = 0
+			sprite_pixel_visible = 1'b1;
+		else if (!bg_piority && !sprite_pixel_prio)   	// sprite has priority enabled and background priority disabled
+			sprite_pixel_visible = 1'b1;
+
+	end
+end
+
 always @(posedge clk) begin
 	if(h_cnt == 455) begin
 		stage2_wptr <= 8'h00;
@@ -462,9 +488,9 @@ wire vblank  = (v_cnt >= 144);
 
 // x scroll & 7 needs one more memory read per line
 reg [1:0] hextra_tiles;
-wire [7:0] hextra = { 3'b000, hextra_tiles, 3'b000 };
+wire [7:0] hextra = { 3'b000, hextra_tiles, 3'b000 }+MODE3_OFFSET;
 wire hblank  = ((h_cnt < OAM_LEN) || (h_cnt >= 160+OAM_LEN+hextra));
-wire oam     = (h_cnt < OAM_LEN);                            // 80 clocks oam
+wire oam     = (h_cnt <= OAM_LEN);                            // 80 clocks oam
 wire stage2  = ((h_cnt >= STAGE2) && (h_cnt < STAGE2+160));  // output out of stage2
 
 // first valid pixels are delivered 8 clocks after end of hblank
@@ -546,6 +572,7 @@ wire bg_tile_obj_rd = (!vblank) && (!hblank) && (h_cnt[2:1] == 2'b11);
 // Mode 10:  oam
 // Mode 11:  oam and vram
 assign mode = 
+	(ly <= 144 && h_cnt<4)?2'b00:  //AntonioND https://github.com/AntonioND/giibiiadvance/blob/master/docs/TCAGBD.pdf
    !lcdc_on?2'b00:
 	vblank?2'b01:
 	oam?2'b10:
@@ -565,11 +592,11 @@ wire win_start = lcdc_win_ena && (v_cnt >= wy_r) && de && (wx_r >= 7) && (pcnt =
 
 
 // each memory access takes two cycles
-always @(negedge clk or negedge lcdc_on) begin
+always @(negedge clk) begin
 
 	if (!lcdc_on) begin // don't increase counters if lcdoff 
 		//reset counters
-		h_cnt <= 9'd0;  
+		h_cnt <= 9'd6;  
 		v_cnt <= 8'd0;
 		
 	end else begin

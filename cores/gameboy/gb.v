@@ -115,11 +115,11 @@ wire [7:0] cpu_di =
 		sel_sc?sc_r:				// serial transfer control register
 		sel_timer?timer_do:     // timer registers
 		sel_video_reg?video_do: // video registers
-		sel_video_oam?video_do: // video object attribute memory
+		(sel_video_oam&&!(lcd_mode==3 || lcd_mode==2))?video_do: // video object attribute memory
 		sel_audio?audio_do:                                // audio registers
 		sel_rom?rom_do:                                    // boot rom + cartridge rom
 		sel_cram?rom_do:                                   // cartridge ram
-		sel_vram?(isGBC&&vram_bank)?vram1_do:vram_do:       // vram (GBC bank 0+1)
+		(sel_vram&&lcd_mode!=3)?(isGBC&&vram_bank)?vram1_do:vram_do:       // vram (GBC bank 0+1)
 		sel_zpram?zpram_do:     // zero page ram
 		sel_iram?iram_do:       // internal ram
 		sel_ie?{3'b000, ie_r}:  // interrupt enable register
@@ -131,7 +131,7 @@ wire cpu_iorq_n;
 wire cpu_m1_n;
 wire cpu_mreq_n;
 
-wire cpu_clken = isGBC ? !hdma_rd:1'b1;  //when hdma is enabled stop CPU (GBC)
+wire cpu_clken = isGBC ? !hdma_active:1'b1;  //when hdma is enabled stop CPU (GBC)
 wire cpu_stop;
 	
 GBse cpu (
@@ -278,8 +278,8 @@ wire [7:0] irq_vec =
 			if_r[4]&&ie_r[4]?8'h60:   // input
 			8'h55;
 
-wire vs = (lcd_mode == 2'b01);
-reg vsD, vsD2;
+//wire vs = (lcd_mode == 2'b01);
+//reg vsD, vsD2;
 reg [7:0] inputD, inputD2;
 
 // irq is low when an enable irq is active
@@ -296,9 +296,9 @@ always @(negedge clk_cpu) begin //negedge to trigger interrupt earlier
 	end
 
 	// rising edge on vs
-	vsD <= vs;
-	vsD2 <= vsD;
-	if(vsD && !vsD2) if_r[0] <= 1'b1;
+//	vsD <= vs;
+//	vsD2 <= vsD;
+	if(vblank_irq) if_r[0] <= 1'b1;
 
 	// video irq already is a 1 clock event
 	if(video_irq) if_r[1] <= 1'b1;
@@ -359,7 +359,7 @@ timer timer (
 // --------------------------------------------------------------------
 
 // cpu tries to read or write the lcd controller registers
-wire video_irq;
+wire video_irq,vblank_irq;
 wire [7:0] video_do;
 wire [12:0] video_addr;
 wire [15:0] dma_addr;
@@ -375,6 +375,8 @@ video video (
 	
 
 	.irq         ( video_irq     ),
+	.vblank_irq  ( vblank_irq    ),
+
 
 	.cpu_sel_reg ( sel_video_reg ),
 	.cpu_sel_oam ( sel_video_oam ),
@@ -402,7 +404,7 @@ video video (
 );
 
 // total 8k/16k (CGB) vram from $8000 to $9fff
-wire cpu_wr_vram = sel_vram && !cpu_wr_n;
+wire cpu_wr_vram = sel_vram && !cpu_wr_n && lcd_mode!=3;
 
 reg vram_bank; //0-1 FF4F - VBK
 
@@ -453,10 +455,12 @@ wire [15:0] hdma_source_addr;
 wire [15:0] hdma_target_addr;
 wire [7:0] hdma_do;
 wire hdma_rd;
+wire hdma_active;
 
 hdma hdma(
 	.reset	          ( reset         ),
 	.clk		          ( clk2x         ),
+	.speed				 ( cpu_speed     ),
 	
 	// cpu register interface
 	.sel_reg 	       ( sel_hdma      ),
@@ -469,6 +473,7 @@ hdma hdma(
 	
 	// dma connection
 	.hdma_rd           ( hdma_rd          ),
+	.hdma_active       ( hdma_active      ),
 	.hdma_source_addr  ( hdma_source_addr ),
 	.hdma_target_addr  ( hdma_target_addr ) 
 	
