@@ -67,8 +67,8 @@ wire kbd_in_strobe;
 // generated clocks
 wire clk_pix;
 wire ce_pix;
-wire clk_32m /* synthesis keep */ ;
-wire clk_128m /* synthesis keep */ ;
+wire clk_sys /* synthesis keep */ ;
+wire clk_mem /* synthesis keep */ ;
 //wire clk_8m  /* synthesis keep */ ;
 
 wire pll_ready;
@@ -106,9 +106,8 @@ wire       ypbpr;
 
 clockgen CLOCKS(
 	.inclk0	(CLOCK_27[0]),
-	.c0		(clk_32m),
-	.c1		(clk_128m),
-//	.c2     (clk_50m),
+	.c0		(clk_sys), // 40 MHz
+	.c1		(clk_mem), // 120 MHz
 	.c3		(DRAM_CLK),
 	.locked	(pll_ready)  // pll locked output
 );
@@ -147,7 +146,7 @@ wire       q_reconfig_36;
 rom_reconfig_25 rom_reconfig_25
 (
 	.address(pll_rom_address),
-	.clock(CLOCK_27[0]),
+	.clock(clk_sys),
 	.rden(pll_write_rom_ena),
 	.q(q_reconfig_25)
 );
@@ -155,7 +154,7 @@ rom_reconfig_25 rom_reconfig_25
 rom_reconfig_24 rom_reconfig_24
 (
 	.address(pll_rom_address),
-	.clock(CLOCK_27[0]),
+	.clock(clk_sys),
 	.rden(pll_write_rom_ena),
 	.q(q_reconfig_24)
 );
@@ -163,7 +162,7 @@ rom_reconfig_24 rom_reconfig_24
 rom_reconfig_36 rom_reconfig_36
 (
 	.address(pll_rom_address),
-	.clock(CLOCK_27[0]),
+	.clock(clk_sys),
 	.rden(pll_write_rom_ena),
 	.q(q_reconfig_36)
 );
@@ -174,7 +173,7 @@ assign pll_rom_q = pixbaseclk_select == 2'b01 ? q_reconfig_25 :
 pll_reconfig pll_reconfig_inst
 (
     .busy(pll_reconfig_busy),
-    .clock(CLOCK_27[0]),
+    .clock(clk_sys),
     .counter_param(0),
     .counter_type(0),
     .data_in(0),
@@ -197,7 +196,7 @@ pll_reconfig pll_reconfig_inst
     .write_rom_ena(pll_write_rom_ena)
 );
 
-always @(posedge CLOCK_27[0]) begin
+always @(posedge clk_sys) begin
     reg [1:0] pixbaseclk_select_d;
     reg [1:0] pll_reconfig_state = 0;
     reg [9:0] pll_reconfig_timeout;
@@ -237,7 +236,7 @@ end
 
 wire [5:0] osd_r_o, osd_g_o, osd_b_o;
 
-osd #(0,0,4) OSD (
+osd #(10'd0,10'd0,4) OSD (
    .clk_sys    ( clk_pix      ),
 
    // spi for OSD
@@ -296,7 +295,7 @@ assign SPI_DO = (CONF_DATA0==0)?user_io_sdo:1'bZ;
 wire user_io_sdo;
 user_io user_io(
    // the spi interface
-   .clk_sys       ( clk_32m         ),
+   .clk_sys       ( clk_sys         ),
    .SPI_CLK       (SPI_SCK          ),
    .SPI_SS_IO     (CONF_DATA0       ),
    .SPI_MISO      (user_io_sdo           ),   // tristate handling inside user_io
@@ -331,7 +330,7 @@ user_io user_io(
 	.img_size       ( img_size       )
 );
 
-data_io # ( .START_ADDR(26'h40_0000) )
+data_io # ( .START_ADDR(24'h40_0000) )
 DATA_IO  (
 	.sck				( SPI_SCK 			),
 	.ss				( SPI_SS2			),
@@ -342,7 +341,7 @@ DATA_IO  (
 	.index          ( dio_index ),
 
 	// ram interface
-   .clk     		( clk_32m			),
+   .clk     		( clk_sys			),
 	.wr    			( loader_we			),
 	.a					( loader_addr		),
 	.sel				( loader_sel		),
@@ -366,7 +365,7 @@ wire 			i2c_din, i2c_dout, i2c_clock;
 
 archimedes_top ARCHIMEDES(
 	
-	.CLKCPU_I	( clk_32m			),
+	.CLKCPU_I	( clk_sys			),
 	.CLKPIX_I	( clk_pix			), // pixel clock for OSD
 	.CEPIX_O	( ce_pix			),
 	
@@ -432,7 +431,7 @@ wire [25:0] ram_address/* synthesis keep */ ;
 sdram_top SDRAM(
 			
 		// wishbone interface
-		.wb_clk		( clk_32m		),
+		.wb_clk		( clk_sys		),
 		.wb_stb		( ram_stb		),
 		.wb_cyc		( ram_cyc		),
 		.wb_we		( ram_we		),
@@ -445,7 +444,7 @@ sdram_top SDRAM(
 		.wb_cti		( core_cti_o	),
 				
 		// SDRAM Interface
-		.sd_clk		( clk_128m		),
+		.sd_clk		( clk_mem		),
 		.sd_rst		( ~pll_ready	),
 		.sd_cke		( DRAM_CKE		),
 
@@ -461,7 +460,7 @@ sdram_top SDRAM(
 );
 	
 i2cSlaveTop CMOS (
-	.clk		( clk_32m		),
+	.clk		( clk_sys		),
 	.rst		( ~pll_ready	),
 	.sdaIn	    ( i2c_din		),
 	.sdaOut	    ( i2c_dout		),
@@ -480,7 +479,7 @@ audio	AUDIO	(
 	.audio_r		( AUDIO_R		)
 );
 
-always @(posedge clk_32m) begin 
+always @(posedge clk_sys) begin 
 	reg loader_active_old;
     loader_active_old <= loader_active;
 

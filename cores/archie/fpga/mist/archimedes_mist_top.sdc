@@ -100,8 +100,8 @@ set_false_path -to [get_ports {LED}]
 # Set Multicycle Path
 #**************************************************************
 
-set_multicycle_path -from [get_clocks {CLOCKS|altpll_component|auto_generated|pll1|clk[0]}] -to [get_clocks {CLOCKS|altpll_component|auto_generated|pll1|clk[1]}] -setup 4
-set_multicycle_path -from [get_clocks {CLOCKS|altpll_component|auto_generated|pll1|clk[0]}] -to [get_clocks {CLOCKS|altpll_component|auto_generated|pll1|clk[1]}] -hold 3
+set_multicycle_path -from [get_clocks {CLOCKS|altpll_component|auto_generated|pll1|clk[0]}] -to [get_clocks {CLOCKS|altpll_component|auto_generated|pll1|clk[1]}] -setup 3
+set_multicycle_path -from [get_clocks {CLOCKS|altpll_component|auto_generated|pll1|clk[0]}] -to [get_clocks {CLOCKS|altpll_component|auto_generated|pll1|clk[1]}] -hold 2
 
 set_multicycle_path -to {VGA_*[*]} -setup 4
 set_multicycle_path -to {VGA_*[*]} -hold 3

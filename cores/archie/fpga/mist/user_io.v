@@ -227,7 +227,7 @@ always @(posedge clk_sys) begin
 	reg       spi_transfer_end;
 	reg       spi_receiver_strobeD;
 	reg       spi_transfer_endD;
-	reg       sd_wrD;
+	reg [1:0] sd_wrD;
 	reg [7:0] acmd;
 	reg [7:0] abyte_cnt;   // counts bytes
 
@@ -245,7 +245,7 @@ always @(posedge clk_sys) begin
     sd_din_strobe<= 0;
     sd_wrD <= sd_wr;
     // fetch the first byte immediately after the write command seen
-    if (~sd_wrD & sd_wr) begin
+    if ((~sd_wrD[0] & sd_wr[0]) || (~sd_wrD[1] & sd_wr[1])) begin
         sd_buff_addr <= 0;
         sd_din_strobe <= 1;
     end

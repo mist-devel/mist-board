@@ -127,6 +127,12 @@ localparam REG_SendN		= 3'b101;
 localparam REG_Sptr	= 3'b110;
 localparam REG_Ctrl	= 3'b111;
 
+wire       table_valid;
+wire       err;
+wire       memw;
+wire       logcs;
+wire       vidc_cs;
+wire       mem_virtual;
 wire[25:0] phys_address;
 
 memc_translator PAGETABLES(
@@ -332,12 +338,12 @@ always @(posedge clkcpu) begin
 			if ((vidak & vid_load) == 1'b1) begin 
 		
 					// advance the pointer to the next location.
-					vid_address <= vid_address + 4;
+					vid_address <= vid_address + 4'd4;
 					
 			end else if ((vidak & cur_load) == 1'b1) begin 
 			
 				// advance the cursor pointer to the next location.
-				cur_address <= cur_address + 4;
+				cur_address <= cur_address + 4'd4;
 
 			end 
 		
@@ -358,7 +364,7 @@ always @(posedge clkcpu) begin
            if ((sndak & snd_load) == 1'b1) begin 
 		
 				// advance the pointer to the next location.
-				snd_sptr <= snd_sptr + 4;
+				snd_sptr <= snd_sptr + 4'd4;
 		   end 
            
         end else begin 

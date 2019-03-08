@@ -159,7 +159,7 @@ module mt48lc16m16a2 (Dq, Addr, Ba, Clk, Cke, Cs_n, Ras_n, Cas_n, We_n, Dqm);
     `define   A_REF     5
     `define   BST       6
     `define   LMR       7
-
+/*
     // Timing Parameters for -7E PC133 CL2
     parameter tAC  =   5.4;
     parameter tHZ  =   5.4;
@@ -173,6 +173,20 @@ module mt48lc16m16a2 (Dq, Addr, Ba, Clk, Cke, Cs_n, Ras_n, Cas_n, We_n, Dqm);
     parameter tRRD =  14.0;
     parameter tWRa =   7.0;     // A2 Version - Auto precharge mode (1 Clk + 7 ns)
     parameter tWRm =  14.0;     // A2 Version - Manual precharge mode (14 ns)
+*/
+    // Timing Parameters for -75 PC133 CL3
+    parameter tAC  =   5.4;
+    parameter tHZ  =   5.4;
+    parameter tOH  =   3.0;
+    parameter tMRD =   2.0;     // 2 Clk Cycles
+    parameter tRAS =  37.0;
+    parameter tRC  =  60.0;
+    parameter tRCD =  20.0;
+    parameter tRFC =  66.0;
+    parameter tRP  =  20.0;
+    parameter tRRD =  15.0;
+    parameter tWRa =   7.5;     // A2 Version - Auto precharge mode (1 Clk + 7.5 ns)
+    parameter tWRm =  15.0;     // A2 Version - Manual precharge mode (15 ns)
 
     // Timing Check variable
     time  MRD_chk;
@@ -425,7 +439,7 @@ end
 
                 // Record variables
                 Act_b0 = 1'b1;
-				//$display ("%m : Bank 0 activated at time %t", $time);
+				$display ("%m : Bank 0 activated at time %t", $time);
                 Pc_b0 = 1'b0;
                 B0_row_addr = Addr [addr_bits - 1 : 0];
                 RAS_chk0 = $time;
@@ -655,7 +669,7 @@ end
                 (Ba == 2'b01) && ($time - RCD_chk1 < tRCD) ||
                 (Ba == 2'b10) && ($time - RCD_chk2 < tRCD) ||
                 (Ba == 2'b11) && ($time - RCD_chk3 < tRCD)) begin
-                $display("%m : at time %t ERROR: tRCD violation during Read", $time);
+                $display("%m : at time %t ERROR: tRCD violation during Read %t %t %t %t", $time, $time-RCD_chk0, $time-RCD_chk1, $time-RCD_chk2, $time-RCD_chk3 );
             end
 
             // CAS Latency pipeline
