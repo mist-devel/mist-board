@@ -456,6 +456,9 @@ end component cartridge;
 	signal hq2x160 : std_logic;
 	signal osdclk : std_logic;
 	signal clkdiv : std_logic_vector(9 downto 0);
+	signal todclk : std_logic;
+	signal toddiv : std_logic_vector(19 downto 0);
+	signal toddiv3 : std_logic_vector(1 downto 0);
 
 	signal ram_ce : std_logic;
 	signal ram_we : std_logic;
@@ -978,6 +981,7 @@ begin
 		pb_in => pb_in,
 		pb_out => pb_out,
 		flag2_n => flag2_n,
+		todclk => todclk,
 		cia_mode => status(4),
 		disk_num => open,
 		c64rom_addr => c64rom_addr,
@@ -1007,6 +1011,25 @@ begin
 			flag2_n <= UART_RX;
 			pb_in(0) <= UART_RX;
 			UART_TX <= pa2_out;
+		end if;
+	end process;
+
+	-- generate TOD clock from stable 32 MHz
+	process(clk32, reset_n)
+	begin
+		if reset_n = '0' then
+			todclk <= '0';
+			toddiv <= (others => '0');
+		elsif rising_edge(clk32) then
+			toddiv <= toddiv + 1;
+			if (ntsc_init_mode_d2 = '1' and toddiv = 266665 and toddiv3 = "00") or
+			   (ntsc_init_mode_d2 = '1' and toddiv = 266666 and toddiv3 /= "00") or
+			    toddiv = 319999 then
+				toddiv <= (others => '0');
+				todclk <= not todclk;
+				toddiv3 <= toddiv3 + 1;
+				if toddiv3 = "10" then toddiv3 <= "00"; end if;
+			end if;
 		end if;
 	end process;
 
