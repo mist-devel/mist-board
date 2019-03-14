@@ -125,6 +125,7 @@ entity fpga64_sid_iec is
 
 		-- CIA
 		cia_mode    : in std_logic;
+		todclk      : in std_logic;
 
 		disk_num    : out std_logic_vector(7 downto 0);
 
@@ -693,7 +694,7 @@ div1m: process(clk32)				-- this process devides 32 MHz to 1MHz (for the SID)
             cnt_out => cnt1_out,
 
             pc_n => open,
-            tod => vicVSync,
+            tod => todclk,
             irq_n => irq_cia1
 		);
 
@@ -723,7 +724,7 @@ div1m: process(clk32)				-- this process devides 32 MHz to 1MHz (for the SID)
             cnt_out => cnt2_out,
 
             pc_n => pc2_n,
-            tod => vicVSync,
+            tod => todclk,
             irq_n => irq_cia2
 		);
 
