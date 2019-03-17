@@ -13,5 +13,5 @@ found in various other repositories like:
   * [Sorgelig's github repository](https://github.com/sorgelig)
   * [Rok Krajnc's github repository](https://github.com/rkrajnc)
   * [Robinsonb5's github repository](https://github.com/robinsonb5)
-  * [Gehstcock's github repository](https://github.com/Gehstock)
+  * [Gehstock's github repository](https://github.com/Gehstock)
   * [Gyurco's github repository](https://github.com/gyurco)
