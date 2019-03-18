@@ -23,8 +23,9 @@
 module sdram (
 
 	// interface to the MT48LC16M16 chip
-	output [12:0]		sd_addr,    // 13 bit multiplexed address bus
-	output [1:0] 		sd_ba,      // two banks
+	output reg [12:0]	sd_addr,    // 13 bit multiplexed address bus
+	inout  reg [15:0]	sd_data,
+	output reg [ 1:0]	sd_ba,      // two banks
 	output 				sd_cs,      // a single chip select
 	output 				sd_we,      // write enable
 	output 				sd_ras,     // row address select
@@ -34,8 +35,10 @@ module sdram (
 	input 		 		init,			// init signal after FPGA config to initialize RAM
 	input 		 		clk,			// sdram is accessed at up to 128MHz
 	
-//	input [15:0]   	addr,       // 25 bit byte address
-	input [24:0]   	addr,       // 25 bit byte address
+	input  [24:0]   	addr,       // 25 bit byte address
+	input  [ 7:0]   	din,
+	output [ 7:0]  		dout,
+
 	input 		 		refresh,    // refresh cycle
 	input 		 		ce,         // cpu/chipset access
 	input 		 		we          // cpu/chipset requests write
@@ -56,8 +59,8 @@ localparam MODE = { 3'b000, NO_WRITE_BURST, OP_MODE, CAS_LATENCY, ACCESS_TYPE, B
 // ---------------------------------------------------------------------
 
 localparam STATE_IDLE      = 3'd0;   // first state in cycle
-localparam STATE_CMD_START = 3'd1;   // state in which a new command can be started
-localparam STATE_CMD_CONT  = STATE_CMD_START  + RASCAS_DELAY - 3'd1; // 4 command can be continued
+localparam STATE_CMD_START = 3'd0;   // state in which a new command can be started
+localparam STATE_CMD_CONT  = STATE_CMD_START  + RASCAS_DELAY; // 2 command can be continued
 localparam STATE_LAST      = 3'd7;   // last state in cycle
 
 reg [2:0] q /* synthesis noprune */;
@@ -104,17 +107,21 @@ localparam CMD_LOAD_MODE       = 4'b0000;
 
 reg [3:0] sd_cmd;   // current command sent to sd ram
 
+assign dout = sd_data[7:0];
+
 // drive control signals according to current command
 assign sd_cs  = sd_cmd[3];
 assign sd_ras = sd_cmd[2];
 assign sd_cas = sd_cmd[1];
 assign sd_we  = sd_cmd[0];
-
-// assign sd_data = we?{din, din}:16'bZZZZZZZZZZZZZZZZ;
-// assign dout = sd_data[7:0];
+wire [12:0] reset_addr = (reset == 13)?13'b0010000000000:MODE;
+wire [12:0] run_addr = (q == STATE_CMD_START)?addr[20:8]:{ 4'b0010, addr[23], addr[7:0]};
 
 always @(posedge clk) begin
-	sd_cmd <= CMD_INHIBIT;
+	sd_cmd  <= CMD_INHIBIT;
+	sd_addr <= (reset != 0)?reset_addr:run_addr;
+	sd_ba   <= addr[22:21];
+	sd_data <= 16'bZZZZZZZZZZZZZZZZ;
 
 	if(reset != 0) begin
 		if(q == STATE_IDLE) begin
@@ -128,20 +135,9 @@ always @(posedge clk) begin
 		end else if((q == STATE_CMD_CONT)&&(!refresh)) begin
 			if(we)		 sd_cmd <= CMD_WRITE;
 			else if(ce)  sd_cmd <= CMD_READ;
+            if(we) sd_data <= {din, din};
 		end
 	end
 end
-	
-wire [12:0] reset_addr = (reset == 13)?13'b0010000000000:MODE;
-	
-wire [12:0] run_addr = 
-//	(q == STATE_CMD_START)?{ 5'b00000, addr[15:8]}:{ 5'b00100, addr[7:0]};
-//(q == STATE_CMD_START)?addr[21:9]:{ 4'b0010, addr[8:0]};  							//possibly try this LCA 6mar17
-	(q == STATE_CMD_START)?addr[20:8]:{ 4'b0010, addr[23], addr[7:0]};
-
-assign sd_addr = (reset != 0)?reset_addr:run_addr;
-
-//assign sd_ba = 2'b00;
-assign sd_ba = addr[22:21];
 
 endmodule

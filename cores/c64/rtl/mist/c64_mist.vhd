@@ -81,6 +81,7 @@ component sdram is port
 (
    -- interface to the MT48LC16M16 chip
    sd_addr    : out   std_logic_vector(12 downto 0);
+   sd_data    : inout std_logic_vector(15 downto 0);
    sd_cs      : out   std_logic;
    sd_ba      : out   std_logic_vector(1 downto 0);
    sd_we      : out   std_logic;
@@ -93,6 +94,8 @@ component sdram is port
 
    -- cpu/chipset interface
    addr       : in    std_logic_vector(24 downto 0);
+   din        : in    std_logic_vector( 7 downto 0);
+   dout       : out   std_logic_vector( 7 downto 0);
    refresh    : in    std_logic;
    we         : in    std_logic;
    ce         : in    std_logic
@@ -887,11 +890,6 @@ begin
 		end if;
 	end process;
 
-	SDRAM_DQ(15 downto 8) <= (others => 'Z') when sdram_we='0' else (others => '0');
-	SDRAM_DQ(7 downto 0) <= (others => 'Z') when sdram_we='0' else sdram_data_out;
-
-	-- read from sdram
-	c64_data_in <= SDRAM_DQ(7 downto 0);
 	-- clock is always enabled and memory is never masked as we only
 	-- use one byte
 	SDRAM_CKE <= '1';
@@ -900,6 +898,7 @@ begin
 
 	sdr: sdram port map(
 		sd_addr => SDRAM_A,
+		sd_data => SDRAM_DQ,
 		sd_ba => SDRAM_BA,
 		sd_cs => SDRAM_nCS,
 		sd_we => SDRAM_nWE,
@@ -908,6 +907,8 @@ begin
 
 		clk => clk_ram,
 		addr => sdram_addr,
+		din => sdram_data_out,
+		dout => c64_data_in,
 		init => not pll_locked,
 		we => sdram_we,
 		refresh => idle,
