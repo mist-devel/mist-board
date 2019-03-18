@@ -448,8 +448,8 @@ end component cartridge;
 	signal c64_data_in16: std_logic_vector(15 downto 0);
 	alias  c64_data_out_int   : unsigned is unsigned(c64_data_out);
 
-	signal c64_clk : std_logic;	-- 31.527mhz (PAL), 32.727mhz(NTSC) clock source
-	signal clk_ram : std_logic; -- 2 x c64_clk
+	signal clk_c64 : std_logic;	-- 31.527mhz (PAL), 32.727mhz(NTSC) clock source
+	signal clk_ram : std_logic; -- 2 x clk_c64
 	signal clk32   : std_logic; -- 32mhz
 	signal ce_8  : std_logic;
 	signal ce_4  : std_logic;
@@ -502,7 +502,7 @@ begin
 	user_io_d : user_io
 	generic map (STRLEN => CONF_STR'length)
 	port map (
-		clk_sys => c64_clk,
+		clk_sys => clk_c64,
 		clk_sd  => clk32,
 
 		SPI_CLK => SPI_SCK,
@@ -540,7 +540,7 @@ begin
 
 	data_io_d: data_io
 	port map (
-		clk_sys => c64_clk,
+		clk_sys => clk_c64,
 		SPI_SCK => SPI_SCK,
 		SPI_SS2 => SPI_SS2,
 		SPI_DI => SPI_DI,
@@ -567,7 +567,7 @@ begin
 		mem_ce => not ram_ce,
 		mem_ce_out => mem_ce,
 
-		clk32 => c64_clk,
+		clk32 => clk_c64,
 		reset => reset_n,
 		reset_out => reset_crt,
 		
@@ -616,9 +616,9 @@ begin
 	sdram_ce <= mem_ce when iec_cycle='0' else ioctl_iec_cycle_used;
 	sdram_we <= not ram_we when iec_cycle='0' else ioctl_iec_cycle_used;
 
-	process(c64_clk)
+	process(clk_c64)
 	begin
-		if falling_edge(c64_clk) then
+		if falling_edge(clk_c64) then
 
 			old_download <= ioctl_download;
 			iec_cycleD <= iec_cycle;
@@ -735,9 +735,9 @@ begin
 	c64rom_addr <= ioctl_addr(13 downto 0) when ioctl_index = 0 else '1' & ioctl_addr(12 downto 0);
 	c1541rom_wr <= ioctl_wr when (ioctl_index = 0) and (ioctl_addr(14) = '1') and (ioctl_download = '1') else '0';
 
-	process(c64_clk)
+	process(clk_c64)
 	begin
-		if rising_edge(c64_clk) then
+		if rising_edge(clk_c64) then
 			clkdiv <= std_logic_vector(unsigned(clkdiv)+1);
 			if(clkdiv(1 downto 0) = "00") then
 				ce_8 <= '1';
@@ -839,8 +839,8 @@ begin
 	pll : entity work.pll_c64
 	port map(
 		inclk0 => CLOCK_27,
-		c0 => c64_clk,
-		c1 => clk_ram,
+		c0 => clk_ram,
+		c1 => clk_c64,
 		areset => pll_areset,
 		scanclk => pll_scanclk,
 		scandata => pll_scandata,
@@ -849,7 +849,7 @@ begin
 		scandataout => pll_scandataout,
 		scandone => pll_scandone
 	);
-	SDRAM_CLK <= not clk_ram;
+	SDRAM_CLK <= clk_ram;
 
 	-- clock for 1541
 	pll_2 : entity work.pll
@@ -859,9 +859,9 @@ begin
 		locked => pll_locked
 	);
 
-	process(c64_clk)
+	process(clk_c64)
 	begin
-		if rising_edge(c64_clk) then
+		if rising_edge(clk_c64) then
 			-- Reset by:
 			-- Button at device, IO controller reboot, OSD or FPGA startup
 			if status(0)='1' or pll_locked = '0' then
@@ -916,7 +916,7 @@ begin
 
 	dac : sigma_delta_dac
 	port map (
-		clk => c64_clk,
+		clk => clk_c64,
 		ldatasum => audio_data_l(17 downto 3),
 		rdatasum => audio_data_r(17 downto 3),
 		aleft => AUDIO_L,
@@ -926,7 +926,7 @@ begin
 
 	fpga64 : entity work.fpga64_sid_iec
 	port map(
-		clk32 => c64_clk,
+		clk32 => clk_c64,
 		reset_n => reset_n,
 		c64gs => status(11),-- not enough BRAM
 		kbd_clk => not ps2_clk,
@@ -1042,12 +1042,12 @@ begin
 	c1541_iec_data_i <= c64_iec_data_o;
 	c1541_iec_clk_i  <= c64_iec_clk_o;
 
-	process(c64_clk, reset_n)
+	process(clk_c64, reset_n)
 		variable reset_cnt : integer range 0 to 32000000;
 	begin
 		if reset_n = '0' then
 			reset_cnt := 100000;
-		elsif rising_edge(c64_clk) then
+		elsif rising_edge(clk_c64) then
 			if reset_cnt /= 0 then
 				reset_cnt := reset_cnt - 1;
 			end if;
@@ -1066,7 +1066,7 @@ begin
 		clk32 => clk32,
 		reset => c1541_reset,
 
-		c1541rom_clk => c64_clk,
+		c1541rom_clk => clk_c64,
 		c1541rom_addr => ioctl_addr(13 downto 0),
 		c1541rom_data => ioctl_data,
 		c1541rom_wr => c1541rom_wr,
@@ -1097,7 +1097,7 @@ begin
 
 	comp_sync : entity work.composite_sync
 	port map(
-		clk32 => c64_clk,
+		clk32 => clk_c64,
 		hsync => hsync,
 		vsync => vsync,
 		ntsc  => ntsc_init_mode,
@@ -1114,9 +1114,9 @@ begin
 	hq2x <= status(9) xor status(8);
 	ce_pix_actual <= ce_4 when hq2x160='1' else ce_8;
 	
-	process(c64_clk)
+	process(clk_c64)
 	begin
-		if rising_edge(c64_clk) then
+		if rising_edge(clk_c64) then
 			if((old_vsync = '0') and (vsync_out = '1')) then
 				if(status(10 downto 8)="010") then
 					hq2x160 <= '1';
