@@ -63,11 +63,17 @@ module user_io #(parameter STRLEN=0, parameter PS2DIV=100) (
 	output reg          img_mounted, //rising edge if a new image is mounted
 	output reg   [31:0] img_size,    // size of image in bytes
 
-	// ps2 keyboard emulation
+	// ps2 keyboard/mouse emulation
 	output              ps2_kbd_clk,
 	output reg          ps2_kbd_data,
 	output              ps2_mouse_clk,
 	output reg          ps2_mouse_data,
+
+	// mouse data
+	output reg    [8:0] mouse_x,
+	output reg    [8:0] mouse_y,
+	output reg    [7:0] mouse_flags,  // YOvfl, XOvfl, dy8, dx8, 1, mbtn, rbtn, lbtn
+	output reg          mouse_strobe, // mouse data is valid on mouse_strobe
 
 	// serial com port 
 	input [7:0]         serial_data,
@@ -374,11 +380,16 @@ always @(posedge clk_sys) begin
 	reg [7:0] acmd;
 	reg [7:0] abyte_cnt;   // counts bytes
 
+	reg [7:0] mouse_flags_r;
+	reg [7:0] mouse_x_r;
+
 	//synchronize between SPI and sys clock domains
 	spi_receiver_strobeD <= spi_receiver_strobe_r;
 	spi_receiver_strobe <= spi_receiver_strobeD;
 	spi_transfer_endD	<= spi_transfer_end_r;
 	spi_transfer_end	<= spi_transfer_endD;
+
+	mouse_strobe <= 0;
 
 	if (~spi_transfer_endD & spi_transfer_end) begin
 		abyte_cnt <= 8'd0;
@@ -402,6 +413,15 @@ always @(posedge clk_sys) begin
 					// store incoming ps2 mouse bytes 
 					ps2_mouse_fifo[ps2_mouse_wptr] <= spi_byte_in;
 					ps2_mouse_wptr <= ps2_mouse_wptr + 1'd1;
+					if (abyte_cnt == 1) mouse_flags_r <= spi_byte_in;
+					else if (abyte_cnt == 2) mouse_x_r <= spi_byte_in;
+					else if (abyte_cnt == 3) begin
+						// flags: YOvfl, XOvfl, dy8, dx8, 1, mbtn, rbtn, lbtn
+						mouse_flags <= mouse_flags_r;
+						mouse_x <= { mouse_flags_r[4], mouse_x_r };
+						mouse_y <= { mouse_flags_r[5], spi_byte_in };
+						mouse_strobe <= 1;
+					end
 				end
 				8'h05: begin
 					// store incoming ps2 keyboard bytes 
@@ -446,6 +466,7 @@ always @(posedge clk_sd) begin
 	reg       spi_transfer_end;
 	reg       spi_receiver_strobeD;
 	reg       spi_transfer_endD;
+	reg       sd_wrD;
 	reg [7:0] acmd;
 	reg [7:0] abyte_cnt;   // counts bytes
 
@@ -460,9 +481,12 @@ always @(posedge clk_sd) begin
 		if(~&sd_buff_addr) sd_buff_addr <= sd_buff_addr + 1'b1;
 	end
 
-	if(sd_din_strobe) begin
-		sd_din_strobe<= 0;
-		if(~&sd_buff_addr) sd_buff_addr <= sd_buff_addr + 1'b1;
+	sd_din_strobe<= 0;
+	sd_wrD <= sd_wr;
+	// fetch the first byte immediately after the write command seen
+	if (~sd_wrD & sd_wr) begin
+		sd_buff_addr <= 0;
+		sd_din_strobe <= 1;
 	end
 
 	img_mounted <= 0;
@@ -473,7 +497,7 @@ always @(posedge clk_sd) begin
 		sd_ack_conf <= 1'b0;
 		sd_dout_strobe <= 1'b0;
 		sd_din_strobe <= 1'b0;
-		sd_buff_addr<= 0;
+		sd_buff_addr <= 0;
 	end else if (spi_receiver_strobeD ^ spi_receiver_strobe) begin
 
 		if(~&abyte_cnt) 
@@ -482,9 +506,10 @@ always @(posedge clk_sd) begin
 		if(abyte_cnt == 0) begin
 			acmd <= spi_byte_in;
 
-			// fetch first byte when sectore FPGA->IO command has been seen
-			if(spi_byte_in == 8'h18)
+			if(spi_byte_in == 8'h18) begin
 				sd_din_strobe <= 1'b1;
+				if(~&sd_buff_addr) sd_buff_addr <= sd_buff_addr + 1'b1;
+			end
 
 			if((spi_byte_in == 8'h17) || (spi_byte_in == 8'h18))
 				sd_ack <= 1'b1;
@@ -500,7 +525,10 @@ always @(posedge clk_sd) begin
 				end
 
 				// send sector FPGA -> IO
-				8'h18: sd_din_strobe <= 1'b1;
+				8'h18: begin
+					sd_din_strobe <= 1'b1;
+					if(~&sd_buff_addr) sd_buff_addr <= sd_buff_addr + 1'b1;
+				end
 
 				// send SD config IO -> FPGA
 				8'h19: begin

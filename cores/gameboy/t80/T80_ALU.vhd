@@ -155,7 +155,7 @@ begin
 		end if;
 	end process;
 
-	process (Arith16, ALU_OP, F_In, BusA, BusB, IR, Q_v, Carry_v, HalfCarry_v, OverFlow_v, BitMask, ISet, Z16)
+	process (Arith16, ALU_OP, F_In, BusA, BusB, IR, Q_v, Carry_v, HalfCarry_v, OverFlow_v, BitMask, ISet, Z16, Rot_Akku)
 		variable Q_t : std_logic_vector(7 downto 0);
 		variable DAA_Q : unsigned(8 downto 0);
 	begin

@@ -17,8 +17,8 @@
 --    Device Part: -
 --    Device Speed Grade: 8
 --    PLL Scan Chain: Fast PLL (144 bits)
---    File Name: /home/gyuri/git/mist-board/cores/c64/rtl/mist/pll_c64_pal.mif
---    Generated: Sun Feb 10 22:52:34 2019
+--    File Name: /home/gyurco/git/mist-board/cores/c64/rtl/mist/pll_c64_pal.mif
+--    Generated: Mon Mar 18 13:55:59 2019
 
 WIDTH=1;
 DEPTH=144;
@@ -82,41 +82,41 @@ CONTENT BEGIN
 	52   :   1;
 	53   :   0;
 	54   :   0; -- clk0 counter: Bypass = 0 (1 bit(s))
-	55   :   0; -- clk0 counter: High Count = 9 (8 bit(s))
+	55   :   0; -- clk0 counter: High Count = 5 (8 bit(s))
 	56   :   0;
 	57   :   0;
 	58   :   0;
-	59   :   1;
-	60   :   0;
+	59   :   0;
+	60   :   1;
 	61   :   0;
 	62   :   1;
-	63   :   0; -- clk0 counter: Odd Division = 0 (1 bit(s))
-	64   :   0; -- clk0 counter: Low Count = 9 (8 bit(s))
+	63   :   1; -- clk0 counter: Odd Division = 1 (1 bit(s))
+	64   :   0; -- clk0 counter: Low Count = 4 (8 bit(s))
 	65   :   0;
 	66   :   0;
 	67   :   0;
-	68   :   1;
-	69   :   0;
+	68   :   0;
+	69   :   1;
 	70   :   0;
-	71   :   1;
+	71   :   0;
 	72   :   0; -- clk1 counter: Bypass = 0 (1 bit(s))
-	73   :   0; -- clk1 counter: High Count = 5 (8 bit(s))
+	73   :   0; -- clk1 counter: High Count = 9 (8 bit(s))
 	74   :   0;
 	75   :   0;
 	76   :   0;
-	77   :   0;
-	78   :   1;
+	77   :   1;
+	78   :   0;
 	79   :   0;
 	80   :   1;
-	81   :   1; -- clk1 counter: Odd Division = 1 (1 bit(s))
-	82   :   0; -- clk1 counter: Low Count = 4 (8 bit(s))
+	81   :   0; -- clk1 counter: Odd Division = 0 (1 bit(s))
+	82   :   0; -- clk1 counter: Low Count = 9 (8 bit(s))
 	83   :   0;
 	84   :   0;
 	85   :   0;
-	86   :   0;
-	87   :   1;
+	86   :   1;
+	87   :   0;
 	88   :   0;
-	89   :   0;
+	89   :   1;
 	90   :   1; -- clk2 counter: Bypass = 1 (1 bit(s))
 	91   :   0; -- clk2 counter: High Count = 0 (8 bit(s))
 	92   :   0;

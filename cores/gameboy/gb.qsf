@@ -138,6 +138,123 @@ set_location_assignment PIN_59 -to SDRAM_nCS
 set_location_assignment PIN_33 -to SDRAM_CKE
 set_location_assignment PIN_43 -to SDRAM_CLK
 
+set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to SDRAM_A[12]
+set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to SDRAM_A[11]
+set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to SDRAM_A[10]
+set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to SDRAM_A[9]
+set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to SDRAM_A[8]
+set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to SDRAM_A[7]
+set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to SDRAM_A[6]
+set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to SDRAM_A[5]
+set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to SDRAM_A[4]
+set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to SDRAM_A[3]
+set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to SDRAM_A[2]
+set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to SDRAM_A[1]
+set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to SDRAM_A[0]
+set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to SDRAM_BA[1]
+set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to SDRAM_BA[0]
+set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to SDRAM_DQ[15]
+set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to SDRAM_DQ[14]
+set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to SDRAM_DQ[13]
+set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to SDRAM_DQ[12]
+set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to SDRAM_DQ[11]
+set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to SDRAM_DQ[10]
+set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to SDRAM_DQ[9]
+set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to SDRAM_DQ[8]
+set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to SDRAM_DQ[7]
+set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to SDRAM_DQ[6]
+set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to SDRAM_DQ[5]
+set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to SDRAM_DQ[4]
+set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to SDRAM_DQ[3]
+set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to SDRAM_DQ[2]
+set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to SDRAM_DQ[1]
+set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to SDRAM_DQ[0]
+set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to SDRAM_DQMH
+set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to SDRAM_DQML
+set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to SDRAM_nCAS
+set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to SDRAM_nRAS
+set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to SDRAM_nWE
+set_instance_assignment -name FAST_OUTPUT_ENABLE_REGISTER ON -to SDRAM_DQ[15]
+set_instance_assignment -name FAST_OUTPUT_ENABLE_REGISTER ON -to SDRAM_DQ[14]
+set_instance_assignment -name FAST_OUTPUT_ENABLE_REGISTER ON -to SDRAM_DQ[13]
+set_instance_assignment -name FAST_OUTPUT_ENABLE_REGISTER ON -to SDRAM_DQ[12]
+set_instance_assignment -name FAST_OUTPUT_ENABLE_REGISTER ON -to SDRAM_DQ[11]
+set_instance_assignment -name FAST_OUTPUT_ENABLE_REGISTER ON -to SDRAM_DQ[10]
+set_instance_assignment -name FAST_OUTPUT_ENABLE_REGISTER ON -to SDRAM_DQ[9]
+set_instance_assignment -name FAST_OUTPUT_ENABLE_REGISTER ON -to SDRAM_DQ[8]
+set_instance_assignment -name FAST_OUTPUT_ENABLE_REGISTER ON -to SDRAM_DQ[7]
+set_instance_assignment -name FAST_OUTPUT_ENABLE_REGISTER ON -to SDRAM_DQ[6]
+set_instance_assignment -name FAST_OUTPUT_ENABLE_REGISTER ON -to SDRAM_DQ[5]
+set_instance_assignment -name FAST_OUTPUT_ENABLE_REGISTER ON -to SDRAM_DQ[4]
+set_instance_assignment -name FAST_OUTPUT_ENABLE_REGISTER ON -to SDRAM_DQ[3]
+set_instance_assignment -name FAST_OUTPUT_ENABLE_REGISTER ON -to SDRAM_DQ[2]
+set_instance_assignment -name FAST_OUTPUT_ENABLE_REGISTER ON -to SDRAM_DQ[1]
+set_instance_assignment -name FAST_OUTPUT_ENABLE_REGISTER ON -to SDRAM_DQ[0]
+set_instance_assignment -name FAST_INPUT_REGISTER ON -to SDRAM_DQ[15]
+set_instance_assignment -name FAST_INPUT_REGISTER ON -to SDRAM_DQ[14]
+set_instance_assignment -name FAST_INPUT_REGISTER ON -to SDRAM_DQ[13]
+set_instance_assignment -name FAST_INPUT_REGISTER ON -to SDRAM_DQ[12]
+set_instance_assignment -name FAST_INPUT_REGISTER ON -to SDRAM_DQ[11]
+set_instance_assignment -name FAST_INPUT_REGISTER ON -to SDRAM_DQ[10]
+set_instance_assignment -name FAST_INPUT_REGISTER ON -to SDRAM_DQ[9]
+set_instance_assignment -name FAST_INPUT_REGISTER ON -to SDRAM_DQ[8]
+set_instance_assignment -name FAST_INPUT_REGISTER ON -to SDRAM_DQ[7]
+set_instance_assignment -name FAST_INPUT_REGISTER ON -to SDRAM_DQ[6]
+set_instance_assignment -name FAST_INPUT_REGISTER ON -to SDRAM_DQ[5]
+set_instance_assignment -name FAST_INPUT_REGISTER ON -to SDRAM_DQ[4]
+set_instance_assignment -name FAST_INPUT_REGISTER ON -to SDRAM_DQ[3]
+set_instance_assignment -name FAST_INPUT_REGISTER ON -to SDRAM_DQ[2]
+set_instance_assignment -name FAST_INPUT_REGISTER ON -to SDRAM_DQ[1]
+set_instance_assignment -name FAST_INPUT_REGISTER ON -to SDRAM_DQ[0]
+
+set_instance_assignment -name CURRENT_STRENGTH_NEW "MAXIMUM CURRENT" -to SDRAM_A[0]
+set_instance_assignment -name CURRENT_STRENGTH_NEW "MAXIMUM CURRENT" -to SDRAM_A[1]
+set_instance_assignment -name CURRENT_STRENGTH_NEW "MAXIMUM CURRENT" -to SDRAM_A[2]
+set_instance_assignment -name CURRENT_STRENGTH_NEW "MAXIMUM CURRENT" -to SDRAM_A[3]
+set_instance_assignment -name CURRENT_STRENGTH_NEW "MAXIMUM CURRENT" -to SDRAM_A[4]
+set_instance_assignment -name CURRENT_STRENGTH_NEW "MAXIMUM CURRENT" -to SDRAM_A[5]
+set_instance_assignment -name CURRENT_STRENGTH_NEW "MAXIMUM CURRENT" -to SDRAM_A[6]
+set_instance_assignment -name CURRENT_STRENGTH_NEW "MAXIMUM CURRENT" -to SDRAM_A[7]
+set_instance_assignment -name CURRENT_STRENGTH_NEW "MAXIMUM CURRENT" -to SDRAM_A[8]
+set_instance_assignment -name CURRENT_STRENGTH_NEW "MAXIMUM CURRENT" -to SDRAM_A[9]
+set_instance_assignment -name CURRENT_STRENGTH_NEW "MAXIMUM CURRENT" -to SDRAM_A[10]
+set_instance_assignment -name CURRENT_STRENGTH_NEW "MAXIMUM CURRENT" -to SDRAM_A[11]
+set_instance_assignment -name CURRENT_STRENGTH_NEW "MAXIMUM CURRENT" -to SDRAM_A[12]
+set_instance_assignment -name CURRENT_STRENGTH_NEW "MAXIMUM CURRENT" -to SDRAM_DQ[0]
+set_instance_assignment -name CURRENT_STRENGTH_NEW "MAXIMUM CURRENT" -to SDRAM_DQ[1]
+set_instance_assignment -name CURRENT_STRENGTH_NEW "MAXIMUM CURRENT" -to SDRAM_DQ[2]
+set_instance_assignment -name CURRENT_STRENGTH_NEW "MAXIMUM CURRENT" -to SDRAM_DQ[3]
+set_instance_assignment -name CURRENT_STRENGTH_NEW "MAXIMUM CURRENT" -to SDRAM_DQ[4]
+set_instance_assignment -name CURRENT_STRENGTH_NEW "MAXIMUM CURRENT" -to SDRAM_DQ[5]
+set_instance_assignment -name CURRENT_STRENGTH_NEW "MAXIMUM CURRENT" -to SDRAM_DQ[6]
+set_instance_assignment -name CURRENT_STRENGTH_NEW "MAXIMUM CURRENT" -to SDRAM_DQ[7]
+set_instance_assignment -name CURRENT_STRENGTH_NEW "MAXIMUM CURRENT" -to SDRAM_DQ[8]
+set_instance_assignment -name CURRENT_STRENGTH_NEW "MAXIMUM CURRENT" -to SDRAM_DQ[9]
+set_instance_assignment -name CURRENT_STRENGTH_NEW "MAXIMUM CURRENT" -to SDRAM_DQ[10]
+set_instance_assignment -name CURRENT_STRENGTH_NEW "MAXIMUM CURRENT" -to SDRAM_DQ[11]
+set_instance_assignment -name CURRENT_STRENGTH_NEW "MAXIMUM CURRENT" -to SDRAM_DQ[12]
+set_instance_assignment -name CURRENT_STRENGTH_NEW "MAXIMUM CURRENT" -to SDRAM_DQ[13]
+set_instance_assignment -name CURRENT_STRENGTH_NEW "MAXIMUM CURRENT" -to SDRAM_DQ[14]
+set_instance_assignment -name CURRENT_STRENGTH_NEW "MAXIMUM CURRENT" -to SDRAM_DQ[15]
+set_instance_assignment -name CURRENT_STRENGTH_NEW "MAXIMUM CURRENT" -to SDRAM_BA[0]
+set_instance_assignment -name CURRENT_STRENGTH_NEW "MAXIMUM CURRENT" -to SDRAM_BA[1]
+set_instance_assignment -name CURRENT_STRENGTH_NEW "MAXIMUM CURRENT" -to SDRAM_DQML
+set_instance_assignment -name CURRENT_STRENGTH_NEW "MAXIMUM CURRENT" -to SDRAM_DQMH
+set_instance_assignment -name CURRENT_STRENGTH_NEW "MAXIMUM CURRENT" -to SDRAM_nRAS
+set_instance_assignment -name CURRENT_STRENGTH_NEW "MAXIMUM CURRENT" -to SDRAM_nCAS
+set_instance_assignment -name CURRENT_STRENGTH_NEW "MAXIMUM CURRENT" -to SDRAM_nWE
+set_instance_assignment -name CURRENT_STRENGTH_NEW "MAXIMUM CURRENT" -to SDRAM_nCS
+set_instance_assignment -name CURRENT_STRENGTH_NEW "MAXIMUM CURRENT" -to SDRAM_CKE
+set_instance_assignment -name CURRENT_STRENGTH_NEW "MAXIMUM CURRENT" -to SDRAM_CLK
+set_instance_assignment -name CURRENT_STRENGTH_NEW "MAXIMUM CURRENT" -to VGA_R[*]
+set_instance_assignment -name CURRENT_STRENGTH_NEW "MAXIMUM CURRENT" -to VGA_G[*]
+set_instance_assignment -name CURRENT_STRENGTH_NEW "MAXIMUM CURRENT" -to VGA_B[*]
+set_instance_assignment -name CURRENT_STRENGTH_NEW "MAXIMUM CURRENT" -to VGA_HS
+set_instance_assignment -name CURRENT_STRENGTH_NEW "MAXIMUM CURRENT" -to VGA_VS
+set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to LED
+set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to SPI_DO
+set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to AUDIO_L
+set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to AUDIO_R
 
 set_global_assignment -name ENABLE_SIGNALTAP OFF
 set_global_assignment -name USE_SIGNALTAP_FILE output_files/clk.stp
@@ -154,7 +271,6 @@ set_global_assignment -name POWER_BOARD_THERMAL_MODEL "NONE (CONSERVATIVE)"
 set_global_assignment -name PARTITION_NETLIST_TYPE SOURCE -section_id Top
 set_global_assignment -name PARTITION_FITTER_PRESERVATION_LEVEL PLACEMENT_AND_ROUTING -section_id Top
 set_global_assignment -name PARTITION_COLOR 16764057 -section_id Top
-set_instance_assignment -name CURRENT_STRENGTH_NEW "MAXIMUM CURRENT" -to VGA_*
 set_global_assignment -name VERILOG_INPUT_VERSION VERILOG_2001
 set_global_assignment -name VERILOG_SHOW_LMF_MAPPING_MESSAGES OFF
 set_global_assignment -name PHYSICAL_SYNTHESIS_COMBO_LOGIC ON

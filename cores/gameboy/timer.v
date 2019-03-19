@@ -49,10 +49,10 @@ wire resetdiv = cpu_sel && cpu_wr && (cpu_addr == 2'b00); //resetdiv also resets
 reg [9:0] clk_div;
 always @(posedge clk or posedge resetdiv)
 	if(resetdiv)
-	  clk_div <= 10'd6;
+	  clk_div <= 10'd2;
 	else
 		if (reset)
-		     clk_div <= 10'd6;
+		     clk_div <= 10'd8;
 		  else
 	        clk_div <= clk_div + 10'd1;
 

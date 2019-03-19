@@ -43,11 +43,14 @@ set_output_delay -clock [get_clocks {pll|altpll_component|auto_generated|pll1|cl
 set_output_delay -clock [get_clocks {pll|altpll_component|auto_generated|pll1|clk[0]}] -min -5 [get_ports {VGA_*}]
 
 # SDRAM delays
-set_input_delay -clock [get_clocks {pll|altpll_component|auto_generated|pll1|clk[1]}] -max 6.4 [get_ports SDRAM_DQ[*]]
-set_input_delay -clock [get_clocks {pll|altpll_component|auto_generated|pll1|clk[1]}] -min 3.2 [get_ports SDRAM_DQ[*]]
+set_input_delay -clock [get_clocks {pll|altpll_component|auto_generated|pll1|clk[0]}] -max 6.4 [get_ports SDRAM_DQ[*]]
+set_input_delay -clock [get_clocks {pll|altpll_component|auto_generated|pll1|clk[0]}] -min 3.2 [get_ports SDRAM_DQ[*]]
 
-set_output_delay -clock [get_clocks {pll|altpll_component|auto_generated|pll1|clk[1]}] -max 1.5 [get_ports {SDRAM_D* SDRAM_A* SDRAM_BA* SDRAM_n* SDRAM_CKE}]
-set_output_delay -clock [get_clocks {pll|altpll_component|auto_generated|pll1|clk[1]}] -min -0.8 [get_ports {SDRAM_D* SDRAM_A* SDRAM_BA* SDRAM_n* SDRAM_CKE}]
+set_output_delay -clock [get_clocks {pll|altpll_component|auto_generated|pll1|clk[0]}] -max 1.5 [get_ports {SDRAM_D* SDRAM_A* SDRAM_BA* SDRAM_n* SDRAM_CKE}]
+set_output_delay -clock [get_clocks {pll|altpll_component|auto_generated|pll1|clk[0]}] -min -0.8 [get_ports {SDRAM_D* SDRAM_A* SDRAM_BA* SDRAM_n* SDRAM_CKE}]
+
+set_output_delay -clock [get_clocks {pll|altpll_component|auto_generated|pll1|clk[0]}] -max 1.5 [get_ports {SDRAM_CLK}]
+set_output_delay -clock [get_clocks {pll|altpll_component|auto_generated|pll1|clk[0]}] -min -0.8 [get_ports {SDRAM_CLK}]
 
 set_multicycle_path -from {video_mixer:vmixer|scandoubler:scandoubler|Hq2x:Hq2x|*} -to {VGA_*[*]} -setup 4
 set_multicycle_path -from {video_mixer:vmixer|scandoubler:scandoubler|Hq2x:Hq2x|*} -to {VGA_*[*]} -hold 3

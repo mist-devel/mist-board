@@ -81,6 +81,7 @@ component sdram is port
 (
    -- interface to the MT48LC16M16 chip
    sd_addr    : out   std_logic_vector(12 downto 0);
+   sd_data    : inout std_logic_vector(15 downto 0);
    sd_cs      : out   std_logic;
    sd_ba      : out   std_logic_vector(1 downto 0);
    sd_we      : out   std_logic;
@@ -93,6 +94,8 @@ component sdram is port
 
    -- cpu/chipset interface
    addr       : in    std_logic_vector(24 downto 0);
+   din        : in    std_logic_vector( 7 downto 0);
+   dout       : out   std_logic_vector( 7 downto 0);
    refresh    : in    std_logic;
    we         : in    std_logic;
    ce         : in    std_logic
@@ -196,7 +199,11 @@ component user_io generic(STRLEN : integer := 0 ); port
 	ps2_kbd_data      : out std_logic;
 
 	ps2_mouse_clk     : out std_logic;
-	ps2_mouse_data    : out std_logic
+	ps2_mouse_data    : out std_logic;
+	mouse_x           : out signed(8 downto 0);
+	mouse_y           : out signed(8 downto 0);
+	mouse_flags       : out std_logic_vector(8 downto 0); -- YOvfl, XOvfl, dy8, dx8, 1, mbtn, rbtn, lbtn
+	mouse_strobe      : out std_logic
 	);
 end component user_io;
 
@@ -385,6 +392,10 @@ end component cartridge;
 	signal joyB_c64 : std_logic_vector(6 downto 0);
 	signal joyC_c64 : std_logic_vector(6 downto 0);
 	signal joyD_c64 : std_logic_vector(6 downto 0);
+	signal potA_x   : std_logic_vector(7 downto 0);
+	signal potA_y   : std_logic_vector(7 downto 0);
+	signal potB_x   : std_logic_vector(7 downto 0);
+	signal potB_y   : std_logic_vector(7 downto 0);
 	signal reset_key : std_logic;
 	signal cart_detach_key :std_logic;							-- cartridge detach key CTRL-D - LCA
 	
@@ -415,7 +426,15 @@ end component cartridge;
 
 	signal ps2_clk : std_logic;
 	signal ps2_dat : std_logic;
-	
+	signal mouse_en     : std_logic;
+	signal mouse_x      : signed( 8 downto 0);
+	signal mouse_x_pos  : signed(10 downto 0);
+	signal mouse_y      : signed( 8 downto 0);
+	signal mouse_y_pos  : signed(10 downto 0);
+	signal mouse_flags  : std_logic_vector(8 downto 0);
+	signal mouse_btns   : std_logic_vector(1 downto 0);
+	signal mouse_strobe : std_logic;
+
 	signal c64_iec_atn_i  : std_logic;
 	signal c64_iec_clk_o  : std_logic;
 	signal c64_iec_data_o : std_logic;
@@ -448,14 +467,17 @@ end component cartridge;
 	signal c64_data_in16: std_logic_vector(15 downto 0);
 	alias  c64_data_out_int   : unsigned is unsigned(c64_data_out);
 
-	signal c64_clk : std_logic;	-- 31.527mhz (PAL), 32.727mhz(NTSC) clock source
-	signal clk_ram : std_logic; -- 2 x c64_clk
+	signal clk_c64 : std_logic;	-- 31.527mhz (PAL), 32.727mhz(NTSC) clock source
+	signal clk_ram : std_logic; -- 2 x clk_c64
 	signal clk32   : std_logic; -- 32mhz
 	signal ce_8  : std_logic;
 	signal ce_4  : std_logic;
 	signal hq2x160 : std_logic;
 	signal osdclk : std_logic;
 	signal clkdiv : std_logic_vector(9 downto 0);
+	signal todclk : std_logic;
+	signal toddiv : std_logic_vector(19 downto 0);
+	signal toddiv3 : std_logic_vector(1 downto 0);
 
 	signal ram_ce : std_logic;
 	signal ram_we : std_logic;
@@ -499,7 +521,7 @@ begin
 	user_io_d : user_io
 	generic map (STRLEN => CONF_STR'length)
 	port map (
-		clk_sys => c64_clk,
+		clk_sys => clk_c64,
 		clk_sd  => clk32,
 
 		SPI_CLK => SPI_SCK,
@@ -532,12 +554,16 @@ begin
 		sd_dout_strobe => sd_buff_wr,
 		img_mounted => sd_change,
 		ps2_kbd_clk => ps2_clk,
-		ps2_kbd_data => ps2_dat
+		ps2_kbd_data => ps2_dat,
+		mouse_x => mouse_x,
+		mouse_y => mouse_y,
+		mouse_flags => mouse_flags,
+		mouse_strobe => mouse_strobe
 	);
 
 	data_io_d: data_io
 	port map (
-		clk_sys => c64_clk,
+		clk_sys => clk_c64,
 		SPI_SCK => SPI_SCK,
 		SPI_SS2 => SPI_SS2,
 		SPI_DI => SPI_DI,
@@ -564,7 +590,7 @@ begin
 		mem_ce => not ram_ce,
 		mem_ce_out => mem_ce,
 
-		clk32 => c64_clk,
+		clk32 => clk_c64,
 		reset => reset_n,
 		reset_out => reset_crt,
 		
@@ -597,8 +623,8 @@ begin
 	);
 	
 	-- rearrange joystick contacta for c64
-	joyA_int <= joyA(6 downto 4) & joyA(0) & joyA(1) & joyA(2) & joyA(3);
-	joyB_int <= joyB(6 downto 4) & joyB(0) & joyB(1) & joyB(2) & joyB(3);
+	joyA_int <= joyA(6 downto 5) & (joyA(4) or (mouse_en and mouse_btns(0))) & joyA(0) & joyA(1) & joyA(2) & (joyA(3) or (mouse_en and mouse_btns(1)));
+	joyB_int <= joyB(6 downto 5) & (joyB(4) or (mouse_en and mouse_btns(0))) & joyB(0) & joyB(1) & joyB(2) & (joyB(3) or (mouse_en and mouse_btns(1)));
 	joyC_c64 <= joyC(6 downto 4) & joyC(0) & joyC(1) & joyC(2) & joyC(3);
 	joyD_c64 <= joyD(6 downto 4) & joyD(0) & joyD(1) & joyD(2) & joyD(3);
 
@@ -613,9 +639,9 @@ begin
 	sdram_ce <= mem_ce when iec_cycle='0' else ioctl_iec_cycle_used;
 	sdram_we <= not ram_we when iec_cycle='0' else ioctl_iec_cycle_used;
 
-	process(c64_clk)
+	process(clk_c64)
 	begin
-		if falling_edge(c64_clk) then
+		if falling_edge(clk_c64) then
 
 			old_download <= ioctl_download;
 			iec_cycleD <= iec_cycle;
@@ -732,9 +758,9 @@ begin
 	c64rom_addr <= ioctl_addr(13 downto 0) when ioctl_index = 0 else '1' & ioctl_addr(12 downto 0);
 	c1541rom_wr <= ioctl_wr when (ioctl_index = 0) and (ioctl_addr(14) = '1') and (ioctl_download = '1') else '0';
 
-	process(c64_clk)
+	process(clk_c64)
 	begin
-		if rising_edge(c64_clk) then
+		if rising_edge(clk_c64) then
 			clkdiv <= std_logic_vector(unsigned(clkdiv)+1);
 			if(clkdiv(1 downto 0) = "00") then
 				ce_8 <= '1';
@@ -836,8 +862,8 @@ begin
 	pll : entity work.pll_c64
 	port map(
 		inclk0 => CLOCK_27,
-		c0 => c64_clk,
-		c1 => clk_ram,
+		c0 => clk_ram,
+		c1 => clk_c64,
 		areset => pll_areset,
 		scanclk => pll_scanclk,
 		scandata => pll_scandata,
@@ -846,7 +872,7 @@ begin
 		scandataout => pll_scandataout,
 		scandone => pll_scandone
 	);
-	SDRAM_CLK <= not clk_ram;
+	SDRAM_CLK <= clk_ram;
 
 	-- clock for 1541
 	pll_2 : entity work.pll
@@ -856,9 +882,9 @@ begin
 		locked => pll_locked
 	);
 
-	process(c64_clk)
+	process(clk_c64)
 	begin
-		if rising_edge(c64_clk) then
+		if rising_edge(clk_c64) then
 			-- Reset by:
 			-- Button at device, IO controller reboot, OSD or FPGA startup
 			if status(0)='1' or pll_locked = '0' then
@@ -884,11 +910,6 @@ begin
 		end if;
 	end process;
 
-	SDRAM_DQ(15 downto 8) <= (others => 'Z') when sdram_we='0' else (others => '0');
-	SDRAM_DQ(7 downto 0) <= (others => 'Z') when sdram_we='0' else sdram_data_out;
-
-	-- read from sdram
-	c64_data_in <= SDRAM_DQ(7 downto 0);
 	-- clock is always enabled and memory is never masked as we only
 	-- use one byte
 	SDRAM_CKE <= '1';
@@ -897,6 +918,7 @@ begin
 
 	sdr: sdram port map(
 		sd_addr => SDRAM_A,
+		sd_data => SDRAM_DQ,
 		sd_ba => SDRAM_BA,
 		sd_cs => SDRAM_nCS,
 		sd_we => SDRAM_nWE,
@@ -905,6 +927,8 @@ begin
 
 		clk => clk_ram,
 		addr => sdram_addr,
+		din => sdram_data_out,
+		dout => c64_data_in,
 		init => not pll_locked,
 		we => sdram_we,
 		refresh => idle,
@@ -913,7 +937,7 @@ begin
 
 	dac : sigma_delta_dac
 	port map (
-		clk => c64_clk,
+		clk => clk_c64,
 		ldatasum => audio_data_l(17 downto 3),
 		rdatasum => audio_data_r(17 downto 3),
 		aleft => AUDIO_L,
@@ -923,7 +947,7 @@ begin
 
 	fpga64 : entity work.fpga64_sid_iec
 	port map(
-		clk32 => c64_clk,
+		clk32 => clk_c64,
 		reset_n => reset_n,
 		c64gs => status(11),-- not enough BRAM
 		kbd_clk => not ps2_clk,
@@ -958,6 +982,10 @@ begin
 		ba => open,
 		joyA => unsigned(joyA_c64),
 		joyB => unsigned(joyB_c64),
+		potA_x => potA_x,
+		potA_y => potA_y,
+		potB_x => potB_x,
+		potB_y => potB_y,
 		serioclk => open,
 		ces => ces,
 		SIDclk => open,
@@ -978,6 +1006,7 @@ begin
 		pb_in => pb_in,
 		pb_out => pb_out,
 		flag2_n => flag2_n,
+		todclk => todclk,
 		cia_mode => status(4),
 		disk_num => open,
 		c64rom_addr => c64rom_addr,
@@ -986,6 +1015,39 @@ begin
 --		cart_detach_key => cart_detach_key,
 		reset_key => reset_key
 	);
+
+	-- paddle pins - mouse or GS controller
+	potA_x <= '0' & std_logic_vector(mouse_x_pos)(6 downto 1) & '0' when mouse_en = '1'
+	          else x"00" when joyA_c64(5) = '1' else x"FF";
+	potA_y <= '0' & std_logic_vector(mouse_y_pos)(6 downto 1) & '0' when mouse_en = '1'
+	          else x"00" when joyA_c64(6) = '1' else x"FF";
+	potB_x <= '0' & std_logic_vector(mouse_x_pos)(6 downto 1) & '0' when mouse_en = '1'
+	          else x"00" when joyB_c64(5) = '1' else x"FF";
+	potB_y <= '0' & std_logic_vector(mouse_y_pos)(6 downto 1) & '0' when mouse_en = '1'
+	          else x"00" when joyB_c64(6) = '1' else x"FF";
+
+	process(clk_c64, reset_n)
+		variable mov_x: signed(6 downto 0);
+		variable mov_y: signed(6 downto 0);
+	begin
+		if reset_n = '0' then
+			mouse_x_pos <= (others => '0');
+			mouse_y_pos <= (others => '0');
+			mouse_en <= '0';
+		elsif rising_edge(clk_c64) then
+			if mouse_strobe = '1' then
+				mouse_en <= '1';
+				-- due to limited resolution on the c64 side, limit the mouse movement speed
+				if mouse_x > 40 then mov_x:="0101000"; elsif mouse_x < -40 then mov_x:= "1011000"; else mov_x := mouse_x(6 downto 0); end if;
+				if mouse_y > 40 then mov_y:="0101000"; elsif mouse_y < -40 then mov_y:= "1011000"; else mov_y := mouse_y(6 downto 0); end if;
+				mouse_x_pos <= mouse_x_pos + mov_x;
+				mouse_y_pos <= mouse_y_pos + mov_y;
+				mouse_btns <= mouse_flags(1 downto 0);
+			elsif joya(7 downto 0) /= 0 or joyb(7 downto 0) /= 0 then
+				mouse_en <= '0';
+			end if;
+		end if;
+	end process;
 
 	-- connect user port
 	process (pa2_out, pb_out, joyC_c64, joyD_c64, UART_RX, status)
@@ -1010,6 +1072,25 @@ begin
 		end if;
 	end process;
 
+	-- generate TOD clock from stable 32 MHz
+	process(clk32, reset_n)
+	begin
+		if reset_n = '0' then
+			todclk <= '0';
+			toddiv <= (others => '0');
+		elsif rising_edge(clk32) then
+			toddiv <= toddiv + 1;
+			if (ntsc_init_mode_d2 = '1' and toddiv = 266665 and toddiv3 = "00") or
+			   (ntsc_init_mode_d2 = '1' and toddiv = 266666 and toddiv3 /= "00") or
+			    toddiv = 319999 then
+				toddiv <= (others => '0');
+				todclk <= not todclk;
+				toddiv3 <= toddiv3 + 1;
+				if toddiv3 = "10" then toddiv3 <= "00"; end if;
+			end if;
+		end if;
+	end process;
+
 	disk_readonly <= status(16);
 
     c64_iec_data_i <= c1541_iec_data_o;
@@ -1019,12 +1100,12 @@ begin
 	c1541_iec_data_i <= c64_iec_data_o;
 	c1541_iec_clk_i  <= c64_iec_clk_o;
 
-	process(c64_clk, reset_n)
+	process(clk_c64, reset_n)
 		variable reset_cnt : integer range 0 to 32000000;
 	begin
 		if reset_n = '0' then
 			reset_cnt := 100000;
-		elsif rising_edge(c64_clk) then
+		elsif rising_edge(clk_c64) then
 			if reset_cnt /= 0 then
 				reset_cnt := reset_cnt - 1;
 			end if;
@@ -1043,7 +1124,7 @@ begin
 		clk32 => clk32,
 		reset => c1541_reset,
 
-		c1541rom_clk => c64_clk,
+		c1541rom_clk => clk_c64,
 		c1541rom_addr => ioctl_addr(13 downto 0),
 		c1541rom_data => ioctl_data,
 		c1541rom_wr => c1541rom_wr,
@@ -1074,7 +1155,7 @@ begin
 
 	comp_sync : entity work.composite_sync
 	port map(
-		clk32 => c64_clk,
+		clk32 => clk_c64,
 		hsync => hsync,
 		vsync => vsync,
 		ntsc  => ntsc_init_mode,
@@ -1091,9 +1172,9 @@ begin
 	hq2x <= status(9) xor status(8);
 	ce_pix_actual <= ce_4 when hq2x160='1' else ce_8;
 	
-	process(c64_clk)
+	process(clk_c64)
 	begin
-		if rising_edge(c64_clk) then
+		if rising_edge(clk_c64) then
 			if((old_vsync = '0') and (vsync_out = '1')) then
 				if(status(10 downto 8)="010") then
 					hq2x160 <= '1';

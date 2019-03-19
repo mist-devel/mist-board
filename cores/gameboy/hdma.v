@@ -1,6 +1,7 @@
 module hdma(
 	input  reset,
    input  clk,    // 8 Mhz cpu clock
+	input  speed,  // cpu speed mode use for initial delay
 	
 	// cpu register interface
 	input        sel_reg,
@@ -12,11 +13,15 @@ module hdma(
 	input [1:0] lcd_mode, 
 	
 	// dma connection
-	output hdma_rd,
+	output reg hdma_rd,
+	output reg hdma_active,
 	output [15:0] hdma_source_addr,
 	output [15:0] hdma_target_addr
 
 );
+
+localparam DELAY_SINGLE = 5'd10;
+localparam DELAY_DOUBLE = DELAY_SINGLE/5'd2;
 
 //ff51-ff55 HDMA1-5 (GBC)
 reg [7:0] hdma_source_h;		// ff51
@@ -26,16 +31,17 @@ reg [3:0] hdma_target_l;	   // ff54 only top 4 bits used
 reg hdma_mode; 					// ff55 bit 7  - 1=General Purpose DMA 0=H-Blank DMA
 reg hdma_enabled;					// ff55 !bit 7 when read
 reg [7:0] hdma_length;			// ff55 bit 6:0 - dma transfer length (hdma_length+1)*16 bytes
-reg hdma_active;
 
 // it takes about 8us to transfer a block of 16 bytes. -> 500ns per byte -> 2Mhz
 // 32 cycles in Normal Speed Mode, and 64 'fast' cycles in Double Speed Mode
 reg [13:0] hdma_cnt; 
 reg [5:0]  hdma_16byte_cnt; //16bytes*4
 
-assign hdma_rd = hdma_active;
+//assign hdma_rd = hdma_active;
 assign hdma_source_addr = { hdma_source_h,hdma_source_l,4'd0} + hdma_cnt[13:2];
 assign hdma_target_addr = { 3'b100,hdma_target_h,hdma_target_l,4'd0} + hdma_cnt[13:2];
+
+reg [4:0] dma_delay;
 
 reg [1:0] hdma_state;
 parameter active=2'd0,blocksent=2'd1,wait_h=2'd2;
@@ -48,7 +54,8 @@ always @(posedge clk) begin
 		hdma_source_h <= 8'hFF;
 		hdma_source_l <= 4'hF;
 		hdma_target_h <= 5'h1F;
-		hdma_target_l <= 4'hF;		
+		hdma_target_l <= 4'hF;
+      dma_delay <= 5'd0;
 	end else begin
 	   if(sel_reg && wr) begin
 		
@@ -64,10 +71,12 @@ always @(posedge clk) begin
 							if (hdma_mode == 1 && hdma_enabled && !din[7]) begin  //terminate an active H-Blank transfer by writing zero to Bit 7 of FF55
 								hdma_state <= wait_h;
 								hdma_active <= 1'b0;
+								hdma_rd <= 1'b0;
 								hdma_enabled <= 1'b0;
 							end else begin															  //normal trigger
 								hdma_enabled <= 1'b1;
 								hdma_mode <= din[7];
+								dma_delay <= speed?DELAY_DOUBLE:DELAY_SINGLE;
 								hdma_length <= {1'b0,din[6:0]} + 8'd1;  
 								hdma_cnt <= 14'd0; 
 								hdma_16byte_cnt <= 6'h3f;
@@ -78,29 +87,38 @@ always @(posedge clk) begin
 		end
 		
 		if (hdma_enabled) begin
-			if(hdma_mode==0) begin 				                    //mode 0 GDMA do the transfer in one go			
-				if(hdma_length != 0) begin
-					hdma_active <= 1'b1;
-					hdma_cnt <= hdma_cnt + 1'd1;
-					hdma_16byte_cnt <= hdma_16byte_cnt - 1'd1;
-					if (!hdma_16byte_cnt) begin
-							hdma_length <= hdma_length - 1'd1;
-							if (hdma_length == 1) begin
-								hdma_active <= 1'b0;
-								hdma_enabled <= 1'b0;
-								hdma_length <= 8'h80; //7f+1
-							end
-				   end	
-				end 
+			if(hdma_mode==0) begin 				                    //mode 0 GDMA do the transfer in one go after inital delay
+             hdma_active <= 1'b1;
+			    if (dma_delay>0) begin
+                dma_delay <= dma_delay - 5'd1;
+			    end else begin
+					if(hdma_length != 0) begin
+						hdma_rd <= 1'b1;
+						hdma_cnt <= hdma_cnt + 1'd1;
+						hdma_16byte_cnt <= hdma_16byte_cnt - 1'd1;
+						if (!hdma_16byte_cnt) begin
+								hdma_length <= hdma_length - 1'd1;
+								if (hdma_length == 1) begin
+									hdma_active <= 1'b0;
+									hdma_rd <= 1'b0;
+									hdma_enabled <= 1'b0;
+									hdma_length <= 8'h80; //7f+1
+								end
+						end	
+					end 
+			    end
 
 			end else begin        			                       //mode 1 HDMA transfer 1 block (16bytes) in each H-Blank only
 				case (hdma_state)
 					
 					wait_h:    begin 
-								    if (lcd_mode == 2'b00 ) 	// Mode 00:  h-blank
+								    if (lcd_mode == 2'b00 ) begin	// Mode 00:  h-blank
+									   dma_delay <= speed?DELAY_DOUBLE:DELAY_SINGLE;
 									   hdma_state <= active;
+									 end
 								    hdma_16byte_cnt <= 6'h3f;
 									 hdma_active <= 1'b0;
+									 hdma_rd <= 1'b0;
 							     end
 				   
 					blocksent: begin
@@ -114,16 +132,23 @@ always @(posedge clk) begin
 
 					active:    begin
 									if(hdma_length != 0) begin
-										hdma_active <= 1'b1;
-										hdma_cnt <= hdma_cnt + 1'd1;
-										hdma_16byte_cnt <= hdma_16byte_cnt - 1'd1;
-										if (!hdma_16byte_cnt) begin
-												hdma_length <= hdma_length - 1'd1;
-												hdma_state <= blocksent;
-												hdma_active <= 1'b0;
+									  hdma_active <= 1'b1;
+									  if (dma_delay>0) begin
+										  dma_delay <= dma_delay - 5'd1;
+									  end else begin
+											hdma_rd <= 1'b1;
+											hdma_cnt <= hdma_cnt + 1'd1;
+											hdma_16byte_cnt <= hdma_16byte_cnt - 1'd1;
+											if (!hdma_16byte_cnt) begin
+													hdma_length <= hdma_length - 1'd1;
+													hdma_state <= blocksent;
+													hdma_active <= 1'b0;
+													hdma_rd <= 1'b0;
+											end
 										end
 									end else begin
 										hdma_active <= 1'b0;
+										hdma_rd <= 1'b0;
 										hdma_enabled <= 1'b0;
 										hdma_length <= 8'h80; //7f+1
 									end
@@ -154,6 +179,7 @@ module hdma_tb;
 
 	reg  reset = 1'd1;
 	reg  clk = 1'd0;
+	reg speed = 1'b0;
 	
 	// cpu register interface
 	reg        sel_reg = 1'd0;
@@ -166,6 +192,7 @@ module hdma_tb;
 	
 	// dma connection
 	wire hdma_rd;
+	wire hdma_active;
 	wire [15:0] hdma_source_addr;
 	wire [15:0] hdma_target_addr;
 	
@@ -174,7 +201,8 @@ module hdma_tb;
 	hdma hdma(
 		.reset	          ( reset         ),
 		.clk		          ( clk           ),
-		
+		.speed				 ( speed         ),
+ 		 
 		// cpu register interface
 		.sel_reg 	       ( sel_reg       ),
 		.addr			       ( addr          ),
@@ -186,6 +214,7 @@ module hdma_tb;
 		
 		// dma connection
 		.hdma_rd           ( hdma_rd          ),
+		.hdma_active       ( hdma_active      ),
 		.hdma_source_addr  ( hdma_source_addr ),
 		.hdma_target_addr  ( hdma_target_addr ) 
 		
