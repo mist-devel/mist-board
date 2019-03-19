@@ -86,6 +86,10 @@ entity fpga64_sid_iec is
 		-- joystick interface
 		joyA        : in  unsigned(6 downto 0);
 		joyB        : in  unsigned(6 downto 0);
+		potA_x      : in  std_logic_vector(7 downto 0);
+		potA_y      : in  std_logic_vector(7 downto 0);
+		potB_x      : in  std_logic_vector(7 downto 0);
+		potB_y      : in  std_logic_vector(7 downto 0);
 
 		-- serial port, for connection to pheripherals
 		serioclk    : out std_logic;
@@ -600,8 +604,14 @@ div1m: process(clk32)				-- this process devides 32 MHz to 1MHz (for the SID)
 	          sid_do8580_l when second_sid_en='0' else
 			  sid_do8580_r;
 
-	pot_x <= X"FF" when ((cia1_pao(7) and JoyA(5)) or (cia1_pao(6) and JoyB(5))) = '0' else X"00";
-	pot_y <= X"FF" when ((cia1_pao(7) and JoyA(6)) or (cia1_pao(6) and JoyB(6))) = '0' else X"00";
+	-- CD4066 analogue switch
+	pot_x <= potA_x when cia1_pao(6) = '1' else
+	         potB_x when cia1_pao(7) = '1' else
+			 x"FF";
+	pot_y <= potA_y when cia1_pao(6) = '1' else
+	         potB_y when cia1_pao(7) = '1' else
+			 x"FF";
+
 	second_sid_en <= '0' when sid_mode(0) = '0' else
                      '1' when cpuAddr(11 downto 8) = x"4" and cpuAddr(5) = '1' else -- D420
                      '1' when cpuAddr(11 downto 8) = x"5" else -- D500
