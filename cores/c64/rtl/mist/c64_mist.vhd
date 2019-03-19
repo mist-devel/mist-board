@@ -199,7 +199,11 @@ component user_io generic(STRLEN : integer := 0 ); port
 	ps2_kbd_data      : out std_logic;
 
 	ps2_mouse_clk     : out std_logic;
-	ps2_mouse_data    : out std_logic
+	ps2_mouse_data    : out std_logic;
+	mouse_x           : out signed(8 downto 0);
+	mouse_y           : out signed(8 downto 0);
+	mouse_flags       : out std_logic_vector(8 downto 0); -- YOvfl, XOvfl, dy8, dx8, 1, mbtn, rbtn, lbtn
+	mouse_strobe      : out std_logic
 	);
 end component user_io;
 
@@ -388,6 +392,10 @@ end component cartridge;
 	signal joyB_c64 : std_logic_vector(6 downto 0);
 	signal joyC_c64 : std_logic_vector(6 downto 0);
 	signal joyD_c64 : std_logic_vector(6 downto 0);
+	signal potA_x   : std_logic_vector(7 downto 0);
+	signal potA_y   : std_logic_vector(7 downto 0);
+	signal potB_x   : std_logic_vector(7 downto 0);
+	signal potB_y   : std_logic_vector(7 downto 0);
 	signal reset_key : std_logic;
 	signal cart_detach_key :std_logic;							-- cartridge detach key CTRL-D - LCA
 	
@@ -418,7 +426,15 @@ end component cartridge;
 
 	signal ps2_clk : std_logic;
 	signal ps2_dat : std_logic;
-	
+	signal mouse_en     : std_logic;
+	signal mouse_x      : signed( 8 downto 0);
+	signal mouse_x_pos  : signed(10 downto 0);
+	signal mouse_y      : signed( 8 downto 0);
+	signal mouse_y_pos  : signed(10 downto 0);
+	signal mouse_flags  : std_logic_vector(8 downto 0);
+	signal mouse_btns   : std_logic_vector(1 downto 0);
+	signal mouse_strobe : std_logic;
+
 	signal c64_iec_atn_i  : std_logic;
 	signal c64_iec_clk_o  : std_logic;
 	signal c64_iec_data_o : std_logic;
@@ -538,7 +554,11 @@ begin
 		sd_dout_strobe => sd_buff_wr,
 		img_mounted => sd_change,
 		ps2_kbd_clk => ps2_clk,
-		ps2_kbd_data => ps2_dat
+		ps2_kbd_data => ps2_dat,
+		mouse_x => mouse_x,
+		mouse_y => mouse_y,
+		mouse_flags => mouse_flags,
+		mouse_strobe => mouse_strobe
 	);
 
 	data_io_d: data_io
@@ -603,8 +623,8 @@ begin
 	);
 	
 	-- rearrange joystick contacta for c64
-	joyA_int <= joyA(6 downto 4) & joyA(0) & joyA(1) & joyA(2) & joyA(3);
-	joyB_int <= joyB(6 downto 4) & joyB(0) & joyB(1) & joyB(2) & joyB(3);
+	joyA_int <= joyA(6 downto 5) & (joyA(4) or (mouse_en and mouse_btns(0))) & joyA(0) & joyA(1) & joyA(2) & (joyA(3) or (mouse_en and mouse_btns(1)));
+	joyB_int <= joyB(6 downto 5) & (joyB(4) or (mouse_en and mouse_btns(0))) & joyB(0) & joyB(1) & joyB(2) & (joyB(3) or (mouse_en and mouse_btns(1)));
 	joyC_c64 <= joyC(6 downto 4) & joyC(0) & joyC(1) & joyC(2) & joyC(3);
 	joyD_c64 <= joyD(6 downto 4) & joyD(0) & joyD(1) & joyD(2) & joyD(3);
 
@@ -962,6 +982,10 @@ begin
 		ba => open,
 		joyA => unsigned(joyA_c64),
 		joyB => unsigned(joyB_c64),
+		potA_x => potA_x,
+		potA_y => potA_y,
+		potB_x => potB_x,
+		potB_y => potB_y,
 		serioclk => open,
 		ces => ces,
 		SIDclk => open,
@@ -991,6 +1015,39 @@ begin
 --		cart_detach_key => cart_detach_key,
 		reset_key => reset_key
 	);
+
+	-- paddle pins - mouse or GS controller
+	potA_x <= '0' & std_logic_vector(mouse_x_pos)(6 downto 1) & '0' when mouse_en = '1'
+	          else x"00" when joyA_c64(5) = '1' else x"FF";
+	potA_y <= '0' & std_logic_vector(mouse_y_pos)(6 downto 1) & '0' when mouse_en = '1'
+	          else x"00" when joyA_c64(6) = '1' else x"FF";
+	potB_x <= '0' & std_logic_vector(mouse_x_pos)(6 downto 1) & '0' when mouse_en = '1'
+	          else x"00" when joyB_c64(5) = '1' else x"FF";
+	potB_y <= '0' & std_logic_vector(mouse_y_pos)(6 downto 1) & '0' when mouse_en = '1'
+	          else x"00" when joyB_c64(6) = '1' else x"FF";
+
+	process(clk_c64, reset_n)
+		variable mov_x: signed(6 downto 0);
+		variable mov_y: signed(6 downto 0);
+	begin
+		if reset_n = '0' then
+			mouse_x_pos <= (others => '0');
+			mouse_y_pos <= (others => '0');
+			mouse_en <= '0';
+		elsif rising_edge(clk_c64) then
+			if mouse_strobe = '1' then
+				mouse_en <= '1';
+				-- due to limited resolution on the c64 side, limit the mouse movement speed
+				if mouse_x > 40 then mov_x:="0101000"; elsif mouse_x < -40 then mov_x:= "1011000"; else mov_x := mouse_x(6 downto 0); end if;
+				if mouse_y > 40 then mov_y:="0101000"; elsif mouse_y < -40 then mov_y:= "1011000"; else mov_y := mouse_y(6 downto 0); end if;
+				mouse_x_pos <= mouse_x_pos + mov_x;
+				mouse_y_pos <= mouse_y_pos + mov_y;
+				mouse_btns <= mouse_flags(1 downto 0);
+			elsif joya(7 downto 0) /= 0 or joyb(7 downto 0) /= 0 then
+				mouse_en <= '0';
+			end if;
+		end if;
+	end process;
 
 	-- connect user port
 	process (pa2_out, pb_out, joyC_c64, joyD_c64, UART_RX, status)
