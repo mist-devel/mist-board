@@ -1164,7 +1164,7 @@ assign VBLANK_STOP = pal?9'd269:9'd244;		// Screen blanking stop// Composite Syn
 
 always @(posedge clk)								// composite synchron is either hsync or equalization+vsync
 	begin
-	csyncreg<=(equalization)?(eq1&eq2)^vsync:hsync;
+	csyncreg<=(equalization)?~((eq1&eq2)|~vsync):hsync;
 	end
 
 always @(posedge clk)								// vsync signal inverts equalization signal
