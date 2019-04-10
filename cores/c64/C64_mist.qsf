@@ -138,9 +138,9 @@ set_global_assignment -name SAVE_DISK_SPACE OFF
 # ==================
 set_global_assignment -name FITTER_EARLY_TIMING_ESTIMATE_MODE OPTIMISTIC
 set_global_assignment -name PHYSICAL_SYNTHESIS_COMBO_LOGIC ON
-set_global_assignment -name PHYSICAL_SYNTHESIS_REGISTER_RETIMING ON
-set_global_assignment -name PHYSICAL_SYNTHESIS_ASYNCHRONOUS_SIGNAL_PIPELINING ON
-set_global_assignment -name PHYSICAL_SYNTHESIS_REGISTER_DUPLICATION ON
+set_global_assignment -name PHYSICAL_SYNTHESIS_REGISTER_RETIMING OFF
+set_global_assignment -name PHYSICAL_SYNTHESIS_ASYNCHRONOUS_SIGNAL_PIPELINING OFF
+set_global_assignment -name PHYSICAL_SYNTHESIS_REGISTER_DUPLICATION OFF
 set_global_assignment -name PHYSICAL_SYNTHESIS_COMBO_LOGIC_FOR_AREA ON
 set_global_assignment -name PHYSICAL_SYNTHESIS_MAP_LOGIC_TO_MEMORY_FOR_AREA ON
 set_global_assignment -name PHYSICAL_SYNTHESIS_EFFORT NORMAL
@@ -166,7 +166,7 @@ set_global_assignment -name USE_CONFIGURATION_DEVICE OFF
 # SignalTap II Assignments
 # ========================
 set_global_assignment -name ENABLE_SIGNALTAP OFF
-set_global_assignment -name USE_SIGNALTAP_FILE output_files/pll.stp
+set_global_assignment -name USE_SIGNALTAP_FILE output_files/ioctl.stp
 
 # Power Estimation Assignments
 # ============================
@@ -337,6 +337,13 @@ set_global_assignment -name PARTITION_NETLIST_TYPE SOURCE -section_id Top
 set_global_assignment -name PARTITION_FITTER_PRESERVATION_LEVEL PLACEMENT_AND_ROUTING -section_id Top
 set_global_assignment -name PARTITION_COLOR 16764057 -section_id Top
 set_global_assignment -name AUTO_SHIFT_REGISTER_RECOGNITION OFF
+set_location_assignment PIN_46 -to UART_TX
+set_location_assignment PIN_31 -to UART_RX
+set_location_assignment PLL_1 -to pll|altpll_component|auto_generated|pll1
+set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to UART_TX
+
+set_global_assignment -name VHDL_FILE rtl/tap_fifo.vhd
+set_global_assignment -name VHDL_FILE rtl/c1530.vhd
 set_global_assignment -name VERILOG_FILE rtl/sid8580/sid_voice.v
 set_global_assignment -name VERILOG_FILE rtl/sid8580/sid_filters.v
 set_global_assignment -name VERILOG_FILE rtl/sid8580/sid_envelope.v
@@ -399,9 +406,5 @@ set_global_assignment -name QIP_FILE rtl/mist/pll_c64_reconfig.qip
 set_global_assignment -name QIP_FILE rtl/mist/rom_reconfig_pal.qip
 set_global_assignment -name QIP_FILE rtl/mist/rom_reconfig_ntsc.qip
 set_global_assignment -name SIGNALTAP_FILE output_files/pll.stp
-set_location_assignment PIN_46 -to UART_TX
-set_location_assignment PIN_31 -to UART_RX
-set_location_assignment PLL_1 -to pll|altpll_component|auto_generated|pll1
-set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to UART_TX
-
+set_global_assignment -name SIGNALTAP_FILE output_files/ioctl.stp
 set_instance_assignment -name PARTITION_HIERARCHY root_partition -to | -section_id Top

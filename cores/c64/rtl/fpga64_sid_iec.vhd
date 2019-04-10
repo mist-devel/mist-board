@@ -131,6 +131,11 @@ entity fpga64_sid_iec is
 		cia_mode    : in std_logic;
 		todclk      : in std_logic;
 
+		cass_motor  : out std_logic;
+		cass_write  : out std_logic;
+		cass_sense  : in  std_logic;
+		cass_do     : in  std_logic;
+
 		disk_num    : out std_logic_vector(7 downto 0);
 
 		c64rom_addr : in std_logic_vector(13 downto 0);
@@ -697,7 +702,7 @@ div1m: process(clk32)				-- this process devides 32 MHz to 1MHz (for the SID)
             pb_in => std_logic_vector(cia1_pbi),
             unsigned(pb_out) => cia1_pbo,
 
-            flag_n => flag2_n,
+            flag_n => cass_do,
             sp_in => sp1_in,
             sp_out => sp1_out,
             cnt_in => cnt1_in,
@@ -757,10 +762,12 @@ div1m: process(clk32)				-- this process devides 32 MHz to 1MHz (for the SID)
 			do => cpuDo,
 			we => cpuWe,
 			
-			diIO => cpuIO(7) & cpuIO(6) & "01" & cpuIO(3) & "111",
+			diIO => cpuIO(7) & cpuIO(6) & cpuIO(5) & cass_sense & cpuIO(3) & "111",
 			doIO => cpuIO
 		);
 
+	cass_motor <= cpuIO(5);
+	cass_write <= cpuIO(3);
 -- -----------------------------------------------------------------------
 -- Keyboard
 -- -----------------------------------------------------------------------

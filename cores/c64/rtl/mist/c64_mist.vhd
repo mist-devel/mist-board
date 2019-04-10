@@ -130,11 +130,11 @@ end component;
 constant CONF_STR : string := 
 	"C64;;"&
 	"S,D64,Mount Disk;"&
-	"F,PRG,Load File;"&
-	"F,CRT,Load Cartridge;" &--3
-	"F,ROM,Load Kernal;"&
---	"F,TAP,Load File;"&--5
+	"F,PRGTAPCRT,Load;"& --2
+	"F,ROM,Load Kernal;"& --3
 --	"F,T64,Load File;"&--6
+	"TH,Play/Stop TAP;"&
+	"OI,Tape sound,Off,On;"&
 	"OG,Disk Write,Enable,Disable;"&
 	"O2,Video standard,PAL,NTSC;"&
 	"O8A,Scandoubler Fx,None,HQ2x-320,HQ2x-160,CRT 25%,CRT 50%;"&
@@ -327,6 +327,7 @@ end component cartridge;
 	signal ces: std_logic_vector(3 downto 0);
 	signal iec_cycle: std_logic;
 	signal iec_cycleD: std_logic;
+	signal iec_cycle_rD: std_logic;
 	signal buttons: std_logic_vector(1 downto 0);
 	
 	-- signals to connect "data_io" for direct PRG injection
@@ -494,7 +495,26 @@ end component cartridge;
 	
 	signal audio_data_l : std_logic_vector(17 downto 0);
 	signal audio_data_r : std_logic_vector(17 downto 0);
-	
+	signal audio_data_l_mix : std_logic_vector(17 downto 0);
+
+	signal cass_motor  : std_logic;
+	signal cass_write  : std_logic;
+	signal cass_sense  : std_logic;
+	signal cass_do : std_logic;
+	signal tap_mem_ce : std_logic;
+	signal tap_play_addr  : std_logic_vector(24 downto 0);
+	signal tap_last_addr  : std_logic_vector(24 downto 0);
+	signal tap_in : std_logic_vector(7 downto 0);
+	signal tap_reset : std_logic;
+	signal tap_wrreq : std_logic;
+	signal tap_wrfull : std_logic;
+	signal tap_fifo_error : std_logic;
+	signal tap_loaded : std_logic;
+	signal tap_mode : std_logic;
+	signal tap_play : std_logic;
+	signal tap_play_btn: std_logic;
+	signal tap_play_btnD: std_logic;
+
 	signal reset_counter    : integer;
 	signal reset_n          : std_logic;
 	signal led_disk         : std_logic;
@@ -511,8 +531,8 @@ end component cartridge;
 	signal mem_ce           : std_logic;
 begin
 
-	-- 1541 activity led
-	LED <= not ioctl_download and not led_disk;
+	-- 1541/tape activity led
+	LED <= not ioctl_download and not led_disk and cass_motor;
 
 	iec_cycle <= '1' when ces = "1011" else '0';
 
@@ -577,7 +597,7 @@ begin
 		ioctl_dout => ioctl_data
 	);
 
-	cart_loading <= '1' when ioctl_download = '1' and ioctl_index = 3 else '0';
+	cart_loading <= '1' when ioctl_download = '1' and ioctl_index = x"82" else '0';
 
 	cart : cartridge
 	port map (
@@ -632,12 +652,12 @@ begin
 	joyA_c64 <= joyB_int when status(3)='1' else joyA_int;
 	joyB_c64 <= joyA_int when status(3)='1' else joyB_int;
 
-	sdram_addr <= c64_addr_temp when iec_cycle='0' else ioctl_ram_addr; 
+	sdram_addr <= c64_addr_temp when iec_cycle='0' else ioctl_ram_addr when ioctl_download = '1' else tap_play_addr;
 	sdram_data_out <= c64_data_out when iec_cycle='0' else ioctl_ram_data;
-	
+
 	-- ram_we and ce are active low
-	sdram_ce <= mem_ce when iec_cycle='0' else ioctl_iec_cycle_used;
-	sdram_we <= not ram_we when iec_cycle='0' else ioctl_iec_cycle_used;
+	sdram_ce <= mem_ce when iec_cycle='0' else ioctl_iec_cycle_used or tap_mem_ce;
+	sdram_we <= not ram_we when iec_cycle='0' else ioctl_iec_cycle_used when ioctl_download = '1' else '0';
 
 	process(clk_c64)
 	begin
@@ -664,7 +684,7 @@ begin
 			end if;
 
 			if ioctl_wr='1' then
-				if ioctl_index = 2 then--prg
+				if ioctl_index = x"02" then--prg
 					if ioctl_addr = 0 then
 						ioctl_load_addr(7 downto 0) <= ioctl_data;
 					elsif(ioctl_addr = 1) then
@@ -674,7 +694,7 @@ begin
 					end if;
 				end if;
 
-				if ioctl_index = 3 then--CRT, e0(MAX)
+				if ioctl_index = x"82" then--CRT, e0(MAX)
 					if ioctl_addr = 0 then
 						ioctl_load_addr <= '0' & X"100000";
 						cart_blk_len <= (others => '0');
@@ -714,21 +734,26 @@ begin
 							ioctl_ram_wr <= '1';
 						end if;
 					end if;
-					
-					if ioctl_index = 5 then
-						if ioctl_addr = 0 then
-							ioctl_load_addr <= '0' & X"200000";
-							ioctl_ram_data <= ioctl_data;
-						else
-							ioctl_ram_wr <= '1';
-						end if;
+				end if;
+
+				if ioctl_index = x"42" then -- TAP
+					if ioctl_addr = 0 then
+						ioctl_load_addr <= '0' & X"200000";
+						ioctl_ram_data <= ioctl_data;
+					else
+						ioctl_ram_wr <= '1';
 					end if;
 				end if;
+
 			end if;
 			
-			if old_download /= ioctl_download and ioctl_index = 3 then
+			if old_download /= ioctl_download and ioctl_index = x"82" then
 				cart_attached <= old_download;
 				erase_cram <= '1';
+			end if;
+
+			if old_download /= ioctl_download and ioctl_index = x"42" then
+				tap_loaded <= old_download;
 			end if;
 
 			if status(5)='1' or buttons(1)='1' then
@@ -754,7 +779,7 @@ begin
 		end if;
 	end process;
 
-	c64rom_wr   <= ioctl_wr when (((ioctl_index = 0) and (ioctl_addr(14) = '0')) or (ioctl_index = 4)) and (ioctl_download = '1') else '0';
+	c64rom_wr   <= ioctl_wr when (((ioctl_index = 0) and (ioctl_addr(14) = '0')) or (ioctl_index = 3)) and (ioctl_download = '1') else '0';
 	c64rom_addr <= ioctl_addr(13 downto 0) when ioctl_index = 0 else '1' & ioctl_addr(12 downto 0);
 	c1541rom_wr <= ioctl_wr when (ioctl_index = 0) and (ioctl_addr(14) = '1') and (ioctl_download = '1') else '0';
 
@@ -891,7 +916,7 @@ begin
 				reset_counter <= 1000000;
 				reset_n <= '0';
 			elsif buttons(1)='1' or status(5)='1' or reset_key = '1' or reset_crt='1' or
-			(ioctl_download='1' and (ioctl_index = 3 or ioctl_index = 4)) then
+			(ioctl_download='1' and (ioctl_index = 3 or ioctl_index = x"82")) then -- kernal or crt
 				reset_counter <= 255;
 				reset_n <= '0';
 			elsif ioctl_download ='1' then
@@ -935,15 +960,18 @@ begin
 		ce => sdram_ce
 	);
 
+	audio_data_l_mix <= audio_data_l when status(18) = '0' else
+	                    audio_data_l + (cass_do & "00000000000000");
+--	                    (cass_do & "00000000000000000");
+
 	dac : sigma_delta_dac
 	port map (
 		clk => clk_c64,
-		ldatasum => audio_data_l(17 downto 3),
+		ldatasum => audio_data_l_mix(17 downto 3),
 		rdatasum => audio_data_r(17 downto 3),
 		aleft => AUDIO_L,
 		aright => AUDIO_R
 	);
-
 
 	fpga64 : entity work.fpga64_sid_iec
 	port map(
@@ -1009,6 +1037,12 @@ begin
 		todclk => todclk,
 		cia_mode => status(4),
 		disk_num => open,
+
+		cass_motor => cass_motor,
+		cass_write => cass_write,
+		cass_sense => cass_sense,
+		cass_do    => cass_do,
+
 		c64rom_addr => c64rom_addr,
 		c64rom_data => ioctl_data,
 		c64rom_wr => c64rom_wr,
@@ -1151,6 +1185,64 @@ begin
 		sd_buff_wr   => sd_buff_wr,
 
 		led => led_disk
+	);
+
+	-- TAP playback controller
+	cass_sense <= not tap_play;
+	tap_play_btn <= status(17);
+
+	process(clk_c64, reset_n)
+	begin
+		if reset_n = '0' then
+			tap_play_addr <= '0' & X"200000";
+			tap_last_addr <= '0' & X"200000";
+			tap_play <= '0';
+			tap_reset <= '1';
+			tap_mem_ce <= '0';
+		elsif rising_edge(clk_c64) then
+			tap_reset <= '0';
+			if ioctl_download = '1' and ioctl_index = x"42" then
+				tap_play <= '0';
+				tap_play_addr <= '0' & X"200000";
+				tap_last_addr <= ioctl_load_addr;
+				tap_reset <= '1';
+				if ioctl_addr = x"00000C" and ioctl_wr = '1' then
+					tap_mode <= ioctl_data(0);
+				end if;
+			end if;
+
+			tap_play_btnD <= tap_play_btn;
+			if tap_loaded = '1' and tap_play_btnD = '0' and tap_play_btn = '1' then
+				tap_play <= not tap_play;
+			end if;
+
+			if tap_fifo_error = '1' or tap_play_addr = tap_last_addr then tap_play <= '0'; end if;
+
+			iec_cycle_rD <= iec_cycle;
+			tap_wrreq <= '0';
+			if iec_cycle = '0' and iec_cycle_rD = '1' and tap_play = '1' and tap_wrfull = '0' then
+				tap_play_addr <= tap_play_addr + 1;
+				tap_mem_ce <= '1';
+			end if;
+			if iec_cycle = '1' and iec_cycle_rD = '1' and tap_mem_ce = '1' then
+				tap_mem_ce <= '0';
+				tap_wrreq <= '1';
+			end if;
+		end if;
+	end process;
+
+	c1530 : entity work.c1530
+	port map(
+		clk32 => clk_c64,
+		restart_tape => tap_reset,
+		wav_mode => '0',
+		tap_mode1 => tap_mode,
+		host_tap_in => c64_data_in,
+		host_tap_wrreq => tap_wrreq,
+		tap_fifo_wrfull => tap_wrfull,
+		tap_fifo_error => tap_fifo_error,
+		play => not cass_motor and not tap_reset,
+		do => cass_do
 	);
 
 	comp_sync : entity work.composite_sync
