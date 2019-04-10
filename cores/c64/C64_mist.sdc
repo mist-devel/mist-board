@@ -52,8 +52,8 @@ set_output_delay -clock [get_clocks {pll|altpll_component|auto_generated|pll1|cl
 set_output_delay -clock [get_clocks {pll|altpll_component|auto_generated|pll1|clk[0]}] -max 1.5 [get_ports {SDRAM_CLK}]
 set_output_delay -clock [get_clocks {pll|altpll_component|auto_generated|pll1|clk[0]}] -min -0.8 [get_ports {SDRAM_CLK}]
 
-set_multicycle_path -from {video_mixer:vmixer|scandoubler:scandoubler|Hq2x:Hq2x|*} -to {VGA_*[*]} -setup 4
-set_multicycle_path -from {video_mixer:vmixer|scandoubler:scandoubler|Hq2x:Hq2x|*} -to {VGA_*[*]} -hold 3
+set_multicycle_path -from {video_mixer:vmixer|scandoubler:scandoubler|Hq2x:Hq2x|*} -setup 4
+set_multicycle_path -from {video_mixer:vmixer|scandoubler:scandoubler|Hq2x:Hq2x|*} -hold 3
 
 set_multicycle_path -to {VGA_*[*]} -setup 4
 set_multicycle_path -to {VGA_*[*]} -hold 3
