@@ -509,7 +509,6 @@ end component cartridge;
 	signal tap_wrreq : std_logic;
 	signal tap_wrfull : std_logic;
 	signal tap_fifo_error : std_logic;
-	signal tap_loaded : std_logic;
 	signal tap_mode : std_logic;
 	signal tap_play : std_logic;
 	signal tap_play_btn: std_logic;
@@ -750,10 +749,6 @@ begin
 			if old_download /= ioctl_download and ioctl_index = x"82" then
 				cart_attached <= old_download;
 				erase_cram <= '1';
-			end if;
-
-			if old_download /= ioctl_download and ioctl_index = x"42" then
-				tap_loaded <= old_download;
 			end if;
 
 			if status(5)='1' or buttons(1)='1' then
@@ -1212,15 +1207,16 @@ begin
 			end if;
 
 			tap_play_btnD <= tap_play_btn;
-			if tap_loaded = '1' and tap_play_btnD = '0' and tap_play_btn = '1' then
+			if tap_play_btnD = '0' and tap_play_btn = '1' then
 				tap_play <= not tap_play;
 			end if;
 
-			if tap_fifo_error = '1' or tap_play_addr = tap_last_addr then tap_play <= '0'; end if;
+			if tap_fifo_error = '1' then tap_play <= '0'; end if;
 
 			iec_cycle_rD <= iec_cycle;
 			tap_wrreq <= '0';
-			if iec_cycle = '0' and iec_cycle_rD = '1' and tap_play = '1' and tap_wrfull = '0' then
+			if iec_cycle = '0' and iec_cycle_rD = '1' and
+			  ioctl_download = '0' and tap_play_addr /= tap_last_addr and tap_wrfull = '0' then
 				tap_play_addr <= tap_play_addr + 1;
 				tap_mem_ce <= '1';
 			end if;
