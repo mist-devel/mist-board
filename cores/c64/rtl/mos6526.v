@@ -2,7 +2,7 @@
 // by Rayne
 // Timers & Interrupts are rewritten by slingshot
 // Passes all Lorenz CIA Timer tests
-// Passes all "new" CIA tests from VICE, except dd0dtest
+// Passes all CIA tests from VICE, except dd0dtest
 
 module mos6526 (
   input  wire       mode,   // 0 - 6526 "old", 1 - 8521 "new"
@@ -55,6 +55,7 @@ reg [5:0] tod_hr;
 reg [7:0] sdr;
 reg [4:0] imr;
 reg [4:0] icr;
+reg timer_b_int; // for Timer B bug
 reg [7:0] cra;
 reg [7:0] crb;
 
@@ -249,10 +250,14 @@ always @(posedge clk) begin
     timer_b        <= 16'h0000;
     timerBff       <= 1'b0;
     icr[1]         <= 1'b0;
+    timer_b_int    <= 0;
   end
   else begin
     if (phi2_p) begin
-      if (int_reset) icr[1] <= 0;
+      if (int_reset) begin
+        icr[1] <= 0;
+        timer_b_int <= 0;
+      end
       countB0 <= cnt_in && ~cnt_in_prev;
       countB1 <= countB0;
       countB2 <= timerBin & crb[0];
@@ -264,6 +269,7 @@ always @(posedge clk) begin
       if (timerBoverflow) begin
         timerBff <= ~timerBff;
         icr[1] <= 1;
+        timer_b_int <= 1;
         timer_b <= {tb_hi, tb_lo};
         countB3 <= 0;
         if (crb[3] | oneShotB0) begin
@@ -271,6 +277,8 @@ always @(posedge clk) begin
             countB2 <= 0;
         end
       end
+      // Timer B bug - INT fired, but ICR not set
+      if (!mode & int_reset) icr[1] <= 0;
 
       if (loadB1) begin
         timer_b <= {tb_hi, tb_lo};
@@ -469,6 +477,8 @@ always @(posedge clk) begin
   end
 end
 
+wire [4:0] icr_adj = {icr[4:2], timer_b_int, icr[0]};
+
 // Interrupt Control
 always @(posedge clk) begin
   reg [7:0] imr_reg;
@@ -485,7 +495,7 @@ always @(posedge clk) begin
 
     if (phi2_p | mode) begin
       imr <= imr_reg[7] ? imr | imr_reg[4:0] : imr & ~imr_reg[4:0];
-      irq_n <= irq_n ? ~|(imr & icr) : irq_n;
+      irq_n <= irq_n ? ~|(imr & icr_adj) : irq_n;
     end
     if (phi2_p & int_reset) begin
       irq_n <= 1;
