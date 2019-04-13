@@ -348,8 +348,6 @@ end component cartridge;
 	signal c64_data_out: std_logic_vector(7 downto 0);
 	signal sdram_addr: std_logic_vector(24 downto 0);
 	signal sdram_data_out: std_logic_vector(7 downto 0);
-	
-	
 
 --	cartridge signals LCA
 	signal cart_id 			: std_logic_vector(15 downto 0);					-- cart ID or cart type
@@ -651,35 +649,38 @@ begin
 	joyA_c64 <= joyB_int when status(3)='1' else joyA_int;
 	joyB_c64 <= joyA_int when status(3)='1' else joyB_int;
 
-	sdram_addr <= c64_addr_temp when iec_cycle='0' else ioctl_ram_addr when ioctl_download = '1' else tap_play_addr;
+	sdram_addr <= c64_addr_temp when iec_cycle='0' else ioctl_ram_addr when ioctl_download = '1' or erasing = '1' else tap_play_addr;
 	sdram_data_out <= c64_data_out when iec_cycle='0' else ioctl_ram_data;
 
 	-- ram_we and ce are active low
 	sdram_ce <= mem_ce when iec_cycle='0' else ioctl_iec_cycle_used or tap_mem_ce;
-	sdram_we <= not ram_we when iec_cycle='0' else ioctl_iec_cycle_used when ioctl_download = '1' else '0';
+	sdram_we <= not ram_we when iec_cycle='0' else ioctl_iec_cycle_used when ioctl_download = '1' or erasing = '1' else '0';
 
 	process(clk_c64)
 	begin
-		if falling_edge(clk_c64) then
+		if rising_edge(clk_c64) then
 
 			old_download <= ioctl_download;
 			iec_cycleD <= iec_cycle;
 			cart_hdr_wr <= '0';
 
-			if(iec_cycle='1' and iec_cycleD='0' and ioctl_ram_wr='1') then
+			if iec_cycle = '0' and iec_cycleD = '1' and ioctl_ram_wr = '1' then
 				ioctl_ram_wr <= '0';
-				ioctl_iec_cycle_used <= '1';
-				ioctl_ram_addr  <= ioctl_load_addr;
-				ioctl_load_addr <= ioctl_load_addr + "1";
+				ioctl_ram_addr <= ioctl_load_addr;
+				ioctl_load_addr <= ioctl_load_addr + 1;
 				if erasing = '1' then
-					ioctl_ram_data  <= (others => '0');
+					-- fill RAM with 64 bytes 0, 64 bytes ff
+					-- same as VICE uses
+					-- Freeload and probably some more code depend on some kind of pattern
+					ioctl_ram_data  <= (others => ioctl_load_addr(6));
 				else
 					ioctl_ram_data <= ioctl_data;
 				end if;
-			else 
-				if(iec_cycle='0') then
-					ioctl_iec_cycle_used <= '0';
-				end if;
+				ioctl_iec_cycle_used <= '1';
+			end if;
+			-- second IEC cycle - SDRAM data written, disable WE on the next
+			if iec_cycle = '1' and iec_cycleD = '1' and ioctl_iec_cycle_used = '1' then
+				ioctl_iec_cycle_used <= '0';
 			end if;
 
 			if ioctl_wr='1' then
@@ -739,9 +740,8 @@ begin
 					if ioctl_addr = 0 then
 						ioctl_load_addr <= '0' & X"200000";
 						ioctl_ram_data <= ioctl_data;
-					else
-						ioctl_ram_wr <= '1';
 					end if;
+					ioctl_ram_wr <= '1';
 				end if;
 
 			end if;
@@ -1211,18 +1211,19 @@ begin
 				tap_play <= not tap_play;
 			end if;
 
-			if tap_fifo_error = '1' then tap_play <= '0'; end if;
+--			if tap_fifo_error = '1' then tap_play <= '0'; end if;
 
 			iec_cycle_rD <= iec_cycle;
 			tap_wrreq <= '0';
 			if iec_cycle = '0' and iec_cycle_rD = '1' and
 			  ioctl_download = '0' and tap_play_addr /= tap_last_addr and tap_wrfull = '0' then
-				tap_play_addr <= tap_play_addr + 1;
 				tap_mem_ce <= '1';
 			end if;
+			-- second IEC cycle - SDRAM data ready on the next
 			if iec_cycle = '1' and iec_cycle_rD = '1' and tap_mem_ce = '1' then
 				tap_mem_ce <= '0';
 				tap_wrreq <= '1';
+				tap_play_addr <= tap_play_addr + 1;
 			end if;
 		end if;
 	end process;
