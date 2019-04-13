@@ -155,11 +155,11 @@ end
 always @(posedge clk) begin
   if (!res_n) icr[4] <= 1'b0;
   else begin
-    if (!flag_n && flag_n_prev) icr[4] <= 1'b1;
     if (phi2_p) begin
-      flag_n_prev <= flag_n;
       if (int_reset) icr[4] <= 1'b0;
     end
+    flag_n_prev <= flag_n;
+    if (!flag_n && flag_n_prev) icr[4] <= 1'b1;
   end
 end
 

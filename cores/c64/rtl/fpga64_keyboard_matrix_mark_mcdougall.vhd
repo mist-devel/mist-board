@@ -72,10 +72,14 @@ architecture rtl of fpga64_keyboard_matrix is
 	signal key_return: std_logic := '0';
 	signal key_left: std_logic := '0';
 	signal key_right: std_logic := '0';
-	signal key_f7: std_logic := '0';
 	signal key_f1: std_logic := '0';
+	signal key_f2: std_logic := '0';
 	signal key_f3: std_logic := '0';
+	signal key_f4: std_logic := '0';
 	signal key_f5: std_logic := '0';
+	signal key_f6: std_logic := '0';
+	signal key_f7: std_logic := '0';
+	signal key_f8: std_logic := '0';
 	signal key_up: std_logic := '0';
 	signal key_down: std_logic := '0';
 
@@ -144,7 +148,7 @@ architecture rtl of fpga64_keyboard_matrix is
 
 	-- for joystick emulation on PS2
 	signal joySelKey : std_logic;
-	signal joyKeys : std_logic_vector(joyA'range);	-- active high
+	signal joyKeys : std_logic_vector(joyA'range) := (others => '0');	-- active high
 	signal joyA_s : unsigned(joyA'range);						-- active low
 	signal joyB_s : unsigned(joyB'range);						-- active low
 	signal joySel : std_logic_vector(1 downto 0) := "00";
@@ -206,10 +210,10 @@ begin
 				((pbi(0) or not key_del) and
 				(pbi(1) or not key_return) and
 				(pbi(2) or not (key_left or key_right)) and
-				(pbi(3) or not key_f7) and
-				(pbi(4) or not key_f1) and
-				(pbi(5) or not key_f3) and
-				(pbi(6) or not key_f5) and
+				(pbi(3) or not (key_f7 or key_f8)) and
+				(pbi(4) or not (key_f1 or key_f2)) and
+				(pbi(5) or not (key_f3 or key_f4)) and
+				(pbi(6) or not (key_f5 or key_f6)) and
 				(pbi(7) or not (key_up or key_down))));
 			pao(1) <= pai(1) and joyA_s(1) and
 				((not backwardsReadingEnabled) or
@@ -220,7 +224,7 @@ begin
 				(pbi(4) or not key_Z) and
 				(pbi(5) or not key_S) and
 				(pbi(6) or not key_E) and
-				(pbi(7) or not (key_left or key_up or key_shiftL))));
+				(pbi(7) or not (key_left or key_up or key_shiftL or key_f2 or key_f4 or key_f6 or key_f8))));
 			pao(2) <= pai(2) and joyA_s(2) and
 				((not backwardsReadingEnabled) or
 				((pbi(0) or not key_5) and
@@ -348,7 +352,7 @@ begin
 				(pai(7) or not key_Q);
 			pbo(7) <= pbi(7) and
 				(pai(0) or not (key_up or key_down)) and
-				(pai(1) or not (key_left or key_up or key_shiftL)) and
+				(pai(1) or not (key_left or key_up or key_shiftL or key_f2 or key_f4 or key_f6 or key_f8)) and
 				(pai(2) or not key_X) and
 				(pai(3) or not key_V) and
 				(pai(4) or not key_N) and
@@ -371,25 +375,22 @@ begin
 					releaseFlag <= '0';		
 					extendedFlag <= '0';
 					case theScanCode is
-					when X"01" => key_pound <= not releaseFlag;
-					when X"03" => key_F5 <= not releaseFlag;
-					when X"04" => key_F3 <= not releaseFlag;
 					when X"05" => key_F1 <= not releaseFlag;
-					when X"06" => -- F2
-						if releaseFlag = '0' then
-							traceKey <= '1';
-						end if;
-					when X"09" => key_plus <= not releaseFlag;
-					when X"0A" => -- F8
-						if releaseFlag = '0' then
-							diskChgKey <= '1';
-						end if;
-					when X"0B" => -- F6
-						if releaseFlag = '0' then
-							trace2Key <= '1';
-						end if;
-					when X"0C" => restore_key <= not releaseFlag; -- F4
+					when X"06" => key_F2 <= not releaseFlag;
+					when X"04" => key_F3 <= not releaseFlag;
+					when X"0C" => key_F4 <= not releaseFlag;
+					when X"03" => key_F5 <= not releaseFlag;
+					when X"0B" => key_F6 <= not releaseFlag;
 					when X"83" => key_F7 <= not releaseFlag;
+					when X"0A" => key_F8 <= not releaseFlag;
+					when X"01" => key_pound <= not releaseFlag; -- F9
+					when X"09" => key_plus <= not releaseFlag; -- F10
+					when X"78" => -- F11
+						if key_ctrl = '1' then
+							reset_key <= not releaseFlag;
+						else
+							restore_key <= not releaseFlag;
+						end if;
 					when X"0E" => key_arrowleft <= not releaseFlag;
 					when X"11" => key_commodore <= not releaseFlag; 
 					when X"12" => if extendedFlag = '0' then key_shiftl <= not releaseFlag; end if;
@@ -458,14 +459,6 @@ begin
 					when X"74" => if extendedFlag = '0' then joyKeys(3) <= not releaseFlag; else key_right <= not releaseFlag; end if;
 					when X"75" => if extendedFlag = '0' then joyKeys(0) <= not releaseFlag; else key_up <= not releaseFlag; end if;
 					when X"76" => key_runstop <= not releaseFlag; 
-					when X"78" => -- F11
-						if key_ctrl = '1' then
-							reset_key <= not releaseFlag;
-						else
-							if releaseFlag = '0' then
-								joySelKey <= '1';
-							end if;
-						end if;
 					when others => null;
 					end case;
 				end if;
