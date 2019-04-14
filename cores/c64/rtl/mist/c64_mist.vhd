@@ -403,6 +403,22 @@ end component cartridge;
 	signal c64_b  : std_logic_vector(5 downto 0);
 
 	signal status         : std_logic_vector(31 downto 0);
+  
+	-- status(1) and status(12) are not used
+	signal st_tape_sound       : std_logic;                    -- status(18)
+	signal st_tap_play_btn     : std_logic;                    -- status(17)
+	signal st_disk_readonly    : std_logic;                    -- status(16)
+	signal st_sid_mode         : std_logic_vector(2 downto 0); -- status(15 downto 13)
+	signal st_c64gs            : std_logic;                    -- status(11)
+	signal st_scandoubler_fx   : std_logic_vector(2 downto 0); -- status(10 downto 8)
+	signal st_user_port_uart   : std_logic;                    -- status(7)
+	signal st_audio_filter_off : std_logic;                    -- status(6)
+	signal st_detach_cartdrige : std_logic;                    -- status(5)
+	signal st_cia_mode         : std_logic;                    -- status(4)
+	signal st_swap_joystick    : std_logic;                    -- status(3)
+	signal st_ntsc             : std_logic;                    -- status(2)
+	signal st_reset            : std_logic;                    -- status(0)
+
 	signal scanlines      : std_logic_vector(1 downto 0);
 	signal hq2x           : std_logic;
 	signal ce_pix_actual  : std_logic;
@@ -553,7 +569,21 @@ begin
 
 		conf_str => to_slv(CONF_STR),
 
-		status => status,
+		-- map status word (12 and 1 are not used)
+		status(18)           => st_tape_sound,
+		status(17)           => st_tap_play_btn,
+		status(16)           => st_disk_readonly,
+		status(15 downto 13) => st_sid_mode,
+		status(11)           => st_c64gs,
+		status(10 downto 8)  => st_scandoubler_fx,
+		status(7)            => st_user_port_uart,
+		status(6)            => st_audio_filter_off,
+		status(5)            => st_detach_cartdrige,
+		status(4)            => st_cia_mode,
+		status(3)            => st_swap_joystick,
+		status(2)            => st_ntsc,
+		status(0)            => st_reset,
+ 
 		buttons => buttons,
 		scandoubler_disable => tv15Khz_mode,
 		ypbpr => ypbpr,
@@ -646,8 +676,8 @@ begin
 	joyD_c64 <= joyD(6 downto 4) & joyD(0) & joyD(1) & joyD(2) & joyD(3);
 
 	-- swap joysticks if requested
-	joyA_c64 <= joyB_int when status(3)='1' else joyA_int;
-	joyB_c64 <= joyA_int when status(3)='1' else joyB_int;
+	joyA_c64 <= joyB_int when st_swap_joystick='1' else joyA_int;
+	joyB_c64 <= joyA_int when st_swap_joystick='1' else joyB_int;
 
 	sdram_addr <= c64_addr_temp when iec_cycle='0' else ioctl_ram_addr when ioctl_download = '1' or erasing = '1' else tap_play_addr;
 	sdram_data_out <= c64_data_out when iec_cycle='0' else ioctl_ram_data;
@@ -751,7 +781,7 @@ begin
 				erase_cram <= '1';
 			end if;
 
-			if status(5)='1' or buttons(1)='1' then
+			if st_detach_cartdrige='1' or buttons(1)='1' then
 				cart_attached <= '0';
 			end if;
 			
@@ -795,7 +825,7 @@ begin
 		end if;
 	end process;
 
-	ntsc_init_mode <= status(2);
+	ntsc_init_mode <= st_ntsc;
 
 	pll_rom_pal : entity work.rom_reconfig_pal
 	port map(
@@ -907,10 +937,10 @@ begin
 		if rising_edge(clk_c64) then
 			-- Reset by:
 			-- Button at device, IO controller reboot, OSD or FPGA startup
-			if status(0)='1' or pll_locked = '0' then
+			if st_reset = '1' or pll_locked = '0' then
 				reset_counter <= 1000000;
 				reset_n <= '0';
-			elsif buttons(1)='1' or status(5)='1' or reset_key = '1' or reset_crt='1' or
+			elsif buttons(1)='1' or st_detach_cartdrige='1' or reset_key = '1' or reset_crt='1' or
 			(ioctl_download='1' and (ioctl_index = 3 or ioctl_index = x"82")) then -- kernal or crt
 				reset_counter <= 255;
 				reset_n <= '0';
@@ -955,7 +985,7 @@ begin
 		ce => sdram_ce
 	);
 
-	audio_data_l_mix <= audio_data_l when status(18) = '0' else
+	audio_data_l_mix <= audio_data_l when st_tape_sound = '0' else
 	                    audio_data_l + (cass_do & "00000000000000");
 --	                    (cass_do & "00000000000000000");
 
@@ -972,7 +1002,7 @@ begin
 	port map(
 		clk32 => clk_c64,
 		reset_n => reset_n,
-		c64gs => status(11),-- not enough BRAM
+		c64gs => st_c64gs,-- not enough BRAM
 		kbd_clk => not ps2_clk,
 		kbd_dat => ps2_dat,
 		ramAddr => c64_addr_int,
@@ -1016,8 +1046,8 @@ begin
 		idle => idle,
 		audio_data_l => audio_data_l,
 		audio_data_r => audio_data_r,
-		extfilter_en => not status(6),
-		sid_mode => status(15 downto 13),
+		extfilter_en => not st_audio_filter_off,
+		sid_mode => st_sid_mode,
 		iec_data_o => c64_iec_data_o,
 		iec_atn_o  => c64_iec_atn_o,
 		iec_clk_o  => c64_iec_clk_o,
@@ -1030,7 +1060,7 @@ begin
 		pb_out => pb_out,
 		flag2_n => flag2_n,
 		todclk => todclk,
-		cia_mode => status(4),
+		cia_mode => st_cia_mode,
 		disk_num => open,
 
 		cass_motor => cass_motor,
@@ -1082,7 +1112,7 @@ begin
 	process (pa2_out, pb_out, joyC_c64, joyD_c64, UART_RX, status)
 	begin
 		pa2_in <= pa2_out;
-		if status(7) = '0' then
+		if st_user_port_uart = '0' then
 			-- Protovision 4 player interface
 			flag2_n <= '1';
 			UART_TX <= '0';
@@ -1120,7 +1150,7 @@ begin
 		end if;
 	end process;
 
-	disk_readonly <= status(16);
+	disk_readonly <= st_disk_readonly;
 
     c64_iec_data_i <= c1541_iec_data_o;
     c64_iec_clk_i <= c1541_iec_clk_o;
@@ -1184,7 +1214,7 @@ begin
 
 	-- TAP playback controller
 	cass_sense <= not tap_play;
-	tap_play_btn <= status(17);
+	tap_play_btn <= st_tap_play_btn; 
 
 	process(clk_c64, reset_n)
 	begin
@@ -1257,15 +1287,15 @@ begin
 	c64_g <= (others => '0') when blank = '1' else std_logic_vector(g(7 downto 2));
 	c64_b <= (others => '0') when blank = '1' else std_logic_vector(b(7 downto 2));
 	
-	scanlines <= status(10 downto 9);
-	hq2x <= status(9) xor status(8);
+	scanlines <= st_scandoubler_fx(2 downto 1);
+	hq2x <= st_scandoubler_fx(1) xor st_scandoubler_fx(0);
 	ce_pix_actual <= ce_4 when hq2x160='1' else ce_8;
 	
 	process(clk_c64)
 	begin
 		if rising_edge(clk_c64) then
 			if((old_vsync = '0') and (vsync_out = '1')) then
-				if(status(10 downto 8)="010") then
+				if(st_scandoubler_fx="010") then
 					hq2x160 <= '1';
 				else
 					hq2x160 <= '0';
