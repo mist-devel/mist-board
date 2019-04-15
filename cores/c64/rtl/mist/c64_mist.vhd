@@ -550,9 +550,9 @@ end component cartridge;
 	signal erase_to         : std_logic_vector(4 downto 0) := (others => '0');
 	signal mem_ce           : std_logic;
 	
-   -- sdram layout 
-   constant C64_MEM_START : std_logic_vector(24 downto 0) := '0' & X"000000"; -- normal C64 RAM
-   constant CRT_MEM_START : std_logic_vector(24 downto 0) := '0' & X"100000"; -- cartdriges
+	-- sdram layout 
+	constant C64_MEM_START : std_logic_vector(24 downto 0) := '0' & X"000000"; -- normal C64 RAM
+	constant CRT_MEM_START : std_logic_vector(24 downto 0) := '0' & X"100000"; -- cartdriges
 	constant TAP_MEM_START : std_logic_vector(24 downto 0) := '0' & X"200000"; -- .tap files 
 	
 begin
