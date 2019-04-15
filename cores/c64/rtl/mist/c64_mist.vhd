@@ -207,6 +207,13 @@ component user_io generic(STRLEN : integer := 0 ); port
 	);
 end component user_io;
 
+-- constants for ioctl_index 
+constant FILE_BOOT : std_logic_vector(7 downto 0) := x"00";      -- ROM files sent at boot time
+constant FILE_PRG  : std_logic_vector(7 downto 0) := x"02";
+constant FILE_TAP  : std_logic_vector(7 downto 0) := x"42";
+constant FILE_CRT  : std_logic_vector(7 downto 0) := x"82";
+constant FILE_ROM  : std_logic_vector(7 downto 0) := x"03";
+
 component data_io port
 (
 	clk_sys			  : in std_logic;
@@ -624,7 +631,7 @@ begin
 		ioctl_dout => ioctl_data
 	);
 
-	cart_loading <= '1' when ioctl_download = '1' and ioctl_index = x"82" else '0';
+	cart_loading <= '1' when ioctl_download = '1' and ioctl_index = FILE_CRT else '0';
 
 	cart : cartridge
 	port map (
@@ -714,7 +721,7 @@ begin
 			end if;
 
 			if ioctl_wr='1' then
-				if ioctl_index = x"02" then--prg
+				if ioctl_index = FILE_PRG then
 					if ioctl_addr = 0 then
 						ioctl_load_addr(7 downto 0) <= ioctl_data;
 					elsif(ioctl_addr = 1) then
@@ -724,7 +731,7 @@ begin
 					end if;
 				end if;
 
-				if ioctl_index = x"82" then--CRT, e0(MAX)
+				if ioctl_index = FILE_CRT then -- e0(MAX)
 					if ioctl_addr = 0 then
 						ioctl_load_addr <= '0' & X"100000";
 						cart_blk_len <= (others => '0');
@@ -766,7 +773,7 @@ begin
 					end if;
 				end if;
 
-				if ioctl_index = x"42" then -- TAP
+				if ioctl_index = FILE_TAP then
 					if ioctl_addr = 0 then
 						ioctl_load_addr <= '0' & X"200000";
 						ioctl_ram_data <= ioctl_data;
@@ -776,7 +783,7 @@ begin
 
 			end if;
 			
-			if old_download /= ioctl_download and ioctl_index = x"82" then
+			if old_download /= ioctl_download and ioctl_index = FILE_CRT then
 				cart_attached <= old_download;
 				erase_cram <= '1';
 			end if;
@@ -804,9 +811,9 @@ begin
 		end if;
 	end process;
 
-	c64rom_wr   <= ioctl_wr when (((ioctl_index = 0) and (ioctl_addr(14) = '0')) or (ioctl_index = 3)) and (ioctl_download = '1') else '0';
-	c64rom_addr <= ioctl_addr(13 downto 0) when ioctl_index = 0 else '1' & ioctl_addr(12 downto 0);
-	c1541rom_wr <= ioctl_wr when (ioctl_index = 0) and (ioctl_addr(14) = '1') and (ioctl_download = '1') else '0';
+	c64rom_wr   <= ioctl_wr when (((ioctl_index = FILE_BOOT) and (ioctl_addr(14) = '0')) or (ioctl_index = FILE_ROM)) and (ioctl_download = '1') else '0';
+	c64rom_addr <= ioctl_addr(13 downto 0) when ioctl_index = FILE_BOOT else '1' & ioctl_addr(12 downto 0);
+	c1541rom_wr <= ioctl_wr when (ioctl_index = FILE_BOOT) and (ioctl_addr(14) = '1') and (ioctl_download = '1') else '0';
 
 	process(clk_c64)
 	begin
@@ -941,7 +948,7 @@ begin
 				reset_counter <= 1000000;
 				reset_n <= '0';
 			elsif buttons(1)='1' or st_detach_cartdrige='1' or reset_key = '1' or reset_crt='1' or
-			(ioctl_download='1' and (ioctl_index = 3 or ioctl_index = x"82")) then -- kernal or crt
+			(ioctl_download='1' and (ioctl_index = FILE_ROM or ioctl_index = FILE_CRT)) then 
 				reset_counter <= 255;
 				reset_n <= '0';
 			elsif ioctl_download ='1' then
@@ -1214,8 +1221,8 @@ begin
 
 	-- TAP playback controller
 	cass_sense <= not tap_play;
-	tap_play_btn <= st_tap_play_btn; 
-
+	tap_play_btn <= st_tap_play_btn; 	
+	
 	process(clk_c64, reset_n)
 	begin
 		if reset_n = '0' then
@@ -1226,7 +1233,7 @@ begin
 			tap_mem_ce <= '0';
 		elsif rising_edge(clk_c64) then
 			tap_reset <= '0';
-			if ioctl_download = '1' and ioctl_index = x"42" then
+			if ioctl_download = '1' and ioctl_index = FILE_TAP then
 				tap_play <= '0';
 				tap_play_addr <= '0' & X"200000";
 				tap_last_addr <= ioctl_load_addr;
