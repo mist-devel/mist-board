@@ -549,6 +549,12 @@ end component cartridge;
 	signal force_erase      : std_logic;
 	signal erase_to         : std_logic_vector(4 downto 0) := (others => '0');
 	signal mem_ce           : std_logic;
+	
+   -- sdram layout 
+   constant C64_MEM_START : std_logic_vector(24 downto 0) := '0' & X"000000"; -- normal C64 RAM
+   constant CRT_MEM_START : std_logic_vector(24 downto 0) := '0' & X"100000"; -- cartdriges
+	constant TAP_MEM_START : std_logic_vector(24 downto 0) := '0' & X"200000"; -- .tap files 
+	
 begin
 
 	-- 1541/tape activity led
@@ -733,7 +739,7 @@ begin
 
 				if ioctl_index = FILE_CRT then -- e0(MAX)
 					if ioctl_addr = 0 then
-						ioctl_load_addr <= '0' & X"100000";
+						ioctl_load_addr <= CRT_MEM_START;
 						cart_blk_len <= (others => '0');
 						cart_hdr_cnt <= (others => '0');
 					end if;
@@ -775,7 +781,7 @@ begin
 
 				if ioctl_index = FILE_TAP then
 					if ioctl_addr = 0 then
-						ioctl_load_addr <= '0' & X"200000";
+						ioctl_load_addr <= TAP_MEM_START;
 						ioctl_ram_data <= ioctl_data;
 					end if;
 					ioctl_ram_wr <= '1';
@@ -1226,8 +1232,8 @@ begin
 	process(clk_c64, reset_n)
 	begin
 		if reset_n = '0' then
-			tap_play_addr <= '0' & X"200000";
-			tap_last_addr <= '0' & X"200000";
+			tap_play_addr <= TAP_MEM_START;
+			tap_last_addr <= TAP_MEM_START;
 			tap_play <= '0';
 			tap_reset <= '1';
 			tap_mem_ce <= '0';
@@ -1235,7 +1241,7 @@ begin
 			tap_reset <= '0';
 			if ioctl_download = '1' and ioctl_index = FILE_TAP then
 				tap_play <= '0';
-				tap_play_addr <= '0' & X"200000";
+				tap_play_addr <= TAP_MEM_START;
 				tap_last_addr <= ioctl_load_addr;
 				tap_reset <= '1';
 				if ioctl_addr = x"00000C" and ioctl_wr = '1' then
