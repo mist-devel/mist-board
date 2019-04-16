@@ -134,7 +134,7 @@ entity fpga64_sid_iec is
 		cass_motor  : out std_logic;
 		cass_write  : out std_logic;
 		cass_sense  : in  std_logic;
-		cass_do     : in  std_logic;
+		cass_read   : in  std_logic;
 
 		disk_num    : out std_logic_vector(7 downto 0);
 
@@ -702,7 +702,7 @@ div1m: process(clk32)				-- this process devides 32 MHz to 1MHz (for the SID)
             pb_in => std_logic_vector(cia1_pbi),
             unsigned(pb_out) => cia1_pbo,
 
-            flag_n => cass_do,
+            flag_n => cass_read,
             sp_in => sp1_in,
             sp_out => sp1_out,
             cnt_in => cnt1_in,
