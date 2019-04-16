@@ -486,6 +486,6 @@ pll pll (
 	 .locked(pll_locked)
 );
 
-assign SDRAM_CLK = ~clk64;
+assign SDRAM_CLK = clk64;
 
 endmodule
