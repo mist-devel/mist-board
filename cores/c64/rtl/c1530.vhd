@@ -137,7 +137,7 @@ begin
 
 			-- Wav player required a large depth fifo to give chance
 			-- fifo not falling empty while host go reading next sd card sector
-			-- (fifo is read every ~22Âµs, host have to be faster than 11ms to read sd sector)
+			-- (fifo is read every ~22µs, host have to be faster than 11ms to read sd sector)
 
 			wav_player_tick_cnt <= wav_player_tick_cnt + '1';
 		
@@ -166,7 +166,7 @@ begin
 --			if ((tap_player_tick_cnt = "100000") and (skip_bytes = '0')) then -- divide by 33
 			if ((tap_player_tick_cnt = "011111") and (skip_bytes = '0')) then -- divide by 32
 
-				-- square wave period (1/2 duty cycle not mendatory, only falling edge matter)
+				-- square wave period (1/2 duty cycle not mandatory, only falling edge matter)
 				if wave_cnt > '0' & wave_len(10 downto 1) then
 					cass_read <= '1';
 				else
