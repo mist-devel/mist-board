@@ -140,7 +140,7 @@ begin
 
 			-- Wav player required a large depth fifo to give chance
 			-- fifo not falling empty while host go reading next sd card sector
-			-- (fifo is read every ~22Âµs, host have to be faster than 11ms to read sd sector)
+			-- (fifo is read every ~22µs, host have to be faster than 11ms to read sd sector)
 
 			wav_player_tick_cnt <= wav_player_tick_cnt + '1';
 		
