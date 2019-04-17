@@ -126,10 +126,13 @@ begin
 		end if;
 		
 		playing <= (not cass_motor) and (not sense) and (not ear_input_detected);  -- cass_motor and sense are low active
+		
+		if playing = '0' and ear_input_detected = '0' then
+			cass_read <= '1';
+		end if;	
 
 		tap_fifo_rdreq <= '0';
-		if playing = '0' then 
-			cass_read <= '1';
+		if playing = '0' then 			
 			tap_fifo_error <= '0';
 			wave_cnt <= (others => '0');
 			wave_len <= (others => '0');
@@ -141,7 +144,7 @@ begin
 
 			-- Wav player required a large depth fifo to give chance
 			-- fifo not falling empty while host go reading next sd card sector
-			-- (fifo is read every ~22µs, host have to be faster than 11ms to read sd sector)
+			-- (fifo is read every ~22Âµs, host have to be faster than 11ms to read sd sector)
 
 			wav_player_tick_cnt <= wav_player_tick_cnt + '1';
 		
