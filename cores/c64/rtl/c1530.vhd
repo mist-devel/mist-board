@@ -129,6 +129,7 @@ begin
 
 		tap_fifo_rdreq <= '0';
 		if playing = '0' then 
+			cass_read <= '1';
 			tap_fifo_error <= '0';
 			wave_cnt <= (others => '0');
 			wave_len <= (others => '0');
