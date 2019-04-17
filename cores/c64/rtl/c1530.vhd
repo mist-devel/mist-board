@@ -132,13 +132,6 @@ begin
 		end if;	
 
 		tap_fifo_rdreq <= '0';
-		if playing = '0' then 			
-			tap_fifo_error <= '0';
-			wave_cnt <= (others => '0');
-			wave_len <= (others => '0');
-			tap_player_tick_cnt <= (others => '0');
-			wav_player_tick_cnt <= (others => '0');
-		end if;		
 
 		if (playing = '1') and (wav_mode = '1') then
 
