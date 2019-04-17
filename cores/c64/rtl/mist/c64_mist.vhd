@@ -996,7 +996,7 @@ begin
 	);
 
 	audio_data_l_mix <= audio_data_l when st_tape_sound = '0' else
-	                    audio_data_l + ((cass_read or cass_write) & "00000000000000");
+	                    audio_data_l + ((not (cass_read or cass_write)) & "00000000000000");
 --	                    (cass_read & "00000000000000000");
 
 	dac : sigma_delta_dac
