@@ -521,19 +521,16 @@ end component cartridge;
 	signal cass_motor  : std_logic;
 	signal cass_write  : std_logic;
 	signal cass_sense  : std_logic;
-	signal cass_do : std_logic;
-	signal tap_mem_ce : std_logic;
+	signal cass_read   : std_logic;
+	
+	signal tap_mem_ce     : std_logic;
 	signal tap_play_addr  : std_logic_vector(24 downto 0);
-	signal tap_last_addr  : std_logic_vector(24 downto 0);
-	signal tap_in : std_logic_vector(7 downto 0);
-	signal tap_reset : std_logic;
-	signal tap_wrreq : std_logic;
-	signal tap_wrfull : std_logic;
+	signal tap_last_addr  : std_logic_vector(24 downto 0);	
+	signal tap_reset      : std_logic;
+	signal tap_wrreq      : std_logic;
+	signal tap_wrfull     : std_logic;
 	signal tap_fifo_error : std_logic;
-	signal tap_mode : std_logic;
-	signal tap_play : std_logic;
-	signal tap_play_btn: std_logic;
-	signal tap_play_btnD: std_logic;
+	signal tap_version    : std_logic;	
 
 	signal reset_counter    : integer;
 	signal reset_n          : std_logic;
@@ -999,8 +996,8 @@ begin
 	);
 
 	audio_data_l_mix <= audio_data_l when st_tape_sound = '0' else
-	                    audio_data_l + (cass_do & "00000000000000");
---	                    (cass_do & "00000000000000000");
+	                    audio_data_l + ((not (cass_read or cass_write)) & "00000000000000");
+--	                    (cass_read & "00000000000000000");
 
 	dac : sigma_delta_dac
 	port map (
@@ -1078,9 +1075,9 @@ begin
 
 		cass_motor => cass_motor,
 		cass_write => cass_write,
+		cass_read  => cass_read,
 		cass_sense => cass_sense,
-		cass_do    => cass_do,
-
+		
 		c64rom_addr => c64rom_addr,
 		c64rom_data => ioctl_data,
 		c64rom_wr => c64rom_wr,
@@ -1225,33 +1222,23 @@ begin
 		led => led_disk
 	);
 
-	-- TAP playback controller
-	cass_sense <= not tap_play;
-	tap_play_btn <= st_tap_play_btn; 	
-	
+	-- TAP playback controller	
 	process(clk_c64, reset_n)
 	begin
 		if reset_n = '0' then
 			tap_play_addr <= TAP_MEM_START;
-			tap_last_addr <= TAP_MEM_START;
-			tap_play <= '0';
+			tap_last_addr <= TAP_MEM_START;			
 			tap_reset <= '1';
 			tap_mem_ce <= '0';
 		elsif rising_edge(clk_c64) then
 			tap_reset <= '0';
-			if ioctl_download = '1' and ioctl_index = FILE_TAP then
-				tap_play <= '0';
+			if ioctl_download = '1' and ioctl_index = FILE_TAP then				
 				tap_play_addr <= TAP_MEM_START;
 				tap_last_addr <= ioctl_load_addr;
 				tap_reset <= '1';
 				if ioctl_addr = x"00000C" and ioctl_wr = '1' then
-					tap_mode <= ioctl_data(0);
+					tap_version <= ioctl_data(0);
 				end if;
-			end if;
-
-			tap_play_btnD <= tap_play_btn;
-			if tap_play_btnD = '0' and tap_play_btn = '1' then
-				tap_play <= not tap_play;
 			end if;
 
 --			if tap_fifo_error = '1' then tap_play <= '0'; end if;
@@ -1276,13 +1263,17 @@ begin
 		clk32 => clk_c64,
 		restart_tape => tap_reset,
 		wav_mode => '0',
-		tap_mode1 => tap_mode,
+		tap_version => tap_version,
 		host_tap_in => c64_data_in,
 		host_tap_wrreq => tap_wrreq,
 		tap_fifo_wrfull => tap_wrfull,
-		tap_fifo_error => tap_fifo_error,
-		play => not cass_motor and not tap_reset,
-		do => cass_do
+		tap_fifo_error => tap_fifo_error,		
+		cass_read  => cass_read,
+		cass_write => cass_write,
+		cass_motor => cass_motor,
+		cass_sense => cass_sense,
+		osd_play_stop_toggle => st_tap_play_btn,
+		ear_input => UART_RX
 	);
 
 	comp_sync : entity work.composite_sync
