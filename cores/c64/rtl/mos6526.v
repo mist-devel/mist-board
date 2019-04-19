@@ -2,7 +2,7 @@
 // by Rayne
 // Timers & Interrupts are rewritten by slingshot
 // Passes all Lorenz CIA Timer tests
-// Passes all "new" CIA tests from VICE, except dd0dtest
+// Passes all CIA tests from VICE, except dd0dtest
 
 module mos6526 (
   input  wire       mode,   // 0 - 6526 "old", 1 - 8521 "new"
@@ -55,6 +55,7 @@ reg [5:0] tod_hr;
 reg [7:0] sdr;
 reg [4:0] imr;
 reg [4:0] icr;
+reg timer_b_int; // for Timer B bug
 reg [7:0] cra;
 reg [7:0] crb;
 
@@ -121,10 +122,7 @@ always @(posedge clk) begin
     case (rs)
       4'h0: pra  <= db_in;
       4'h2: ddra <= db_in;
-		default: begin
-        pra  <= pra;
-        ddra <= ddra;
-		end
+      default: ;
     endcase
   if (phi2_p) pa_out <= pra | ~ddra;
 end
@@ -139,10 +137,7 @@ always @(posedge clk) begin
     case (rs)
       4'h1: prb  <= db_in;
       4'h3: ddrb <= db_in;
-      default: begin
-        prb  <= prb;
-        ddrb <= ddrb;
-      end
+      default: ;
     endcase
   if (phi2_p) begin
     pb_out[7]   <= crb[1] ? (crb[2] ? timerBff ^ timerBoverflow : timerBoverflow) : prb[7] | ~ddrb[7];
@@ -255,10 +250,14 @@ always @(posedge clk) begin
     timer_b        <= 16'h0000;
     timerBff       <= 1'b0;
     icr[1]         <= 1'b0;
+    timer_b_int    <= 0;
   end
   else begin
     if (phi2_p) begin
-      if (int_reset) icr[1] <= 0;
+      if (int_reset) begin
+        icr[1] <= 0;
+        timer_b_int <= 0;
+      end
       countB0 <= cnt_in && ~cnt_in_prev;
       countB1 <= countB0;
       countB2 <= timerBin & crb[0];
@@ -270,6 +269,7 @@ always @(posedge clk) begin
       if (timerBoverflow) begin
         timerBff <= ~timerBff;
         icr[1] <= 1;
+        timer_b_int <= 1;
         timer_b <= {tb_hi, tb_lo};
         countB3 <= 0;
         if (crb[3] | oneShotB0) begin
@@ -277,6 +277,8 @@ always @(posedge clk) begin
             countB2 <= 0;
         end
       end
+      // Timer B bug - INT fired, but ICR not set
+      if (!mode & int_reset) icr[1] <= 0;
 
       if (loadB1) begin
         timer_b <= {tb_hi, tb_lo};
@@ -326,7 +328,7 @@ always @(posedge clk) begin
     case (rs)
       4'h8: tod_latched <= 1'b0;
       4'hb: tod_latched <= 1'b1;
-      default: tod_latched <= tod_latched;
+      default: ;
     endcase
   else if (wr)
     case (rs)
@@ -345,14 +347,7 @@ always @(posedge clk) begin
               if (db_in[4:0] == 5'h12) tod_hr <= {~db_in[7], db_in[4:0]};
               else tod_hr <= {db_in[7], db_in[4:0]};
             end
-      default: begin
-        tod_run   <= tod_run;
-        tod_10ths <= tod_10ths;
-        tod_sec   <= tod_sec;
-        tod_min   <= tod_min;
-        tod_hr    <= tod_hr;
-        tod_alarm <= tod_alarm;
-      end
+      default: ;
     endcase
   tod_prev <= tod;
   tod_tick <= 1'b0;
@@ -482,11 +477,15 @@ always @(posedge clk) begin
   end
 end
 
-reg [7:0] imr_reg;
+wire [4:0] icr_adj = {icr[4:2], timer_b_int, icr[0]};
+
 // Interrupt Control
 always @(posedge clk) begin
+  reg [7:0] imr_reg;
+
   if (!res_n) begin
     imr       <= 5'h00;
+    imr_reg   <= 0;
     irq_n     <= 1'b1;
     int_reset <= 0;
   end
@@ -496,7 +495,7 @@ always @(posedge clk) begin
 
     if (phi2_p | mode) begin
       imr <= imr_reg[7] ? imr | imr_reg[4:0] : imr & ~imr_reg[4:0];
-      irq_n <= irq_n ? ~|(imr & icr) : irq_n;
+      irq_n <= irq_n ? ~|(imr & icr_adj) : irq_n;
     end
     if (phi2_p & int_reset) begin
       irq_n <= 1;
