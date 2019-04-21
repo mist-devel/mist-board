@@ -1131,10 +1131,12 @@ begin
 			UART_TX <= '0';
 			pb_in(7 downto 6) <= pb_out(7 downto 6);
 			if pb_out(7) = '1' then
-				pb_in(5 downto 0) <= not joyC_c64(5 downto 0);
+				pb_in(3 downto 0) <= not joyC_c64(3 downto 0);
 			else
-				pb_in(5 downto 0) <= not joyD_c64(5 downto 0);
+				pb_in(3 downto 0) <= not joyD_c64(3 downto 0);
 			end if;
+			pb_in(4) <= not joyC_c64(4);
+			pb_in(5) <= not joyD_c64(4);
 		else
 			-- UART
 			pb_in(7 downto 1) <= pb_out(7 downto 1);
