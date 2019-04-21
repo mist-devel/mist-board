@@ -1273,7 +1273,7 @@ begin
 		cass_motor => cass_motor,
 		cass_sense => cass_sense,
 		osd_play_stop_toggle => st_tap_play_btn,
-		ear_input => UART_RX and not st_user_port_uart;
+		ear_input => UART_RX and not st_user_port_uart
 	);
 
 	comp_sync : entity work.composite_sync
