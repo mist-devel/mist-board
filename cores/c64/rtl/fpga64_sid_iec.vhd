@@ -45,6 +45,7 @@ entity fpga64_sid_iec is
 		kbd_dat     : in  std_logic;
 		reset_key   : out std_logic;
 		cart_detach_key : out std_logic;
+		tap_playstop_key : out std_logic;
 
 		-- external memory
 		ramAddr     : out unsigned(15 downto 0);
@@ -283,7 +284,12 @@ architecture rtl of fpga64_sid_iec is
 	signal ntscMode : std_logic;
 	signal ntscModeInvert : std_logic := '0' ;
 	signal restore_key : std_logic;
-	
+
+	signal cd4066_sigA  : std_logic_vector(7 downto 0);
+	signal cd4066_sigB  : std_logic_vector(7 downto 0);
+	signal cd4066_sigC  : std_logic_vector(7 downto 0);
+	signal cd4066_sigD  : std_logic_vector(7 downto 0);
+
 	signal clk_1MHz     : std_logic_vector(31 downto 0);
 	signal voice_l      : signed(17 downto 0);
 	signal voice_r      : signed(17 downto 0);
@@ -610,12 +616,13 @@ div1m: process(clk32)				-- this process devides 32 MHz to 1MHz (for the SID)
 			  sid_do8580_r;
 
 	-- CD4066 analogue switch
-	pot_x <= potA_x when cia1_pao(6) = '1' else
-	         potB_x when cia1_pao(7) = '1' else
-			 x"FF";
-	pot_y <= potA_y when cia1_pao(6) = '1' else
-	         potB_y when cia1_pao(7) = '1' else
-			 x"FF";
+	cd4066_sigA <= x"FF" when cia1_pao(7) = '0' else potB_x;
+	cd4066_sigB <= x"FF" when cia1_pao(7) = '0' else potB_y;
+	cd4066_sigC <= x"FF" when cia1_pao(6) = '0' else potA_x;
+	cd4066_sigD <= x"FF" when cia1_pao(6) = '0' else potA_y;
+
+	pot_x <= cd4066_sigA and cd4066_sigC;
+	pot_y <= cd4066_sigB and cd4066_sigD;
 
 	second_sid_en <= '0' when sid_mode(0) = '0' else
                      '1' when cpuAddr(11 downto 8) = x"4" and cpuAddr(5) = '1' else -- D420
@@ -799,8 +806,9 @@ div1m: process(clk32)				-- this process devides 32 MHz to 1MHz (for the SID)
 			reset_key => reset_key,
 			restore_key => restore_key,
 			cart_detach_key => cart_detach_key,					-- cartridge detach key CTRL-D - LCA
+			tapPlayStopKey => tap_playstop_key,
 			disk_num => disk_num,
-			
+
 			backwardsReadingEnabled => '1'
 		);
 
