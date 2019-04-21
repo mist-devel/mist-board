@@ -530,7 +530,8 @@ end component cartridge;
 	signal tap_wrreq      : std_logic;
 	signal tap_wrfull     : std_logic;
 	signal tap_fifo_error : std_logic;
-	signal tap_version    : std_logic;	
+	signal tap_version    : std_logic;
+	signal tap_playstop_key : std_logic;
 
 	signal reset_counter    : integer;
 	signal reset_n          : std_logic;
@@ -1085,6 +1086,7 @@ begin
 		c64rom_data => ioctl_data,
 		c64rom_wr => c64rom_wr,
 --		cart_detach_key => cart_detach_key,
+		tap_playstop_key => tap_playstop_key,
 		reset_key => reset_key
 	);
 
@@ -1277,7 +1279,7 @@ begin
 		cass_write => cass_write,
 		cass_motor => cass_motor,
 		cass_sense => cass_sense,
-		osd_play_stop_toggle => st_tap_play_btn,
+		osd_play_stop_toggle => st_tap_play_btn or tap_playstop_key,
 		ear_input => UART_RX and not st_user_port_uart
 	);
 

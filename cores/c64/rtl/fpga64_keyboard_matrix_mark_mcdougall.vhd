@@ -55,6 +55,8 @@ entity fpga64_keyboard_matrix is
 		disk_num : out std_logic_vector(7 downto 0);
 		
 		cart_detach_key : out std_logic;			-- CTRL D - remove active cartridge signal - LCA
+
+		tapPlayStopKey: out std_logic;
 		
 		-- Config
 		-- backwardsReadingEnabled = 1 allows reversal of PIA registers to still work.
@@ -366,6 +368,7 @@ begin
 			joySelKey <= '0';
 			diskChgKey <= '0';
 			cart_detach_key <= '0';
+			tapPlayStopKey <= '0';
 			if newScanCode = '1' then
 				if theScanCode=X"F0" then
 					releaseFlag <= '1';		
@@ -458,7 +461,8 @@ begin
 					when X"72" => if extendedFlag = '0' then joyKeys(1) <= not releaseFlag; else key_down <= not releaseFlag; end if;
 					when X"74" => if extendedFlag = '0' then joyKeys(3) <= not releaseFlag; else key_right <= not releaseFlag; end if;
 					when X"75" => if extendedFlag = '0' then joyKeys(0) <= not releaseFlag; else key_up <= not releaseFlag; end if;
-					when X"76" => key_runstop <= not releaseFlag; 
+					when X"76" => key_runstop <= not releaseFlag;
+					when X"7D" => if extendedFlag = '1' then tapPlayStopKey <= not releaseFlag; end if; -- pg up
 					when others => null;
 					end case;
 				end if;
