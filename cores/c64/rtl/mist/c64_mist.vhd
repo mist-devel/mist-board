@@ -560,6 +560,7 @@ begin
 	iec_cycle <= '1' when ces = "1011" else '0';
 
 	sd_sdhc <= '1';
+	sd_conf <= '0';
 	-- User io
 	user_io_d : user_io
 	generic map (STRLEN => CONF_STR'length)
@@ -579,21 +580,7 @@ begin
 
 		conf_str => to_slv(CONF_STR),
 
-		-- map status word (12 and 1 are not used)
-		status(18)           => st_tape_sound,
-		status(17)           => st_tap_play_btn,
-		status(16)           => st_disk_readonly,
-		status(15 downto 13) => st_sid_mode,
-		status(11)           => st_c64gs,
-		status(10 downto 8)  => st_scandoubler_fx,
-		status(7)            => st_user_port_uart,
-		status(6)            => st_audio_filter_off,
-		status(5)            => st_detach_cartdrige,
-		status(4)            => st_cia_mode,
-		status(3)            => st_swap_joystick,
-		status(2)            => st_ntsc,
-		status(0)            => st_reset,
- 
+		status => status,
 		buttons => buttons,
 		scandoubler_disable => tv15Khz_mode,
 		ypbpr => ypbpr,
@@ -617,6 +604,22 @@ begin
 		mouse_flags => mouse_flags,
 		mouse_strobe => mouse_strobe
 	);
+
+	st_tape_sound       <= status(18);
+	st_tap_play_btn     <= status(17);
+	st_disk_readonly    <= status(16);
+	st_sid_mode         <= status(15 downto 13);
+	st_c64gs            <= status(11);
+	st_scandoubler_fx   <= status(10 downto 8);
+	st_user_port_uart   <= status(7);
+	st_audio_filter_off <= status(6);
+	st_detach_cartdrige <= status(5);
+	st_cia_mode         <= status(4);
+	st_swap_joystick    <= status(3);
+	st_ntsc             <= status(2);
+	st_reset            <= status(0);
+
+	ioctl_force_erase <= '0';
 
 	data_io_d: data_io
 	port map (
@@ -1119,7 +1122,7 @@ begin
 	end process;
 
 	-- connect user port
-	process (pa2_out, pb_out, joyC_c64, joyD_c64, UART_RX, status)
+	process (pa2_out, pb_out, joyC_c64, joyD_c64, UART_RX, st_user_port_uart)
 	begin
 		pa2_in <= pa2_out;
 		if st_user_port_uart = '0' then
