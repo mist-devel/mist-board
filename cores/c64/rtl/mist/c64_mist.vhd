@@ -548,6 +548,9 @@ end component cartridge;
 	signal erase_to         : std_logic_vector(4 downto 0) := (others => '0');
 	signal mem_ce           : std_logic;
 	
+	signal uart_rxD         : std_logic;
+	signal uart_rxD2        : std_logic;
+
 	-- sdram layout 
 	constant C64_MEM_START : std_logic_vector(24 downto 0) := '0' & X"000000"; -- normal C64 RAM
 	constant CRT_MEM_START : std_logic_vector(24 downto 0) := '0' & X"100000"; -- cartdriges
@@ -839,6 +842,15 @@ begin
 		end if;
 	end process;
 
+	-- UART_RX synchronizer
+	process(clk_c64)
+	begin
+		if rising_edge(clk_c64) then
+			uart_rxD <= UART_RX;
+			uart_rxD2 <= uart_rxD;
+		end if;
+	end process;
+
 	ntsc_init_mode <= st_ntsc;
 
 	pll_rom_pal : entity work.rom_reconfig_pal
@@ -1124,7 +1136,7 @@ begin
 	end process;
 
 	-- connect user port
-	process (pa2_out, pb_out, joyC_c64, joyD_c64, UART_RX, st_user_port_uart)
+	process (pa2_out, pb_out, joyC_c64, joyD_c64, uart_rxD2, st_user_port_uart)
 	begin
 		pa2_in <= pa2_out;
 		if st_user_port_uart = '0' then
@@ -1142,8 +1154,8 @@ begin
 		else
 			-- UART
 			pb_in(7 downto 1) <= pb_out(7 downto 1);
-			flag2_n <= UART_RX;
-			pb_in(0) <= UART_RX;
+			flag2_n <= uart_rxD2;
+			pb_in(0) <= uart_rxD2;
 			UART_TX <= pa2_out;
 		end if;
 	end process;
@@ -1280,7 +1292,7 @@ begin
 		cass_motor => cass_motor,
 		cass_sense => cass_sense,
 		osd_play_stop_toggle => st_tap_play_btn or tap_playstop_key,
-		ear_input => UART_RX and not st_user_port_uart
+		ear_input => uart_rxD2 and not st_user_port_uart
 	);
 
 	comp_sync : entity work.composite_sync
