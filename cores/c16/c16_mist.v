@@ -69,7 +69,7 @@ module c16_mist (
 // the configuration string is returned to the io controller to allow
 // it to control the menu on the OSD 
 parameter CONF_STR = {
-        "C16;PRG;",
+        "C16;PRGTAP;",
 		  "S,D64,Mount Disk;",
         "F,ROM,Load Kernal;",
         "O2,Scanlines,Off,On;",
@@ -78,7 +78,9 @@ parameter CONF_STR = {
         "T5,Reset;"
 };
 
-parameter CONF_STR_LEN = 8+17+18+20+28+18+9;
+parameter CONF_STR_LEN = 11+17+18+20+28+18+9;
+
+localparam TAP_MEM_START = 22'h20000;
 
 // the status register is controlled by the on screen display (OSD)
 wire [7:0] status;
@@ -116,15 +118,15 @@ wire c16_sdram_oe = !c16_cas &&  c16_rw;
 // ioctl_sdram_data
 
 // multiplex c16 and ioctl signals
-wire [15:0] mux_sdram_addr = c16_wait?ioctl_sdram_addr:c16_sdram_addr;
-wire [7:0] mux_sdram_data = c16_wait?ioctl_sdram_data:c16_sdram_data;
-wire mux_sdram_wr = clkref ? (c16_wait?ioctl_sdram_write:c16_sdram_wr) : 0;
-wire mux_sdram_oe = clkref ? (c16_wait?1'b0:c16_sdram_oe) : 0;
+wire [15:0] mux_sdram_addr = clkref ? c16_sdram_addr : ioctl_sdram_addr[15:0];
+wire [ 7:0] mux_sdram_data = clkref ? c16_sdram_data : ioctl_sdram_data;
+wire mux_sdram_wr = clkref ? c16_sdram_wr : ioctl_sdram_write;
+wire mux_sdram_oe = clkref ? c16_sdram_oe : 0;
 
 wire [15:0] sdram_din = { mux_sdram_data, mux_sdram_data };
 wire [14:0] sdram_addr_64k = mux_sdram_addr[15:1];   // 64k mapping
 wire [14:0] sdram_addr_16k = { 1'b0, mux_sdram_addr[13:7], 1'b0, mux_sdram_addr[6:1] };   // 16k
-wire [24:0] sdram_addr = { 10'h00, memory_16k?sdram_addr_16k:sdram_addr_64k };
+wire [24:0] sdram_addr = (clkref | (~clkref & prg_download)) ? { 10'h00, memory_16k?sdram_addr_16k:sdram_addr_64k } : ioctl_sdram_addr;
 
 wire sdram_wr = mux_sdram_wr;
 wire sdram_oe = mux_sdram_oe;
@@ -274,16 +276,14 @@ wire sd_clk;
 wire ioctl_wr;
 wire [15:0] ioctl_addr;
 wire [7:0] ioctl_data;
-wire [4:0] ioctl_index;
+wire [7:0] ioctl_index;
 wire ioctl_downloading;
 
-wire rom_download = ioctl_downloading && ((ioctl_index == 5'd0) || (ioctl_index == 5'd3));
-wire prg_download = ioctl_downloading && (ioctl_index == 5'd1);
+wire rom_download = ioctl_downloading && ((ioctl_index == 8'h00) || (ioctl_index == 8'h03));
+wire prg_download = ioctl_downloading && (ioctl_index == 8'h01);
+wire tap_download = ioctl_downloading && (ioctl_index == 8'h41);
 
-// halt cpu when it's done with the current cycle
-reg c16_wait;
-always @(posedge c16_ras) 
-	c16_wait <= prg_download;
+wire c16_wait = 0;
 
 data_io data_io (
       // SPI interface
@@ -361,40 +361,48 @@ wire [7:0] zp_ovl_dout =
 	
 // the address taken from the first to bytes of a prg file tell
 // us where the file is to go in memory
-reg [15:0] ioctl_load_addr;
 reg 	   ioctl_ram_wr;
-reg 	ioctl_sdram_write;
-reg [15:0] ioctl_sdram_addr;
-reg [7:0] ioctl_sdram_data;
-  
-always @(negedge c16_ras) begin
-	ioctl_sdram_write <= ioctl_ram_wr;
+reg [24:0] ioctl_sdram_addr;
+reg [ 7:0] ioctl_sdram_data;
+reg        ioctl_sdram_write;
 
-	if(ioctl_ram_wr) begin
-		ioctl_sdram_addr <= ioctl_load_addr + ioctl_addr - 16'd2;
-		ioctl_sdram_data <= ioctl_data;
-	end
-end
-		
 // address starts counting with 0
-always @(negedge clk28) begin
+always @(posedge clk28) begin
+	reg last_clkref;
+
+	last_clkref <= clkref;
+
 	if(ioctl_sdram_write) 
 		ioctl_ram_wr <= 1'b0;
 
-   // data io has a byte for us
-   if(ioctl_wr) begin
-      if(ioctl_addr == 16'h0000)
-			ioctl_load_addr[7:0] <= ioctl_data;
-      else if (ioctl_addr == 16'h0001) 
-			ioctl_load_addr[15:8] <= ioctl_data;
-      else 
-			// io controller sent a new byte. Store it until it can be
-			// saved in RAM
+	// data io has a byte for us
+	if(ioctl_wr) begin
+		if (prg_download) begin
+			if(ioctl_addr == 16'h0000) ioctl_sdram_addr[7:0] <= ioctl_data;
+			else if (ioctl_addr == 16'h0001) ioctl_sdram_addr[24:8] <= { 9'b0, ioctl_data };
+			else 
+				// io controller sent a new byte. Store it until it can be
+				// saved in RAM
+				ioctl_ram_wr <= 1'b1;
+		end else if (tap_download) begin
+			if(ioctl_addr == 16'h0000) ioctl_sdram_addr <= TAP_MEM_START;
 			ioctl_ram_wr <= 1'b1;
-   end
+		end
+	end
+
+	// C16 time slice - clkref=1, IO controller - clkref=0
+	if (~clkref & last_clkref) begin
+		ioctl_sdram_write <= ioctl_ram_wr;
+		if (ioctl_ram_wr) ioctl_sdram_data <= ioctl_data;
+	end
+	if (clkref & ~last_clkref) begin
+		if (ioctl_sdram_write) ioctl_sdram_addr <= ioctl_sdram_addr + 1'd1;
+		ioctl_sdram_write <= 0;
+	end
 end
 
-	
+reg tap_version;
+
 // ---------------------------------------------------------------------------------
 // ------------------------------ the on screen display ----------------------------
 // ---------------------------------------------------------------------------------
