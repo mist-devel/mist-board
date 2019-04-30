@@ -118,8 +118,8 @@ wire c16_sdram_oe = !c16_cas &&  c16_rw;
 // multiplex c16 and ioctl signals
 wire [15:0] mux_sdram_addr = c16_wait?ioctl_sdram_addr:c16_sdram_addr;
 wire [7:0] mux_sdram_data = c16_wait?ioctl_sdram_data:c16_sdram_data;
-wire mux_sdram_wr = c16_wait?ioctl_sdram_write:c16_sdram_wr;
-wire mux_sdram_oe = c16_wait?1'b0:c16_sdram_oe;
+wire mux_sdram_wr = clkref ? (c16_wait?ioctl_sdram_write:c16_sdram_wr) : 0;
+wire mux_sdram_oe = clkref ? (c16_wait?1'b0:c16_sdram_oe) : 0;
 
 wire [15:0] sdram_din = { mux_sdram_data, mux_sdram_data };
 wire [14:0] sdram_addr_64k = mux_sdram_addr[15:1];   // 64k mapping
@@ -135,7 +135,7 @@ wire [15:0] sdram_dout;
 wire [7:0] c16_din = zp_overwrite?zp_ovl_dout:
 	(c16_a_low[0]?sdram_dout[15:8]:sdram_dout[7:0]);
 
-assign SDRAM_CLK = ~clk28;
+assign SDRAM_CLK = clk28;
 
 // synchronize sdram state machine with the ras/cas phases of the c16
 reg last_ras;
