@@ -63,6 +63,11 @@ module C16 #(parameter MODE_PAL = 1)(
 	//input IEC_ATNIN,
 	output IEC_RESET,
 	
+	input CASS_READ,
+	output CASS_WRITE,
+	input CASS_SENSE,
+	output CASS_MOTOR,
+
 	output AUDIO_L,
 	output AUDIO_R,
 
@@ -238,7 +243,7 @@ always @(posedge CLK28)		// reset tries to emulate the length of a real reset
 // assign VSYNC=1'b1; // set scart mode to RGB for TV
 
 assign c16_addr=(~mux)?c16_addrlatch:cpu_addr&ted_addr;																	// C16 address bus
-assign c16_data=(mux)?c16_datalatch:cpu_data&ted_data&ram_data&kernal_data&basic_data&keyport_data;		// C16 data bus
+assign c16_data=(mux)?c16_datalatch:cpu_data&ted_data&ram_data&kernal_data&basic_data&keyport_data&cass_data;		// C16 data bus
 
 always @(posedge CLK28)							// addres and data bus latching emulates dynamic memory behaviour of these buses 
 	begin
@@ -262,5 +267,11 @@ assign port_in[6]=IEC_CLKIN;
 assign IEC_ATNOUT=port_out[2];
 //assign ATN=IEC_ATNIN;
 assign IEC_RESET=sreset;
+
+assign     CASS_MOTOR = port_out[3];
+assign     port_in[4] = CASS_READ;
+wire       cass_sel   = cpu_addr[15:4] == 12'hFD1;
+wire [7:0] cass_data  = { 5'b11111, cass_sel ? CASS_SENSE : 1'b1, 2'b11 };
+assign     CASS_WRITE = port_out[6];
 
 endmodule
