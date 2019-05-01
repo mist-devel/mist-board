@@ -79,10 +79,11 @@ parameter CONF_STR = {
         "O2,Scanlines,Off,On;",
         "O3,Joysticks,Normal,Swapped;",
         "O4,Memory,64k,16k;",
+        "O89,SID,Off,6581,8580;",
         "T5,Reset;"
 };
 
-parameter CONF_STR_LEN = 11+17+18+18+21+20+28+18+9;
+parameter CONF_STR_LEN = 11+17+18+18+21+20+28+18+22+9;
 
 localparam TAP_MEM_START = 22'h20000;
 
@@ -96,7 +97,7 @@ always @(posedge clk28) begin
 end
 
 // the status register is controlled by the on screen display (OSD)
-wire [7:0] status;
+wire [31:0] status;
 wire tv15khz;
 wire ypbpr;
 wire scanlines = status[2];
@@ -105,6 +106,7 @@ wire memory_16k = status[4];
 wire osd_reset = status[5];
 wire tap_play = status[6];
 wire tap_sound = status[7];
+wire [1:0] sid_type = status[9:8];
 wire [1:0] buttons;
 
 wire [7:0] js0, js1;
@@ -606,8 +608,17 @@ always @(negedge clk28) begin
 end
 
 wire audio_l_out, audio_r_out;
-assign AUDIO_L = audio_l_out | (tap_sound & ~cass_read);
-assign AUDIO_R = audio_r_out | (tap_sound & ~cass_read);
+wire [17:0] sid_audio;
+wire [17:0] audio_data_l = sid_audio + { audio_l_out, tap_sound & ~cass_read, 13'd0 };
+wire [17:0] audio_data_r = sid_audio + { audio_r_out, tap_sound & ~cass_read, 13'd0 };
+
+sigma_delta_dac dac (
+	.clk      ( clk28),
+	.ldatasum ( audio_data_l[17:3] ),
+	.rdatasum ( audio_data_r[17:3] ),
+	.aleft    ( AUDIO_L ),
+	.aright   ( AUDIO_R )
+);
 
 // include the c16 itself
 C16 c16 (
@@ -651,6 +662,8 @@ C16 c16 (
 	.CASS_MOTOR  ( cass_motor ),
 	.CASS_SENSE  ( cass_sense ),
 
+	.SID_TYPE    ( sid_type    ),
+	.SID_AUDIO   ( sid_audio   ),
 	.AUDIO_L     ( audio_l_out ),
 	.AUDIO_R     ( audio_r_out ),
 

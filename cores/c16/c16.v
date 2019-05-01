@@ -68,6 +68,9 @@ module C16 #(parameter MODE_PAL = 1)(
 	input CASS_SENSE,
 	output CASS_MOTOR,
 
+	input [1:0] SID_TYPE,
+	output [17:0] SID_AUDIO,
+
 	output AUDIO_L,
 	output AUDIO_R,
 
@@ -244,7 +247,7 @@ always @(posedge CLK28)		// reset tries to emulate the length of a real reset
 // assign VSYNC=1'b1; // set scart mode to RGB for TV
 
 assign c16_addr=(~mux)?c16_addrlatch:cpu_addr&ted_addr;																	// C16 address bus
-assign c16_data=(mux)?c16_datalatch:cpu_data&ted_data&ram_data&kernal_data&basic_data&keyport_data&cass_data;		// C16 data bus
+assign c16_data=(mux)?c16_datalatch:cpu_data&ted_data&ram_data&kernal_data&basic_data&keyport_data&cass_data&sid_data;	// C16 data bus
 
 always @(posedge CLK28)							// addres and data bus latching emulates dynamic memory behaviour of these buses 
 	begin
@@ -274,5 +277,60 @@ assign     port_in[4] = CASS_READ;
 wire       cass_sel   = cpu_addr[15:4] == 12'hFD1;
 wire [7:0] cass_data  = { 5'b11111, cass_sel ? CASS_SENSE : 1'b1, 2'b11 };
 assign     CASS_WRITE = port_out[6];
+
+// SID extension
+reg sid_clk_en;
+always @(posedge CLK28) begin
+	reg muxD, sid_clk;
+
+	sid_clk_en <= 0;
+	muxD <= mux;
+	if (~muxD & mux) begin
+		sid_clk <= ~sid_clk;
+		sid_clk_en <= sid_clk;
+	end
+end
+
+// valid adresses for SID: FD40-FD5F and FE80-FE9F
+wire cs_sid = SID_TYPE && ((c16_addr[15:5] == 'b1111_1101_010) || (c16_addr[15:5] == 'b1111_1110_100));
+
+wire  [7:0] sid8580_data;
+wire [15:0] sid8580_audio;
+
+sid8580 sid8580
+(
+	.reset(sreset),
+	.clk32(CLK28),
+	.clk_1MHz(sid_clk_en),
+
+	.cs(cs_sid),
+	.we(~RW),
+	.addr(c16_addr[4:0]),
+	.data_in(c16_data),
+	.data_out(sid8580_data),
+
+	.extfilter_en(1),
+	.audio_data(sid8580_audio)
+);
+
+wire  [7:0] sid6581_data;
+wire [17:0] sid6581_audio;
+sid_top #(.g_num_voices(3)) sid6581
+(
+	.reset(sreset),
+	.clock(CLK28),
+	.start_iter(sid_clk_en),
+
+	.wren(~RW & cs_sid),
+	.addr({ 3'd0, c16_addr[4:0] }),
+	.wdata(c16_data),
+	.rdata(sid6581_data),
+
+	.extfilter_en(0), // disabled due to out of BRAM
+	.sample_left(sid6581_audio)
+);
+
+assign      SID_AUDIO = SID_TYPE[0] ? sid6581_audio : (SID_TYPE[1] ? { sid8580_audio, 2'd0 } : 18'd0);
+wire  [7:0] sid_data  = (cs_sid & RW) ? (SID_TYPE[0] ? sid6581_data : sid8580_data) : 8'hFF;
 
 endmodule
