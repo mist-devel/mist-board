@@ -28,7 +28,7 @@ module data_io (
 
 	output        downloading,   // signal indicating an active download
 	output [15:0] size,          // number of bytes in input buffer
-   output reg [4:0] index,      // menu index used to upload the file
+	output reg [7:0] index,      // menu index used to upload the file
 	 
 	// external ram interface
 	input 			clk,
@@ -78,7 +78,7 @@ always@(posedge sck, posedge ss) begin
 			sbuf <= { sbuf[5:0], sdi};
 
 		// increase target address after write
-		if(rclk)
+		if(rclk && ~&addr)
 			addr <= addr + 16'd1;
 	 
 		// count 0-7 8-15 8-15 ... 
@@ -105,11 +105,11 @@ always@(posedge sck, posedge ss) begin
 			rclk <= 1'b1;
 			a <= addr;
 		end
-		
+
       // expose file (menu) index
       if((cmd == UIO_FILE_INDEX) && (cnt == 15))
-			index <= {sbuf[3:0], sdi};
-							
+			index <= {sbuf[6:0], sdi};
+
 	end
 end
 

@@ -23,7 +23,7 @@
 module sdram (
 
 	// interface to the MT48LC16M16 chip
-	inout [15:0]  		sd_data,    // 16 bit bidirectional data bus
+	inout  reg [15:0]	sd_data,    // 16 bit bidirectional data bus
 	output reg [12:0]	sd_addr,    // 13 bit multiplexed address bus
 	output reg [1:0] 	sd_dqm,     // two byte masks
 	output reg[1:0] 	sd_ba,      // two banks
@@ -33,13 +33,13 @@ module sdram (
 	output 				sd_cas,     // columns address select
 
 	// cpu/chipset interface
-	input 		 		init,			// init signal after FPGA config to initialize RAM
-	input 		 		clk,			// sdram is accessed at up to 128MHz
-	input					clkref,		// reference clock to sync to
+	input 		 		init,		// init signal after FPGA config to initialize RAM
+	input 		 		clk,		// sdram is accessed at up to 128MHz
+	input				clkref,		// reference clock to sync to
 	
-	input [15:0]  		din,			// data input from chipset/cpu
-	output [15:0] 		dout,			// data output to chipset/cpu
-	input [24:0]   	addr,       // 25 bit word address
+	input [15:0]  		din,		// data input from chipset/cpu
+	output reg [15:0]	dout,		// data output to chipset/cpu
+	input [24:0]   		addr,       // 25 bit word address
 	input [1:0] 		ds,         // data strobe for hi/low byte
 	input 		 		oe,         // cpu/chipset requests read
 	input 		 		we          // cpu/chipset requests write
@@ -49,7 +49,7 @@ module sdram (
 localparam RASCAS_DELAY   = 3'd2;   // tRCD>=20ns -> 2 cycles@64MHz
 localparam BURST_LENGTH   = 3'b000; // 000=none, 001=2, 010=4, 011=8
 localparam ACCESS_TYPE    = 1'b0;   // 0=sequential, 1=interleaved
-localparam CAS_LATENCY    = 3'd3;   // 2/3 allowed
+localparam CAS_LATENCY    = 3'd2;   // 2/3 allowed
 localparam OP_MODE        = 2'b00;  // only 00 (standard operation) allowed
 localparam NO_WRITE_BURST = 1'b1;   // 0= write burst enabled, 1=only single access write
 
@@ -61,18 +61,19 @@ localparam MODE = { 3'b000, NO_WRITE_BURST, OP_MODE, CAS_LATENCY, ACCESS_TYPE, B
 
 localparam STATE_IDLE      = 4'd0;    // first state in cycle
 localparam STATE_CMD_START = 4'd1;    // state in which a new command can be started
-localparam STATE_CMD_CONT  = STATE_CMD_START  + RASCAS_DELAY - 3'd1; // 4 command can be continued
-localparam STATE_LAST      = 4'd15;   // last state in cycle
+localparam STATE_CMD_CONT  = STATE_CMD_START  + RASCAS_DELAY - 1'd1; // 2 command can be continued
+localparam STATE_DATA_READY= STATE_CMD_CONT + CAS_LATENCY + 1'd1;
+localparam STATE_LAST      = 4'd7;   // last state in cycle
 
-reg [3:0] q /* synthesis noprune */;
+reg [2:0] q /* synthesis noprune */;
 always @(posedge clk) begin
-	// 32Mhz counter synchronous to 4 Mhz clock
-   // force counter to pass state 5->6 exactly after the rising edge of clkref
-	// since clkref is two clocks early
-   if(((q == 14) && ( clkref == 0)) ||
-		((q == 15) && ( clkref == 1)) ||
-      ((q != 14) && (q != 15)))
-			q <= q + 4'd1;
+	reg last_clkref;
+	last_clkref <= clkref;
+
+	// Sync SDRAM cycle to rising edge of clkref
+	q <= q + 1'd1;
+	if (~last_clkref & clkref) q <= 0;
+
 end
 
 // ---------------------------------------------------------------------
@@ -111,12 +112,9 @@ assign sd_ras = sd_cmd[2];
 assign sd_cas = sd_cmd[1];
 assign sd_we  = sd_cmd[0];
 
-assign sd_data = we?din:16'bZZZZZZZZZZZZZZZZ;
-
-assign dout = sd_data;
-
 always @(posedge clk) begin
 	sd_cmd <= CMD_INHIBIT;
+	sd_data <= 16'bZZZZZZZZZZZZZZZZ;
 
 	if(reset != 0) begin
 		sd_ba <= 2'b00;
@@ -143,7 +141,10 @@ always @(posedge clk) begin
 		end else if(q == STATE_CMD_CONT) begin
 			if(we)		 sd_cmd <= CMD_WRITE;
 			else if(oe)  sd_cmd <= CMD_READ;
-		end 
+			if(we)		 sd_data <= din;
+		end else if(q == STATE_DATA_READY) begin
+			if(oe)		 dout <= sd_data;
+		end
 	end
 end
 

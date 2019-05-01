@@ -54,7 +54,9 @@ module c16_mist (
    output 	 VGA_VS,
    output [5:0]  VGA_R,
    output [5:0]  VGA_G,
-   output [5:0]  VGA_B
+   output [5:0]  VGA_B,
+
+   input     UART_RX
 );
 
 // -------------------------------------------------------------------------
@@ -69,25 +71,42 @@ module c16_mist (
 // the configuration string is returned to the io controller to allow
 // it to control the menu on the OSD 
 parameter CONF_STR = {
-        "C16;PRG;",
-		  "S,D64,Mount Disk;",
+        "C16;PRGTAP;",
+        "S,D64,Mount Disk;",
         "F,ROM,Load Kernal;",
+        "T6,Play/Stop tape;",
+        "O7,Tape sound,Off,On;",
         "O2,Scanlines,Off,On;",
         "O3,Joysticks,Normal,Swapped;",
-		  "O4,Memory,64k,16k;",
+        "O4,Memory,64k,16k;",
+        "O89,SID,Off,6581,8580;",
         "T5,Reset;"
 };
 
-parameter CONF_STR_LEN = 8+17+18+20+28+18+9;
+parameter CONF_STR_LEN = 11+17+18+18+21+20+28+18+22+9;
+
+localparam TAP_MEM_START = 22'h20000;
+
+reg uart_rxD;
+reg uart_rxD2;
+
+// UART_RX synchronizer
+always @(posedge clk28) begin
+        uart_rxD <= UART_RX;
+        uart_rxD2 <= uart_rxD;
+end
 
 // the status register is controlled by the on screen display (OSD)
-wire [7:0] status;
+wire [31:0] status;
 wire tv15khz;
 wire ypbpr;
 wire scanlines = status[2];
 wire joystick_swap = status[3];
 wire memory_16k = status[4];
 wire osd_reset = status[5];
+wire tap_play = status[6];
+wire tap_sound = status[7];
+wire [1:0] sid_type = status[9:8];
 wire [1:0] buttons;
 
 wire [7:0] js0, js1;
@@ -116,26 +135,27 @@ wire c16_sdram_oe = !c16_cas &&  c16_rw;
 // ioctl_sdram_data
 
 // multiplex c16 and ioctl signals
-wire [15:0] mux_sdram_addr = c16_wait?ioctl_sdram_addr:c16_sdram_addr;
-wire [7:0] mux_sdram_data = c16_wait?ioctl_sdram_data:c16_sdram_data;
-wire mux_sdram_wr = c16_wait?ioctl_sdram_write:c16_sdram_wr;
-wire mux_sdram_oe = c16_wait?1'b0:c16_sdram_oe;
+wire [24:0] mux_sdram_addr = clkref ? c16_sdram_addr : (tap_sdram_oe ? tap_play_addr : ioctl_sdram_addr);
+wire [ 7:0] mux_sdram_data = clkref ? c16_sdram_data : ioctl_sdram_data;
+wire mux_sdram_wr = clkref ? c16_sdram_wr : ioctl_sdram_write;
+wire mux_sdram_oe = clkref ? c16_sdram_oe : tap_sdram_oe;
 
 wire [15:0] sdram_din = { mux_sdram_data, mux_sdram_data };
 wire [14:0] sdram_addr_64k = mux_sdram_addr[15:1];   // 64k mapping
 wire [14:0] sdram_addr_16k = { 1'b0, mux_sdram_addr[13:7], 1'b0, mux_sdram_addr[6:1] };   // 16k
-wire [24:0] sdram_addr = { 10'h00, memory_16k?sdram_addr_16k:sdram_addr_64k };
+wire [24:0] sdram_addr = (clkref | (~clkref & prg_download)) ?
+                         { 10'h00, memory_16k?sdram_addr_16k:sdram_addr_64k } :
+                         (tap_sdram_oe ? tap_play_addr : ioctl_sdram_addr);
 
 wire sdram_wr = mux_sdram_wr;
 wire sdram_oe = mux_sdram_oe;
 wire [1:0] sdram_ds = { mux_sdram_addr[0], !mux_sdram_addr[0] }; 
 
-// only c16 reads from sdram
 wire [15:0] sdram_dout;
 wire [7:0] c16_din = zp_overwrite?zp_ovl_dout:
 	(c16_a_low[0]?sdram_dout[15:8]:sdram_dout[7:0]);
 
-assign SDRAM_CLK = ~clk28;
+assign SDRAM_CLK = clk28;
 
 // synchronize sdram state machine with the ras/cas phases of the c16
 reg last_ras;
@@ -274,16 +294,14 @@ wire sd_clk;
 wire ioctl_wr;
 wire [15:0] ioctl_addr;
 wire [7:0] ioctl_data;
-wire [4:0] ioctl_index;
+wire [7:0] ioctl_index;
 wire ioctl_downloading;
 
-wire rom_download = ioctl_downloading && ((ioctl_index == 5'd0) || (ioctl_index == 5'd3));
-wire prg_download = ioctl_downloading && (ioctl_index == 5'd1);
+wire rom_download = ioctl_downloading && ((ioctl_index == 8'h00) || (ioctl_index == 8'h03));
+wire prg_download = ioctl_downloading && (ioctl_index == 8'h01);
+wire tap_download = ioctl_downloading && (ioctl_index == 8'h41);
 
-// halt cpu when it's done with the current cycle
-reg c16_wait;
-always @(posedge c16_ras) 
-	c16_wait <= prg_download;
+wire c16_wait = 0;
 
 data_io data_io (
       // SPI interface
@@ -335,10 +353,10 @@ always @(posedge clk28) begin
 		// registers are automatically adjusted at the end of the
 		// download/injection
 		// the registers to be set have been taken from the vice emulator
-		reg_2d <= ioctl_sdram_addr + 16'd1;
-		reg_2f <= ioctl_sdram_addr + 16'd1;
-		reg_31 <= ioctl_sdram_addr + 16'd1;
-		reg_9d <= ioctl_sdram_addr + 16'd1;
+		reg_2d <= ioctl_sdram_addr[15:0] + 16'd1;
+		reg_2f <= ioctl_sdram_addr[15:0] + 16'd1;
+		reg_31 <= ioctl_sdram_addr[15:0] + 16'd1;
+		reg_9d <= ioctl_sdram_addr[15:0] + 16'd1;
 	end else	if(zp_sel && !c16_rw) begin
 		// cpu writes registers
 		if(zp_2d_sel) reg_2d[ 7:0] <= c16_dout;
@@ -361,40 +379,111 @@ wire [7:0] zp_ovl_dout =
 	
 // the address taken from the first to bytes of a prg file tell
 // us where the file is to go in memory
-reg [15:0] ioctl_load_addr;
 reg 	   ioctl_ram_wr;
-reg 	ioctl_sdram_write;
-reg [15:0] ioctl_sdram_addr;
-reg [7:0] ioctl_sdram_data;
-  
-always @(negedge c16_ras) begin
-	ioctl_sdram_write <= ioctl_ram_wr;
+reg [24:0] ioctl_sdram_addr;
+reg [ 7:0] ioctl_sdram_data;
+reg        ioctl_sdram_write;
 
-	if(ioctl_ram_wr) begin
-		ioctl_sdram_addr <= ioctl_load_addr + ioctl_addr - 16'd2;
-		ioctl_sdram_data <= ioctl_data;
-	end
-end
-		
 // address starts counting with 0
-always @(negedge clk28) begin
+always @(posedge clk28) begin
+	reg last_clkref;
+
+	last_clkref <= clkref;
+
 	if(ioctl_sdram_write) 
 		ioctl_ram_wr <= 1'b0;
 
-   // data io has a byte for us
-   if(ioctl_wr) begin
-      if(ioctl_addr == 16'h0000)
-			ioctl_load_addr[7:0] <= ioctl_data;
-      else if (ioctl_addr == 16'h0001) 
-			ioctl_load_addr[15:8] <= ioctl_data;
-      else 
-			// io controller sent a new byte. Store it until it can be
-			// saved in RAM
+	// data io has a byte for us
+	if(ioctl_wr) begin
+		if (prg_download) begin
+			if(ioctl_addr == 16'h0000) ioctl_sdram_addr[7:0] <= ioctl_data;
+			else if (ioctl_addr == 16'h0001) ioctl_sdram_addr[24:8] <= { 9'b0, ioctl_data };
+			else 
+				// io controller sent a new byte. Store it until it can be
+				// saved in RAM
+				ioctl_ram_wr <= 1'b1;
+		end else if (tap_download) begin
+			if(ioctl_addr == 16'h0000) ioctl_sdram_addr <= TAP_MEM_START;
 			ioctl_ram_wr <= 1'b1;
-   end
+		end
+	end
+
+	// C16 time slice - clkref=1, IO controller - clkref=0
+	if (~clkref & last_clkref) begin
+		ioctl_sdram_write <= ioctl_ram_wr;
+		if (ioctl_ram_wr) ioctl_sdram_data <= ioctl_data;
+	end
+	if (clkref & ~last_clkref) begin
+		if (ioctl_sdram_write) ioctl_sdram_addr <= ioctl_sdram_addr + 1'd1;
+		ioctl_sdram_write <= 0;
+	end
 end
 
-	
+// ---------------------------------------------------------------------------------
+// -------------------------------- TAP playback -----------------------------------
+// ---------------------------------------------------------------------------------
+
+reg [24:0] tap_play_addr;
+reg [24:0] tap_last_addr;
+reg  [7:0] tap_data_in;
+reg        tap_reset;
+reg        tap_wrreq;
+reg        tap_wrfull;
+reg  [1:0] tap_version;
+reg        tap_sdram_oe;
+wire       cass_read;
+wire       cass_write;
+wire       cass_motor;
+wire       cass_sense;
+
+always @(posedge clk28) begin
+	reg clkref_D;
+
+    if (reset) begin
+        tap_play_addr <= TAP_MEM_START;
+        tap_last_addr <= TAP_MEM_START;
+        tap_sdram_oe <= 0;
+        tap_reset <= 1;
+    end else begin
+        tap_reset <= 0;
+        if (tap_download) begin
+            tap_play_addr <= TAP_MEM_START;
+            tap_last_addr <= ioctl_sdram_addr;
+            tap_reset <= 1;
+            if (ioctl_sdram_addr == (TAP_MEM_START + 25'h0C) && ioctl_wr) begin
+                tap_version <= ioctl_data[1:0];
+            end
+        end
+        clkref_D <= clkref;
+        tap_wrreq <= 0;
+        if (clkref_D && !clkref && !ioctl_downloading && tap_play_addr != tap_last_addr && !tap_wrfull) tap_sdram_oe <= 1;
+        if (clkref && !clkref_D && tap_sdram_oe) begin
+            tap_wrreq <= 1;
+			tap_data_in <= tap_play_addr[0] ? sdram_dout[15:8]:sdram_dout[7:0];
+            tap_sdram_oe <= 0;
+            tap_play_addr <= tap_play_addr + 1'd1;
+        end
+    end
+end
+
+c1530 c1530
+(
+    .clk32(clk28),
+    .restart_tape(tap_reset),
+    .wav_mode(0),
+    .tap_version(tap_version),
+    .host_tap_in(tap_data_in),
+    .host_tap_wrreq(tap_wrreq),
+    .tap_fifo_wrfull(tap_wrfull),
+    .tap_fifo_error(),
+    .cass_read(cass_read),
+    .cass_write(cass_write),
+    .cass_motor(cass_motor),
+    .cass_sense(cass_sense),
+    .osd_play_stop_toggle(tap_play),
+    .ear_input(uart_rxD2)
+);
+
 // ---------------------------------------------------------------------------------
 // ------------------------------ the on screen display ----------------------------
 // ---------------------------------------------------------------------------------
@@ -412,7 +501,7 @@ wire osd_clk = tv15khz?clk7:clk14;
 wire [5:0] red, green, blue;
 
 // include the on screen display
-osd #(11,0,5) osd (
+osd #(10'd11,10'd0,3'd5) osd (
    .clk_sys    ( clk28        ),
    .ce_pix     ( osd_clk      ),
 
@@ -518,6 +607,19 @@ always @(negedge clk28) begin
 		{ kernal_dl_wr, basic_dl_wr, c1541_dl_wr } <= 0;
 end
 
+wire audio_l_out, audio_r_out;
+wire [17:0] sid_audio;
+wire [17:0] audio_data_l = sid_audio + { audio_l_out, tap_sound & ~cass_read, 13'd0 };
+wire [17:0] audio_data_r = sid_audio + { audio_r_out, tap_sound & ~cass_read, 13'd0 };
+
+sigma_delta_dac dac (
+	.clk      ( clk28),
+	.ldatasum ( audio_data_l[17:3] ),
+	.rdatasum ( audio_data_r[17:3] ),
+	.aleft    ( AUDIO_L ),
+	.aright   ( AUDIO_R )
+);
+
 // include the c16 itself
 C16 c16 (
 	.CLK28   ( clk28 ),
@@ -555,8 +657,15 @@ C16 c16 (
 	.IEC_ATNOUT  ( c16_iec_atn_o ),
 	.IEC_RESET   ( ),
 
-	.AUDIO_L     ( AUDIO_L ),
-	.AUDIO_R     ( AUDIO_R ),
+	.CASS_READ   ( cass_read  ),
+	.CASS_WRITE  ( cass_write ),
+	.CASS_MOTOR  ( cass_motor ),
+	.CASS_SENSE  ( cass_sense ),
+
+	.SID_TYPE    ( sid_type    ),
+	.SID_AUDIO   ( sid_audio   ),
+	.AUDIO_L     ( audio_l_out ),
+	.AUDIO_R     ( audio_r_out ),
 
 	.PAL         ( c16_pal ),
 	
@@ -714,7 +823,7 @@ end
 // ---------------------------------------------------------------------------------
 
 wire led_disk;
-assign LED = !led_disk;
+assign LED = !led_disk && cass_motor;
 
 wire c16_iec_atn_o;
 wire c16_iec_data_o;
