@@ -127,6 +127,7 @@ assign kbus[7] = kbus_kbd[7] & joy1_sel[4];
 	);
 
 // TED 8360 instance	
+wire irq_n, cpuclk, cs0, cs1;
 
 ted mos8360(
 	.clk(CLK28),
@@ -234,7 +235,7 @@ always @(posedge CLK28)		// reset tries to emulate the length of a real reset
 		if(resetcounter==24'd16777215)
 			sreset<=0;
 		else begin
-			resetcounter<=resetcounter+1;
+			resetcounter<=resetcounter+1'd1;
 			sreset<=1;
 			end
 		end

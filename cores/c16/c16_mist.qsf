@@ -330,8 +330,8 @@ set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to VGA_B[3]
 set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to VGA_B[2]
 set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to VGA_B[1]
 set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to VGA_B[0]
-set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to VGA_HS
-set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to VGA_VS
+set_instance_assignment -name CURRENT_STRENGTH_NEW 8MA -to VGA_HS
+set_instance_assignment -name CURRENT_STRENGTH_NEW 8MA -to VGA_VS
 set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to LED
 set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to AUDIO_L
 set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to AUDIO_R
@@ -357,6 +357,7 @@ set_global_assignment -name VERILOG_FILE colors_to_rgb.v
 set_global_assignment -name VERILOG_FILE c16_mist.v
 set_global_assignment -name VERILOG_FILE c16_keymatrix.v
 set_global_assignment -name VERILOG_FILE c16.v
+set_global_assignment -name VERILOG_FILE ps2receiver.v
 set_global_assignment -name VERILOG_FILE basic_rom.v
 set_global_assignment -name VHDL_FILE c1541/gcr_floppy.vhd
 set_global_assignment -name VHDL_FILE c1541/spram.vhd

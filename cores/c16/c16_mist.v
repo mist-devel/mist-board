@@ -499,7 +499,7 @@ wire osd_clk = tv15khz?clk7:clk14;
 wire [5:0] red, green, blue;
 
 // include the on screen display
-osd #(11,0,5) osd (
+osd #(10'd11,10'd0,3'd5) osd (
    .clk_sys    ( clk28        ),
    .ce_pix     ( osd_clk      ),
 

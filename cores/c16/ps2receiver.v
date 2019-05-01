@@ -56,18 +56,18 @@ always @(posedge clk)
 	rx_done<=0;													// rx_done is active only for one clk cycle
 	if(watchdog==0)											// when watchdog timer expires, reset received bits
 		receivedbits<=0;
-	else watchdog<=watchdog-1;
+	else watchdog<=watchdog-1'd1;
 		
 	if(prev_ps2clkreg & ~ps2clkreg)						// falling edge of ps2 clock
 		begin
 		watchdog<=12'd2900;									// reload watchdog timer
 		shiftreg<={ps2_data,shiftreg[10:1]};
-		receivedbits<=receivedbits+1;
+		receivedbits<=receivedbits+1'd1;
 		end
 		
 	if(receivedbits==4'd11)
 		begin
-		ps2scancode<=shiftreg[9:1];
+		ps2scancode<=shiftreg[8:1];
 		rx_done<=1;
 		receivedbits<=0;
 		end
