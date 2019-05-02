@@ -1142,7 +1142,7 @@ begin
 		if st_user_port_uart = '0' then
 			-- Protovision 4 player interface
 			flag2_n <= '1';
-			UART_TX <= '0';
+			UART_TX <= not cass_motor;
 			pb_in(7 downto 6) <= pb_out(7 downto 6);
 			if pb_out(7) = '1' then
 				pb_in(3 downto 0) <= not joyC_c64(3 downto 0);
