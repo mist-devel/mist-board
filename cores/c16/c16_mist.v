@@ -143,9 +143,9 @@ wire mux_sdram_oe = clkref ? c16_sdram_oe : tap_sdram_oe;
 wire [15:0] sdram_din = { mux_sdram_data, mux_sdram_data };
 wire [14:0] sdram_addr_64k = mux_sdram_addr[15:1];   // 64k mapping
 wire [14:0] sdram_addr_16k = { 1'b0, mux_sdram_addr[13:7], 1'b0, mux_sdram_addr[6:1] };   // 16k
-wire [24:0] sdram_addr = (clkref | (~clkref & prg_download)) ?
+wire [23:0] sdram_addr = (clkref | (~clkref & prg_download)) ?
                          { 10'h00, memory_16k?sdram_addr_16k:sdram_addr_64k } :
-                         (tap_sdram_oe ? tap_play_addr : ioctl_sdram_addr);
+                         (tap_sdram_oe ? tap_play_addr[24:1] : ioctl_sdram_addr[24:1]);
 
 wire sdram_wr = mux_sdram_wr;
 wire sdram_oe = mux_sdram_oe;
@@ -171,12 +171,15 @@ end
 
 // latch/demultiplex dram address
 reg [7:0] c16_a_low;
-always @(negedge c16_ras)
-	c16_a_low <= c16_a;
-
 reg [7:0] c16_a_hi;
-always @(negedge c16_cas)
-	c16_a_hi <= c16_a;
+
+always @(posedge clk28) begin
+	reg c16_rasD, c16_casD;
+	c16_rasD <= c16_ras;
+	c16_casD <= c16_cas;
+	if (c16_rasD & ~c16_ras) c16_a_low <= c16_a;
+	if (c16_casD & ~c16_cas) c16_a_hi  <= c16_a;
+end
 
 sdram sdram (
    // interface to the MT48LC16M16 chip
