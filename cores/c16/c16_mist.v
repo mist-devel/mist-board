@@ -496,7 +496,7 @@ c1530 c1530
 wire [5:0] osd_r_in = tv15khz?{c16_r, 2'b00}:video_r;
 wire [5:0] osd_g_in = tv15khz?{c16_g, 2'b00}:video_g;
 wire [5:0] osd_b_in = tv15khz?{c16_b, 2'b00}:video_b;
-wire osd_hs_in = tv15khz?!c16_hs:video_hs;
+wire osd_hs_in = tv15khz?c16_hs:video_hs;
 wire osd_vs_in = tv15khz?!c16_vs:video_vs;
 
 wire osd_clk = tv15khz?clk7:clk14;
@@ -559,7 +559,7 @@ scandoubler scandoubler (
    .scanlines ( scanlines?2'b10:2'b00 ),
 
    // shifter video interface
-   .hs_in     ( !c16_hs ),
+	.hs_in     ( c16_hs ),
 	.vs_in     ( !c16_vs ),
 	.r_in      ( c16_r ),
 	.g_in      ( c16_g ),
