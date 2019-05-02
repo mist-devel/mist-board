@@ -56,7 +56,8 @@ module c16_mist (
    output [5:0]  VGA_G,
    output [5:0]  VGA_B,
 
-   input     UART_RX
+   input     UART_RX,
+   output    UART_TX
 );
 
 // -------------------------------------------------------------------------
@@ -95,6 +96,8 @@ always @(posedge clk28) begin
         uart_rxD <= UART_RX;
         uart_rxD2 <= uart_rxD;
 end
+
+assign UART_TX = ~cass_motor;
 
 // the status register is controlled by the on screen display (OSD)
 wire [31:0] status;
@@ -144,7 +147,7 @@ wire [15:0] sdram_din = { mux_sdram_data, mux_sdram_data };
 wire [14:0] sdram_addr_64k = mux_sdram_addr[15:1];   // 64k mapping
 wire [14:0] sdram_addr_16k = { 1'b0, mux_sdram_addr[13:7], 1'b0, mux_sdram_addr[6:1] };   // 16k
 wire [23:0] sdram_addr = (clkref | (~clkref & prg_download)) ?
-                         { 10'h00, memory_16k?sdram_addr_16k:sdram_addr_64k } :
+                         { 9'd0, memory_16k?sdram_addr_16k:sdram_addr_64k } :
                          (tap_sdram_oe ? tap_play_addr[24:1] : ioctl_sdram_addr[24:1]);
 
 wire sdram_wr = mux_sdram_wr;

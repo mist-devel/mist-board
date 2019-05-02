@@ -119,6 +119,7 @@ set_location_assignment PIN_59 -to SDRAM_nCS
 set_location_assignment PIN_33 -to SDRAM_CKE
 set_location_assignment PIN_43 -to SDRAM_CLK
 set_location_assignment PIN_31 -to UART_RX
+set_location_assignment PIN_46 -to UART_TX
 
 # Classic Timing Assignments
 # ==========================
@@ -337,6 +338,7 @@ set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to AUDIO_L
 set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to AUDIO_R
 set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to SPI_DO
 set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to CONF_DATA0
+set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to UART_TX
 set_global_assignment -name VERILOG_INPUT_VERSION VERILOG_2001
 set_global_assignment -name VERILOG_SHOW_LMF_MAPPING_MESSAGES OFF
 set_global_assignment -name ENABLE_DRC_SETTINGS OFF
