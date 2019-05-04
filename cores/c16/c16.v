@@ -30,7 +30,7 @@
 // Additional Comments: 
 //
 //////////////////////////////////////////////////////////////////////////////////
-module C16 #(parameter MODE_PAL = 1)(
+module C16 (
 	input wire CLK28,
 	input wire RESET,
 	input wire WAIT,
@@ -48,7 +48,11 @@ module C16 #(parameter MODE_PAL = 1)(
 	output wire [7:0] A,
 	input wire [7:0] DIN,
 	output wire [7:0] DOUT,
-	
+
+	output wire CS0, // Select BASIC ROM (low active)
+	output wire CS1, // Select Kernal ROM (low active)
+	output wire [13:0] ROM_ADDR,
+
 	input [4:0] JOY0,
 	input [4:0] JOY1,
 	
@@ -85,6 +89,9 @@ module C16 #(parameter MODE_PAL = 1)(
 	output RGBS
     );
 
+parameter MODE_PAL = 1;
+parameter INTERNAL_ROM = 1;
+
 wire [15:0] c16_addr;
 wire [15:0] ted_addr;
 wire [15:0] cpu_addr;
@@ -111,6 +118,7 @@ assign kbus[3:0] = kbus_kbd[3:0] & joy0_sel[3:0] & joy1_sel[3:0];
 assign kbus[5:4] = kbus_kbd[5:4]; // no joystick line connected here
 assign kbus[6] = kbus_kbd[6] & joy0_sel[4];
 assign kbus[7] = kbus_kbd[7] & joy1_sel[4];
+assign ROM_ADDR = c16_addr[13:0];
 
 // 8501 CPU
 	mos8501 cpu (
@@ -130,7 +138,7 @@ assign kbus[7] = kbus_kbd[7] & joy1_sel[4];
 	);
 
 // TED 8360 instance	
-wire irq_n, cpuclk, cs0, cs1;
+wire irq_n, cpuclk;
 
 ted mos8360(
 	.clk(CLK28),
@@ -149,8 +157,8 @@ ted mos8360(
 	.mux(mux),
 	.ras(RAS),
 	.cas(CAS),
-	.cs0(cs0),
-	.cs1(cs1),
+	.cs0(CS0),
+	.cs1(CS1),
 	.aec(aec),
 	.k(kbus),
 	.snd(sound),
@@ -163,23 +171,26 @@ ted mos8360(
 	kernal_rom #(.MODE_PAL(MODE_PAL)) kernal(
 		.clk(CLK28),
 		.address_in(kernal_dl_write?dl_addr:c16_addr[13:0]),
-		.data_out(kernal_data),
+		.data_out(kernal_data_int),
 		.data_in(dl_data),
 		.wr(kernal_dl_write),
-		.cs(cs1)
+		.cs(CS1)
 		);
+wire [7:0] kernal_data_int;
+assign kernal_data = INTERNAL_ROM ? kernal_data_int : (~CS1 & RW) ? DIN : 8'hFF;
 
 // Basic rom
 
 	basic_rom basic(
 		.clk(CLK28),
 		.address_in(basic_dl_write?dl_addr:c16_addr[13:0]),
-		.data_out(basic_data),
+		.data_out(basic_data_int),
 		.data_in(dl_data),
 		.wr(basic_dl_write),
-		.cs(cs0)
+		.cs(CS0)
 		);
-
+wire [7:0] basic_data_int;
+assign basic_data = INTERNAL_ROM ? basic_data_int : (~CS0 & RW) ? DIN : 8'hFF;
 // Color decoder to 12bit RGB	
  
 colors_to_rgb colordecode (
@@ -315,6 +326,7 @@ sid8580 sid8580
 
 wire  [7:0] sid6581_data;
 wire [17:0] sid6581_audio;
+
 sid_top #(.g_num_voices(3)) sid6581
 (
 	.reset(sreset),
@@ -326,7 +338,7 @@ sid_top #(.g_num_voices(3)) sid6581
 	.wdata(c16_data),
 	.rdata(sid6581_data),
 
-	.extfilter_en(0), // disabled due to out of BRAM
+	.extfilter_en(1),
 	.sample_left(sid6581_audio)
 );
 

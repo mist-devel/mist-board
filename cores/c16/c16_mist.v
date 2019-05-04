@@ -86,7 +86,8 @@ parameter CONF_STR = {
 
 parameter CONF_STR_LEN = 11+17+18+18+21+20+28+18+22+9;
 
-localparam TAP_MEM_START = 22'h20000;
+localparam ROM_MEM_START = 25'h10000;
+localparam TAP_MEM_START = 25'h20000;
 
 reg uart_rxD;
 reg uart_rxD2;
@@ -127,10 +128,14 @@ wire ps2_mouse_clk, ps2_mouse_data;
 assign SDRAM_CKE = 1'b1;
 
 // ram access signals from c16
-wire [15:0] c16_sdram_addr = { c16_a_hi, c16_a_low };
+wire c16_rom_access = (~c16_basic_sel | ~c16_kernal_sel) && c16_rw;
+wire [15:0] c16_sdram_addr = c16_rom_access ? { 1'b0, ~c16_basic_sel, c16_rom_addr } : { c16_a_hi, c16_a_low };
 wire [7:0] c16_sdram_data = c16_dout;
 wire c16_sdram_wr = !c16_cas && !c16_rw;
-wire c16_sdram_oe = !c16_cas &&  c16_rw;
+wire c16_sdram_oe = (!c16_cas && c16_rw) || c16_rom_access;
+wire c16_basic_sel;
+wire c16_kernal_sel;
+wire [13:0] c16_rom_addr;
 
 // ram access signals from io controller
 // ioctl_sdram_write
@@ -146,9 +151,18 @@ wire mux_sdram_oe = clkref ? c16_sdram_oe : tap_sdram_oe;
 wire [15:0] sdram_din = { mux_sdram_data, mux_sdram_data };
 wire [14:0] sdram_addr_64k = mux_sdram_addr[15:1];   // 64k mapping
 wire [14:0] sdram_addr_16k = { 1'b0, mux_sdram_addr[13:7], 1'b0, mux_sdram_addr[6:1] };   // 16k
-wire [23:0] sdram_addr = (clkref | (~clkref & prg_download)) ?
-                         { 9'd0, memory_16k?sdram_addr_16k:sdram_addr_64k } :
-                         (tap_sdram_oe ? tap_play_addr[24:1] : ioctl_sdram_addr[24:1]);
+wire [14:0] sdram_addr_c16ram = memory_16k?sdram_addr_16k:sdram_addr_64k;
+
+reg  [23:0] sdram_addr;
+always @(*) begin
+	casex ({ clkref, c16_rom_access, prg_download, tap_sdram_oe })
+		'b0X00: sdram_addr = ioctl_sdram_addr[24:1];
+		'b0X01: sdram_addr = tap_play_addr[24:1];
+		'b0X1X: sdram_addr = { 9'd0, sdram_addr_c16ram };
+		'b10XX: sdram_addr = { 9'd0, sdram_addr_c16ram };
+		'b11XX: sdram_addr = { 8'd0,1'b1, 1'b0, ~c16_basic_sel, c16_rom_addr[13:1] };
+	endcase
+end
 
 wire sdram_wr = mux_sdram_wr;
 wire sdram_oe = mux_sdram_oe;
@@ -307,7 +321,7 @@ wire rom_download = ioctl_downloading && ((ioctl_index == 8'h00) || (ioctl_index
 wire prg_download = ioctl_downloading && (ioctl_index == 8'h01);
 wire tap_download = ioctl_downloading && (ioctl_index == 8'h41);
 
-wire c16_wait = 0;
+wire c16_wait = rom_download | prg_download;
 
 data_io data_io (
       // SPI interface
@@ -411,6 +425,9 @@ always @(posedge clk28) begin
 		end else if (tap_download) begin
 			if(ioctl_addr == 16'h0000) ioctl_sdram_addr <= TAP_MEM_START;
 			ioctl_ram_wr <= 1'b1;
+		end else if (rom_download) begin
+			if((ioctl_index == 8'h0 && ioctl_addr == 16'h4000) || (ioctl_index == 8'h3 && ioctl_addr == 16'h0000)) ioctl_sdram_addr <= ROM_MEM_START;
+			if((ioctl_index == 8'h0 && ioctl_addr[15:14]) || ioctl_index == 8'h3) ioctl_ram_wr <= 1'b1;
 		end
 	end
 
@@ -627,7 +644,7 @@ sigma_delta_dac dac (
 );
 
 // include the c16 itself
-C16 c16 (
+C16 #(.INTERNAL_ROM(0)) c16 (
 	.CLK28   ( clk28 ),
 	.RESET   ( reset ),
 	.WAIT    ( c16_wait ),
@@ -644,6 +661,10 @@ C16 c16 (
 	.A       ( c16_a ),
 	.DOUT    ( c16_dout ),
 	.DIN     ( c16_din ),
+
+	.CS0     ( c16_basic_sel  ),
+	.CS1     ( c16_kernal_sel ),
+	.ROM_ADDR( c16_rom_addr   ),
 
 	.JOY0    ( jsB[4:0] ),
 	.JOY1    ( jsA[4:0] ),
