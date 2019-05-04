@@ -129,13 +129,26 @@ assign SDRAM_CKE = 1'b1;
 
 // ram access signals from c16
 wire c16_rom_access = (~c16_basic_sel | ~c16_kernal_sel) && c16_rw;
-wire [15:0] c16_sdram_addr = c16_rom_access ? { 1'b0, ~c16_basic_sel, c16_rom_addr } : { c16_a_hi, c16_a_low };
-wire [7:0] c16_sdram_data = c16_dout;
-wire c16_sdram_wr = !c16_cas && !c16_rw;
-wire c16_sdram_oe = (!c16_cas && c16_rw) || c16_rom_access;
 wire c16_basic_sel;
 wire c16_kernal_sel;
 wire [13:0] c16_rom_addr;
+wire [3:0] c16_rom_sel;
+reg [1:0] c16_rom_sel_mux;
+
+always @(*) begin
+	casex ({ c16_basic_sel, c16_rom_sel })
+		'b1_00XX: c16_rom_sel_mux <= 2'b00; // Kernal
+		'b1_10XX: c16_rom_sel_mux <= 2'b11; // Function HIGH
+		'b0_XX00: c16_rom_sel_mux <= 2'b01; // BASIC
+		'b0_XX10: c16_rom_sel_mux <= 2'b10; // Function LOW
+		default : c16_rom_sel_mux <= 2'b00; // CARTRIDGE - not supported now
+	endcase
+end
+
+wire [15:0] c16_sdram_addr = c16_rom_access ? { c16_rom_sel_mux, c16_rom_addr } : { c16_a_hi, c16_a_low };
+wire [7:0] c16_sdram_data = c16_dout;
+wire c16_sdram_wr = !c16_cas && !c16_rw;
+wire c16_sdram_oe = (!c16_cas && c16_rw) || c16_rom_access;
 
 // ram access signals from io controller
 // ioctl_sdram_write
@@ -160,7 +173,7 @@ always @(*) begin
 		'b0X01: sdram_addr = tap_play_addr[24:1];
 		'b0X1X: sdram_addr = { 9'd0, sdram_addr_c16ram };
 		'b10XX: sdram_addr = { 9'd0, sdram_addr_c16ram };
-		'b11XX: sdram_addr = { 8'd0,1'b1, 1'b0, ~c16_basic_sel, c16_rom_addr[13:1] };
+		'b11XX: sdram_addr = { 8'd0,1'b1, c16_rom_sel_mux, c16_rom_addr[13:1] };
 	endcase
 end
 
@@ -665,6 +678,7 @@ C16 #(.INTERNAL_ROM(0)) c16 (
 	.CS0     ( c16_basic_sel  ),
 	.CS1     ( c16_kernal_sel ),
 	.ROM_ADDR( c16_rom_addr   ),
+	.ROM_SEL ( c16_rom_sel    ),
 
 	.JOY0    ( jsB[4:0] ),
 	.JOY1    ( jsA[4:0] ),

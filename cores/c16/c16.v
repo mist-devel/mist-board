@@ -51,6 +51,9 @@ module C16 (
 
 	output wire CS0, // Select BASIC ROM (low active)
 	output wire CS1, // Select Kernal ROM (low active)
+	output wire [3:0] ROM_SEL, // 3:2 - Kernal, Cartridge1 HIGH, Function HIGH, Cartridge2 HIGH
+	                           // 1:0 - BASIC, Cartridge2 LOW, Function LOW, Cartridge2 LOW
+
 	output wire [13:0] ROM_ADDR,
 
 	input [4:0] JOY0,
@@ -119,6 +122,19 @@ assign kbus[5:4] = kbus_kbd[5:4]; // no joystick line connected here
 assign kbus[6] = kbus_kbd[6] & joy0_sel[4];
 assign kbus[7] = kbus_kbd[7] & joy1_sel[4];
 assign ROM_ADDR = c16_addr[13:0];
+
+reg [3:0] rom_sel_reg;
+wire kern = c16_addr[15:8] == 8'hFC; // FCXX is always kernal
+assign ROM_SEL = { rom_sel_reg[3:2] & { ~kern, ~kern }, rom_sel_reg[1:0] };
+
+always @(posedge CLK28) begin
+	if (sreset)
+		rom_sel_reg <= 0;
+	else begin
+		// FDD0-FDDF is ROM banking address
+		if (c16_addr[15:4] == 12'hFDD && ~RW) rom_sel_reg <= c16_addr[3:0];
+	end
+end
 
 // 8501 CPU
 	mos8501 cpu (
