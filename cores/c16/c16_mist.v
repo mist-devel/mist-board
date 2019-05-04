@@ -645,8 +645,8 @@ end
 
 wire audio_l_out, audio_r_out;
 wire [17:0] sid_audio;
-wire [17:0] audio_data_l = sid_audio + { audio_l_out, tap_sound & ~cass_read, 13'd0 };
-wire [17:0] audio_data_r = sid_audio + { audio_r_out, tap_sound & ~cass_read, 13'd0 };
+wire [17:0] audio_data_l = sid_audio + { audio_l_out, tap_sound & ~cass_read, 14'd0 };
+wire [17:0] audio_data_r = sid_audio + { audio_r_out, tap_sound & ~cass_read, 14'd0 };
 
 sigma_delta_dac dac (
 	.clk      ( clk28),
