@@ -367,9 +367,9 @@ wire zp_32_sel = c16_sdram_addr == 16'h0032;
 wire zp_9d_sel = c16_sdram_addr == 16'h009d;
 wire zp_9e_sel = c16_sdram_addr == 16'h009e;
 
-wire zp_overwrite = 
+wire zp_overwrite = !c16_rom_access && (
 	zp_2d_sel || zp_2e_sel || zp_2f_sel || zp_30_sel ||
-	zp_31_sel || zp_32_sel || zp_9d_sel || zp_9e_sel;
+	zp_31_sel || zp_32_sel || zp_9d_sel || zp_9e_sel);
 
 reg zp_cas_delay, zp_sel;
 reg zp_dl_delay, zp_dl;
