@@ -445,7 +445,7 @@ lcd lcd (
 );
 
 // include the on screen display
-osd #(16,0,4) osd (
+osd #(10'd16,10'd0,4) osd (
    .clk_sys    ( clk64       ),
 
    // spi for OSD
