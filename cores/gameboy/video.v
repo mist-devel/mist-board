@@ -71,7 +71,6 @@ wire [10:0] sprite_addr;
 
 //gbc
 wire [2:0] sprite_pixel_cmap_gbc;
-wire sprite_tile_vbank;
 
 // "data strobe" for the two bytes each sprite line consists of
 wire [1:0] sprite_dvalid = {
@@ -82,6 +81,7 @@ sprites sprites (
 	.clk      ( clk          ),
 	.clk_reg  ( clk_reg      ),
 	.size16   ( lcdc_spr_siz ),
+	.isGBC    ( isGBC        ),
 
 	.v_cnt    ( v_cnt        ),
 	.h_cnt    ( h_cnt-STAGE2 ),     // sprites are added in second stage
@@ -100,7 +100,6 @@ sprites sprites (
 
 	//gbc
 	.pixel_cmap_gbc ( sprite_pixel_cmap_gbc ),
-	.tile_vbank     ( sprite_tile_vbank     ),
 
 	.oam_wr   ( oam_wr       ),
 	.oam_addr ( oam_addr     ),

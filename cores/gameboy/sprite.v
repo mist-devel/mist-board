@@ -22,6 +22,8 @@
 module sprite (
 	input clk,
 	input size16,
+	input isGBC,
+	input [7:0] sprite_index,
 
 	input [7:0] v_cnt,
 	input [7:0] h_cnt,
@@ -41,7 +43,6 @@ module sprite (
 	
 	//gbc
 	output [2:0] pixel_cmap_gbc,
-	output tile_vbank,
 	
 	input oam_wr,
 	input [1:0] oam_addr,
@@ -51,7 +52,7 @@ module sprite (
 
 // x position for priority detection. Invisible sprites are far to the right and
 // have minimum priority
-assign x = v_visible?x_pos:8'hff;
+assign x = v_visible?isGBC?sprite_index:x_pos:8'hff;
 
 // register used to store pixel data for current line
 reg [7:0] data0;
@@ -88,7 +89,6 @@ assign pixel_cmap = flags[4];
 assign pixel_prio = flags[7];
 
 assign pixel_cmap_gbc = flags[2:0];
-assign tile_vbank = flags[3];
 
 reg [7:0] y_pos;
 reg [7:0] x_pos;
