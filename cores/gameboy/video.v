@@ -24,6 +24,7 @@ module video (
 	input  clk,    // 4 Mhz cpu clock
 	input  clk_reg,
 	input  isGBC,
+	input  isGBC_game,
 
 	// cpu register adn oam interface
 	input  cpu_sel_oam,
@@ -81,7 +82,7 @@ sprites sprites (
 	.clk      ( clk          ),
 	.clk_reg  ( clk_reg      ),
 	.size16   ( lcdc_spr_siz ),
-	.isGBC    ( isGBC        ),
+	.isGBC    ( isGBC&&isGBC_game ),
 
 	.v_cnt    ( v_cnt        ),
 	.h_cnt    ( h_cnt-STAGE2 ),     // sprites are added in second stage
@@ -337,8 +338,13 @@ reg [7:0] stage2_wptr;
 reg [7:0] stage2_rptr;
 
 
-wire [5:0] palette_index = (stage2_bgp_buffer_pix[stage2_rptr][2:0] << 3) + (stage2_buffer[stage2_rptr]<<1); //gbc
-
+wire [5:0] palette_index = isGBC_game? 
+								(stage2_bgp_buffer_pix[stage2_rptr][2:0] << 3) + (stage2_buffer[stage2_rptr]<<1):  //GBC game
+							//GB game in GBC mode
+							(stage2_buffer[stage2_rptr] == 2'b00)?{3'd0,bgp[1:0],1'b0}:
+							(stage2_buffer[stage2_rptr] == 2'b01)?{3'd0,bgp[3:2],1'b0}:
+							(stage2_buffer[stage2_rptr] == 2'b10)?{3'd0,bgp[5:4],1'b0}:
+							{3'd0,bgp[7:6],1'b0};
 
 // apply bg palette
 wire [14:0] stage2_bg_pix = (!lcdc_bg_ena && !window_ena)?15'h7FFF:  // background off?
@@ -352,7 +358,13 @@ wire [14:0] stage2_bg_pix = (!lcdc_bg_ena && !window_ena)?15'h7FFF:  // backgrou
 
 // apply sprite palette
 
-wire [5:0] sprite_palette_index = (sprite_pixel_cmap_gbc << 3) + (sprite_pixel_data<<1); //gbc
+wire [5:0] sprite_palette_index = isGBC_game? 
+									(sprite_pixel_cmap_gbc << 3) + (sprite_pixel_data<<1): //gbc game
+								//GB game in GBC mode
+								(sprite_pixel_data == 2'b00)? (sprite_pixel_cmap << 3) + (obp[1:0]<<1):
+								(sprite_pixel_data == 2'b01)? (sprite_pixel_cmap << 3) + (obp[3:2]<<1):
+								(sprite_pixel_data == 2'b10)? (sprite_pixel_cmap << 3) + (obp[5:4]<<1):
+								(sprite_pixel_cmap << 3) + (obp[7:6]<<1);
 
 wire [7:0] obp = sprite_pixel_cmap?obp1:obp0;
 wire [14:0] sprite_pix = isGBC?{obpd[sprite_palette_index+1][6:0],obpd[sprite_palette_index]}: //gbc
@@ -363,7 +375,7 @@ wire [14:0] sprite_pix = isGBC?{obpd[sprite_palette_index+1][6:0],obpd[sprite_pa
 
 // https://forums.nesdev.com/viewtopic.php?f=20&t=10771&sid=8fdb6e110fd9b5434d4a567b1199585e#p122222
 // priority list: BG0 < OBJL < BGL < OBJH < BGH
-wire bg_piority = isGBC&&stage2_bgp_buffer_pix[stage2_rptr][3];
+wire bg_piority = isGBC&&isGBC_game&&stage2_bgp_buffer_pix[stage2_rptr][3];
 wire [1:0] bg_color = stage2_buffer[stage2_rptr];
 reg sprite_pixel_visible;
 
@@ -371,7 +383,7 @@ always @(*) begin
 	sprite_pixel_visible = 1'b0;
 	if (sprite_pixel_active && lcdc_spr_ena) begin		// pixel active and sprites enabled
 
-		if (isGBC) begin
+		if (isGBC&&isGBC_game) begin
 			if (sprite_pixel_data == 2'b00)
 				sprite_pixel_visible = 1'b0;
 			else if (bg_color == 2'b00)
@@ -438,7 +450,7 @@ reg [7:0] bg_tile_data1;
 
 
 wire stage1_clkena = !vblank && hdvalid;
-wire [1:0] stage1_data = (isGBC&&bg_tile_attr_old[5])?{ tile_shift_1_x[0], tile_shift_0_x[0] }:{ tile_shift_1[7], tile_shift_0[7] };
+wire [1:0] stage1_data = (isGBC&&isGBC_game&&bg_tile_attr_old[5])?{ tile_shift_1_x[0], tile_shift_0_x[0] }:{ tile_shift_1[7], tile_shift_0[7] };
 
 wire [7:0] vram_gbc_data = bg_tile_attr_new[3]?vram1_data:vram_data; //gbc check tile bank
 reg [7:0] bg_tile_attr_old,bg_tile_attr_new; //GBC
@@ -450,7 +462,7 @@ always @(posedge clk) begin
 	if(h_cnt[0]) begin
 		if(bg_tile_map_rd) bg_tile <= vram_data;
 
-		if (isGBC) begin
+		if (isGBC&&isGBC_game) begin
 			if(bg_tile_map_rd) bg_tile_attr_new <= vram1_data; //get tile attr from vram bank1
 			if(bg_tile_data0_rd) bg_tile_data0 <= vram_gbc_data;
 		   if(bg_tile_data1_rd) bg_tile_data1 <= vram_gbc_data;
@@ -489,8 +501,8 @@ wire [2:0] tile_line_gbc = bg_tile_attr_new[6]? (3'b111 - tile_line): tile_line;
 
 assign vram_addr =
 	bg_tile_map_rd?{2'b11, tile_map_sel, bg_tile_map_addr}:
-	bg_tile_data0_rd?{bg_tile_a12, bg_tile, isGBC?tile_line_gbc:tile_line, 1'b0}:
-	bg_tile_data1_rd?{bg_tile_a12, bg_tile, isGBC?tile_line_gbc:tile_line, 1'b1}:
+	bg_tile_data0_rd?{bg_tile_a12, bg_tile, isGBC&&isGBC_game?tile_line_gbc:tile_line, 1'b0}:
+	bg_tile_data1_rd?{bg_tile_a12, bg_tile, isGBC&&isGBC_game?tile_line_gbc:tile_line, 1'b1}:
 	{1'b0, sprite_addr, h_cnt[3]};
 
 reg [9:0] bg_tile_map_addr;
