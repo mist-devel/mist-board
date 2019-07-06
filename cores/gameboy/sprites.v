@@ -23,7 +23,7 @@ module sprites (
 	input clk,
 	input clk_reg,
 	input size16,
-	input isGBC,
+	input isGBC_game,
 
 	// pixel position input which the current pixel is generated for
 	input [7:0] v_cnt,
@@ -99,7 +99,7 @@ for(i=0;i<SPRITES;i=i+1) begin : spr
 	sprite sprite (
 		.clk      ( clk_reg ),
 		.size16   ( size16  ),
-		.isGBC    ( isGBC   ),
+		.isGBC_game    ( isGBC_game  ),
 		
 		.sprite_index ( i   ),
 

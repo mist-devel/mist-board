@@ -22,7 +22,7 @@
 module sprite (
 	input clk,
 	input size16,
-	input isGBC,
+	input isGBC_game,
 	input [7:0] sprite_index,
 
 	input [7:0] v_cnt,
@@ -52,15 +52,15 @@ module sprite (
 
 // x position for priority detection. Invisible sprites are far to the right and
 // have minimum priority
-assign x = v_visible?isGBC?sprite_index:x_pos:8'hff;
+assign x = v_visible?isGBC_game?sprite_index:x_pos:8'hff;
 
 // register used to store pixel data for current line
 reg [7:0] data0;
 reg [7:0] data1;
 
 always @(posedge clk) begin
-	if(ds[0]) data0 <= flags[3]?data_1:data;
-	if(ds[1]) data1 <= flags[3]?data_1:data;
+	if(ds[0]) data0 <= flags[3]&&isGBC_game?data_1:data;
+	if(ds[1]) data1 <= flags[3]&&isGBC_game?data_1:data;
 end
 
 wire [7:0] height = size16?8'd16:8'd8;
