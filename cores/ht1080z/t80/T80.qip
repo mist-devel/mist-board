@@ -1,0 +1,6 @@
+set_global_assignment -name VHDL_FILE [file join $::quartus(qip_path) T80s.vhd ]
+set_global_assignment -name VHDL_FILE [file join $::quartus(qip_path) T80pa.vhd ]
+set_global_assignment -name VHDL_FILE [file join $::quartus(qip_path) T80_Reg.vhd ]
+set_global_assignment -name VHDL_FILE [file join $::quartus(qip_path) T80_MCode.vhd ]
+set_global_assignment -name VHDL_FILE [file join $::quartus(qip_path) T80_ALU.vhd ]
+set_global_assignment -name VHDL_FILE [file join $::quartus(qip_path) T80.vhd ]

@@ -375,7 +375,7 @@ begin
 			MCycles <= "000";
 			DO <= "00000000";
 
-			ACC <= (others => '1');
+			ACC <= (others => '0');
 			if Mode = 3 then
 				F <= "11110000";
 			else

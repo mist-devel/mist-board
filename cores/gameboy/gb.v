@@ -372,7 +372,8 @@ video video (
 	.clk		    ( clk           ),
 	.clk_reg     ( clk_cpu       ),   //can be 2x in cgb double speed mode
 	.isGBC       ( isGBC         ),
-	
+
+	.isGBC_game  ( isGBC_game|boot_rom_enabled ),  //enable GBC mode during bootstrap rom
 
 	.irq         ( video_irq     ),
 	.vblank_irq  ( vblank_irq    ),
