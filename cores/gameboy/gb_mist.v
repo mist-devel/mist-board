@@ -328,9 +328,9 @@ always @(posedge clk64) begin
 		if(dio_download && dio_write) begin
 			// cart is stored in 16 bit wide sdram, so addresses are shifted right
 			case(dio_addr)
-				24'h142: cart_cgb_flag <= dio_data[15:8];
-				24'ha3:  cart_mbc_type <= dio_data[7:0];                 // $147
-				24'ha4: { cart_rom_size, cart_ram_size } <= dio_data;    // $148/$149
+				24'ha1: cart_cgb_flag <= dio_data[7:0];               // $143
+				24'ha3: cart_mbc_type <= dio_data[7:0];               // $147
+				24'ha4: { cart_rom_size, cart_ram_size } <= dio_data; // $148/$149
 			endcase
 		end
 	end
