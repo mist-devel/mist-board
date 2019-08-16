@@ -297,61 +297,61 @@ podules PODULES(
 
 	.speed_i		( ioc_speed				),
 	
-	.wb_cyc			( cpu_cyc & podules_en),
-	.wb_stb			( cpu_stb & podules_en),
-	.wb_we			( cpu_we  & podules_en),
+	.wb_cyc			( cpu_cyc & podules_en	),
+	.wb_stb			( cpu_stb & podules_en	),
+	.wb_we			( cpu_we  & podules_en	),
 
 	.wb_dat_o		( pod_dat_o				),
 	.wb_dat_i		( cpu_dat_o[15:0]		),
-	.wb_adr			( cpu_address[15:2]		)
+	.wb_adr			( cpu_address[15:2]		),
 );
 
-wire [7:0]	floppy_dat_o;
-wire 		floppy_en = ioc_cs & ioc_select[1];
+wire [7:0]  floppy_dat_o;
+wire        floppy_en = ioc_cs & ioc_select[1];
 
 // floppy drive signals.
-wire  [3:0] floppy_drive;
-wire  	  	floppy_side;
-wire  	  	floppy_motor;
-wire 		  	floppy_inuse;
-wire 		  	floppy_density;
-wire 		  	floppy_reset;
+wire [3:0]  floppy_drive;
+wire        floppy_side;
+wire        floppy_motor;
+wire        floppy_inuse;
+wire        floppy_density;
+wire        floppy_reset;
 
-fdc1772 FDC1772 (
+wire        fdc_sel = cpu_stb & cpu_cyc & floppy_en;
 
-	.clkcpu			( CLKCPU_I				),
-	.clk8m_en		( ioc_clk8m_en			),
+fdc1772 #(.CLK(42000000)) FDC1772 (
 
-	.wb_cyc			( cpu_cyc & floppy_en	),
-	.wb_stb			( cpu_stb & floppy_en	),
-	.wb_we			( cpu_we  & floppy_en	),
+	.clkcpu         ( CLKCPU_I         ),
+	.clk8m_en       ( ioc_clk8m_en     ),
 
-	.wb_dat_o		( floppy_dat_o			),
-	.wb_dat_i		( cpu_dat_o[23:16]	),
-	.wb_adr			( cpu_address[15:2]	),
-	
-	.floppy_firq	( floppy_firq			),
-	.floppy_drq		( floppy_drq			),
+	.cpu_sel        ( fdc_sel          ),
+	.cpu_rw         ( !cpu_we          ),
+	.cpu_addr       ( cpu_address[3:2] ),
+	.cpu_dout       ( floppy_dat_o     ),
+	.cpu_din        ( cpu_dat_o[23:16] ),
 
-	.img_mounted    ( img_mounted           ),
-	.img_size       ( img_size              ),
-	.img_wp         ( 0                     ),
-	.sd_lba         ( sd_lba                ),
-	.sd_rd          ( sd_rd                 ),
-	.sd_wr          ( sd_wr                 ),
-	.sd_ack         ( sd_ack                ),
-	.sd_buff_addr   ( sd_buff_addr          ),
-	.sd_dout        ( sd_dout               ),
-	.sd_din         ( sd_din                ),
-	.sd_dout_strobe ( sd_dout_strobe        ),
-	.sd_din_strobe  ( sd_din_strobe         ),
+	.irq            ( floppy_firq      ),
+	.drq            ( floppy_drq       ),
 
-	.floppy_drive	( floppy_drive			),
-	.floppy_motor	( floppy_motor			),
-	.floppy_inuse	( floppy_inuse			),
-	.floppy_side	( floppy_side 			),
-	.floppy_density ( floppy_density		),
-	.floppy_reset	( floppy_reset			)
+	.img_mounted    ( img_mounted      ),
+	.img_size       ( img_size         ),
+	.img_wp         ( 0                ),
+	.sd_lba         ( sd_lba           ),
+	.sd_rd          ( sd_rd            ),
+	.sd_wr          ( sd_wr            ),
+	.sd_ack         ( sd_ack           ),
+	.sd_buff_addr   ( sd_buff_addr     ),
+	.sd_dout        ( sd_dout          ),
+	.sd_din         ( sd_din           ),
+	.sd_dout_strobe ( sd_dout_strobe   ),
+	.sd_din_strobe  ( sd_din_strobe    ),
+
+	.floppy_drive	( floppy_drive     ),
+//	.floppy_motor	( floppy_motor     ),
+//	.floppy_inuse	( floppy_inuse     ),
+	.floppy_side	( floppy_side      ),
+//	.floppy_density ( floppy_density   ),
+	.floppy_reset	( floppy_reset     )
 );
 
 wire [7:0]	latches_dat_o;

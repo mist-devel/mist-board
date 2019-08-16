@@ -41,7 +41,7 @@ set_global_assignment -name DEVICE EP3C25E144C8
 set_global_assignment -name TOP_LEVEL_ENTITY archimedes_mist_top
 set_global_assignment -name ORIGINAL_QUARTUS_VERSION 13.1
 set_global_assignment -name PROJECT_CREATION_TIME_DATE "13:48:24  SEPTEMBER 20, 2014"
-set_global_assignment -name LAST_QUARTUS_VERSION 13.1
+set_global_assignment -name LAST_QUARTUS_VERSION "13.1 SP4.26"
 set_global_assignment -name PROJECT_OUTPUT_DIRECTORY output_files
 set_global_assignment -name MIN_CORE_JUNCTION_TEMP 0
 set_global_assignment -name MAX_CORE_JUNCTION_TEMP 85
@@ -136,7 +136,7 @@ set_instance_assignment -name CURRENT_STRENGTH_NEW "MAXIMUM CURRENT" -to VGA_*
 set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to DRAM_*
 
 set_global_assignment -name ENABLE_SIGNALTAP OFF
-set_global_assignment -name USE_SIGNALTAP_FILE output_files/sd.stp
+set_global_assignment -name USE_SIGNALTAP_FILE output_files/fdc.stp
 set_global_assignment -name STRATIX_DEVICE_IO_STANDARD "3.3-V LVTTL"
 set_global_assignment -name ENABLE_CONFIGURATION_PINS OFF
 set_global_assignment -name ENABLE_NCE_PIN OFF
@@ -171,12 +171,13 @@ set_global_assignment -name SMART_RECOMPILE ON
 set_global_assignment -name TIMEQUEST_MULTICORNER_ANALYSIS ON
 set_global_assignment -name OPTIMIZE_HOLD_TIMING "ALL PATHS"
 set_global_assignment -name OPTIMIZE_MULTI_CORNER_TIMING ON
-set_global_assignment -name FITTER_EFFORT "AUTO FIT"
+set_global_assignment -name FITTER_EFFORT "STANDARD FIT"
 set_instance_assignment -name FAST_INPUT_REGISTER ON -to DRAM_DQ[*]
 set_instance_assignment -name FAST_OUTPUT_ENABLE_REGISTER ON -to DRAM_DQ[*]
 set_global_assignment -name SEED 1
 set_global_assignment -name ENABLE_DRC_SETTINGS OFF
 set_location_assignment PLL_1 -to CLOCKS|altpll_component|auto_generated|pll1
+set_global_assignment -name PHYSICAL_SYNTHESIS_EFFORT EXTRA
 set_global_assignment -name VERILOG_FILE archimedes_mist_top.v
 set_global_assignment -name SYSTEMVERILOG_FILE rgb2ypbpr.sv
 set_global_assignment -name VERILOG_FILE sigma_delta_dac.v
@@ -226,5 +227,4 @@ set_global_assignment -name QIP_FILE rom_reconfig_36.qip
 set_global_assignment -name QIP_FILE pll_vidc.qip
 set_global_assignment -name SIGNALTAP_FILE output_files/vidc.stp
 set_global_assignment -name SIGNALTAP_FILE output_files/sd.stp
-set_global_assignment -name PHYSICAL_SYNTHESIS_EFFORT NORMAL
 set_instance_assignment -name PARTITION_HIERARCHY root_partition -to | -section_id Top

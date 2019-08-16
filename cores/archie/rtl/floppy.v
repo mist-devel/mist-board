@@ -25,9 +25,15 @@ module floppy (
 	input 	     step_in,
 	input 	     step_out,
 
+	input [10:0] sector_len,
+	input        sector_base,    // number of first sector on track (archie 0, dos 1)
+	input  [4:0] spt,            // sectors/track
+	input  [9:0] sector_gap_len, // gap len/sector
+	input        hd,
+
 	output 	     dclk_en,      // data clock enable
 	output [6:0] track,        // number of track under head
-	output [3:0] sector,       // number of sector under head, 0 = no sector
+	output [4:0] sector,       // number of sector under head, 0 = no sector
 	output 	     sector_hdr,   // valid sector header under head
 	output 	     sector_data,  // valid sector data under head
 	       
@@ -41,9 +47,10 @@ parameter SYS_CLK = 8000000;
 
 assign sector_hdr = (sec_state == SECTOR_STATE_HDR);
 assign sector_data = (sec_state == SECTOR_STATE_DATA);
-   
+
 // a standard DD floppy has a data rate of 250kBit/s and rotates at 300RPM
-localparam RATE = 20'd250000;
+localparam RATEDD = 20'd250000;
+localparam RATEHD = 20'd500000;
 localparam RPM = 10'd300;
 localparam STEPBUSY = 8'd18;       // 18ms after step data can be read
 localparam SPINUP = 10'd500;       // drive spins up in up to 800ms
@@ -53,34 +60,36 @@ localparam SECTOR_HDR_LEN = 4'd6;  // GUESSED: Sector header is 6 bytes
 localparam TRACKS = 8'd85;         // max allowed track
 
 // Archimedes specific values
-localparam SECTOR_LEN = 11'd1024;  // Default sector size is 1k on Archie ...
-localparam SPT = 4'd5;             // ... with 5 sectors per track
-localparam SECTOR_BASE = 4'd0;     // number of first sector on track (archie 0, dos 1)
-   
+//localparam SECTOR_LEN = 11'd1024 // Default sector size is 1024 on Archie
+//localparam SECTOR_LEN = 11'd512; // Default sector size is 512 on ST ...
+//localparam SPT = 4'd10;           // ... with 5 sectors per track
+//localparam SECTOR_BASE = 4'd1;    // number of first sector on track (archie 0, dos 1)
+
 // number of physical bytes per track
-localparam BPT = RATE*60/(8*RPM);
+localparam BPTDD = RATEDD*60/(8*RPM);
+localparam BPTHD = RATEHD*60/(8*RPM);
 
 // report disk ready if it spins at full speed and head is not moving
-assign ready = select && (rate == RATE) && (step_busy == 0);
-   
+assign ready = select && (rate == (hd ? RATEHD : RATEDD)) && (step_busy == 0);
+
 // ================================================================
 // ========================= INDEX PULSE ==========================
 // ================================================================
-   
+
 // Index pulse generation. Pulse starts with the begin of index_pulse_start
 // and lasts INDEX_PULSE_CYCLES system clock cycles
 localparam INDEX_PULSE_CYCLES = INDEX_PULSE_LEN * SYS_CLK / 1000;
 reg [18:0] index_pulse_cnt;
 always @(posedge clk) begin
-   if(index_pulse_start && (index_pulse_cnt == INDEX_PULSE_CYCLES-1)) begin
-      index <= 1'b0;
-      index_pulse_cnt <= 16'd0;
-   end else if(index_pulse_cnt == INDEX_PULSE_CYCLES-1)
-     index <= 1'b1;
-   else
-     index_pulse_cnt <= index_pulse_cnt + 16'd1;
+	if(index_pulse_start && (index_pulse_cnt == INDEX_PULSE_CYCLES-1)) begin
+		index <= 1'b0;
+		index_pulse_cnt <= 19'd0;
+	end else if(index_pulse_cnt == INDEX_PULSE_CYCLES-1)
+		index <= 1'b1;
+	else
+		index_pulse_cnt <= index_pulse_cnt + 1'd1;
 end
-   
+
 // ================================================================
 // ======================= track handling =========================
 // ================================================================
@@ -88,91 +97,90 @@ end
 localparam[19:0] STEP_BUSY_CLKS = (SYS_CLK/1000)*STEPBUSY;  // steprate is in ms
 
 assign track = current_track;
-reg [6:0] current_track = 7'd0;
+reg [6:0] current_track /* verilator public */ = 7'd0;
 
 reg step_inD;
 reg step_outD;
-reg [19:0] step_busy;
+reg [19:0] step_busy /* verilator public */;
    
 always @(posedge clk) begin
-   step_inD <= step_in;
-   step_outD <= step_out;
+	step_inD <= step_in;
+	step_outD <= step_out;
 
-   if(step_busy != 0)
-     step_busy <= step_busy - 18'd1;
+	if(step_busy != 0)
+		step_busy <= step_busy - 18'd1;
 
-   if(select) begin
-      // rising edge of step signal starts step
-      if(step_in && !step_inD) begin
-	 if(current_track != 0) current_track <= current_track - 7'd1;
-	 step_busy <= STEP_BUSY_CLKS;
-      end
+	if(select) begin
+		// rising edge of step signal starts step
+		if(step_in && !step_inD) begin
+			if(current_track != 0) current_track <= current_track - 7'd1;
+				step_busy <= STEP_BUSY_CLKS;
+		end
 
-      if(step_out && !step_outD) begin
-	 if(current_track != TRACKS-1) current_track <= current_track + 7'd1;
-	 step_busy <= STEP_BUSY_CLKS;
-      end
-   end
+		if(step_out && !step_outD) begin
+			if(current_track != TRACKS-1) current_track <= current_track + 7'd1;
+				step_busy <= STEP_BUSY_CLKS;
+		end
+	end
 end
-   
+
 // ================================================================
 // ====================== sector handling =========================
 // ================================================================
 
 // track has BPT bytes
 // SPT sectors are stored on the track
-localparam SECTOR_GAP_LEN = BPT/SPT - (SECTOR_LEN + SECTOR_HDR_LEN);
+//localparam SECTOR_GAP_LEN = BPT/SPT - (SECTOR_LEN + SECTOR_HDR_LEN);
 
 assign sector = current_sector;
-   
+
 localparam SECTOR_STATE_GAP  = 2'd0;
 localparam SECTOR_STATE_HDR  = 2'd1;
 localparam SECTOR_STATE_DATA = 2'd2;
 
 // we simulate an interleave of 1
-reg [3:0] start_sector = SECTOR_BASE;
-   
+reg [4:0] start_sector = 4'd1;
+
 reg [1:0] sec_state;
 reg [9:0] sec_byte_cnt;  // counting bytes within sectors
-reg [3:0] current_sector = SECTOR_BASE;
+reg [4:0] current_sector = 4'd1;
   
 always @(posedge clk) begin
 	if (byte_clk_en) begin
-   if(index_pulse_start) begin
-      sec_byte_cnt <= SECTOR_GAP_LEN-1'd1;
-      sec_state <= SECTOR_STATE_GAP;     // track starts with gap
-      current_sector <= start_sector;    // track starts with sector 1
-   end else begin
-      if(sec_byte_cnt == 0) begin
-	 case(sec_state)
-	   SECTOR_STATE_GAP: begin
-	      sec_state <= SECTOR_STATE_HDR;
-	      sec_byte_cnt <= SECTOR_HDR_LEN-1'd1;
-	   end
+		if(index_pulse_start) begin
+			sec_byte_cnt <= sector_gap_len-1'd1;
+			sec_state <= SECTOR_STATE_GAP;     // track starts with gap
+			current_sector <= start_sector;    // track starts with sector 1
+		end else begin
+			if(sec_byte_cnt == 0) begin
+				case(sec_state)
+				SECTOR_STATE_GAP: begin
+					sec_state <= SECTOR_STATE_HDR;
+					sec_byte_cnt <= SECTOR_HDR_LEN-1'd1;
+				end
 	   
-	   SECTOR_STATE_HDR: begin
-	      sec_state <= SECTOR_STATE_DATA;
-	      sec_byte_cnt <= SECTOR_LEN-1'd1;
-	   end
+				SECTOR_STATE_HDR: begin
+					sec_state <= SECTOR_STATE_DATA;
+					sec_byte_cnt <= sector_len-1'd1;
+				end
 	   
-	   SECTOR_STATE_DATA: begin
-	      sec_state <= SECTOR_STATE_GAP;
-	      sec_byte_cnt <= SECTOR_GAP_LEN-1'd1;
-	      if(current_sector == SECTOR_BASE+SPT-1) 
-		current_sector <= SECTOR_BASE;
-	      else
- 	        current_sector <= sector + 4'd1;
-	   end
+				SECTOR_STATE_DATA: begin
+					sec_state <= SECTOR_STATE_GAP;
+					sec_byte_cnt <= sector_gap_len-1'd1;
+					if(current_sector == sector_base+spt-1) 
+						current_sector <= sector_base;
+					else
+						current_sector <= sector + 1'd1;
+					end
 
-	   default:
-	     sec_state <= SECTOR_STATE_GAP;
+				default:
+					sec_state <= SECTOR_STATE_GAP;
 	      
-	 endcase
-      end else
-	sec_byte_cnt <= sec_byte_cnt - 10'd1;
-   end
-
-   end
+				endcase
+			end else
+				sec_byte_cnt <= sec_byte_cnt - 10'd1;
+		end
+	end
 end
    
 // ================================================================
@@ -187,7 +195,7 @@ always @(posedge clk) begin
 	if (byte_clk_en) begin
 		index_pulse_start <= 1'b0;
 
-		if(byte_cnt == BPT-1) begin
+		if(byte_cnt == ((hd ? BPTHD : BPTDD)-1'd1)) begin
 			byte_cnt <= 0;
 			index_pulse_start <= 1'b1;
 		end else
@@ -217,41 +225,41 @@ end
 localparam SPIN_UP_CLKS = SYS_CLK/1000*SPINUP;
 localparam SPIN_DOWN_CLKS = SYS_CLK/1000*SPINDOWN;
 reg [31:0] spin_up_counter;
-   
+
 // internal motor on signal that is only true if the drive is selected
 wire motor_on_sel = motor_on && select;
    
 // data rate determines rotation speed
-reg [31:0] rate = 0;
+reg [31:0] rate /* verilator public */ = 0;
 reg motor_onD;
 
 always @(posedge clk) begin
-   motor_onD <= motor_on_sel;
+	motor_onD <= motor_on_sel;
 
-   // reset spin_up counter whenever motor state changes
-   if(motor_onD != motor_on_sel)
-     spin_up_counter <= 32'd0;
-   else begin
-      spin_up_counter <= spin_up_counter + RATE;
+	// reset spin_up counter whenever motor state changes
+	if(motor_onD != motor_on_sel)
+		spin_up_counter <= 32'd0;
+	else begin
+		spin_up_counter <= spin_up_counter + (hd ? RATEHD : RATEDD);
       
-      if(motor_on_sel) begin
-	 // spinning up
-	 if(spin_up_counter > SPIN_UP_CLKS) begin
-	    if(rate < RATE)
-	      rate <= rate + 32'd1;
-	    spin_up_counter <= spin_up_counter - (SPIN_UP_CLKS - RATE);
-	 end
-      end else begin
-	 // spinning down
-	 if(spin_up_counter > SPIN_DOWN_CLKS) begin
-	    if(rate > 0)
-	      rate <= rate - 32'd1;
-	    spin_up_counter <= spin_up_counter - (SPIN_DOWN_CLKS - RATE);
-	 end
-      end // else: !if(motor_on)
-   end // else: !if(motor_onD != motor_on)
+		if(motor_on_sel) begin
+			// spinning up
+			if(spin_up_counter > SPIN_UP_CLKS) begin
+				if(rate < (hd ? RATEHD : RATEDD))
+					rate <= rate + 32'd1;
+				spin_up_counter <= spin_up_counter - (SPIN_UP_CLKS - (hd ? RATEHD : RATEDD));
+			end
+		end else begin
+			// spinning down
+			if(spin_up_counter > SPIN_DOWN_CLKS) begin
+				if(rate > 0)
+					rate <= rate - 32'd1;
+				spin_up_counter <= spin_up_counter - (SPIN_DOWN_CLKS - (hd ? RATEHD : RATEDD));
+			end
+		end // else: !if(motor_on)
+	end // else: !if(motor_onD != motor_on)
 end
-   
+
 // Generate a data clock from the system clock. This depends on motor
 // speed and reaches the full rate when the disk rotates at 300RPM. No
 // valid data can be read until the disk has reached it's full speed.
@@ -259,13 +267,13 @@ reg data_clk;
 reg data_clk_en;
 reg [31:0] clk_cnt;
 always @(posedge clk) begin
-   data_clk_en <= 0;
-   if(clk_cnt + rate > SYS_CLK/2) begin
-      clk_cnt <= clk_cnt - (SYS_CLK/2 - rate);
-      data_clk <= !data_clk;
-      if (~data_clk) data_clk_en <= 1;
-   end else
-     clk_cnt <= clk_cnt + rate;
-end   
-   
+	data_clk_en <= 0;
+	if(clk_cnt + rate > SYS_CLK/2) begin
+		clk_cnt <= clk_cnt - (SYS_CLK/2 - rate);
+		data_clk <= !data_clk;
+		if (~data_clk) data_clk_en <= 1;
+	end else
+		clk_cnt <= clk_cnt + rate;
+end
+
 endmodule
