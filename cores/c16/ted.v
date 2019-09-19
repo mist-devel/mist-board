@@ -741,7 +741,7 @@ always @(posedge clk)
 	begin
 	if(hpos_392 & videoline==EOS)	// clear videocounter reload register at last line
 		videocounter_reload<=0;
-	else if(VertSubCount==6 && latch_charposition && VertSubActive)			// Latch videocounter position at 6th line of a character row
+	else if(VertSubCount==6 && latch_charposition && enabledisplay)			// Latch videocounter position at 6th line of a character row
 		videocounter_reload<=videocounter;
 	end	
 	
