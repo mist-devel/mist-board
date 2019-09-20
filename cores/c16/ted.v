@@ -741,6 +741,8 @@ always @(posedge clk)
 	begin
 	if(hpos_392 & videoline==EOS)	// clear videocounter reload register at last line
 		videocounter_reload<=0;
+	else if(inc_videocounter && hcounter_next == 9'd432 && tick8) // if the videocounter running when it's reloaded, that affects the reload value (HSP in Alpharay)
+		videocounter_reload<=videocounter+1'd1;
 	else if(VertSubCount==6 && latch_charposition && enabledisplay)			// Latch videocounter position at 6th line of a character row
 		videocounter_reload<=videocounter;
 	end	
