@@ -249,9 +249,9 @@ always @(posedge clkcpu) begin
 		
 	end
 
-	// increment the clock counter. 42 MHz clkcpu assumed.
+	// increment the clock counter. 40 MHz clkcpu assumed.
 	clken_counter <= clken_counter + 1'd1;
-	if (clken_counter == 20) clken_counter <= 0;
+	if (clken_counter == 19) clken_counter <= 0;
 
 	if (write_request & ctrl_selected) begin 
 	

@@ -319,7 +319,7 @@ wire        floppy_reset;
 
 wire        fdc_sel = cpu_stb & cpu_cyc & floppy_en;
 
-fdc1772 #(.CLK(42000000)) FDC1772 (
+fdc1772 #(.CLK(40000000)) FDC1772 (
 
 	.clkcpu         ( CLKCPU_I         ),
 	.clk8m_en       ( ioc_clk8m_en     ),
