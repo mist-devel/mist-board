@@ -37,15 +37,15 @@ module vidc_timing(
 		input			cevid,
 		input			rst,
 
-		output reg o_vsync,
-		output reg o_hsync, 
+		output        o_vsync,
+		output        o_hsync, 
 
-		output reg o_cursor,
-		output reg o_enabled,
-		output reg o_border,
-		output reg o_flyback /* synthesis keep */ 
+		output        o_cursor,
+		output        o_enabled,
+		output        o_border,
+		output        o_flyback
     );
-	 
+
 reg [9:0] hcount;
 reg [9:0] vcount;
 
@@ -91,12 +91,6 @@ reg [9:0]		vidc_vcer; // vertical cursor end
 
 initial begin 
 
-	o_flyback 	= 1'b0;
-	o_cursor		= 1'b0;
-	
-	hcount 	= 10'h3FF;
-	vcount 	= 10'h3FF;
-	
 	vidc_vcr		= 10'd0; // vertical cycle register
 	vidc_vswr	= 10'd0; // vertical sync width
 	vidc_vbsr	= 10'd0; // vertical border start
@@ -153,42 +147,71 @@ always @(posedge clkcpu) begin
 
 end
 
-wire vborder = (vcount >= vidc_vbsr) & (vcount < vidc_vber);
-wire hborder = (hcount >= vidc_hbsr) & (hcount < vidc_hber);
-wire vdisplay = (vcount >= vidc_vdsr) & (vcount < vidc_vder);
-wire hdisplay = (hcount >= vidc_hdsr) & (hcount < vidc_hder);
-wire vflyback = (vcount >= vidc_vber);
+reg vborder;
+reg hborder;
+reg vdisplay;
+reg hdisplay;
+reg vflyback;
+reg vcursor;
+reg hcursor;
+reg hsync;
+reg vsync;
 
-wire vcursor = (vcount >= vidc_vcsr) & (vcount < vidc_vcer);
-wire hcursor = ({1'b0, hcount} >= vidc_hcsr);
-	 	 
+assign o_cursor = hcursor & vcursor;
+assign o_flyback = vflyback;
+assign o_enabled = hdisplay & vdisplay;
+assign o_border = hborder & vborder;
+assign o_vsync = ~vsync;
+assign o_hsync = ~hsync;
+
 always @(posedge clkvid) begin
 
+	if (rst) begin
+		hcount <= 0;
+		vcount <= 0;
+		hborder <= 0;
+		vborder <= 0;
+		hsync <= 0;
+		vsync <= 0;
+		vflyback <= 0;
+		hdisplay <= 0;
+		vdisplay <= 0;
+		hcursor <= 0;
+		vcursor <= 0;
+	end else
 	if (cevid) begin
-		o_flyback 	<= vflyback;
-		o_enabled 	<= hdisplay && vdisplay;
-		o_border 	<= hborder && vborder;
-		o_vsync 	<= ~((vcount <= vidc_vswr) & !rst);
-		o_hsync 	<= ~((hcount < vidc_hswr) & !rst);
-
-		o_cursor <= hcursor & vcursor;
-
 		// video frame control
 
-		if (hcount < vidc_hcr) begin
-			hcount <= hcount + 9'd1;
-		end else begin
-			// horizontal refresh time.
+		hcount <= hcount + 1'd1;
+		if (hcount == vidc_hbsr) hborder <= 1;
+		if (hcount == vidc_hber) hborder <= 0;
+		if (hcount == vidc_hdsr) hdisplay <= 1;
+		if (hcount == vidc_hder) hdisplay <= 0;
+		if ({1'b0, hcount} == vidc_hcsr) hcursor <= 1;
+		if (hcount == vidc_hswr) hsync <= 0;
+
+		if (hcount == vidc_hcr) begin
 			hcount <= 0;
+			hcursor <= 0;
+			hsync <= 1;
 
-			if (vcount < vidc_vcr) begin
-				vcount <= vcount + 9'd1;
-			end else begin
-				// vertical refresh time
+			vcount <= vcount + 1'd1;
+			if (vcount == vidc_vbsr) vborder <= 1;
+			if (vcount == vidc_vber) vborder <= 0;
+			if (vcount == vidc_vdsr) vdisplay <= 1;
+			if (vcount == vidc_vder) vdisplay <= 0;
+			if (vcount == vidc_vber) vflyback <= 1;
+			if (vcount == vidc_vcsr) vcursor <= 1;
+			if (vcount == vidc_vcer) vcursor <= 0;
+			if (vcount == vidc_vswr) vsync <= 0;
+
+			if (vcount == vidc_vcr) begin
 				vcount <= 0;
-
+				vflyback <= 0;
+				vsync <= 1;
 			end
 		end
+
 	end
 end
 
