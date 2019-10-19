@@ -136,7 +136,7 @@ set_instance_assignment -name CURRENT_STRENGTH_NEW "MAXIMUM CURRENT" -to VGA_*
 set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to DRAM_*
 
 set_global_assignment -name ENABLE_SIGNALTAP OFF
-set_global_assignment -name USE_SIGNALTAP_FILE output_files/fdc.stp
+set_global_assignment -name USE_SIGNALTAP_FILE output_files/vidc.stp
 set_global_assignment -name STRATIX_DEVICE_IO_STANDARD "3.3-V LVTTL"
 set_global_assignment -name ENABLE_CONFIGURATION_PINS OFF
 set_global_assignment -name ENABLE_NCE_PIN OFF
@@ -177,7 +177,7 @@ set_instance_assignment -name FAST_OUTPUT_ENABLE_REGISTER ON -to DRAM_DQ[*]
 set_global_assignment -name SEED 1
 set_global_assignment -name ENABLE_DRC_SETTINGS OFF
 set_location_assignment PLL_1 -to CLOCKS|altpll_component|auto_generated|pll1
-set_global_assignment -name PHYSICAL_SYNTHESIS_EFFORT EXTRA
+set_global_assignment -name PHYSICAL_SYNTHESIS_EFFORT NORMAL
 set_global_assignment -name VERILOG_FILE archimedes_mist_top.v
 set_global_assignment -name SYSTEMVERILOG_FILE rgb2ypbpr.sv
 set_global_assignment -name VERILOG_FILE sigma_delta_dac.v
@@ -192,8 +192,6 @@ set_global_assignment -name VERILOG_FILE ../../rtl/fdc1772.v
 set_global_assignment -name VERILOG_FILE ../../rtl/latches.v
 set_global_assignment -name VERILOG_FILE ../../rtl/floppy.v
 set_global_assignment -name VERILOG_FILE ../../rtl/podules.v
-set_global_assignment -name VERILOG_FILE ../../rtl/vidc_audio.v
-set_global_assignment -name VERILOG_FILE ../../rtl/vidc_dmachannel.v
 set_global_assignment -name VERILOG_FILE ../../rtl/i2cslave/serialInterface.v
 set_global_assignment -name VERILOG_FILE ../../rtl/i2cslave/registerInterface.v
 set_global_assignment -name VERILOG_FILE ../../rtl/i2cslave/i2cSlaveTop.v
@@ -202,7 +200,9 @@ set_global_assignment -name VERILOG_FILE ../../rtl/ioc_irq.v
 set_global_assignment -name VERILOG_FILE ../../rtl/ioc.v
 set_global_assignment -name VERILOG_FILE ../../rtl/amber/a23_barrel_shift.v
 set_global_assignment -name VERILOG_FILE ../../rtl/memc_translator.v
-set_global_assignment -name VERILOG_FILE ../../rtl/vidc_fifo.v
+set_global_assignment -name VERILOG_FILE ../../rtl/vidc_audio.v
+set_global_assignment -name VERILOG_FILE ../../rtl/vidc_dmachannel.v
+set_global_assignment -name QIP_FILE ../../rtl/vidc_dcfifo.qip
 set_global_assignment -name VERILOG_FILE ../../rtl/vidc_timing.v
 set_global_assignment -name VERILOG_FILE ../../rtl/vidc.v
 set_global_assignment -name VERILOG_FILE ../../rtl/por.v

@@ -40,8 +40,8 @@ module vidc(
 	    // dma control.
 	    input [31:0]	viddat, 
 	    input 	 		vidak,
-	    output 		 	vidrq,
-		
+	    output 			vidrq,
+
         input 	 		sndak,
 	    output 		 	sndrq,
         
@@ -102,6 +102,7 @@ wire		snd_load;
 // internal data request lines
 wire		currq_int;
 wire		vidrq_int;
+reg         hsync_cpu;
 
 reg      cepix;
 
@@ -157,15 +158,15 @@ vidc_dmachannel VIDEODMA (
 	.rq			( vidrq_int		),
 	
 	.busy		( vid_load		),
-	.stall		( ~hsync		),
-	
+	.stall		( ~hsync_cpu	),
+
 	.dev_data	( pix_data		),
 	.dev_ak		( pix_ack		)
 
 );
 
 // this module does the math for a DMA channel
-vidc_dmachannel #(.FIFO_SIZE(2)) CURSORDMA (
+vidc_dmachannel #(.FIFO4WORDS(1'b1)) CURSORDMA (
 
 	.rst		( flybk | rst_i	),
 	.clkcpu		( clkcpu		),
@@ -178,7 +179,7 @@ vidc_dmachannel #(.FIFO_SIZE(2)) CURSORDMA (
 	.rq			( currq_int		),
 	
 	.busy		( cur_load		),
-	.stall		( hsync | vid_load	),
+	.stall		( hsync_cpu | vid_load	),
 
 	.dev_data	( csr_data		),
 	.dev_ak		( csr_ack		)
@@ -186,7 +187,7 @@ vidc_dmachannel #(.FIFO_SIZE(2)) CURSORDMA (
 );
 
 // this module does the math for a DMA channel
-vidc_dmachannel SOUNDDMA (
+vidc_dmachannel #(.FIFO4WORDS(1'b1)) SOUNDDMA (
 
 	.rst		( rst_i			),
 	.clkcpu		( clkcpu		),
@@ -386,7 +387,8 @@ assign	video_b[2:0]	= vidc_colour[10:8];
 
 assign video_en     = enabled;
 
-// this demux's the two dma channels that share the vidrq. 
-assign vidrq = hsync ? vidrq_int : ~vid_load & currq_int;
+// this demux's the two dma channels that share the vidrq.
+always @(posedge clkcpu) hsync_cpu <= hsync; // transfer hsync to cpu clock domain
+assign vidrq = hsync_cpu ? vidrq_int : ~vid_load & currq_int;
 
 endmodule

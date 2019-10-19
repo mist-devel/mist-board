@@ -26,124 +26,97 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
- 
+
 module vidc_dmachannel
 (
-	input			clkcpu,
-	input			clkdev,
-	input			cedev,
+	input           rst,
 
-	input			rst,
-		
 	// dma bus
-	input			ak,
-	output reg		rq,
-	input [31:0] 	        cpu_data,
-	
+	input           clkcpu,
+	input           ak,
+	output reg      rq,
+	input [31:0]    cpu_data,
+
 	output			busy,
 	input 			stall, // dont start another request with this high.
-	
+
 	// device bus
+	input			clkdev,
+	input			cedev,
 	input			dev_ak,
 	output	[7:0]	dev_data
 );
 
-parameter FIFO_SIZE = 3;
-localparam MEM_DEPTH = 2**FIFO_SIZE;
-localparam WORD_WIDTH = FIFO_SIZE;
-localparam BYTE_WIDTH = FIFO_SIZE + 2;
-localparam HALF_FULL = 1<<(WORD_WIDTH-1);
+// 8 or 4 words fifo
+parameter  FIFO4WORDS = 1'b0;
 
-reg [1:0]	dma_count	= 2'd0;
-reg			load	= 	1'b0;
-reg			ak_r	=	1'b0;
+reg  [1:0] dma_count = 2'd0;
+reg        load      = 1'b0;
+wire       fifo_can_load;
+wire [3:0] wrusedw;
 
-// each channel has a fifo of a different size. 
-wire [WORD_WIDTH-1:0]	wr_ptr;
-wire [WORD_WIDTH-1:0]	space;
-
-wire 		full;
-
-wire 	        fifo_can_load;
-	
 initial begin 
 
 	rq	= 1'b0;
 	
 end
 
-vidc_fifo #(.FIFO_SIZE(FIFO_SIZE)) VIDEO_FIFO(
-	
-	.rst	( rst		),
-	.wr_clk	( clkcpu	),
-	.rd_clk	( clkdev	),
-	.rd_ce	( cedev	),
-	.wr_en	( ak & load	), 
-	.rd_en	( dev_ak	),
+vidc_dcfifo VIDEO_FIFO(
 
-	.din	( cpu_data	),
-	.dout	( dev_data	),
-
-	.wr_ptr	( wr_ptr	),
-
-	.space	( space		),
-	.full	( full		)
+	.aclr   ( rst       ),
+	.data   ( cpu_data  ),
+	.rdclk  ( clkdev    ),
+	.rdreq  ( cedev & dev_ak ),
+	.wrclk  ( clkcpu    ),
+	.wrreq  ( ak & load ),
+	.q      ( dev_data  ),
+	.wrusedw( wrusedw   )
 );
 
 // DMA interface control
 // this is in the cpu clock domain. 
 always @(posedge clkcpu) begin
 	reg rstD, rstD2;
-	ak_r	<=	ak;
 	rstD <= rst;
 	rstD2 <= rstD;
 	if (rstD2 == 1'b1) begin
-	
+
 		// do reset logic 
 		dma_count 	<= 2'd0;	
 		load 		<= 1'b0;
 		rq 			<= 1'b0;
-		
+
 	end else begin
-	
+
 		// if the load is in progress
-		if ((load == 1'b1) & (ak == 1'b1)) begin
-			
+		if (ak & load) begin
+
 			// are we done?
-			if (dma_count == 2'd3) begin
-									
-				load 	<= 1'b0;
-					
-			end
-			
+			if (dma_count == 2'd3) load 	<= 1'b0;
 			// clear the request on the first ack. 
 			// the dma action will continue until 4 words are read.
 			rq	 	<= 1'b0;
-			
+
 			// count the ack pulses
 			dma_count <= dma_count + 2'd1;
 
-		end else if (load == 1'b0) begin
-				
+		end else if (~load) begin
+
 			// possibly unnecessary?
 			dma_count 	<= 2'd0;
-				
+			// if the fifo can load and its our slot then go.
+			if (fifo_can_load === 1'b1) begin 
+				load <= 1'b1;
+				rq	 <= 1'b1;
+			end 
 		end
-		
-		// if the fifo can load and its our slot then go.
-		if (fifo_can_load === 1'b1) begin 
-					
-			load <= 1'b1;
-			rq	 <= 1'b1;
-					
-		end 
-		
 	end
-		
+
 end
 
-// TODO: replace 2'b00 with bits 4 and 5 of fifo control register for video fifo.
-assign  fifo_can_load = ~stall & ((space > 3'd4) | ((space == 'd0) & (full == 1'b0))) & (wr_ptr[1:0] == 2'b00);
-assign	busy = load;
+// TODO: use bits 4 and 5 of fifo control register for requesting new data to the video fifo.
+// But the RAM timing is so different from the original machine that it won't be useful
+assign fifo_can_load = ~stall && ((!FIFO4WORDS && wrusedw <= 4) || (FIFO4WORDS && wrusedw == 0));
+assign busy = load;
 
 endmodule
