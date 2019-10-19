@@ -155,7 +155,6 @@ wire sirq_n;
 wire ram_cs;
 wire vid_we;
 wire snd_ack, snd_req;
-wire [31:0] cpu_dout;
 
 memc MEMC(
 	
@@ -172,7 +171,6 @@ memc MEMC(
 	.cpu_sel		( cpu_sel		),
 	.cpu_ack		( cpu_ack		),
 	.cpu_err		( cpu_err		),
-	.cpu_dout		( cpu_dout		),
 	
 	// memory interface
 	.mem_addr_o		( MEM_ADDR_O	),
@@ -182,7 +180,6 @@ memc MEMC(
 	.mem_sel_o		( MEM_SEL_O		),
 	.mem_we_o		( MEM_WE_O		),
 	.mem_cti_o		( MEM_CTI_O		),
-	.mem_dat_i		( MEM_DAT_I		),
 	
 	// vidc interface
 	.hsync			( HSYNC			),
@@ -393,7 +390,7 @@ assign cpu_dat_i	=	floppy_en				?	{24'd0, floppy_dat_o} :
 							latches_en				?	{24'd0, latches_dat_o} :
 							podules_en			 	? 	{16'd0, pod_dat_o} :
 							ioc_cs & ~ioc_sext 	?  {24'd0, ioc_dat_o} :			
-							ram_cs					?	cpu_dout :
+							ram_cs					?	MEM_DAT_I	:
 							32'hFFFF_FFFF;
 								  
 assign I2C_CLOCK	= ioc_cout[1];
