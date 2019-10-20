@@ -244,12 +244,10 @@ always @(posedge sd_clk) begin
 					// now we access the second part of the 32 bit location.
 					sd_addr <= { 4'b0000, wb_adr[23], wb_adr[8:2], 1'b1 };  // no auto precharge
 					sd_dqm		<= ~wb_sel[3:2];
-					if (sd_reading) begin 
-						sd_cmd <= CMD_READ;
-						if (burst_mode & can_burst) begin 
-							sd_burst <= 1'b1; 
-						end
-					end else if (sd_writing) begin
+
+					if (sd_reading & burst_mode & can_burst) sd_burst <= 1'b1; 
+
+					if (sd_writing) begin
 						sd_cmd		<= CMD_WRITE;
 						sd_done		<= ~sd_done;
 `ifdef VERILATOR
@@ -258,28 +256,6 @@ always @(posedge sd_clk) begin
 						sd_dq 		<= wb_dat_i[31:16];
 `endif
 					end 
-				end
-				
-				CYCLE_CAS2: begin 
-					if (sd_burst) begin 
-						// always, always read on a 32bit boundary and completely ignore the lsb of wb_adr.
-						sd_addr <= { 4'b0000, wb_adr[23], wb_adr[8:3], 2'b10 };  // no auto precharge
-						sd_dqm		<= ~wb_sel[1:0];
-						if (sd_reading) begin 
-							sd_cmd <= CMD_READ;
-						end  
-					end
-				end
-
-				CYCLE_CAS3: begin 
-					if (sd_burst) begin 
-						// always, always read on a 32bit boundary and completely ignore the lsb of wb_adr.
-						sd_addr	<= { 4'b0000, wb_adr[23], wb_adr[8:3], 2'b11 };  // no auto precharge
-						sd_dqm	<= ~wb_sel[3:2];
-						if (sd_reading) begin 
-							sd_cmd <= CMD_READ;
-						end
-					end
 				end
 
 				CYCLE_READ0: begin 
@@ -316,7 +292,7 @@ always @(posedge sd_clk) begin
 				end
 				endcase
 			end else begin
-				sd_cycle 	<= 4'd0;
+				sd_cycle <= 4'd0;
 				sd_burst <= 1'b0;
 			end
 		end
