@@ -27,7 +27,7 @@
 */
 
 localparam RASCAS_DELAY   = 3'd3;   // tRCD=20ns -> 3 cycles@128MHz
-localparam BURST_LENGTH   = 3'b010; // 000=1, 001=2, 010=4, 011=8, 111 = continuous.
+localparam BURST_LENGTH   = 3'b011; // 000=1, 001=2, 010=4, 011=8, 111 = continuous.
 localparam ACCESS_TYPE    = 1'b0;   // 0=sequential, 1=interleaved
 localparam CAS_LATENCY    = 3'd3;   // 2/3 allowed
 localparam OP_MODE        = 2'b00;  // only 00 (standard operation) allowed
