@@ -201,7 +201,9 @@ module mt48lc16m16a2 (Dq, Addr, Ba, Clk, Cke, Cs_n, Ras_n, Cas_n, We_n, Dqm);
    
 
     initial begin
+`ifndef VERILATOR
         Dq_reg = {data_bits{1'bz}};
+`endif
         Data_in_enable = 0; Data_out_enable = 0;
         Act_b0 = 1; Act_b1 = 1; Act_b2 = 1; Act_b3 = 1;
         Pc_b0 = 0; Pc_b1 = 0; Pc_b2 = 0; Pc_b3 = 0;
@@ -1028,7 +1030,7 @@ end
                 2'b10 : Dq_dqm = Bank2[{Row, Col}];
                 2'b11 : Dq_dqm = Bank3[{Row, Col}];
             endcase
-
+`ifndef VERILATOR
             // Dqm operation
             if (Dqm_reg0 [0] == 1'b1) begin
                 Dq_dqm [ 7 : 0] = 8'bz;
@@ -1036,15 +1038,21 @@ end
             if (Dqm_reg0 [1] == 1'b1) begin
                 Dq_dqm [15 : 8] = 8'bz;
             end
-
+`endif
             // Display debug message
             if (Dqm_reg0 !== 2'b11) begin
+`ifdef VERILATOR
+                Dq_reg <= Dq_dqm;
+`else
                 Dq_reg = #tAC Dq_dqm;
+`endif
                 if (Debug) begin
                     $display("%m : at time %t READ : Bank = %h Row = %h, Col = %h, Data = %h", $time, Bank, Row, Col, Dq_reg);
                 end
             end else begin
+`ifndef VERILATOR
                 Dq_reg = #tHZ {data_bits{1'bz}};
+`endif
                 if (Debug) begin
                     $display("%m : at time %t READ : Bank = %h Row = %h, Col = %h, Data = Hi-Z due to DQM", $time, Bank, Row, Col);
                 end
