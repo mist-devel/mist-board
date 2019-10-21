@@ -83,6 +83,7 @@ reg  [11:0] sd_active_row[3:0];
 reg   [3:0] sd_bank_active;
 wire  [1:0] sd_bank = wb_adr[22:21];
 wire [11:0] sd_row = wb_adr[20:9];
+reg  [23:0] sd_last_adr;
 
 initial begin 
 	t			= 4'd0;
@@ -113,7 +114,7 @@ localparam REFRESH_PERIOD  = (RAM_CLK / (16 * 8192)) - CYCLE_END;
 
 `ifdef VERILATOR
 reg [15:0] sd_q;
-assign sd_dq = (sd_writing && (sd_cycle == CYCLE_CAS1 || sd_cycle == CYCLE_CAS2)) ? sd_q : 16'bZZZZZZZZZZZZZZZZ;
+assign sd_dq = (sd_we && (sd_cycle == CYCLE_CAS1 || sd_cycle == CYCLE_CAS2)) ? sd_q : 16'bZZZZZZZZZZZZZZZZ;
 `endif
 
 always @(posedge sd_clk) begin 
@@ -128,8 +129,10 @@ always @(posedge sd_clk) begin
 		reset 	<= 5'h1f;
 		sd_addr	<= 13'd0;
 		sd_ready  <= 0;
+		sd_last_adr <= 24'hffffff;
 	end else begin
 		if (!sd_ready) begin
+			sd_last_adr <= 24'hffffff;
 			sd_word <= 0;
 			t <= t + 1'd1;
 
@@ -162,7 +165,6 @@ always @(posedge sd_clk) begin
 	
 			// bring the wishbone bus signal into the ram clock domain.
 
-			sd_we	<= wb_we;
 			if (sd_req) begin 
 				sd_stb	<= wb_stb;
 				sd_cyc	<= wb_cyc;
@@ -195,6 +197,7 @@ always @(posedge sd_clk) begin
 					sd_auto_refresh <= 1'b0;
 					sd_cycle <= 5'd0;
 				end
+				default: ;
 				endcase
 
 			end else if (sd_cyc | (sd_cycle != 0) | (sd_cycle == 0 && sd_req)) begin 
@@ -203,14 +206,25 @@ always @(posedge sd_clk) begin
 				sd_cycle <= sd_cycle + 1'd1;
 				case (sd_cycle)
 				CYCLE_PRECHARGE: begin
-					if (~sd_bank_active[sd_bank])
-						sd_cycle	<= CYCLE_RAS_START;
-					else if (sd_active_row[sd_bank] == sd_row)
-						sd_cycle	<= CYCLE_CAS0;
-					else begin
-						sd_cmd		<= CMD_PRECHARGE;
-						sd_addr[10] <= 0;
-						sd_ba		<= sd_bank;
+					sd_we	<= wb_we;
+					word_index <= 2'b00;
+					if (~wb_we && sd_last_adr[23:4] == wb_adr[23:4]) begin
+						// this word is already in sd_dat, but where?
+						word_index <= wb_adr[3:2] - sd_last_adr[3:2];
+						sd_done <= ~sd_done;
+						sd_cycle <= CYCLE_READ4; // allow time to de-assert wb_cyc
+					end else begin
+						sd_last_adr <= wb_we ? 24'hffffff : wb_adr;
+
+						if (~sd_bank_active[sd_bank])
+							sd_cycle	<= CYCLE_RAS_START;
+						else if (sd_active_row[sd_bank] == sd_row)
+							sd_cycle	<= CYCLE_CAS0;
+						else begin
+							sd_cmd		<= CMD_PRECHARGE;
+							sd_addr[10] <= 0;
+							sd_ba		<= sd_bank;
+						end
 					end
 				end
 
@@ -228,9 +242,9 @@ always @(posedge sd_clk) begin
 					sd_addr <= { 4'b0000, wb_adr[23], wb_adr[8:2], 1'b0 };  // no auto precharge
 					sd_ba 	<= sd_bank;
 
-					if (sd_reading) begin 
+					if (~sd_we) begin 
 						sd_cmd <= CMD_READ;
-					end else if (sd_writing) begin 
+					end else begin 
 						sd_cmd		<= CMD_WRITE;
 						sd_dqm <= ~wb_sel[1:0];
 `ifdef VERILATOR
@@ -244,10 +258,10 @@ always @(posedge sd_clk) begin
 				CYCLE_CAS1: begin 
 					// now we access the second part of the 32 bit location.
 					sd_addr <= { 4'b0000, wb_adr[23], wb_adr[8:2], 1'b1 };  // no auto precharge
-					if (sd_reading) sd_dqm <= ~wb_sel[1:0];
-					if (sd_reading & burst_mode & can_burst) sd_burst <= 1'b1; 
+					if (~sd_we) sd_dqm <= ~wb_sel[1:0];
+					if (~sd_we & burst_mode & can_burst) sd_burst <= 1'b1; 
 
-					if (sd_writing) begin
+					if (sd_we) begin
 						sd_cmd		<= CMD_WRITE;
 						sd_dqm <= ~wb_sel[3:2];
 						sd_done		<= ~sd_done;
@@ -259,18 +273,17 @@ always @(posedge sd_clk) begin
 					end 
 				end
 
-				CYCLE_CAS2:	if (sd_reading) sd_dqm <= ~wb_sel[3:2];
+				CYCLE_CAS2:	if (~sd_we) sd_dqm <= ~wb_sel[3:2];
 
 				CYCLE_READ0: begin 
-					if (sd_reading) begin 
-					        sd_dat[0][15:0] <= sd_dq;
-							sd_word <= 2'b01;
-					end else begin
-						if (sd_writing) sd_cycle <= CYCLE_END;
-					end
+					if (~sd_we) begin 
+						sd_dat[0][15:0] <= sd_dq;
+						sd_word <= 3'b001;
+					end else 
+						sd_cycle <= CYCLE_END;
 				end
 
-				CYCLE_READ1: if (sd_reading) sd_done <= ~sd_done;
+				CYCLE_READ1: if (~sd_we) sd_done <= ~sd_done;
 
 				CYCLE_END: begin 
 					sd_burst <= 1'b0;
@@ -278,6 +291,8 @@ always @(posedge sd_clk) begin
 					sd_stb <= 1'b0;
 					sd_cycle <= 5'd0;
 				end
+
+				default: ;
 				endcase
 			end else begin
 				sd_cycle <= 5'd0;
@@ -289,45 +304,36 @@ end
 
 reg wb_burst;
 reg [1:0] wb_word;
+reg [1:0] word_index;
+
 always @(posedge wb_clk) begin 
 	reg sd_doneD;
-	
+
 	sd_doneD <= sd_done;
 	wb_ack	<= (sd_done ^ sd_doneD) & ~wb_ack;
-	
+
 	if (wb_stb & wb_cyc) begin 
-	
+
 		if ((sd_done ^ sd_doneD) & ~wb_ack) begin 
-	
-			wb_dat_o <= sd_dat[0];
+			wb_dat_o <= sd_dat[word_index];
 			wb_burst <= burst_mode;
-			wb_word <= 2'b01;
-	
+			wb_word <= word_index + 1'd1;
 		end
-		
+
 		if (wb_ack & wb_burst) begin 
-		
 			wb_ack	<= 1'b1;
-			wb_burst	<= ~&wb_word;
+			wb_burst <= (wb_word + 1'd1) != word_index;
 			wb_word <= wb_word + 1'd1;
 			wb_dat_o <= sd_dat[wb_word];
-			
 		end 
-		
-	
-	end else begin 
-	
-		wb_burst <= 1'b0;
-	
-	end
 
-		
+	end else begin 
+		wb_burst <= 1'b0;
+	end
 end
 
 wire burst_mode = wb_cti == 3'b010;
 wire can_burst = wb_adr[2] === 1'b0;
-wire sd_reading = sd_stb & sd_cyc & ~sd_we;
-wire sd_writing = sd_stb & sd_cyc & sd_we;
 
 // drive control signals according to current command
 assign sd_cs_n  = sd_cmd[3];

@@ -5,6 +5,7 @@
 #include "edge.h"
 
 #include <iostream>
+#include <iomanip>
 #include <string>
 
 
@@ -130,10 +131,40 @@ int wb_read32(int address)
     uut->wb_we  = 0;
     uut->wb_cti = 0;
 
-    
     return uut->wb_dat_o;
 }
 
+int wb_write32(int address, int data)
+{
+    wait_ready();
+    wait_nack();
+
+    while (!Verilated::gotFinish())
+    {
+        if (wb_clk.PosEdge())
+        {
+            uut->wb_adr = address;
+            uut->wb_dat_i = data;
+            uut->wb_sel = 0xF;
+            uut->wb_cyc = 1;
+            uut->wb_stb = 1;
+            uut->wb_we  = 1;
+            uut->wb_cti = 0;
+            break;
+        }
+
+        tick();
+    }
+
+    wait_ack();
+
+    uut->wb_cyc = 0;
+    uut->wb_stb = 0;
+    uut->wb_we  = 0;
+    uut->wb_cti = 0;
+
+    return uut->wb_dat_o;
+}
 
 void wb_read32x4(int address, int result[4])
 {
@@ -218,19 +249,50 @@ int main(int argc, char** argv)
     tick();
     tick();
     wait_ready();
-
-    std::cout << std::hex << wb_read32(0) << std::dec << std::endl;
-    std::cout << std::hex << wb_read32(4) << std::dec << std::endl;
-    std::cout << std::hex << wb_read32(8) << std::dec << std::endl;
-    std::cout << std::hex << wb_read32(12) << std::dec << std::endl;
+    std::cout << "32 bit reads" << std::endl;
+    std::cout << std::setw(8) << std::setfill('0') << std::hex << wb_read32(0) << std::dec << std::endl;
+    std::cout << std::setw(8) << std::setfill('0') << std::hex << wb_read32(4) << std::dec << std::endl;
+    std::cout << std::setw(8) << std::setfill('0') << std::hex << wb_read32(8) << std::dec << std::endl;
+    std::cout << std::setw(8) << std::setfill('0') << std::hex << wb_read32(12) << std::dec << std::endl;
     
     int result[4] = {0,0};
     wb_read32x4(0, result);
+    std::cout << "128 bit read" << std::endl;
+    std::cout << std::setw(8) << std::setfill('0') << std::hex << result[0] << std::dec << std::endl;
+    std::cout << std::setw(8) << std::setfill('0') << std::hex << result[1] << std::dec << std::endl;
+    std::cout << std::setw(8) << std::setfill('0') << std::hex << result[2] << std::dec << std::endl;
+    std::cout << std::setw(8) << std::setfill('0') << std::hex << result[3] << std::dec << std::endl;
 
-    std::cout << std::hex << result[0] << std::dec << std::endl;
-    std::cout << std::hex << result[1] << std::dec << std::endl;
-    std::cout << std::hex << result[2] << std::dec << std::endl;
-    std::cout << std::hex << result[3] << std::dec << std::endl;
+    std::cout << "32 bit write/read back" << std::endl;
+    wb_write32(0xaaaa, 0x01020304);
+    std::cout << std::setw(8) << std::setfill('0') << std::hex << wb_read32(0xaaaa) << std::dec << std::endl;
+    wb_write32(0xbbbc, 0x05060708);
+    std::cout << std::setw(8) << std::setfill('0') << std::hex << wb_read32(0xbbbc) << std::dec << std::endl;
+    std::cout << std::setw(8) << std::setfill('0') << std::hex << wb_read32(0xaaaa) << std::dec << std::endl;
+    std::cout << std::setw(8) << std::setfill('0') << std::hex << wb_read32(0xbbbc) << std::dec << std::endl;
+
+
+    std::cout << std::setw(8) << std::setfill('0') << std::hex << wb_read32(0xaaaa) << std::dec << std::endl;
+    std::cout << std::setw(8) << std::setfill('0') << std::hex << wb_read32(0xbbbc) << std::dec << std::endl;
+
+    std::cout << "32 bit write/read back from cache" << std::endl;
+    wb_write32(0xccc0, 0x01020304);
+    wb_write32(0xccc4, 0x05060708);
+    wb_write32(0xccc8, 0x090a0b0c);
+    wb_write32(0xcccc, 0x0d0e0f01);
+
+    std::cout << "32 bit read back" << std::endl;
+    std::cout << std::setw(8) << std::setfill('0') << std::hex << wb_read32(0xccc8) << std::dec << std::endl;
+    std::cout << std::setw(8) << std::setfill('0') << std::hex << wb_read32(0xccc4) << std::dec << std::endl;
+    std::cout << std::setw(8) << std::setfill('0') << std::hex << wb_read32(0xccc0) << std::dec << std::endl;
+    std::cout << std::setw(8) << std::setfill('0') << std::hex << wb_read32(0xcccc) << std::dec << std::endl;
+
+    std::cout << "128 bit read back" << std::endl;
+    wb_read32x4(0xccc0, result);
+    std::cout << std::setw(8) << std::setfill('0') << std::hex << result[0] << std::dec << std::endl;
+    std::cout << std::setw(8) << std::setfill('0') << std::hex << result[1] << std::dec << std::endl;
+    std::cout << std::setw(8) << std::setfill('0') << std::hex << result[2] << std::dec << std::endl;
+    std::cout << std::setw(8) << std::setfill('0') << std::hex << result[3] << std::dec << std::endl;
 
 
     for (int i=0; i < 64; i++)

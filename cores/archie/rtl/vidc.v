@@ -46,7 +46,8 @@ module vidc(
 	    output 		 	sndrq,
         
 	    output 	 		flybk,
-	    
+	    output reg		hsync_cpu,
+
 	    // video outputs
 	    output 	 		hsync,
 	    output 	 		vsync,
@@ -102,7 +103,6 @@ wire		snd_load;
 // internal data request lines
 wire		currq_int;
 wire		vidrq_int;
-reg         hsync_cpu;
 
 reg      cepix;
 

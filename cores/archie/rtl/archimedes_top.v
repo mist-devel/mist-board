@@ -125,6 +125,7 @@ module archimedes_top(
 
 (*KEEP="TRUE"*)wire			rom_low_cs/* synthesis keep */ ;
 wire [5:0]						ioc_cin, ioc_cout;
+wire hsync_cpu;
 
 a23_core ARM(
 
@@ -182,7 +183,7 @@ memc MEMC(
 	.mem_cti_o		( MEM_CTI_O		),
 	
 	// vidc interface
-	.hsync			( HSYNC			),
+	.hsync			( hsync_cpu		),
 	.flybk			( vid_flybk		),
 	.vidrq			( vid_req		),
 	.vidak			( vid_ack		),
@@ -212,6 +213,7 @@ vidc VIDC(
 
 	  // memc 
 	  .flybk		( vid_flybk	),
+	  .hsync_cpu	( hsync_cpu ),
 	  .vidak		( vid_ack	),
 	  .vidrq		( vid_req	),
 	  .sndak		( snd_ack	),
@@ -303,7 +305,7 @@ podules PODULES(
 
 	.wb_dat_o		( pod_dat_o				),
 	.wb_dat_i		( cpu_dat_o[15:0]		),
-	.wb_adr			( cpu_address[15:2]		),
+	.wb_adr			( cpu_address[15:2]		)
 );
 
 wire [7:0]  floppy_dat_o;
