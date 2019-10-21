@@ -83,6 +83,7 @@ reg  [11:0] sd_active_row[3:0];
 reg   [3:0] sd_bank_active;
 wire  [1:0] sd_bank = wb_adr[22:21];
 wire [11:0] sd_row = wb_adr[20:9];
+reg  [23:0] sd_last_adr;
 
 initial begin 
 	t			= 4'd0;
@@ -128,8 +129,10 @@ always @(posedge sd_clk) begin
 		reset 	<= 5'h1f;
 		sd_addr	<= 13'd0;
 		sd_ready  <= 0;
+		sd_last_adr <= 24'hffffff;
 	end else begin
 		if (!sd_ready) begin
+			sd_last_adr <= 24'hffffff;
 			sd_word <= 0;
 			t <= t + 1'd1;
 
@@ -204,14 +207,24 @@ always @(posedge sd_clk) begin
 				case (sd_cycle)
 				CYCLE_PRECHARGE: begin
 					sd_we	<= wb_we;
-					if (~sd_bank_active[sd_bank])
-						sd_cycle	<= CYCLE_RAS_START;
-					else if (sd_active_row[sd_bank] == sd_row)
-						sd_cycle	<= CYCLE_CAS0;
-					else begin
-						sd_cmd		<= CMD_PRECHARGE;
-						sd_addr[10] <= 0;
-						sd_ba		<= sd_bank;
+					word_index <= 2'b00;
+					if (~wb_we && sd_last_adr[23:4] == wb_adr[23:4]) begin
+						// this word is already in sd_dat, but where?
+						word_index <= wb_adr[3:2] - sd_last_adr[3:2];
+						sd_done <= ~sd_done;
+						sd_cycle <= CYCLE_READ4; // allow time to de-assert wb_cyc
+					end else begin
+						sd_last_adr <= wb_we ? 24'hffffff : wb_adr;
+
+						if (~sd_bank_active[sd_bank])
+							sd_cycle	<= CYCLE_RAS_START;
+						else if (sd_active_row[sd_bank] == sd_row)
+							sd_cycle	<= CYCLE_CAS0;
+						else begin
+							sd_cmd		<= CMD_PRECHARGE;
+							sd_addr[10] <= 0;
+							sd_ba		<= sd_bank;
+						end
 					end
 				end
 
@@ -291,39 +304,32 @@ end
 
 reg wb_burst;
 reg [1:0] wb_word;
+reg [1:0] word_index;
+
 always @(posedge wb_clk) begin 
 	reg sd_doneD;
-	
+
 	sd_doneD <= sd_done;
 	wb_ack	<= (sd_done ^ sd_doneD) & ~wb_ack;
-	
+
 	if (wb_stb & wb_cyc) begin 
-	
+
 		if ((sd_done ^ sd_doneD) & ~wb_ack) begin 
-	
-			wb_dat_o <= sd_dat[0];
+			wb_dat_o <= sd_dat[word_index];
 			wb_burst <= burst_mode;
-			wb_word <= 2'b01;
-	
+			wb_word <= word_index + 1'd1;
 		end
-		
+
 		if (wb_ack & wb_burst) begin 
-		
 			wb_ack	<= 1'b1;
-			wb_burst	<= ~&wb_word;
+			wb_burst <= (wb_word + 1'd1) != word_index;
 			wb_word <= wb_word + 1'd1;
 			wb_dat_o <= sd_dat[wb_word];
-			
 		end 
-		
-	
-	end else begin 
-	
-		wb_burst <= 1'b0;
-	
-	end
 
-		
+	end else begin 
+		wb_burst <= 1'b0;
+	end
 end
 
 wire burst_mode = wb_cti == 3'b010;
