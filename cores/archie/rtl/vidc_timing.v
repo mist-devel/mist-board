@@ -199,15 +199,20 @@ always @(posedge clkvid) begin
 			if (vcount == vidc_vbsr) vborder <= 1;
 			if (vcount == vidc_vber) vborder <= 0;
 			if (vcount == vidc_vdsr) vdisplay <= 1;
-			if (vcount == vidc_vder) vdisplay <= 0;
-			if (vcount == vidc_vber) vflyback <= 1;
+			if (vcount == vidc_vder) begin
+				vdisplay <= 0;
+				vflyback <= 1;
+			end
 			if (vcount == vidc_vcsr) vcursor <= 1;
 			if (vcount == vidc_vcer) vcursor <= 0;
-			if (vcount == vidc_vswr) vsync <= 0;
+			if (vcount == vidc_vswr) begin
+				vsync <= 0;
+				vflyback <= 0;
+			end
 
 			if (vcount == vidc_vcr) begin
 				vcount <= 0;
-				vflyback <= 0;
+				vflyback <= 1; // turn vflayback on even if vder is crazy-programmed
 				vsync <= 1;
 			end
 		end
