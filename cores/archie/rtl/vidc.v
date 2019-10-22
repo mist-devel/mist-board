@@ -359,7 +359,7 @@ always @(posedge clkpix) begin
 end
 
 // eqn is CE + DE + ABC + BCD (where {E,D} = {vidc_cr[3:2]} and {C,B,A} = pix_shift_count)
-assign  pix_ack = enabled & ((pix_shift_count[2] & vidc_cr[3]) | ( vidc_cr[2] & vidc_cr[3]) | (pix_shift_count[0] & pix_shift_count[1] & pix_shift_count[2]) | (pix_shift_count[1] & pix_shift_count[2] &  vidc_cr[2]));
+assign  pix_ack = hsync & enabled & ((pix_shift_count[2] & vidc_cr[3]) | ( vidc_cr[2] & vidc_cr[3]) | (pix_shift_count[0] & pix_shift_count[1] & pix_shift_count[2]) | (pix_shift_count[1] & pix_shift_count[2] &  vidc_cr[2]));
 assign	csr_ack = cur_enabled & (csr_shift_count[2] & csr_shift_count[0] ) & ~csr_load & ~csr_load_count[3];
 
 // TODO: fix 8 bits per pixel colours.
