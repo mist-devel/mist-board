@@ -116,7 +116,7 @@ end
 
 // TODO: use bits 4 and 5 of fifo control register for requesting new data to the video fifo.
 // But the RAM timing is so different from the original machine that it won't be useful
-assign fifo_can_load = ~stall && ((!FIFO4WORDS && wrusedw <= 4) || (FIFO4WORDS && wrusedw == 0));
+assign fifo_can_load = ~stall && ((!FIFO4WORDS && wrusedw == 4) || wrusedw == 0);
 assign busy = load;
 
 endmodule
