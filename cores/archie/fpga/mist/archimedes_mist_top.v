@@ -234,6 +234,34 @@ always @(posedge clk_sys) begin
     endcase
 end
 
+// forcibly blank back porch area
+reg [3:0] r_adj, g_adj, b_adj;
+reg       hs_adj, vs_adj;
+reg [7:0] pix_cnt;
+// blanking size: 256 cycles @ 24MHz (TV), 64 cycles otherwise (VGA)
+wire      back_porch_n =  (pixbaseclk_select[0] == pixbaseclk_select[1]) ? &pix_cnt : &pix_cnt[5:0];
+
+always @(posedge clk_pix) begin
+
+	hs_adj <= core_hs;
+	vs_adj <= core_vs;
+
+	if (~back_porch_n) pix_cnt <= pix_cnt + 1'd1;
+	if (~hs_adj) pix_cnt <= 0;
+	if (back_porch_n) begin
+		r_adj <= core_r;
+		g_adj <= core_g;
+		b_adj <= core_b;
+	end else
+		{ r_adj, g_adj, b_adj } <= 12'h0;
+end
+
+wire       vs = vs_adj;
+wire       hs = hs_adj;
+wire [5:0] r = { r_adj, r_adj[3:2] };
+wire [5:0] g = { g_adj, g_adj[3:2] };
+wire [5:0] b = { b_adj, b_adj[3:2] };
+
 wire [5:0] osd_r_o, osd_g_o, osd_b_o;
 
 osd #(10'd0,10'd0,4) OSD (
@@ -244,11 +272,11 @@ osd #(10'd0,10'd0,4) OSD (
    .SPI_SCK    ( SPI_SCK      ),
    .SPI_SS3    ( SPI_SS3      ),
 
-   .R_in       ( {core_r, 2'b00} ),
-   .G_in       ( {core_g, 2'b00} ),
-   .B_in       ( {core_b, 2'b00} ),
-   .HSync      ( core_hs      ),
-   .VSync      ( core_vs      ),
+   .R_in       ( r            ),
+   .G_in       ( g            ),
+   .B_in       ( b            ),
+   .HSync      ( hs           ),
+   .VSync      ( vs           ),
 
    .R_out      ( osd_r_o      ),
    .G_out      ( osd_g_o      ),
@@ -270,10 +298,10 @@ rgb2ypbpr rgb2ypbpr
 assign VGA_R = ypbpr?Pr:osd_r_o;
 assign VGA_G = ypbpr? Y:osd_g_o;
 assign VGA_B = ypbpr?Pb:osd_b_o;
-wire   CSync = ~(core_hs ^ core_vs);
+wire   CSync = ~(hs ^ vs);
 //24 MHz modes get composite sync automatically
-assign VGA_HS = ((pixbaseclk_select[0] == pixbaseclk_select[1]) | ypbpr) ? CSync : core_hs;
-assign VGA_VS = ((pixbaseclk_select[0] == pixbaseclk_select[1]) | ypbpr) ? 1'b1 : core_vs;
+assign VGA_HS = ((pixbaseclk_select[0] == pixbaseclk_select[1]) | ypbpr) ? CSync : hs;
+assign VGA_VS = ((pixbaseclk_select[0] == pixbaseclk_select[1]) | ypbpr) ? 1'b1 : vs;
 
 wire [31:0] sd_lba;
 wire  [1:0] sd_rd;
