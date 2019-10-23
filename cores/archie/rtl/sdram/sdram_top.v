@@ -66,10 +66,7 @@ reg [4:0]	reset;
 reg [31:0]	sd_dat[4]; // data output to chipset/cpu
 reg  [2:0]	sd_word;
 
-reg			sd_stb 	= 1'b0; // copy of the wishbone bus signal.
 reg			sd_we 	= 1'b0; // copy of the wishbone bus signal.
-reg			sd_cyc 	= 1'b0; // copy of the wishbone bus signal.
-reg			sd_burst = 1'b0;
 
 reg	[4:0]	sd_cycle= 5'd0;
 reg			sd_done = 1'b0;
@@ -165,11 +162,6 @@ always @(posedge sd_clk) begin
 	
 			// bring the wishbone bus signal into the ram clock domain.
 
-			if (sd_req) begin 
-				sd_stb	<= wb_stb;
-				sd_cyc	<= wb_cyc;
-			end
-
 			sd_refresh <= sd_refresh + 9'd1;
 			if(|sd_word) begin
 				sd_word <= sd_word + 1'd1;
@@ -200,7 +192,7 @@ always @(posedge sd_clk) begin
 				default: ;
 				endcase
 
-			end else if (sd_cyc | (sd_cycle != 0) | (sd_cycle == 0 && sd_req)) begin 
+			end else if ((sd_cycle != 0) | (sd_cycle == 0 && sd_req)) begin 
 
 				// while the cycle is active count.
 				sd_cycle <= sd_cycle + 1'd1;
@@ -259,7 +251,6 @@ always @(posedge sd_clk) begin
 					// now we access the second part of the 32 bit location.
 					sd_addr <= { 4'b0000, wb_adr[23], wb_adr[8:2], 1'b1 };  // no auto precharge
 					if (~sd_we) sd_dqm <= ~wb_sel[1:0];
-					if (~sd_we & burst_mode & can_burst) sd_burst <= 1'b1; 
 
 					if (sd_we) begin
 						sd_cmd		<= CMD_WRITE;
@@ -286,9 +277,6 @@ always @(posedge sd_clk) begin
 				CYCLE_READ1: if (~sd_we) sd_done <= ~sd_done;
 
 				CYCLE_END: begin 
-					sd_burst <= 1'b0;
-					sd_cyc <= 1'b0;
-					sd_stb <= 1'b0;
 					sd_cycle <= 5'd0;
 				end
 
@@ -296,7 +284,6 @@ always @(posedge sd_clk) begin
 				endcase
 			end else begin
 				sd_cycle <= 5'd0;
-				sd_burst <= 1'b0;
 			end
 		end
 	end
@@ -333,7 +320,6 @@ always @(posedge wb_clk) begin
 end
 
 wire burst_mode = wb_cti == 3'b010;
-wire can_burst = wb_adr[2] === 1'b0;
 
 // drive control signals according to current command
 assign sd_cs_n  = sd_cmd[3];
