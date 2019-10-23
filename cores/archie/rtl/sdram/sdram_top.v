@@ -91,6 +91,7 @@ end
 
 localparam CYCLE_PRECHARGE  = 5'd0;
 localparam CYCLE_RAS_START  = 5'd3;
+localparam CYCLE_RAS_CONT   = CYCLE_RAS_START + 1'd1;
 localparam CYCLE_RFSH_START = CYCLE_RAS_START; 
 localparam CYCLE_CAS0 		= CYCLE_RAS_START  + RASCAS_DELAY;
 localparam CYCLE_CAS1 		= CYCLE_CAS0 + 1'd1;
@@ -103,7 +104,7 @@ localparam CYCLE_READ4	   	= CYCLE_READ3+ 1'd1;
 localparam CYCLE_READ5	   	= CYCLE_READ4+ 1'd1;
 localparam CYCLE_READ6	   	= CYCLE_READ5+ 1'd1;
 localparam CYCLE_READ7	   	= CYCLE_READ6+ 1'd1;
-localparam CYCLE_END	   	= CYCLE_READ7+ 1'd1;
+localparam CYCLE_END	   	= CYCLE_READ7;
 localparam CYCLE_RFSH_END	= CYCLE_RFSH_START + RFC_DELAY; 
 
 localparam RAM_CLK		   = 120000000;
@@ -208,9 +209,12 @@ always @(posedge sd_clk) begin
 					end else begin
 						sd_last_adr <= wb_we ? 24'hffffff : wb_adr;
 
-						if (~sd_bank_active[sd_bank])
-							sd_cycle	<= CYCLE_RAS_START;
-						else if (sd_active_row[sd_bank] == sd_row)
+						if (~sd_bank_active[sd_bank]) begin
+							sd_cmd 	<= CMD_ACTIVE;
+							sd_addr	<= { 1'b0, sd_row };
+							sd_ba 	<= sd_bank;
+							sd_cycle	<= CYCLE_RAS_CONT;
+						end else if (sd_active_row[sd_bank] == sd_row)
 							sd_cycle	<= CYCLE_CAS0;
 						else begin
 							sd_cmd		<= CMD_PRECHARGE;
@@ -224,6 +228,9 @@ always @(posedge sd_clk) begin
 					sd_cmd 	<= CMD_ACTIVE;
 					sd_addr	<= { 1'b0, sd_row };
 					sd_ba 	<= sd_bank;
+				end
+
+				CYCLE_RAS_CONT: begin 
 					sd_active_row[sd_bank] <= sd_row;
 					sd_bank_active[sd_bank] <= 1;
 				end
@@ -271,7 +278,7 @@ always @(posedge sd_clk) begin
 						sd_dat[0][15:0] <= sd_dq;
 						sd_word <= 3'b001;
 					end else 
-						sd_cycle <= CYCLE_END;
+						sd_cycle <= 5'd0;
 				end
 
 				CYCLE_READ1: if (~sd_we) sd_done <= ~sd_done;
