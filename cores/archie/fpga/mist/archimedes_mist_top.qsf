@@ -178,8 +178,10 @@ set_global_assignment -name SEED 1
 set_global_assignment -name ENABLE_DRC_SETTINGS OFF
 set_location_assignment PLL_1 -to CLOCKS|altpll_component|auto_generated|pll1
 set_global_assignment -name PHYSICAL_SYNTHESIS_EFFORT NORMAL
+set_instance_assignment -name PARTITION_HIERARCHY root_partition -to | -section_id Top
 set_global_assignment -name VERILOG_FILE archimedes_mist_top.v
 set_global_assignment -name SYSTEMVERILOG_FILE rgb2ypbpr.sv
+set_global_assignment -name VERILOG_FILE scandoubler.v
 set_global_assignment -name VERILOG_FILE sigma_delta_dac.v
 set_global_assignment -name VERILOG_FILE audio.v
 set_global_assignment -name VERILOG_FILE data_io.v
@@ -227,4 +229,3 @@ set_global_assignment -name QIP_FILE rom_reconfig_36.qip
 set_global_assignment -name QIP_FILE pll_vidc.qip
 set_global_assignment -name SIGNALTAP_FILE output_files/vidc.stp
 set_global_assignment -name SIGNALTAP_FILE output_files/sd.stp
-set_instance_assignment -name PARTITION_HIERARCHY root_partition -to | -section_id Top

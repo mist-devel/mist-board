@@ -256,11 +256,32 @@ always @(posedge clk_pix) begin
 		{ r_adj, g_adj, b_adj } <= 12'h0;
 end
 
-wire       vs = vs_adj;
-wire       hs = hs_adj;
-wire [5:0] r = { r_adj, r_adj[3:2] };
-wire [5:0] g = { g_adj, g_adj[3:2] };
-wire [5:0] b = { b_adj, b_adj[3:2] };
+wire [5:0] sd_r, sd_g, sd_b;
+wire       sd_hs;
+wire       sd_vs;
+
+scandoubler #(11, 4) scandoubler
+(
+	.clk_sys    ( clk_pix    ),
+	.scanlines  ( 2'b00      ),
+	.ce_divider ( 1'b1       ),
+	.hs_in      ( hs_adj     ),
+	.vs_in      ( vs_adj     ),
+	.r_in       ( r_adj      ),
+	.g_in       ( g_adj      ),
+	.b_in       ( b_adj      ),
+	.hs_out     ( sd_hs      ),
+	.vs_out     ( sd_vs      ),
+	.r_out      ( sd_r       ),
+	.g_out      ( sd_g       ),
+	.b_out      ( sd_b       )
+);
+
+wire       vs = scandoubler_en ? sd_vs : core_vs;
+wire       hs = scandoubler_en ? sd_hs : core_hs;
+wire [5:0] r = scandoubler_en  ? sd_r : { r_adj, r_adj[3:2] };
+wire [5:0] g = scandoubler_en  ? sd_g : { g_adj, g_adj[3:2] };
+wire [5:0] b = scandoubler_en  ? sd_b : { b_adj, b_adj[3:2] };
 
 wire [5:0] osd_r_o, osd_g_o, osd_b_o;
 
@@ -295,13 +316,14 @@ rgb2ypbpr rgb2ypbpr
 	.pr    ( Pr      )
 );
 
+wire   scandoubler_en = ~scandoubler_disable && pixbaseclk_select[0] == pixbaseclk_select[1];
 assign VGA_R = ypbpr?Pr:osd_r_o;
 assign VGA_G = ypbpr? Y:osd_g_o;
 assign VGA_B = ypbpr?Pb:osd_b_o;
 wire   CSync = ~(hs ^ vs);
 //24 MHz modes get composite sync automatically
-assign VGA_HS = ((pixbaseclk_select[0] == pixbaseclk_select[1]) | ypbpr) ? CSync : hs;
-assign VGA_VS = ((pixbaseclk_select[0] == pixbaseclk_select[1]) | ypbpr) ? 1'b1 : vs;
+assign VGA_HS = ((pixbaseclk_select[0] == pixbaseclk_select[1] && scandoubler_disable) | ypbpr) ? CSync : hs;
+assign VGA_VS = ((pixbaseclk_select[0] == pixbaseclk_select[1] && scandoubler_disable) | ypbpr) ? 1'b1 : vs;
 
 wire [31:0] sd_lba;
 wire  [1:0] sd_rd;
@@ -486,7 +508,7 @@ sdram_top SDRAM(
 		.sd_cas_n   ( DRAM_CAS_N  	),
 		.sd_ready	( ram_ready		)
 );
-	
+
 i2cSlaveTop CMOS (
 	.clk		( clk_sys		),
 	.rst		( ~pll_ready	),
