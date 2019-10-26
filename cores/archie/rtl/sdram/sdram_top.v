@@ -74,7 +74,8 @@ reg			sd_done = 1'b0;
 reg [3:0] 	sd_cmd 	= 4'd0;   // current command sent to sd ram
 
 reg [9:0]	sd_refresh = 10'd0;
-reg			sd_auto_refresh = 1'b0; 
+reg			sd_auto_refresh = 1'b0;
+reg         sd_need_refresh = 1'b0;
 wire		sd_req = wb_stb & wb_cyc & ~wb_ack;
 reg  [11:0] sd_active_row[3:0];
 reg   [3:0] sd_bank_active;
@@ -128,8 +129,10 @@ always @(posedge sd_clk) begin
 		sd_addr	<= 13'd0;
 		sd_ready  <= 0;
 		sd_last_adr <= 24'hffffff;
+		sd_need_refresh <= 1'b0;
 	end else begin
 		if (!sd_ready) begin
+			sd_need_refresh <= 1'b0;
 			sd_last_adr <= 24'hffffff;
 			sd_word <= 0;
 			t <= t + 1'd1;
@@ -161,9 +164,8 @@ always @(posedge sd_clk) begin
 			end
 		end else begin
 	
-			// bring the wishbone bus signal into the ram clock domain.
-
 			sd_refresh <= sd_refresh + 9'd1;
+			if (sd_refresh == REFRESH_PERIOD) sd_need_refresh <= 1'b1;
 			if(|sd_word) begin
 				sd_word <= sd_word + 1'd1;
 				sd_dat[sd_word[2:1]][{sd_word[0],4'b0000} +:16] <= sd_dq;
@@ -172,9 +174,10 @@ always @(posedge sd_clk) begin
 			// it kicks in so that 8192 auto refreshes are 
 			// issued in a 64ms period. Other bus operations 
 			// are stalled during this period.
-			if ((sd_refresh > REFRESH_PERIOD) && (sd_cycle == 5'd0)) begin
+			if (sd_need_refresh && sd_cycle == 5'd0) begin
 				sd_auto_refresh <= 1'b1;
 				sd_refresh		<= 10'd0;
+				sd_need_refresh <= 1'b0;
 				sd_cmd			<= CMD_PRECHARGE;
 				sd_addr[10]		<= 1;
 				sd_bank_active	<= 0;
