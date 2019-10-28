@@ -11,12 +11,14 @@ testword4 equ $10104
 	org $100
 start:
 ;	include	"tests/cmpi_d16_pc.s"
-	include	"tests/bfxxx.s"
+;	include	"tests/longword.s" 
+	include	"tests/mulu.s"
+;	include	"tests/bfxxx.s"
 ;	include	"tests/bcd.s"
 ;	include	"tests/pack.s"
 ;	include "tests/trace.s"
 ;	include "tests/magic.s"
-	
+
 	;; if all tests pass the code will arrive here
 	move.b	#0,$beefed	; exit with result 0
 loop:	bra   	loop

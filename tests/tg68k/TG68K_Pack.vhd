@@ -27,8 +27,8 @@ package TG68K_Pack is
 	type micro_states is (idle, nop, ld_nn, st_nn, ld_dAn1, ld_AnXn1, ld_AnXn2, st_dAn1, ld_AnXnbd1, ld_AnXnbd2, ld_AnXnbd3,
 						  ld_229_1, ld_229_2, ld_229_3, ld_229_4, st_229_1, st_229_2, st_229_3, st_229_4,
 						  st_AnXn1, st_AnXn2, bra1, bsr1, bsr2, nopnop, dbcc1, movem1, movem2, movem3,
-						  andi, op_AxAy, cmpm, link1, link2, unlink1, unlink2, int1, int2, int3, int4, rte1,
-						  rte2, rte3, rte4, rte5, trap00, trap0, trap1, trap2, trap3,
+						  andi, op_AxAy, cmpm, link1, link2, unlink1, unlink2, int1, int2, int3, int4, rtr1, rte1,
+						  rte2, rte3, rte4, rte5, rtd1, rtd2, trap00, trap0, trap1, trap2, trap3,
 						  trap4, trap5, trap6, movec1, movep1, movep2, movep3, movep4, movep5, rota1, bf1,
 						  mul1, mul2, mul_end1,  mul_end2, div1, div2, div3, div4, div_end1, div_end2, pack1, pack2, pack3);
 
@@ -111,8 +111,9 @@ package TG68K_Pack is
 	constant opcBF          : integer := 76; --
 	constant opcBFwb        : integer := 77; --
 	constant opcPACK        : integer := 78; --
+	constant opcTRAPV       : integer := 79; --
 
-	constant lastOpcBit     : integer := 78;
+	constant lastOpcBit     : integer := 79;
 
 	type rTG68K_opc is record
 	   opcMOVE        : bit;
@@ -194,18 +195,17 @@ package TG68K_Pack is
 	   opcBF          : bit;
 	   opcBFwb        : bit;
 	   opcPACK        : bit;
+	   opcTRAPV       : bit;
 	end record;
 
 	component TG68K_ALU
 	generic(
 		MUL_Mode : integer := 0;           --0=>16Bit,  1=>32Bit,  2=>switchable with CPU(1),  3=>no MUL,
-		DIV_Mode : integer := 0;           --0=>16Bit,  1=>32Bit,  2=>switchable with CPU(1),  3=>no DIV,
-                BarrelShifter  : integer := 0  --0=>no,    1=>yes,   2=>switchable with CPU(1)
+		DIV_Mode : integer := 0            --0=>16Bit,  1=>32Bit,  2=>switchable with CPU(1),  3=>no DIV,
 		);
 	port(
 		clk                     : in  std_logic;
 		Reset                   : in  std_logic;
-		cpu                     : in  std_logic_vector(1 downto 0);
 		clkena_lw               : in  std_logic:='1';
 		execOPC                 : in  bit;
 		exe_condition           : in  std_logic;
@@ -216,7 +216,6 @@ package TG68K_Pack is
 		set_stop                : in  bit;
 		Z_error                 : in  bit;
 		rot_bits                : in  std_logic_vector(1 downto 0);
-		rot_cnt                 : in  std_logic_vector(5 downto 0);
 		exec                    : in  bit_vector(lastOpcBit downto 0);
 		OP1out                  : in  std_logic_vector(31 downto 0);
 		OP2out                  : in  std_logic_vector(31 downto 0);
