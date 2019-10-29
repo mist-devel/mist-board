@@ -9,7 +9,7 @@
 -- by the Free Software Foundation, either version 3 of the License, or --
 -- (at your option) any later version. --
 -- --
--- This source file is distributed in the hope that it will be useful, --
+-- This source file is distri1buted in the hope that it will be useful, --
 -- but WITHOUT ANY WARRANTY; without even the implied warranty of --
 -- MERCHANTABILITY or FITNESS for A PARTICULAR PURPOSE. See the --
 -- GNU General Public License for more details. --
@@ -179,6 +179,8 @@ architecture logic of TG68K_ALU IS
   signal c_out        : std_logic_vector(2 downto 0);
   signal addsub_q     : std_logic_vector(31 downto 0);
 
+  signal trigger :  std_logic;
+  
 begin
   -----------------------------------------------------------------------------
   -- set OP1in
@@ -824,6 +826,7 @@ process (clk, Reset, exe_opcode, exe_datatype, Flags, last_data_read, OP2out, fl
   -------------------------------------------------------------------------------
   process (exe_opcode, OP2out, muls_msb, mulu_reg, FAsign, mulu_sign, reg_QA, faktorB, result_mulu, signedOP)
   begin
+          trigger <= '0';
 	if (signedOP = '1' and faktorB(31) = '1') OR FAsign = '1' then
 	  muls_msb <= mulu_reg(63);
 	else
@@ -846,9 +849,10 @@ process (clk, Reset, exe_opcode, exe_datatype, Flags, last_data_read, OP2out, fl
 		  result_mulu(63 downto 47) <= (muls_msb & mulu_reg(63 downto 48) + (mulu_sign & faktorB(31 downto 16)));
 		end if;
 	  end if;
-	else -- 32 Bit xyz
+	elsif micro_state /= idle or exe_opcode(15) = '1' or sndOPC(10) = '0' then -- 32 Bit
 	  result_mulu <= muls_msb & mulu_reg(63 downto 1);          
 	  if mulu_reg(0) = '1' then
+          trigger <= '1';
 		if FAsign = '1' then
 		  result_mulu(63 downto 31) <= (muls_msb & mulu_reg(63 downto 32) - (mulu_sign & faktorB));
 		else
@@ -875,7 +879,7 @@ process (clk, Reset, exe_opcode, exe_datatype, Flags, last_data_read, OP2out, fl
 	if rising_edge(clk) then
 	  if clkena_lw = '1' then
 		if micro_state = mul1 then
-		  mulu_reg(63 downto 0) <= (others => '0');
+		  mulu_reg(63 downto 32) <= (others => '0');
 		  if divs = '1' and ((exe_opcode(15) = '1' and reg_QA(15) = '1') OR (exe_opcode(15) = '0' and reg_QA(31) = '1')) then --MULS Neg faktor
 			FAsign <= '1';
 			mulu_reg(31 downto 0) <= 0 - reg_QA;
