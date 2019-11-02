@@ -56,6 +56,7 @@ module archimedes_mist_top(
   input          SPI_SCK,
   input          SPI_SS2,    // data_io
   input          SPI_SS3,    // OSD
+  input          SPI_SS4,    // Direct SD
   input          CONF_DATA0  // SPI_SS for user_io
 );
 
@@ -340,7 +341,8 @@ wire  [8:0] sd_buff_addr;
 wire  [1:0] img_mounted;
 wire [31:0] img_size;
 
-assign SPI_DO = (CONF_DATA0==0)?user_io_sdo:1'bZ;
+// de-multiplex spi outputs from user_io and data_io
+assign SPI_DO = (CONF_DATA0==0)?user_io_sdo:(SPI_SS2==0)?data_io_sdo:1'bZ;
 
 wire user_io_sdo;
 user_io user_io(
@@ -380,14 +382,34 @@ user_io user_io(
 	.img_size       ( img_size       )
 );
 
+wire   spi_din = SPI_SS4 ? SPI_DI : SPI_DO;
+
+wire data_io_sdo;
 data_io # ( .START_ADDR(24'h40_0000) )
 DATA_IO  (
-	.sck				( SPI_SCK 			),
-	.ss				( SPI_SS2			),
-	.sdi				( SPI_DI				),
+	.sck            ( SPI_SCK        ),
+	.ss             ( SPI_SS2        ),
+	.ss_sd          ( SPI_SS4        ),
+	.sdi            ( spi_din        ),
+	.sdo            ( data_io_sdo    ),
+
+	.reset          ( reset          ),
+	.ide_req        ( ide_req        ),
+	.ide_ack        ( ide_ack        ),
+	.ide_err        ( ide_err        ),
+	.ide_reg_o_adr  ( ide_reg_i_adr  ),
+	.ide_reg_o      ( ide_reg_i      ),
+	.ide_reg_we     ( ide_reg_we     ),
+	.ide_reg_i_adr  ( ide_reg_o_adr  ),
+	.ide_reg_i      ( ide_reg_o      ),
+	.ide_data_addr  ( ide_data_addr  ),
+	.ide_data_o     ( ide_data_i     ),
+	.ide_data_i     ( ide_data_o     ),
+	.ide_data_rd    ( ide_data_rd    ),
+	.ide_data_we    ( ide_data_we    ),
 
 	.downloading	( downloading	),
-	.size				(						),
+	.size			(				),
 	.index          ( dio_index ),
 
 	// ram interface
@@ -413,13 +435,29 @@ wire	[1:0]	pixbaseclk_select;
 
 wire 			i2c_din, i2c_dout, i2c_clock;
 
+wire       ide_req;
+wire       ide_ack;
+wire       ide_err;
+wire [2:0] ide_reg_o_adr;
+wire [7:0] ide_reg_o;
+wire       ide_reg_we;
+wire [2:0] ide_reg_i_adr;
+wire [7:0] ide_reg_i;
+wire [8:0] ide_data_addr;
+wire [7:0] ide_data_o;
+wire [7:0] ide_data_i;
+wire       ide_data_rd;
+wire       ide_data_we;
+
+wire       reset = ~ram_ready | ~rom_ready;
+
 archimedes_top ARCHIMEDES(
 	
 	.CLKCPU_I	( clk_sys			),
 	.CLKPIX_I	( clk_pix			), // pixel clock for OSD
 	.CEPIX_O	( ce_pix			),
 	
-	.RESET_I	(~ram_ready | ~rom_ready),
+	.RESET_I	( reset             ),
 	
 	.MEM_ACK_I	( core_ack_in		),
 	.MEM_DAT_I	( core_data_in		),
@@ -459,6 +497,21 @@ archimedes_top ARCHIMEDES(
 	.sd_din         ( sd_din         ),
 	.sd_dout_strobe ( sd_dout_strobe ),
 	.sd_din_strobe  ( sd_din_strobe  ),
+
+	// IDE controller
+	.ide_req        ( ide_req        ),
+	.ide_ack        ( ide_ack        ),
+	.ide_err        ( ide_err        ),
+	.ide_reg_o_adr  ( ide_reg_o_adr  ),
+	.ide_reg_o      ( ide_reg_o      ),
+	.ide_reg_we     ( ide_reg_we     ),
+	.ide_reg_i_adr  ( ide_reg_i_adr  ),
+	.ide_reg_i      ( ide_reg_i      ),
+	.ide_data_addr  ( ide_data_addr  ),
+	.ide_data_o     ( ide_data_o     ),
+	.ide_data_i     ( ide_data_i     ),
+	.ide_data_rd    ( ide_data_rd    ),
+	.ide_data_we    ( ide_data_we    ),
 
 	.KBD_OUT_DATA   ( kbd_out_data   ),
 	.KBD_OUT_STROBE ( kbd_out_strobe ),
