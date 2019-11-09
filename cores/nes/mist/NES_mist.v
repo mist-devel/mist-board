@@ -145,8 +145,8 @@ module NES_mist(
 	input 		  UART_TX
 );
 					  
-wire [7:0] joyA;
-wire [7:0] joyB;
+wire [7:0] core_joy_A;
+wire [7:0] core_joy_B;
 wire [1:0] buttons;
 wire [1:0] switches;
  
@@ -156,23 +156,25 @@ parameter CONF_STR = {
 			"NES;NES;",
 			"O1,HQ2X(VGA-Only),OFF,ON;",
 			"O2,Scanlines,OFF,ON;",
-			"O3,Invert mirroring,OFF,ON;",
-			"O4,Hide overscan,OFF,ON;",
-			"O5,Palette,FCEUX,Unsaturated-V6;",
-			"T6,Reset;",
+			"O3,Joystick swap,OFF,ON;",
+			"O4,Invert mirroring,OFF,ON;",
+			"O5,Hide overscan,OFF,ON;",
+			"O6,Palette,FCEUX,Unsaturated-V6;",
+			"T7,Reset;",
 			"V,v0.8;"
 };
 
-parameter CONF_STR_LEN = 8+25+20+27+24+32+9+7;
+parameter CONF_STR_LEN = 8+25+20+24+27+24+32+9+7;
 wire [7:0] status;
 
 wire arm_reset = status[0];
 wire smoothing_osd = status[1];
 wire scanlines_osd = status[2];
-wire mirroring_osd = status[3];
-wire overscan_osd = status[4];
-wire palette2_osd = status[5];
-wire reset_osd = status[6];
+wire joy_swap = status[3];
+wire mirroring_osd = status[4];
+wire overscan_osd = status[5];
+wire palette2_osd = status[6];
+wire reset_osd = status[7];
 
 wire scandoubler_disable;
 wire ypbpr;
@@ -194,8 +196,8 @@ user_io #(.STRLEN(CONF_STR_LEN)) user_io(
    .scandoubler_disable(scandoubler_disable),
    .ypbpr(ypbpr),
 
-   .joystick_0(joyA),
-   .joystick_1(joyB),
+   .joystick_0(core_joy_A),
+   .joystick_1(core_joy_B),
 
    .status(status),
 
@@ -203,10 +205,13 @@ user_io #(.STRLEN(CONF_STR_LEN)) user_io(
    .ps2_kbd_data(ps2_kbd_data)
 );
 
+wire [7:0] joyA = joy_swap ? core_joy_B : core_joy_A;
+wire [7:0] joyB = joy_swap ? core_joy_A : core_joy_B;
+
 wire [7:0] nes_joy_A = (reset_nes || osd_visible) ? 8'd0 : 
-							  { joyB[0], joyB[1], joyB[2], joyB[3], joyB[7], joyB[6], joyB[5], joyB[4] } | kbd_joy0;
+							  { joyA[0], joyA[1], joyA[2], joyA[3], joyA[7], joyA[6], joyA[5], joyA[4] } | kbd_joy0;
 wire [7:0] nes_joy_B = (reset_nes || osd_visible) ? 8'd0 : 
-							  { joyA[0], joyA[1], joyA[2], joyA[3], joyA[7], joyA[6], joyA[5], joyA[4] } | kbd_joy1;
+							  { joyB[0], joyB[1], joyB[2], joyB[3], joyB[7], joyB[6], joyB[5], joyB[4] } | kbd_joy1;
  
   wire clock_locked;
   wire clk85;
