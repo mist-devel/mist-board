@@ -216,7 +216,8 @@ wire [7:0] nes_joy_B = (reset_nes || osd_visible) ? 8'd0 :
   wire clock_locked;
   wire clk85;
   wire clk;
-  clk clock_21mhz(.inclk0(CLOCK_27[0]), .c0(clk85), .c1(SDRAM_CLK), .c2(clk), .locked(clock_locked));
+  clk clock_21mhz(.inclk0(CLOCK_27[0]), .c0(clk85), .c1(clk), .locked(clock_locked));
+  assign SDRAM_CLK = clk85;
 
   // reset after download
   reg [7:0] download_reset_cnt;
