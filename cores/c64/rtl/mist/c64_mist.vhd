@@ -403,7 +403,6 @@ end component cartridge;
 	signal potB_x   : std_logic_vector(7 downto 0);
 	signal potB_y   : std_logic_vector(7 downto 0);
 	signal reset_key : std_logic;
-	signal cart_detach_key :std_logic;							-- cartridge detach key CTRL-D - LCA
 	
 	signal c64_r  : std_logic_vector(5 downto 0);
 	signal c64_g  : std_logic_vector(5 downto 0);
@@ -1097,7 +1096,6 @@ begin
 		c64rom_addr => c64rom_addr,
 		c64rom_data => ioctl_data,
 		c64rom_wr => c64rom_wr,
---		cart_detach_key => cart_detach_key,
 		tap_playstop_key => tap_playstop_key,
 		reset_key => reset_key
 	);

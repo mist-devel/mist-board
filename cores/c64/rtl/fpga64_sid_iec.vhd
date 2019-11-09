@@ -44,7 +44,6 @@ entity fpga64_sid_iec is
 		kbd_clk     : in  std_logic;
 		kbd_dat     : in  std_logic;
 		reset_key   : out std_logic;
-		cart_detach_key : out std_logic;
 		tap_playstop_key : out std_logic;
 
 		-- external memory
@@ -805,7 +804,6 @@ div1m: process(clk32)				-- this process devides 32 MHz to 1MHz (for the SID)
 			trace2Key => trace2Key,
 			reset_key => reset_key,
 			restore_key => restore_key,
-			cart_detach_key => cart_detach_key,					-- cartridge detach key CTRL-D - LCA
 			tapPlayStopKey => tap_playstop_key,
 			disk_num => disk_num,
 
