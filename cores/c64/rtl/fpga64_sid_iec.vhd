@@ -615,10 +615,10 @@ div1m: process(clk32)				-- this process devides 32 MHz to 1MHz (for the SID)
 			  sid_do8580_r;
 
 	-- CD4066 analogue switch
-	cd4066_sigA <= x"FF" when cia1_pao(7) = '0' else potB_x;
-	cd4066_sigB <= x"FF" when cia1_pao(7) = '0' else potB_y;
-	cd4066_sigC <= x"FF" when cia1_pao(6) = '0' else potA_x;
-	cd4066_sigD <= x"FF" when cia1_pao(6) = '0' else potA_y;
+	cd4066_sigA <= x"FF" when cia1_pao(7) = '0' else potA_x;
+	cd4066_sigB <= x"FF" when cia1_pao(7) = '0' else potA_y;
+	cd4066_sigC <= x"FF" when cia1_pao(6) = '0' else potB_x;
+	cd4066_sigD <= x"FF" when cia1_pao(6) = '0' else potB_y;
 
 	pot_x <= cd4066_sigA and cd4066_sigC;
 	pot_y <= cd4066_sigB and cd4066_sigD;
