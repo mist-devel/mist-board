@@ -19,45 +19,45 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
 module archimedes_mist_top(
-  // clock inputs
-  input wire [1:0] 	CLOCK_27, // 27 MHz
-  // LED outputs
-  output wire	LED, // LED Yellow
-  // UART
-  //output wire	UART_TX, // UART Transmitter
-  //input 	wire 	UART_RX, // UART Receiver
+	// clock inputs
+	input   [1:0] CLOCK_27, // 27 MHz
+	// LED outputs
+	output        LED, // LED Yellow
+	// UART
+	//output      UART_TX, // UART Transmitter
+	//input       UART_RX, // UART Receiver
   
-  // VGA
-  output wire	VGA_HS, // VGA H_SYNC
-  output wire	VGA_VS, // VGA V_SYNC
-  output wire [5:0] 	VGA_R, // VGA Red[5:0]
-  output wire [5:0] 	VGA_G, // VGA Green[5:0]
-  output wire [5:0] 	VGA_B, // VGA Blue[5:0];
+	// VGA
+	output        VGA_HS, // VGA H_SYNC
+	output        VGA_VS, // VGA V_SYNC
+	output  [5:0] VGA_R, // VGA Red[5:0]
+	output  [5:0] VGA_G, // VGA Green[5:0]
+	output  [5:0] VGA_B, // VGA Blue[5:0];
 	
 	// AUDIO
-	output wire 		AUDIO_L, // sigma-delta DAC output left
-	output wire 		AUDIO_R, // sigma-delta DAC output right
+	output        AUDIO_L, // sigma-delta DAC output left
+	output        AUDIO_R, // sigma-delta DAC output right
 	
 	// SDRAM
-	output[12:0]		DRAM_A,
-	output[1:0]			DRAM_BA,
-	output 				DRAM_CAS_N,
-	output 				DRAM_CKE,
-	output 				DRAM_CLK,
-	output 				DRAM_CS_N,
-	inout[15:0]			DRAM_DQ,
-	output[1:0]			DRAM_DQM,
-	output 				DRAM_RAS_N,
-	output 				DRAM_WE_N,
+	output [12:0] DRAM_A,
+	output  [1:0] DRAM_BA,
+	output        DRAM_CAS_N,
+	output        DRAM_CKE,
+	output        DRAM_CLK,
+	output        DRAM_CS_N,
+	inout  [15:0] DRAM_DQ,
+	output  [1:0] DRAM_DQM,
+	output        DRAM_RAS_N,
+	output        DRAM_WE_N,
   
-  // SPI
-  inout          SPI_DO,
-  input          SPI_DI,
-  input          SPI_SCK,
-  input          SPI_SS2,    // data_io
-  input          SPI_SS3,    // OSD
-  input          SPI_SS4,    // Direct SD
-  input          CONF_DATA0  // SPI_SS for user_io
+	// SPI
+	inout         SPI_DO,
+	input         SPI_DI,
+	input         SPI_SCK,
+	input         SPI_SS2,    // data_io
+	input         SPI_SS3,    // OSD
+	input         SPI_SS4,    // Direct SD
+	input         CONF_DATA0  // SPI_SS for user_io
 );
 
 wire [7:0] kbd_out_data;
@@ -77,19 +77,19 @@ wire pll_vidc_ready;
 wire ram_ready;
 
 // core's raw video 
-wire [3:0]	core_r, core_g, core_b;
-wire			core_hs, core_vs;
+wire [3:0] core_r, core_g, core_b;
+wire       core_hs, core_vs;
 
 // core's raw audio 
-wire [15:0]	coreaud_l, coreaud_r;
+wire [15:0] coreaud_l, coreaud_r;
 
 // data loading 
-wire        downloading;
-wire        loader_active = downloading && (dio_index == 1 || dio_index == 2);
-wire [7:0]  dio_index;
-wire 		loader_we /* synthesis keep */ ;
-reg			loader_stb = 1'b0 /* synthesis keep */ ;
-reg         rom_ready = 0;
+wire       downloading;
+wire       loader_active = downloading && (dio_index == 1 || dio_index == 2);
+wire [7:0] dio_index;
+wire       loader_we /* synthesis keep */ ;
+reg        loader_stb = 1'b0 /* synthesis keep */ ;
+reg        rom_ready = 0;
 (*KEEP="TRUE"*)wire [3:0]	loader_sel /* synthesis keep */ ;
 (*KEEP="TRUE"*)wire [23:0]	loader_addr /* synthesis keep */ ;
 (*KEEP="TRUE"*)wire [31:0]	loader_data /* synthesis keep */ ;
@@ -173,66 +173,66 @@ assign pll_rom_q = pixbaseclk_select == 2'b01 ? q_reconfig_25 :
 
 pll_reconfig pll_reconfig_inst
 (
-    .busy(pll_reconfig_busy),
-    .clock(clk_sys),
-    .counter_param(0),
-    .counter_type(0),
-    .data_in(0),
-    .pll_areset(pll_areset),
-    .pll_areset_in(0),
-    .pll_configupdate(pll_configupdate),
-    .pll_scanclk(pll_scanclk),
-    .pll_scanclkena(pll_scanclkena),
-    .pll_scandata(pll_scandata),
-    .pll_scandataout(pll_scandataout),
-    .pll_scandone(pll_scandone),
-    .read_param(0),
-    .reconfig(pll_reconfig),
-    .reset(pll_reconfig_reset),
-    .reset_rom_address(0),
-    .rom_address_out(pll_rom_address),
-    .rom_data_in(pll_rom_q),
-    .write_from_rom(pll_write_from_rom),
-    .write_param(0),
-    .write_rom_ena(pll_write_rom_ena)
+	.busy(pll_reconfig_busy),
+	.clock(clk_sys),
+	.counter_param(0),
+	.counter_type(0),
+	.data_in(0),
+	.pll_areset(pll_areset),
+	.pll_areset_in(0),
+	.pll_configupdate(pll_configupdate),
+	.pll_scanclk(pll_scanclk),
+	.pll_scanclkena(pll_scanclkena),
+	.pll_scandata(pll_scandata),
+	.pll_scandataout(pll_scandataout),
+	.pll_scandone(pll_scandone),
+	.read_param(0),
+	.reconfig(pll_reconfig),
+	.reset(pll_reconfig_reset),
+	.reset_rom_address(0),
+	.rom_address_out(pll_rom_address),
+	.rom_data_in(pll_rom_q),
+	.write_from_rom(pll_write_from_rom),
+	.write_param(0),
+	.write_rom_ena(pll_write_rom_ena)
 );
 
 always @(posedge clk_sys) begin
-    reg [1:0] pixbaseclk_select_d;
-    reg [1:0] pll_reconfig_state = 0;
-    reg [9:0] pll_reconfig_timeout;
+	reg [1:0] pixbaseclk_select_d;
+	reg [1:0] pll_reconfig_state = 0;
+	reg [9:0] pll_reconfig_timeout;
 
-    pll_write_from_rom <= 0;
-    pll_reconfig <= 0;
-    pll_reconfig_reset <= 0;
-    case (pll_reconfig_state)
-    2'b00:
-    begin
-        pixbaseclk_select_d <= pixbaseclk_select;
-        if (pixbaseclk_select_d != pixbaseclk_select) begin
-            pll_write_from_rom <= 1;
-            pll_reconfig_state <= 2'b01;
-        end
-    end
-    2'b01: pll_reconfig_state <= 2'b10;
-    2'b10:
+	pll_write_from_rom <= 0;
+	pll_reconfig <= 0;
+	pll_reconfig_reset <= 0;
+	case (pll_reconfig_state)
+	2'b00:
+	begin
+		pixbaseclk_select_d <= pixbaseclk_select;
+		if (pixbaseclk_select_d != pixbaseclk_select) begin
+			pll_write_from_rom <= 1;
+			pll_reconfig_state <= 2'b01;
+		end
+	end
+	2'b01: pll_reconfig_state <= 2'b10;
+	2'b10:
         if (~pll_reconfig_busy) begin
             pll_reconfig <= 1;
             pll_reconfig_state <= 2'b11;
             pll_reconfig_timeout <= 10'd1000;
         end
-    2'b11:
-    begin
-        pll_reconfig_timeout <= pll_reconfig_timeout - 1'd1;
-        if (pll_reconfig_timeout == 10'd1) begin
-            // pll_reconfig stuck in busy state
-            pll_reconfig_reset <= 1;
-            pll_reconfig_state <= 2'b00;
-        end
-        if (~pll_reconfig & ~pll_reconfig_busy) pll_reconfig_state <= 2'b00;
-    end
-    default: ;
-    endcase
+	2'b11:
+	begin
+		pll_reconfig_timeout <= pll_reconfig_timeout - 1'd1;
+		if (pll_reconfig_timeout == 10'd1) begin
+			// pll_reconfig stuck in busy state
+			pll_reconfig_reset <= 1;
+			pll_reconfig_state <= 2'b00;
+		end
+		if (~pll_reconfig & ~pll_reconfig_busy) pll_reconfig_state <= 2'b00;
+	end
+	default: ;
+	endcase
 end
 
 // forcibly blank back porch area
@@ -287,22 +287,22 @@ wire [5:0] b = scandoubler_en  ? sd_b : { b_adj, b_adj[3:2] };
 wire [5:0] osd_r_o, osd_g_o, osd_b_o;
 
 osd #(10'd0,10'd0,4) OSD (
-   .clk_sys    ( clk_pix      ),
+	.clk_sys    ( clk_pix      ),
 
-   // spi for OSD
-   .SPI_DI     ( SPI_DI       ),
-   .SPI_SCK    ( SPI_SCK      ),
-   .SPI_SS3    ( SPI_SS3      ),
+	// spi for OSD
+	.SPI_DI     ( SPI_DI       ),
+	.SPI_SCK    ( SPI_SCK      ),
+	.SPI_SS3    ( SPI_SS3      ),
 
-   .R_in       ( r            ),
-   .G_in       ( g            ),
-   .B_in       ( b            ),
-   .HSync      ( hs           ),
-   .VSync      ( vs           ),
+	.R_in       ( r            ),
+	.G_in       ( g            ),
+	.B_in       ( b            ),
+	.HSync      ( hs           ),
+	.VSync      ( vs           ),
 
-   .R_out      ( osd_r_o      ),
-   .G_out      ( osd_g_o      ),
-   .B_out      ( osd_b_o      )
+	.R_out      ( osd_r_o      ),
+	.G_out      ( osd_g_o      ),
+	.B_out      ( osd_b_o      )
 );
 
 wire [5:0] Y, Pb, Pr;
@@ -346,20 +346,20 @@ assign SPI_DO = (CONF_DATA0==0)?user_io_sdo:(SPI_SS2==0)?data_io_sdo:1'bZ;
 
 wire user_io_sdo;
 user_io user_io(
-   // the spi interface
-   .clk_sys       ( clk_sys         ),
-   .SPI_CLK       (SPI_SCK          ),
-   .SPI_SS_IO     (CONF_DATA0       ),
-   .SPI_MISO      (user_io_sdo           ),   // tristate handling inside user_io
-   .SPI_MOSI      (SPI_DI           ),
+	// the spi interface
+	.clk_sys        ( clk_sys        ),
+	.SPI_CLK        ( SPI_SCK        ),
+	.SPI_SS_IO      ( CONF_DATA0     ),
+	.SPI_MISO       ( user_io_sdo    ),   // tristate handling inside user_io
+	.SPI_MOSI       ( SPI_DI         ),
 
-	.SWITCHES      (switches         ),
-	.BUTTONS       (buttons          ),
+	.SWITCHES       ( switches       ),
+	.BUTTONS        ( buttons        ),
 	.scandoubler_disable(scandoubler_disable),
-	.ypbpr         (ypbpr            ),
+	.ypbpr          ( ypbpr          ),
 
-	.JOY0          (joyA             ),
-	.JOY1          (joyB             ),
+	.JOY0           ( joyA           ),
+	.JOY1           ( joyB           ),
 
 	.kbd_out_data   ( kbd_out_data   ),
 	.kbd_out_strobe ( kbd_out_strobe ),
@@ -408,83 +408,82 @@ DATA_IO  (
 	.ide_data_rd    ( ide_data_rd    ),
 	.ide_data_we    ( ide_data_we    ),
 
-	.downloading	( downloading	),
-	.size			(				),
-	.index          ( dio_index ),
+	.downloading	( downloading	 ),
+	.index          ( dio_index      ),
 
 	// ram interface
-   .clk     		( clk_sys			),
-	.wr    			( loader_we			),
-	.a					( loader_addr		),
-	.sel				( loader_sel		),
-	.d					( loader_data 	)
+	.clk           ( clk_sys         ),
+	.wr            ( loader_we       ),
+	.a             ( loader_addr     ),
+	.sel           ( loader_sel      ),
+	.d             ( loader_data     )
 );
 
-
-wire			core_ack_in    /* synthesis keep */ ; 
-wire			core_stb_out 	/* synthesis keep */ ; 
-wire 			core_cyc_out   /* synthesis keep */ ;
-wire			core_we_o;
-wire [3:0]	core_sel_o;
-wire [2:0]	core_cti_o;
+wire        core_ack_in   /* synthesis keep */ ;
+wire        core_stb_out  /* synthesis keep */ ;
+wire        core_cyc_out  /* synthesis keep */ ;
+wire        core_we_o;
+wire  [3:0] core_sel_o;
+wire  [2:0] core_cti_o;
 wire [31:0] core_data_in, core_data_out;
 wire [31:0] ram_data_in;
 wire [26:2] core_address_out;
 
-wire	[1:0]	pixbaseclk_select;
+wire  [1:0] pixbaseclk_select;
 
-wire 			i2c_din, i2c_dout, i2c_clock;
+wire        i2c_din, i2c_dout, i2c_clock;
 
-wire       ide_req;
-wire       ide_ack;
-wire       ide_err;
-wire [2:0] ide_reg_o_adr;
-wire [7:0] ide_reg_o;
-wire       ide_reg_we;
-wire [2:0] ide_reg_i_adr;
-wire [7:0] ide_reg_i;
-wire [8:0] ide_data_addr;
-wire [7:0] ide_data_o;
-wire [7:0] ide_data_i;
-wire       ide_data_rd;
-wire       ide_data_we;
+wire        ide_req;
+wire        ide_ack;
+wire        ide_err;
+wire  [2:0] ide_reg_o_adr;
+wire  [7:0] ide_reg_o;
+wire        ide_reg_we;
+wire  [2:0] ide_reg_i_adr;
+wire  [7:0] ide_reg_i;
+wire  [8:0] ide_data_addr;
+wire  [7:0] ide_data_o;
+wire  [7:0] ide_data_i;
+wire        ide_data_rd;
+wire        ide_data_we;
 
-wire       reset = ~ram_ready | ~rom_ready;
+wire        reset = ~ram_ready | ~rom_ready;
 
 archimedes_top ARCHIMEDES(
 	
-	.CLKCPU_I	( clk_sys			),
-	.CLKPIX_I	( clk_pix			), // pixel clock for OSD
-	.CEPIX_O	( ce_pix			),
-	
-	.RESET_I	( reset             ),
-	
-	.MEM_ACK_I	( core_ack_in		),
-	.MEM_DAT_I	( core_data_in		),
-	.MEM_DAT_O	( core_data_out	    ),
-	.MEM_ADDR_O	( core_address_out  ),
-	.MEM_STB_O	( core_stb_out		),
-	.MEM_CYC_O	( core_cyc_out		),
-	.MEM_SEL_O	( core_sel_o		),
-	.MEM_WE_O	( core_we_o			),
-	.MEM_CTI_O  ( core_cti_o        ),
-    
-	.HSYNC		( core_hs			),
-	.VSYNC		( core_vs			),
-	
-    .VIDEO_R		( core_r				),
-	.VIDEO_G		( core_g				),
-	.VIDEO_B		( core_b				),
-	
-	.AUDIO_L		( coreaud_l				),
-	.AUDIO_R		( coreaud_r				),
-	
-	.I2C_DOUT	( i2c_din			),
-	.I2C_DIN		( i2c_dout			),
-	.I2C_CLOCK	( i2c_clock			),
-	
-	.DEBUG_LED	( LED					),
+	.CLKCPU_I       ( clk_sys        ),
+	.CLKPIX_I       ( clk_pix        ), // pixel clock for OSD
+	.CEPIX_O        ( ce_pix         ),
 
+	.RESET_I        ( reset          ),
+
+	.MEM_ACK_I      ( core_ack_in    ),
+	.MEM_DAT_I      ( core_data_in   ),
+	.MEM_DAT_O      ( core_data_out  ),
+	.MEM_ADDR_O     ( core_address_out ),
+	.MEM_STB_O      ( core_stb_out   ),
+	.MEM_CYC_O      ( core_cyc_out   ),
+	.MEM_SEL_O      ( core_sel_o     ),
+	.MEM_WE_O       ( core_we_o      ),
+	.MEM_CTI_O      ( core_cti_o     ),
+
+	.HSYNC          ( core_hs        ),
+	.VSYNC          ( core_vs        ),
+
+	.VIDEO_R        ( core_r         ),
+	.VIDEO_G        ( core_g         ),
+	.VIDEO_B        ( core_b         ),
+
+	.AUDIO_L        ( coreaud_l      ),
+	.AUDIO_R        ( coreaud_r      ),
+
+	.I2C_DOUT       ( i2c_din        ),
+	.I2C_DIN        ( i2c_dout       ),
+	.I2C_CLOCK      ( i2c_clock      ),
+
+	.DEBUG_LED      ( LED            ),
+
+	// FDC connection
 	.img_mounted    ( img_mounted    ),
 	.img_size       ( img_size       ),
 	.img_wp         ( 0              ),
@@ -518,93 +517,93 @@ archimedes_top ARCHIMEDES(
 	.KBD_IN_DATA    ( kbd_in_data    ),
 	.KBD_IN_STROBE  ( kbd_in_strobe  ),
 
-	.JOYSTICK0		( ~{joyB[4], joyB[0], joyB[1], joyB[2], joyB[3]} ),
-	.JOYSTICK1		( ~{joyA[4], joyA[0], joyA[1], joyA[2], joyA[3]} ),
+	.JOYSTICK0      ( ~{joyB[4], joyB[0], joyB[1], joyB[2], joyB[3]} ),
+	.JOYSTICK1      ( ~{joyA[4], joyA[0], joyA[1], joyA[2], joyA[3]} ),
 	.VIDBASECLK_O	( pixbaseclk_select ),
 	.VIDSYNCPOL_O	( )
 );
 
-wire			ram_ack	/* synthesis keep */ ;
-wire			ram_stb	/* synthesis keep */ ;
-wire			ram_cyc	/* synthesis keep */ ;
-wire			ram_we 	/* synthesis keep */ ;
-wire  [3:0]	ram_sel	/* synthesis keep */ ;
-wire [25:0] ram_address/* synthesis keep */ ;
+wire        ram_ack     /* synthesis keep */ ;
+wire        ram_stb     /* synthesis keep */ ;
+wire        ram_cyc     /* synthesis keep */ ;
+wire        ram_we      /* synthesis keep */ ;
+wire  [3:0] ram_sel     /* synthesis keep */ ;
+wire [25:0] ram_address /* synthesis keep */ ;
 
 sdram_top SDRAM(
-			
-		// wishbone interface
-		.wb_clk		( clk_sys		),
-		.wb_stb		( ram_stb		),
-		.wb_cyc		( ram_cyc		),
-		.wb_we		( ram_we		),
-		.wb_ack		( ram_ack		),
 
-		.wb_sel		( ram_sel		),
-		.wb_adr		( ram_address	),
-		.wb_dat_i	( ram_data_in	),
-		.wb_dat_o	( core_data_in	),
-		.wb_cti		( core_cti_o	),
-				
-		// SDRAM Interface
-		.sd_clk		( clk_mem		),
-		.sd_rst		( ~pll_ready	),
-		.sd_cke		( DRAM_CKE		),
+	// wishbone interface
+	.wb_clk         ( clk_sys        ),
+	.wb_stb         ( ram_stb        ),
+	.wb_cyc         ( ram_cyc        ),
+	.wb_we          ( ram_we         ),
+	.wb_ack         ( ram_ack        ),
 
-		.sd_dq   	( DRAM_DQ  		),
-		.sd_addr 	( DRAM_A    	),
-		.sd_dqm     ( DRAM_DQM 		),
-		.sd_cs_n    ( DRAM_CS_N    ),
-		.sd_ba      ( DRAM_BA  		),
-		.sd_we_n    ( DRAM_WE_N    ),
-		.sd_ras_n   ( DRAM_RAS_N   ),
-		.sd_cas_n   ( DRAM_CAS_N  	),
-		.sd_ready	( ram_ready		)
+	.wb_sel         ( ram_sel        ),
+	.wb_adr         ( ram_address    ),
+	.wb_dat_i       ( ram_data_in    ),
+	.wb_dat_o       ( core_data_in   ),
+	.wb_cti	        ( core_cti_o     ),
+
+	// SDRAM Interface
+	.sd_clk         ( clk_mem        ),
+	.sd_rst         ( ~pll_ready     ),
+	.sd_cke         ( DRAM_CKE       ),
+
+	.sd_dq          ( DRAM_DQ        ),
+	.sd_addr        ( DRAM_A         ),
+	.sd_dqm         ( DRAM_DQM       ),
+	.sd_cs_n        ( DRAM_CS_N      ),
+	.sd_ba          ( DRAM_BA        ),
+	.sd_we_n        ( DRAM_WE_N      ),
+	.sd_ras_n       ( DRAM_RAS_N     ),
+	.sd_cas_n       ( DRAM_CAS_N     ),
+	.sd_ready	( ram_ready      )
 );
 
 i2cSlaveTop CMOS (
-	.clk		( clk_sys		),
-	.rst		( ~pll_ready	),
-	.sdaIn	    ( i2c_din		),
-	.sdaOut	    ( i2c_dout		),
-	.scl		( i2c_clock		),
-	.we			( downloading && dio_index == 3 && loader_we ),
-	.addr		( loader_addr[7:0] ),
-	.data		( loader_data[7:0] )
+	.clk            ( clk_sys        ),
+	.rst            ( ~pll_ready     ),
+	.sdaIn          ( i2c_din        ),
+	.sdaOut	        ( i2c_dout       ),
+	.scl            ( i2c_clock      ),
+	.we             ( downloading && dio_index == 3 && loader_we ),
+	.addr           ( loader_addr[7:0] ),
+	.data           ( loader_data[7:0] )
 );
 
 audio	AUDIO	(
-	.clk			( clk_pix		),
-	.rst			( ~pll_ready	),
-	.audio_data_l 	( coreaud_l		),
-	.audio_data_r 	( coreaud_r		),
-	.audio_l        ( AUDIO_L		),
-	.audio_r		( AUDIO_R		)
+	.clk            ( clk_pix        ),
+	.rst            ( ~pll_ready     ),
+	.audio_data_l   ( coreaud_l      ),
+	.audio_data_r   ( coreaud_r      ),
+	.audio_l        ( AUDIO_L        ),
+	.audio_r        ( AUDIO_R        )
 );
 
 always @(posedge clk_sys) begin 
 	reg loader_active_old;
-    loader_active_old <= loader_active;
+	loader_active_old <= loader_active;
 
-    if (loader_active_old & ~loader_active) rom_ready <= 1;
+	if (loader_active_old & ~loader_active) rom_ready <= 1;
 	if (loader_we) begin 
-	
+
 		loader_stb <= 1'b1;
-	
+
 	end else if (ram_ack) begin 
-	
+
 		loader_stb <= 1'b0;
-		
+
 	end
 
 end
 
-assign ram_we			= loader_active ? loader_active : core_we_o;
-assign ram_sel			= loader_active ? loader_sel : core_sel_o;
-assign ram_address 	= loader_active ? {loader_addr[23:2],2'b00} : {core_address_out[23:2],2'b00};
-assign ram_stb			= loader_active ? loader_stb : core_stb_out;
-assign ram_cyc			= loader_active ? loader_stb : core_stb_out;
-assign ram_data_in		= loader_active ? loader_data : core_data_out;
-assign core_ack_in  	= loader_active ? 1'b0 : ram_ack;
+assign ram_we       = loader_active ? loader_active : core_we_o;
+assign ram_sel      = loader_active ? loader_sel : core_sel_o;
+assign ram_address  = loader_active ? {loader_addr[23:2],2'b00} : {core_address_out[23:2],2'b00};
+assign ram_stb      = loader_active ? loader_stb : core_stb_out;
+assign ram_cyc      = loader_active ? loader_stb : core_stb_out;
+assign ram_data_in  = loader_active ? loader_data : core_data_out;
+assign core_ack_in  = loader_active ? 1'b0 : ram_ack;
 
-endmodule // archimedes_papoliopro_top
+endmodule // archimedes_mist_top
