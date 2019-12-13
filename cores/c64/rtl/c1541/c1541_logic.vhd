@@ -120,6 +120,7 @@ architecture SYN of c1541_logic is
   signal uc3_pa_oe      : std_logic_vector(7 downto 0);
   signal uc3_pb_oe      : std_logic_vector(7 downto 0);
 
+  signal cpu_a_slice    : std_logic_vector(3 downto 0);
 begin
 
   reset_n <= not reset;
@@ -137,14 +138,24 @@ begin
   end process;
 
   -- decode logic
-  -- RAM $0000-$07FF (2KB)
-  ram_cs <= '1' when STD_MATCH(cpu_a(15 downto 0), "00000-----------") else '0';
-  -- UC1 (VIA6522) $1800-$180F
-  uc1_cs2_n <= '0' when STD_MATCH(cpu_a(15 downto 0), "000110000000----") else '1';
-  -- UC3 (VIA6522) $1C00-$1C0F
-  uc3_cs2_n <= '0' when STD_MATCH(cpu_a(15 downto 0), "000111000000----") else '1';
-  -- ROM $C000-$FFFF (16KB)
-  rom_cs <= '1' when STD_MATCH(cpu_a(15 downto 0), "11--------------") else '0';
+  process (cpu_a, cpu_a_slice)
+  begin
+    ram_cs <= '0';
+    uc1_cs2_n <= '1';
+    uc3_cs2_n <= '1';
+    rom_cs <= cpu_a(15);  -- ROM $C000-$FFFF (16KB)
+
+    -- address decoder logic using a 74LS42 BCD decoder
+    cpu_a_slice <= cpu_a(15)&cpu_a(12)&cpu_a(11)&cpu_a(10);
+    case cpu_a_slice is
+      when "0000" => ram_cs <= '1';     -- RAM $0000-$07FF (2KB) + mirrors
+      when "0001" => ram_cs <= '1';     -- RAM $0000-$07FF (2KB) + mirrors
+      when "0110" => uc1_cs2_n <= '0';  -- UC1 (VIA6522) $1800-$180F + mirrors
+      when "0111" => uc3_cs2_n <= '0';  -- UC3 (VIA6522) $1C00-$1C0F + mirrors
+      when others => null;
+    end case;
+
+  end process;
 
   -- qualified write signals
   ram_wr <= '1' when ram_cs = '1' and cpu_rw_n = '0' else '0';
