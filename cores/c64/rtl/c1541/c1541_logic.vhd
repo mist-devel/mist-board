@@ -20,9 +20,9 @@ entity c1541_logic is
     reset           : in std_logic;
 
     -- serial bus
-    sb_data_oe      : out std_logic;
+    sb_data_oe      : buffer std_logic;
     sb_data_in      : in std_logic;
-    sb_clk_oe       : out std_logic;
+    sb_clk_oe       : buffer std_logic;
     sb_clk_in       : in std_logic;
     sb_atn_oe       : out std_logic;
     sb_atn_in       : in std_logic;
@@ -161,19 +161,13 @@ begin
   uc1_pa_i(0) <= tr00_sense_n;
   uc1_pa_i(7 downto 1) <= (others => '0');  -- NC
   -- PB
-  uc1_pb_i(0) <=  '1' when sb_data_in = '0' else
-                  '1' when (uc1_pb_o(1) = '1' and uc1_pb_oe_n(1) = '0') else  -- DAR comment : external OR wired
-                  '1' when atn = '1' else                                     -- DAR comment : external OR wired 
-                  '0';
-  sb_data_oe <=   '1' when (uc1_pb_o(1) = '1' and uc1_pb_oe_n(1) = '0') else
-                  '1' when atn = '1' else
-                  '0';
-  uc1_pb_i(2) <=  '1' when sb_clk_in = '0' else
-                  '1' when (uc1_pb_o(3) = '1' and uc1_pb_oe_n(3) = '0') else  -- DAR comment : external OR wired
-                  '0';
-  sb_clk_oe <=    '1' when (uc1_pb_o(3) = '1' and uc1_pb_oe_n(3) = '0') else '0';
-		
-  atna <= uc1_pb_o(4); -- when uc1_pc_oe = '1'
+
+  uc1_pb_i(0) <=  not (sb_data_in and sb_data_oe);
+  sb_data_oe <=   not (uc1_pb_o(1) or uc1_pb_oe_n(1)) and not atn;
+  uc1_pb_i(2) <=  not (sb_clk_in and sb_clk_oe);
+  sb_clk_oe <=    not (uc1_pb_o(3) or uc1_pb_oe_n(3));
+
+  atna <= uc1_pb_o(4) or uc1_pb_oe_n(4);
   uc1_pb_i(6 downto 5) <= DEVICE_SELECT xor ds;     -- allows override
   uc1_pb_i(7) <= not sb_atn_in;
 

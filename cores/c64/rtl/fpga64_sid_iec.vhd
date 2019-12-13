@@ -842,9 +842,9 @@ div1m: process(clk32)				-- this process devides 32 MHz to 1MHz (for the SID)
 		end if;
 	end process;
 
-	iec_data_o <= cia2_pao(5);
-	iec_clk_o <= cia2_pao(4);
-	iec_atn_o <= cia2_pao(3);
+	iec_data_o <= not cia2_pao(5);
+	iec_clk_o <= not cia2_pao(4);
+	iec_atn_o <= not cia2_pao(3);
 	ramDataOut <= "00" & unsigned(cia2_pao)(5 downto 3) & "000" when sysCycle >= CYCLE_IEC0 and sysCycle <= CYCLE_IEC3 else cpuDo;
 	ramAddr <= systemAddr when (phi0_cpu = '1') or (phi0_vic = '1') else (others => '0');
 	ramWe <= '0' when sysCycle = CYCLE_IEC2 or sysCycle = CYCLE_IEC3 else not systemWe;
@@ -896,8 +896,8 @@ div1m: process(clk32)				-- this process devides 32 MHz to 1MHz (for the SID)
 		end if;
 		if rising_edge(clk32) then
 			if sysCycle = CYCLE_IEC1 then
-				cia2_pai(7) <= not(iec_data_i or cia2_pao(5));
-				cia2_pai(6) <= not(iec_clk_i or cia2_pao(4));
+				cia2_pai(7) <= iec_data_i and not cia2_pao(5);
+				cia2_pai(6) <= iec_clk_i and not cia2_pao(4);
 			end if;	
 		end if;
 	end process;
