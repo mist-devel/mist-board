@@ -77,6 +77,8 @@ reg [9:0]	sd_refresh = 10'd0;
 reg			sd_auto_refresh = 1'b0;
 reg         sd_need_refresh = 1'b0;
 wire		sd_req = wb_stb & wb_cyc & ~wb_ack;
+reg         sd_req_reg;
+reg         sd_cache_hit;
 reg  [11:0] sd_active_row[3:0];
 reg   [3:0] sd_bank_active;
 wire  [1:0] sd_bank = wb_adr[22:21];
@@ -170,6 +172,9 @@ always @(posedge sd_clk) begin
 				sd_word <= sd_word + 1'd1;
 				sd_dat[sd_word[2:1]][{sd_word[0],4'b0000} +:16] <= sd_dq;
 			end
+			sd_req_reg <= sd_req;
+			sd_cache_hit <= ~wb_we && sd_last_adr[23:4] == wb_adr[23:4];
+
 			// this is the auto refresh code.
 			// it kicks in so that 8192 auto refreshes are 
 			// issued in a 64ms period. Other bus operations 
@@ -196,7 +201,7 @@ always @(posedge sd_clk) begin
 				default: ;
 				endcase
 
-			end else if ((sd_cycle != 0) | (sd_cycle == 0 && sd_req)) begin 
+			end else if ((sd_cycle != 0) | (sd_cycle == 0 && sd_req_reg)) begin
 
 				// while the cycle is active count.
 				sd_cycle <= sd_cycle + 1'd1;
@@ -204,7 +209,7 @@ always @(posedge sd_clk) begin
 				CYCLE_PRECHARGE: begin
 					sd_we	<= wb_we;
 					word_index <= 2'b00;
-					if (~wb_we && sd_last_adr[23:4] == wb_adr[23:4]) begin
+					if (sd_cache_hit) begin
 						// this word is already in sd_dat, but where?
 						word_index <= wb_adr[3:2] - sd_last_adr[3:2];
 						sd_done <= ~sd_done;
@@ -281,7 +286,7 @@ always @(posedge sd_clk) begin
 						sd_dat[0][15:0] <= sd_dq;
 						sd_word <= 3'b001;
 					end else 
-						sd_cycle <= 5'd0;
+						sd_cycle <= CYCLE_END;
 				end
 
 				CYCLE_READ1: if (~sd_we) sd_done <= ~sd_done;

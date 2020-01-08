@@ -44,7 +44,6 @@ entity fpga64_sid_iec is
 		kbd_clk     : in  std_logic;
 		kbd_dat     : in  std_logic;
 		reset_key   : out std_logic;
-		cart_detach_key : out std_logic;
 		tap_playstop_key : out std_logic;
 
 		-- external memory
@@ -616,10 +615,10 @@ div1m: process(clk32)				-- this process devides 32 MHz to 1MHz (for the SID)
 			  sid_do8580_r;
 
 	-- CD4066 analogue switch
-	cd4066_sigA <= x"FF" when cia1_pao(7) = '0' else potB_x;
-	cd4066_sigB <= x"FF" when cia1_pao(7) = '0' else potB_y;
-	cd4066_sigC <= x"FF" when cia1_pao(6) = '0' else potA_x;
-	cd4066_sigD <= x"FF" when cia1_pao(6) = '0' else potA_y;
+	cd4066_sigA <= x"FF" when cia1_pao(7) = '0' else potA_x;
+	cd4066_sigB <= x"FF" when cia1_pao(7) = '0' else potA_y;
+	cd4066_sigC <= x"FF" when cia1_pao(6) = '0' else potB_x;
+	cd4066_sigD <= x"FF" when cia1_pao(6) = '0' else potB_y;
 
 	pot_x <= cd4066_sigA and cd4066_sigC;
 	pot_y <= cd4066_sigB and cd4066_sigD;
@@ -805,7 +804,6 @@ div1m: process(clk32)				-- this process devides 32 MHz to 1MHz (for the SID)
 			trace2Key => trace2Key,
 			reset_key => reset_key,
 			restore_key => restore_key,
-			cart_detach_key => cart_detach_key,					-- cartridge detach key CTRL-D - LCA
 			tapPlayStopKey => tap_playstop_key,
 			disk_num => disk_num,
 
@@ -844,9 +842,9 @@ div1m: process(clk32)				-- this process devides 32 MHz to 1MHz (for the SID)
 		end if;
 	end process;
 
-	iec_data_o <= cia2_pao(5);
-	iec_clk_o <= cia2_pao(4);
-	iec_atn_o <= cia2_pao(3);
+	iec_data_o <= not cia2_pao(5);
+	iec_clk_o <= not cia2_pao(4);
+	iec_atn_o <= not cia2_pao(3);
 	ramDataOut <= "00" & unsigned(cia2_pao)(5 downto 3) & "000" when sysCycle >= CYCLE_IEC0 and sysCycle <= CYCLE_IEC3 else cpuDo;
 	ramAddr <= systemAddr when (phi0_cpu = '1') or (phi0_vic = '1') else (others => '0');
 	ramWe <= '0' when sysCycle = CYCLE_IEC2 or sysCycle = CYCLE_IEC3 else not systemWe;
@@ -898,8 +896,8 @@ div1m: process(clk32)				-- this process devides 32 MHz to 1MHz (for the SID)
 		end if;
 		if rising_edge(clk32) then
 			if sysCycle = CYCLE_IEC1 then
-				cia2_pai(7) <= not(iec_data_i or cia2_pao(5));
-				cia2_pai(6) <= not(iec_clk_i or cia2_pao(4));
+				cia2_pai(7) <= iec_data_i and not cia2_pao(5);
+				cia2_pai(6) <= iec_clk_i and not cia2_pao(4);
 			end if;	
 		end if;
 	end process;

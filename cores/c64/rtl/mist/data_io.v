@@ -31,9 +31,7 @@ module data_io
 	input             SPI_DI,
 
 	// ARM -> FPGA download
-	input             ioctl_force_erase,
 	output reg        ioctl_download = 0, // signal indicating an active download
-	output reg        ioctl_erasing = 0,  // signal indicating an active erase
 	output reg  [7:0] ioctl_index,        // menu index used to upload the file
 	output reg        ioctl_wr = 0,
 	output reg [24:0] ioctl_addr,
@@ -95,19 +93,13 @@ always@(posedge SPI_SCK, posedge SPI_SS2) begin
 			rclk <= 1;
 		end
 
-      // expose file (menu) index
-      if((cmd == UIO_FILE_INDEX) && (cnt == 15)) ioctl_index <= {sbuf, SPI_DI};
+		// expose file (menu) index
+		if((cmd == UIO_FILE_INDEX) && (cnt == 15)) ioctl_index <= {sbuf, SPI_DI};
 	end
 end
 
-reg  [24:0] erase_mask;
-wire [24:0] next_erase = (ioctl_addr + 1'd1) & erase_mask;
-
 always@(posedge clk_sys) begin
 	reg        rclkD, rclkD2;
-	reg        old_force = 0;
-	reg  [6:0] erase_clk_div;
-	reg [24:0] end_addr;
 
 	rclkD    <= rclk;
 	rclkD2   <= rclkD;
@@ -119,30 +111,6 @@ always@(posedge clk_sys) begin
 		ioctl_wr   <= 1;
 	end
 
-	if(ioctl_download) begin
-		old_force     <= 0;
-		ioctl_erasing <= 0;
-	end else begin
-
-		old_force <= ioctl_force_erase;
-		if(ioctl_force_erase & ~old_force) begin
-			ioctl_addr    <= 'h1FFFF;
-			erase_mask    <= 'h1FFFF;
-			end_addr      <= 'h10002;
-			erase_clk_div <= 1;
-			ioctl_erasing <= 1;
-		end else if(ioctl_erasing) begin
-			erase_clk_div <= erase_clk_div + 1'd1;
-			if(!erase_clk_div) begin
-				if(next_erase == end_addr) ioctl_erasing <= 0;
-				else begin
-					ioctl_addr <= next_erase;
-					ioctl_dout <= 0;
-					ioctl_wr   <= 1;
-				end
-			end
-		end
-	end
 end
 
 endmodule

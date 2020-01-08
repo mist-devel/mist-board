@@ -145,41 +145,43 @@ module NES_mist(
 	input 		  UART_TX
 );
 					  
-wire [7:0] joyA;
-wire [7:0] joyB;
-wire [1:0] buttons;
-wire [1:0] switches;
- 
 // the configuration string is returned to the io controller to allow
 // it to control the menu on the OSD 
 parameter CONF_STR = {
 			"NES;NES;",
-			"O1,HQ2X(VGA-Only),OFF,ON;",
-			"O2,Scanlines,OFF,ON;",
-			"O3,Invert mirroring,OFF,ON;",
-			"O4,Hide overscan,OFF,ON;",
-			"O5,Palette,FCEUX,Unsaturated-V6;",
-			"T6,Reset;",
-			"V,v0.8;"
+			"O12,System Type,NTSC,PAL,Dendy;",
+			"O3,HQ2X(VGA-Only),OFF,ON;",
+			"O4,Scanlines,OFF,ON;",
+			"O5,Joystick swap,OFF,ON;",
+			"O6,Invert mirroring,OFF,ON;",
+			"O7,Hide overscan,OFF,ON;",
+			"O8,Palette,FCEUX,Unsaturated-V6;",
+			"T9,Reset;",
+			"V,v1.0;"
 };
 
-parameter CONF_STR_LEN = 8+25+20+27+24+32+9+7;
-wire [7:0] status;
+wire [31:0] status;
 
 wire arm_reset = status[0];
-wire smoothing_osd = status[1];
-wire scanlines_osd = status[2];
-wire mirroring_osd = status[3];
-wire overscan_osd = status[4];
-wire palette2_osd = status[5];
-wire reset_osd = status[6];
+wire [1:0] system_type = status[2:1];
+wire smoothing_osd = status[3];
+wire scanlines_osd = status[4];
+wire joy_swap = status[5];
+wire mirroring_osd = status[6];
+wire overscan_osd = status[7];
+wire palette2_osd = status[8];
+wire reset_osd = status[9];
 
 wire scandoubler_disable;
 wire ypbpr;
 wire ps2_kbd_clk, ps2_kbd_data;
 
+wire [7:0] core_joy_A;
+wire [7:0] core_joy_B;
+wire [1:0] buttons;
+wire [1:0] switches;
 
-user_io #(.STRLEN(CONF_STR_LEN)) user_io(
+user_io #(.STRLEN($size(CONF_STR)>>3)) user_io(
    .clk_sys(clk),
    .conf_str(CONF_STR),
    // the spi interface
@@ -194,8 +196,8 @@ user_io #(.STRLEN(CONF_STR_LEN)) user_io(
    .scandoubler_disable(scandoubler_disable),
    .ypbpr(ypbpr),
 
-   .joystick_0(joyA),
-   .joystick_1(joyB),
+   .joystick_0(core_joy_A),
+   .joystick_1(core_joy_B),
 
    .status(status),
 
@@ -203,15 +205,19 @@ user_io #(.STRLEN(CONF_STR_LEN)) user_io(
    .ps2_kbd_data(ps2_kbd_data)
 );
 
+wire [7:0] joyA = joy_swap ? core_joy_B : core_joy_A;
+wire [7:0] joyB = joy_swap ? core_joy_A : core_joy_B;
+
 wire [7:0] nes_joy_A = (reset_nes || osd_visible) ? 8'd0 : 
-							  { joyB[0], joyB[1], joyB[2], joyB[3], joyB[7], joyB[6], joyB[5], joyB[4] } | kbd_joy0;
+							  { joyA[0], joyA[1], joyA[2], joyA[3], joyA[7], joyA[6], joyA[5], joyA[4] } | kbd_joy0;
 wire [7:0] nes_joy_B = (reset_nes || osd_visible) ? 8'd0 : 
-							  { joyA[0], joyA[1], joyA[2], joyA[3], joyA[7], joyA[6], joyA[5], joyA[4] } | kbd_joy1;
+							  { joyB[0], joyB[1], joyB[2], joyB[3], joyB[7], joyB[6], joyB[5], joyB[4] } | kbd_joy1;
  
   wire clock_locked;
   wire clk85;
   wire clk;
-  clk clock_21mhz(.inclk0(CLOCK_27[0]), .c0(clk85), .c1(SDRAM_CLK), .c2(clk), .locked(clock_locked));
+  clk clock_21mhz(.inclk0(CLOCK_27[0]), .c0(clk85), .c1(clk), .locked(clock_locked));
+  assign SDRAM_CLK = clk85;
 
   // reset after download
   reg [7:0] download_reset_cnt;
@@ -235,18 +241,18 @@ wire [7:0] nes_joy_B = (reset_nes || osd_visible) ? 8'd0 :
   wire [5:0] color;
   wire joypad_strobe;
   wire [1:0] joypad_clock;
-  wire [21:0] memory_addr;
+  wire [21:0] memory_addr_cpu, memory_addr_ppu;
   wire memory_read_cpu, memory_read_ppu;
-  wire memory_write;
+  wire memory_write_cpu, memory_write_ppu;
   wire [7:0] memory_din_cpu, memory_din_ppu;
-  wire [7:0] memory_dout;
+  wire [7:0] memory_dout_cpu, memory_dout_ppu;
   reg [7:0] joypad_bits, joypad_bits2;
   reg [7:0] powerpad_d3, powerpad_d4;
   reg [1:0] last_joypad_clock;
   wire [31:0] dbgadr;
   wire [1:0] dbgctr;
 
-  reg [1:0] nes_ce;
+  wire [1:0] nes_ce;
 
 	always @(posedge clk) begin
 		if (reset_nes) begin
@@ -298,34 +304,49 @@ wire [7:0] nes_joy_B = (reset_nes || osd_visible) ? 8'd0 :
 		led_blink <= led_blink + 13'd1;
 	end
  
-	assign LED = downloading ? 0 : loader_fail ? led_blink[23] : 1;
+	assign LED = downloading ? 1'b0 : loader_fail ? led_blink[23] : 1'b1;
 
   wire osd_visible;
 
   wire reset_nes = (init_reset || buttons[1] || arm_reset || reset_osd || download_reset || loader_fail);
-  wire run_nes = (nes_ce == 3);	// keep running even when reset, so that the reset can actually do its job!
 
   wire ext_audio = 1;
   wire int_audio = 1;
 
-  // NES is clocked at every 4th cycle.
-  always @(posedge clk)
-    nes_ce <= nes_ce + 1;
-    
-  NES nes(clk, reset_nes, run_nes,
-          mapper_flags,
-          sample, color,
-          joypad_strobe, joypad_clock, {powerpad_d4[0],powerpad_d3[0],joypad_bits2[0],joypad_bits[0]},
-			 0, 			//fds_swap
-          5'b11111,  // enable all channels
-          memory_addr,
-          memory_read_cpu, memory_din_cpu,
-          memory_read_ppu, memory_din_ppu,
-          memory_write, memory_dout,
-          cycle, scanline,
-          int_audio,
-          ext_audio
-			 );
+NES nes(
+	.clk(clk),
+	.reset_nes(reset_nes),
+	.sys_type(system_type),
+	.nes_div(nes_ce),
+	.mapper_flags(mapper_flags),
+	.sample(sample),
+	.color(color),
+	.joypad_strobe(joypad_strobe),
+	.joypad_clock(joypad_clock),
+	.joypad_data({powerpad_d4[0],powerpad_d3[0],joypad_bits2[0],joypad_bits[0]}),
+	.mic(),
+	.fds_busy(),
+	.fds_eject(0),
+	.diskside_req(),
+	.diskside(),
+	.audio_channels(5'b11111),  // enable all channels
+	.ex_sprites(),
+	.mask(),
+	.cpumem_addr(memory_addr_cpu),
+	.cpumem_read(memory_read_cpu),
+	.cpumem_din(memory_din_cpu),
+	.cpumem_write(memory_write_cpu),
+	.cpumem_dout(memory_dout_cpu),
+	.ppumem_addr(memory_addr_ppu),
+	.ppumem_read(memory_read_ppu),
+	.ppumem_write(memory_write_ppu),
+	.ppumem_din(memory_din_ppu),
+	.ppumem_dout(memory_dout_ppu),
+	.cycle(cycle),
+	.scanline(scanline),
+	.int_audio(int_audio),
+	.ext_audio(ext_audio)
+);
 
 assign SDRAM_CKE         = 1'b1;
 
@@ -343,7 +364,7 @@ always @(posedge clk) begin
 		loader_write_data_mem <= loader_write_data;
 	end
 
-	if(nes_ce == 3) begin
+	if(nes_ce == 1) begin
 		loader_write_mem <= loader_write_triggered;
 		if(loader_write_triggered)
 			loader_write_triggered <= 1'b0;
@@ -352,48 +373,52 @@ end
 
 sdram sdram (
 	// interface to the MT48LC16M16 chip
-	.sd_data     	( SDRAM_DQ                 ),
-	.sd_addr     	( SDRAM_A                  ),
-	.sd_dqm      	( {SDRAM_DQMH, SDRAM_DQML} ),
-	.sd_cs       	( SDRAM_nCS                ),
-	.sd_ba       	( SDRAM_BA                 ),
-	.sd_we       	( SDRAM_nWE                ),
-	.sd_ras      	( SDRAM_nRAS               ),
-	.sd_cas      	( SDRAM_nCAS               ),
+	.sd_data        ( SDRAM_DQ                 ),
+	.sd_addr        ( SDRAM_A                  ),
+	.sd_dqm         ( {SDRAM_DQMH, SDRAM_DQML} ),
+	.sd_cs          ( SDRAM_nCS                ),
+	.sd_ba          ( SDRAM_BA                 ),
+	.sd_we          ( SDRAM_nWE                ),
+	.sd_ras         ( SDRAM_nRAS               ),
+	.sd_cas         ( SDRAM_nCAS               ),
 
 	// system interface
-	.clk      		( clk85         				),
-	.clkref      	( nes_ce[1]         			),
-	.init         	( !clock_locked     			),
+	.clk            ( clk85                    ),
+	.clkref         ( nes_ce[1]                ),
+	.init           ( !clock_locked            ),
 
 	// cpu/chipset interface
-	.addr     		( downloading ? {3'b000, loader_addr_mem} : {3'b000, memory_addr} ),
+	.addrA     	    ( downloading ? {3'b000, loader_addr_mem} : {3'b000, memory_addr_cpu} ),
+	.addrB          ( {3'b000, memory_addr_ppu} ),
 	
-	.we       		( memory_write || loader_write_mem	),
-	.din       		( downloading ? loader_write_data_mem : memory_dout ),
-	
-	.oeA         	( memory_read_cpu ),
-	.doutA       	( memory_din_cpu	),
-	
-	.oeB         	( memory_read_ppu ),
-	.doutB       	( memory_din_ppu	)
+	.weA            ( memory_write_cpu || loader_write_mem	),
+	.weB            ( memory_write_ppu ),
+
+	.dinA           ( downloading ? loader_write_data_mem : memory_dout_cpu ),
+	.dinB           ( memory_dout_ppu ),
+
+	.oeA            ( memory_read_cpu ),
+	.doutA          ( memory_din_cpu  ),
+
+	.oeB            ( memory_read_ppu ),
+	.doutB          ( memory_din_ppu  )
 );
 
 wire downloading;
 
 data_io data_io (
-	.sck				( SPI_SCK 			),
-	.ss				( SPI_SS2			),
-	.sdi				( SPI_DI				),
+	.sck            ( SPI_SCK      ),
+	.ss             ( SPI_SS2      ),
+	.sdi            ( SPI_DI       ),
 
-	.downloading	( downloading		),
-	.size				(						),
+	.downloading    ( downloading  ),
+	.size           (              ),
 
    // ram interface
-   .clk     		( clk					),
-	.wr    			( loader_clk		),
-	.a					( 						),
-	.d					( loader_input 	)
+	.clk            ( clk          ),
+	.wr             ( loader_clk   ),
+	.a              (              ),
+	.d              ( loader_input )
 );
 
 video video (

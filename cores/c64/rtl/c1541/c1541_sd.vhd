@@ -161,9 +161,9 @@ begin
     sb_clk_oe  => iec_clk_o,
     sb_atn_oe  => iec_atn_o,
 		
-    sb_data_in => not iec_data_i,
-    sb_clk_in  => not iec_clk_i,
-    sb_atn_in  => not iec_atn_i,
+    sb_data_in => iec_data_i,
+    sb_clk_in  => iec_clk_i,
+    sb_atn_in  => iec_atn_i,
     
     -- drive-side interface
     ds              => "00",     -- device select

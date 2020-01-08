@@ -102,31 +102,6 @@ component sdram is port
 );
 end component;
 
-component sram is port
-(
-	init       : in    std_logic;
-	clk        : in    std_logic;
-   SDRAM_DQ   : inout std_logic_vector(15 downto 0);
-   SDRAM_A    : out   std_logic_vector(12 downto 0);
-   SDRAM_DQML : out   std_logic;
-   SDRAM_DQMH : out   std_logic;
-   SDRAM_BA   : out   std_logic_vector(1 downto 0);
-   SDRAM_nCS  : out   std_logic;
-   SDRAM_nWE  : out   std_logic;
-   SDRAM_nRAS : out   std_logic;
-   SDRAM_nCAS : out   std_logic;
-   SDRAM_CKE  : out   std_logic;
-
-   wtbt       : in    std_logic_vector(1 downto 0);
-   addr       : in    std_logic_vector(24 downto 0);
-   dout       : out   std_logic_vector(15 downto 0);
-   din        : in    std_logic_vector(15 downto 0);
-   we         : in    std_logic;
-   rd         : in    std_logic;
-   ready      : out   std_logic
-);
-end component;
-
 constant CONF_STR : string := 
 	"C64;;"&
 	"S,D64,Mount Disk;"&
@@ -218,9 +193,7 @@ component data_io port
 (
 	clk_sys			  : in std_logic;
 	SPI_SCK, SPI_SS2, SPI_DI :in std_logic;
-	ioctl_force_erase : in  std_logic;
 	ioctl_download    : out std_logic;
-	ioctl_erasing     : out std_logic;
 	ioctl_index       : out std_logic_vector(7 downto 0);
 	ioctl_wr          : out std_logic;
 	ioctl_addr        : out std_logic_vector(24 downto 0);
@@ -347,8 +320,6 @@ end component cartridge;
 	signal ioctl_load_addr  : std_logic_vector(24 downto 0);
 	signal ioctl_ram_wr: std_logic;
 	signal ioctl_iec_cycle_used: std_logic;
-	signal ioctl_force_erase: std_logic;
-	signal ioctl_erasing: std_logic;
 	signal ioctl_download: std_logic;
 	signal c64_addr: std_logic_vector(15 downto 0);
 	signal c64_data_in: std_logic_vector(7 downto 0);
@@ -403,7 +374,6 @@ end component cartridge;
 	signal potB_x   : std_logic_vector(7 downto 0);
 	signal potB_y   : std_logic_vector(7 downto 0);
 	signal reset_key : std_logic;
-	signal cart_detach_key :std_logic;							-- cartridge detach key CTRL-D - LCA
 	
 	signal c64_r  : std_logic_vector(5 downto 0);
 	signal c64_g  : std_logic_vector(5 downto 0);
@@ -623,8 +593,6 @@ begin
 	st_ntsc             <= status(2);
 	st_reset            <= status(0);
 
-	ioctl_force_erase <= '0';
-
 	data_io_d: data_io
 	port map (
 		clk_sys => clk_c64,
@@ -633,8 +601,6 @@ begin
 		SPI_DI => SPI_DI,
 
 		ioctl_download => ioctl_download,
-		ioctl_force_erase => ioctl_force_erase,
-		ioctl_erasing => ioctl_erasing,
 		ioctl_index => ioctl_index,
 		ioctl_wr => ioctl_wr,
 		ioctl_addr => ioctl_addr,
@@ -885,16 +851,16 @@ begin
 		pll_scanclkena => pll_scanclkena,
 		pll_scandata => pll_scandata,
 		pll_scandataout => pll_scandataout,
-        pll_scandone => pll_scandone,
+		pll_scandone => pll_scandone,
 		read_param => '0',
-        reconfig => pll_reconfig,
+		reconfig => pll_reconfig,
 		reset => pll_reconfig_reset,
 		reset_rom_address => '0',
 		rom_address_out => pll_rom_address,
 		rom_data_in => pll_rom_q,
 		write_from_rom => pll_write_from_rom,
 		write_param  => '0',
-        write_rom_ena => pll_write_rom_ena
+		write_rom_ena => pll_write_rom_ena
 	);
 
 	process(clk32)
@@ -1097,7 +1063,6 @@ begin
 		c64rom_addr => c64rom_addr,
 		c64rom_data => ioctl_data,
 		c64rom_wr => c64rom_wr,
---		cart_detach_key => cart_detach_key,
 		tap_playstop_key => tap_playstop_key,
 		reset_key => reset_key
 	);
@@ -1136,7 +1101,7 @@ begin
 	end process;
 
 	-- connect user port
-	process (pa2_out, pb_out, joyC_c64, joyD_c64, uart_rxD2, st_user_port_uart)
+	process (pa2_out, pb_out, joyC_c64, joyD_c64, uart_rxD2, st_user_port_uart, cass_motor)
 	begin
 		pa2_in <= pa2_out;
 		if st_user_port_uart = '0' then
@@ -1181,8 +1146,8 @@ begin
 
 	disk_readonly <= st_disk_readonly;
 
-    c64_iec_data_i <= c1541_iec_data_o;
-    c64_iec_clk_i <= c1541_iec_clk_o;
+	c64_iec_data_i <= c1541_iec_data_o;
+	c64_iec_clk_i <= c1541_iec_clk_o;
 
 	c1541_iec_atn_i  <= c64_iec_atn_o;
 	c1541_iec_data_i <= c64_iec_data_o;
