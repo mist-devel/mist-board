@@ -653,9 +653,9 @@ C16 #(.INTERNAL_ROM(0)) c16 (
 	.basic_dl_write  ( basic_dl_wr    ),
 	
 	.IEC_DATAOUT ( c16_iec_data_o ),
-	.IEC_DATAIN  ( !c16_iec_data_i ),
+	.IEC_DATAIN  ( c16_iec_data_i ),
 	.IEC_CLKOUT  ( c16_iec_clk_o ),
-	.IEC_CLKIN   ( !c16_iec_clk_i ),
+	.IEC_CLKIN   ( c16_iec_clk_i ),
 	.IEC_ATNOUT  ( c16_iec_atn_o ),
 	.IEC_RESET   ( ),
 
@@ -818,17 +818,17 @@ wire c16_iec_atn_o;
 wire c16_iec_data_o;
 wire c16_iec_clk_o;
 
-wire c16_iec_atn_i  = !((!c16_iec_atn_o)  & (!c1541_iec_atn_o) );
-wire c16_iec_data_i = !((!c16_iec_data_o) & (!c1541_iec_data_o));
-wire c16_iec_clk_i  = !((!c16_iec_clk_o)  & (!c1541_iec_clk_o) );
+wire c16_iec_atn_i  = c1541_iec_atn_o;
+wire c16_iec_data_i = c1541_iec_data_o;
+wire c16_iec_clk_i  = c1541_iec_clk_o;
 
 wire c1541_iec_atn_o;
 wire c1541_iec_data_o;
 wire c1541_iec_clk_o;
 
-wire c1541_iec_atn_i  = c16_iec_atn_i;
-wire c1541_iec_data_i = c16_iec_data_i;
-wire c1541_iec_clk_i  = c16_iec_clk_i;
+wire c1541_iec_atn_i  = c16_iec_atn_o;
+wire c1541_iec_data_i = c16_iec_data_o;
+wire c1541_iec_clk_i  = c16_iec_clk_o;
 
 c1541_sd c1541_sd (
 	.clk32 ( clk32 ),

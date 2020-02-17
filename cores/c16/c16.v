@@ -291,11 +291,11 @@ assign ram_data=(RW & ~CAS)?DIN:8'hff;				// internal ram_data should be 0xff wh
 
 // connect IEC bus
 
-assign IEC_DATAOUT=port_out[0];
-assign port_in[7]=IEC_DATAIN;
-assign IEC_CLKOUT=port_out[1];
-assign port_in[6]=IEC_CLKIN;
-assign IEC_ATNOUT=port_out[2];
+assign IEC_DATAOUT=~port_out[0];
+assign port_in[7]=IEC_DATAIN & IEC_DATAOUT;
+assign IEC_CLKOUT=~port_out[1];
+assign port_in[6]=IEC_CLKIN & IEC_CLKOUT;
+assign IEC_ATNOUT=~port_out[2];
 //assign ATN=IEC_ATNIN;
 assign IEC_RESET=sreset;
 

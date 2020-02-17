@@ -20,9 +20,9 @@ entity c1541_logic is
     reset           : in std_logic;
 
     -- serial bus
-    sb_data_oe      : out std_logic;
+    sb_data_oe      : buffer std_logic;
     sb_data_in      : in std_logic;
-    sb_clk_oe       : out std_logic;
+    sb_clk_oe       : buffer std_logic;
     sb_clk_in       : in std_logic;
     sb_atn_oe       : out std_logic;
     sb_atn_in       : in std_logic;
@@ -120,6 +120,7 @@ architecture SYN of c1541_logic is
   signal uc3_pa_oe      : std_logic_vector(7 downto 0);
   signal uc3_pb_oe      : std_logic_vector(7 downto 0);
 
+  signal cpu_a_slice    : std_logic_vector(3 downto 0);
 begin
 
   reset_n <= not reset;
@@ -137,14 +138,24 @@ begin
   end process;
 
   -- decode logic
-  -- RAM $0000-$07FF (2KB)
-  ram_cs <= '1' when STD_MATCH(cpu_a(15 downto 0), "00000-----------") else '0';
-  -- UC1 (VIA6522) $1800-$180F
-  uc1_cs2_n <= '0' when STD_MATCH(cpu_a(15 downto 0), "000110000000----") else '1';
-  -- UC3 (VIA6522) $1C00-$1C0F
-  uc3_cs2_n <= '0' when STD_MATCH(cpu_a(15 downto 0), "000111000000----") else '1';
-  -- ROM $C000-$FFFF (16KB)
-  rom_cs <= '1' when STD_MATCH(cpu_a(15 downto 0), "11--------------") else '0';
+  process (cpu_a, cpu_a_slice)
+  begin
+    ram_cs <= '0';
+    uc1_cs2_n <= '1';
+    uc3_cs2_n <= '1';
+    rom_cs <= cpu_a(15);  -- ROM $C000-$FFFF (16KB)
+
+    -- address decoder logic using a 74LS42 BCD decoder
+    cpu_a_slice <= cpu_a(15)&cpu_a(12)&cpu_a(11)&cpu_a(10);
+    case cpu_a_slice is
+      when "0000" => ram_cs <= '1';     -- RAM $0000-$07FF (2KB) + mirrors
+      when "0001" => ram_cs <= '1';     -- RAM $0000-$07FF (2KB) + mirrors
+      when "0110" => uc1_cs2_n <= '0';  -- UC1 (VIA6522) $1800-$180F + mirrors
+      when "0111" => uc3_cs2_n <= '0';  -- UC3 (VIA6522) $1C00-$1C0F + mirrors
+      when others => null;
+    end case;
+
+  end process;
 
   -- qualified write signals
   ram_wr <= '1' when ram_cs = '1' and cpu_rw_n = '0' else '0';
@@ -161,19 +172,13 @@ begin
   uc1_pa_i(0) <= tr00_sense_n;
   uc1_pa_i(7 downto 1) <= (others => '0');  -- NC
   -- PB
-  uc1_pb_i(0) <=  '1' when sb_data_in = '0' else
-                  '1' when (uc1_pb_o(1) = '1' and uc1_pb_oe_n(1) = '0') else  -- DAR comment : external OR wired
-                  '1' when atn = '1' else                                     -- DAR comment : external OR wired 
-                  '0';
-  sb_data_oe <=   '1' when (uc1_pb_o(1) = '1' and uc1_pb_oe_n(1) = '0') else
-                  '1' when atn = '1' else
-                  '0';
-  uc1_pb_i(2) <=  '1' when sb_clk_in = '0' else
-                  '1' when (uc1_pb_o(3) = '1' and uc1_pb_oe_n(3) = '0') else  -- DAR comment : external OR wired
-                  '0';
-  sb_clk_oe <=    '1' when (uc1_pb_o(3) = '1' and uc1_pb_oe_n(3) = '0') else '0';
-		
-  atna <= uc1_pb_o(4); -- when uc1_pc_oe = '1'
+
+  uc1_pb_i(0) <=  not (sb_data_in and sb_data_oe);
+  sb_data_oe <=   not (uc1_pb_o(1) or uc1_pb_oe_n(1)) and not atn;
+  uc1_pb_i(2) <=  not (sb_clk_in and sb_clk_oe);
+  sb_clk_oe <=    not (uc1_pb_o(3) or uc1_pb_oe_n(3));
+
+  atna <= uc1_pb_o(4) or uc1_pb_oe_n(4);
   uc1_pb_i(6 downto 5) <= DEVICE_SELECT xor ds;     -- allows override
   uc1_pb_i(7) <= not sb_atn_in;
 
