@@ -730,7 +730,7 @@ always @(posedge clk)				// videocounter increase window
 	begin
 	if(enabledisplay)
 		begin
-		if(hpos_296 | shiftcount==6'd40)
+		if(hpos_296)// | shiftcount==6'd40)
 			inc_videocounter<=0;
 		else if(hpos_432)
 			inc_videocounter<=1;
@@ -799,7 +799,11 @@ always @(posedge clk)
 		begin
 		if(inc_videocounter)
 			begin
-			if(badline2) begin
+			if(badline) begin										// during badline1 load this buffer together with attribute buffer. Needed for FLI trick
+				char_buf[0]<=data_in;
+				nextchar<=char_buf[39];
+				end
+			else if(badline2) begin
 				char_buf[0]<=data_in;
 				nextchar<=data_in;
 				end
