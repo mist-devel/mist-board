@@ -77,14 +77,14 @@ parameter CONF_STR = {
         "F,ROM,Load Kernal;",
         "T6,Play/Stop tape;",
         "O7,Tape sound,Off,On;",
-        "O2,Scanlines,Off,On;",
+        "O12,Scanlines,Off,25%,50%,75%;",
         "O3,Joysticks,Normal,Swapped;",
         "O4,Memory,64k,16k;",
         "O89,SID,Off,6581,8580;",
         "T5,Reset;"
 };
 
-parameter CONF_STR_LEN = 11+17+18+18+21+20+28+18+22+9;
+parameter CONF_STR_LEN = 11+17+18+18+21+30+28+18+22+9;
 
 localparam ROM_MEM_START = 25'h10000;
 localparam TAP_MEM_START = 25'h20000;
@@ -104,7 +104,8 @@ assign UART_TX = ~cass_motor;
 wire [31:0] status;
 wire tv15khz;
 wire ypbpr;
-wire scanlines = status[2];
+wire no_csync;
+wire [1:0] scanlines = status[2:1];
 wire joystick_swap = status[3];
 wire memory_16k = status[4];
 wire osd_reset = status[5];
@@ -274,58 +275,54 @@ wire img_mounted;
 wire [8:0] sd_buff_addr;
 
 // include user_io module for arm controller communication
-user_io #(.STRLEN(CONF_STR_LEN)) user_io ( 
-      .conf_str       ( CONF_STR       ),
+user_io #(.STRLEN(CONF_STR_LEN)) user_io (
+	.conf_str       ( CONF_STR       ),
 
-      .clk_sys        ( clk28          ),
-		.clk_sd         ( clk32          ),
+	.clk_sys        ( clk28          ),
+	.clk_sd         ( clk32          ),
 
-      .SPI_CLK        ( SPI_SCK        ),
-      .SPI_SS_IO      ( CONF_DATA0     ),
-      .SPI_MISO       ( SPI_DO         ),
-      .SPI_MOSI       ( SPI_DI         ),
+	.SPI_CLK        ( SPI_SCK        ),
+	.SPI_SS_IO      ( CONF_DATA0     ),
+	.SPI_MISO       ( SPI_DO         ),
+	.SPI_MOSI       ( SPI_DI         ),
 
-		.scandoubler_disable ( tv15khz   ),
-		.ypbpr          ( ypbpr          ),
-		.buttons        ( buttons        ),
+	.scandoubler_disable ( tv15khz   ),
+	.ypbpr          ( ypbpr          ),
+	.no_csync       ( no_csync       ),
+	.buttons        ( buttons        ),
 
-		.joystick_0     ( js0            ),
-		.joystick_1     ( js1            ),
+	.joystick_0     ( js0            ),
+	.joystick_1     ( js1            ),
 		
-      // ps2 interface
-      .ps2_kbd_clk    ( ps2_kbd_clk    ),
-      .ps2_kbd_data   ( ps2_kbd_data   ),
-      .ps2_mouse_clk  ( ps2_mouse_clk  ),
-      .ps2_mouse_data ( ps2_mouse_data ),
+	// ps2 interface
+	.ps2_kbd_clk    ( ps2_kbd_clk    ),
+	.ps2_kbd_data   ( ps2_kbd_data   ),
+	.ps2_mouse_clk  ( ps2_mouse_clk  ),
+	.ps2_mouse_data ( ps2_mouse_data ),
 
-      .sd_lba         ( sd_lba ),
-      .sd_rd          ( sd_rd ),
-      .sd_wr          ( sd_wr ),
-      .sd_ack         ( sd_ack ),
-		.sd_ack_conf    ( sd_ack_conf ),
-      .sd_conf        ( sd_conf ),
-      .sd_sdhc        ( sd_sdhc ),
-      .sd_dout        ( sd_dout ),
-      .sd_dout_strobe ( sd_dout_strobe ),
-      .sd_din         ( sd_din ),
-      .sd_din_strobe  ( sd_din_strobe ),
-		.sd_buff_addr	 ( sd_buff_addr),
-      .img_mounted    ( img_mounted ),
+	.sd_lba         ( sd_lba         ),
+	.sd_rd          ( sd_rd          ),
+	.sd_wr          ( sd_wr          ),
+	.sd_ack         ( sd_ack         ),
+	.sd_ack_conf    ( sd_ack_conf    ),
+	.sd_conf        ( sd_conf        ),
+	.sd_sdhc        ( sd_sdhc        ),
+	.sd_dout        ( sd_dout        ),
+	.sd_dout_strobe ( sd_dout_strobe ),
+	.sd_din         ( sd_din         ),
+	.sd_din_strobe  ( sd_din_strobe  ),
+	.sd_buff_addr   ( sd_buff_addr   ),
+	.img_mounted    ( img_mounted    ),
 
-      .status         ( status         )
+	.status         ( status         )
 );
-
-wire sd_cs;
-wire sd_dat;
-wire sd_cmd;
-wire sd_clk;
 
 // ---------------------------------------------------------------------------------
 // ------------------------------ prg memory injection -----------------------------
 // ---------------------------------------------------------------------------------
 
 wire ioctl_wr;
-wire [15:0] ioctl_addr;
+wire [24:0] ioctl_addr;
 wire [7:0] ioctl_data;
 wire [7:0] ioctl_index;
 wire ioctl_downloading;
@@ -337,18 +334,18 @@ wire tap_download = ioctl_downloading && (ioctl_index == 8'h41);
 wire c16_wait = rom_download | prg_download;
 
 data_io data_io (
-      // SPI interface
-      .sck ( SPI_SCK ),
-      .ss  ( SPI_SS2 ),
-      .sdi ( SPI_DI  ),
-			
-      // ram interface
-		.downloading ( ioctl_downloading ),
-      .index ( ioctl_index ),
-      .clk   ( clk28 ),
-      .wr    ( ioctl_wr ),
-      .a     ( ioctl_addr ),
-      .d     ( ioctl_data )
+	.clk_sys        ( clk28 ),
+	// SPI interface
+	.SPI_SCK        ( SPI_SCK ),
+	.SPI_SS2        ( SPI_SS2 ),
+	.SPI_DI         ( SPI_DI  ),
+
+	// ram interface
+	.ioctl_download ( ioctl_downloading ),
+	.ioctl_index    ( ioctl_index ),
+	.ioctl_wr       ( ioctl_wr ),
+	.ioctl_addr     ( ioctl_addr ),
+	.ioctl_dout     ( ioctl_data )
 );
 
 // magic zero page shadow registers to allow the injector to set the
@@ -429,18 +426,18 @@ always @(posedge clk28) begin
 	// data io has a byte for us
 	if(ioctl_wr) begin
 		if (prg_download) begin
-			if(ioctl_addr == 16'h0000) ioctl_sdram_addr[7:0] <= ioctl_data;
-			else if (ioctl_addr == 16'h0001) ioctl_sdram_addr[24:8] <= { 9'b0, ioctl_data };
+			if(ioctl_addr == 0) ioctl_sdram_addr[7:0] <= ioctl_data;
+			else if (ioctl_addr == 25'h1) ioctl_sdram_addr[24:8] <= { 9'b0, ioctl_data };
 			else 
 				// io controller sent a new byte. Store it until it can be
 				// saved in RAM
 				ioctl_ram_wr <= 1'b1;
 		end else if (tap_download) begin
-			if(ioctl_addr == 16'h0000) ioctl_sdram_addr <= TAP_MEM_START;
+			if(ioctl_addr == 0) ioctl_sdram_addr <= TAP_MEM_START;
 			ioctl_ram_wr <= 1'b1;
 		end else if (rom_download) begin
-			if((ioctl_index == 8'h0 && ioctl_addr == 16'h4000) || (ioctl_index == 8'h3 && ioctl_addr == 16'h0000)) ioctl_sdram_addr <= ROM_MEM_START;
-			if((ioctl_index == 8'h0 && ioctl_addr[15:14]) || ioctl_index == 8'h3) ioctl_ram_wr <= 1'b1;
+			if((ioctl_index == 8'h0 && ioctl_addr == 25'h4000) || (ioctl_index == 8'h3 && ioctl_addr == 0)) ioctl_sdram_addr <= ROM_MEM_START;
+			if((ioctl_index == 8'h0 && ioctl_addr[16:14] != 0) || ioctl_index == 8'h3) ioctl_ram_wr <= 1'b1;
 		end
 	end
 
@@ -521,90 +518,54 @@ c1530 c1530
 );
 
 // ---------------------------------------------------------------------------------
-// ------------------------------ the on screen display ----------------------------
+// ---------------------------------- video output ---------------------------------
 // ---------------------------------------------------------------------------------
-	
-// in 15khz mode feed the c16 video directly into the OSD,
-// bypassing the scan doubler
-wire [5:0] osd_r_in = tv15khz?{c16_r, 2'b00}:video_r;
-wire [5:0] osd_g_in = tv15khz?{c16_g, 2'b00}:video_g;
-wire [5:0] osd_b_in = tv15khz?{c16_b, 2'b00}:video_b;
-wire osd_hs_in = tv15khz?c16_hs:video_hs;
-wire osd_vs_in = tv15khz?!c16_vs:video_vs;
+wire hs, vs;
 
-wire osd_clk = tv15khz?clk7:clk14;
+mist_video #(.COLOR_DEPTH(4), .OSD_COLOR(3'd5), .SD_HCNT_WIDTH(10)) mist_video (
+	.clk_sys     ( clk28      ),
 
-wire [5:0] red, green, blue;
+	// OSD SPI interface
+	.SPI_SCK     ( SPI_SCK    ),
+	.SPI_SS3     ( SPI_SS3    ),
+	.SPI_DI      ( SPI_DI     ),
 
-// include the on screen display
-osd #(10'd11,10'd0,3'd5) osd (
-   .clk_sys    ( clk28        ),
-   .ce_pix     ( osd_clk      ),
+	// scanlines (00-none 01-25% 10-50% 11-75%)
+	.scanlines   ( scanlines  ),
 
-   // spi for OSD
-   .sdi        ( SPI_DI       ),
-   .sck        ( SPI_SCK      ),
-   .ss         ( SPI_SS3      ),
+	// non-scandoubled pixel clock divider 0 - clk_sys/4, 1 - clk_sys/2
+	.ce_divider  ( 1'b0       ),
 
-   .red_in     ( osd_r_in     ),
-   .green_in   ( osd_g_in     ),
-   .blue_in    ( osd_b_in     ),
-   .hs_in      ( osd_hs_in    ),
-   .vs_in      ( osd_vs_in    ),
+	// 0 = HVSync 31KHz, 1 = CSync 15KHz
+	.scandoubler_disable ( tv15khz ),
+	// disable csync without scandoubler
+	.no_csync    ( no_csync   ),
+	// YPbPr always uses composite sync
+	.ypbpr       ( ypbpr      ),
+	// Rotate OSD [0] - rotate [1] - left or right
+	.rotate      ( 2'b00      ),
+	// composite-like blending
+	.blend       ( 1'b0       ),
 
-   .red_out    ( red          ),
-   .green_out  ( green        ),
-   .blue_out   ( blue         )
+	// video in
+	.R           ( c16_r      ),
+	.G           ( c16_g      ),
+	.B           ( c16_b      ),
+
+	.HSync       ( c16_hs     ),
+	.VSync       ( ~c16_vs    ),
+
+	// MiST video output signals
+	.VGA_R       ( VGA_R      ),
+	.VGA_G       ( VGA_G      ),
+	.VGA_B       ( VGA_B      ),
+	.VGA_VS      ( vs         ),
+	.VGA_HS      ( hs         )
 );
 
-wire [5:0] y, pb, pr;
-rgb2ypbpr rgb2ypbpr (
-	.red   ( red   ),
-	.green ( green ),
-	.blue  ( blue  ),
-
-	.y     ( y     ),
-	.pb    ( pb    ),
-	.pr    ( pr    )
-);
-
-assign VGA_R  = ypbpr ? pr :   red;
-assign VGA_G  = ypbpr ? y  : green;
-assign VGA_B  = ypbpr ? pb :  blue;
-
-// in 15khz tv mode directly use the c16's composite sync. Otherwise the VGA
-// output is driven from the sync signals generated by the scan doubler. In
-// 15khz mode the VS signal is used as the RGB detect signal on the SCART 
-// connector and thus needs to be driven to 1
-assign VGA_HS = tv15khz ? c16_cs:(ypbpr ? ~(video_hs ^ video_vs) : video_hs);
-assign VGA_VS = (tv15khz || ypbpr)?1'b1:video_vs;
-
-wire video_hs, video_vs;
-wire [5:0] video_r;
-wire [5:0] video_g;
-wire [5:0] video_b;
-
-scandoubler scandoubler (
-	// system interface
-	.clk_sys   ( clk28 ),
-
-   // scanlines (00-none 01-25% 10-50% 11-75%)
-   .scanlines ( scanlines?2'b10:2'b00 ),
-
-   // shifter video interface
-	.hs_in     ( c16_hs ),
-	.vs_in     ( !c16_vs ),
-	.r_in      ( c16_r ),
-	.g_in      ( c16_g ),
-	.b_in      ( c16_b ),
-
-    // output interface
-	.hs_out    ( video_hs ),
-   .vs_out    ( video_vs ),
-   .r_out     ( video_r  ),
-   .g_out     ( video_g  ),
-   .b_out     ( video_b  )
-);
+// Use TED generated csync @15kHz
+assign VGA_HS = (~no_csync & tv15khz & ~ypbpr) ? c16_cs : hs;
+assign VGA_VS = (~no_csync & tv15khz & ~ypbpr) ? 1'b1 : vs;
 
 // ---------------------------------------------------------------------------------
 // ------------------------------------ c16 core -----------------------------------
@@ -631,14 +592,14 @@ reg [13:0] rom_dl_addr;
 wire ioctl_rom_wr = rom_download && ioctl_wr;
 
 always @(negedge clk28) begin
-   reg last_ioctl_rom_wr;
+	reg last_ioctl_rom_wr;
 	last_ioctl_rom_wr <= ioctl_rom_wr;
 	if(ioctl_rom_wr && !last_ioctl_rom_wr) begin
 		rom_dl_data  <= ioctl_data;
 		rom_dl_addr  <= ioctl_addr[13:0];
-		c1541_dl_wr  <= !ioctl_addr[15:14] && ioctl_index == 5'd0;
-		kernal_dl_wr <= ioctl_addr[15:14] == 2'd1 || ioctl_index == 5'd3;
-		basic_dl_wr  <= ioctl_addr[15:14] == 2'd2 && ioctl_index == 5'd0;
+		c1541_dl_wr  <= ioctl_addr[16:14] == 3'd0 && ioctl_index == 8'h0;
+		kernal_dl_wr <= ioctl_addr[16:14] == 3'd1 || ioctl_index == 8'h3;
+		basic_dl_wr  <= ioctl_addr[16:14] == 3'd2 && ioctl_index == 8'h0;
 	end else
 		{ kernal_dl_wr, basic_dl_wr, c1541_dl_wr } <= 0;
 end
@@ -723,19 +684,6 @@ C16 #(.INTERNAL_ROM(0)) c16 (
 // Switching the clocks may crash the system. We might need to force a reset it.
 wire pll_locked = pll_c1541_locked && pll_c16_locked;
 wire ntsc = ~c16_pal;
-
-// tv15hkz has quarter the pixel rate, so we need a 7mhz clock for the OSD
-reg clk7;
-reg clk14;
-
-always @(posedge clk28) begin
-
-   reg [1:0] counter;
-
-	counter <= counter + 1'd1;
-	clk7    <= !counter;
-	clk14   <= !counter[0];
-end
 
 // A PLL to derive the system clock from the MiSTs 27MHz
 wire pll_c1541_locked, clk32;

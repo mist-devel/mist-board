@@ -1,0 +1,3 @@
+[submodule "mist-modules"]
+	path = mist-modules
+	url = https://github.com/mist-devel/mist-modules.git
