@@ -161,35 +161,35 @@ reg [15:0] flags_out = 0;
 
 reg [4:0] prgbank;
 reg [1:0] chrbank;
-reg [2:0] mirror;
-wire four_screen = (mirror[2:1] == 2'b11);
+reg nametable;
+wire four_screen = flags[16] && flags[14];
 
 always @(posedge clk) begin
 	if (~enable) begin
-		// Set value for mirroring
-		mirror[2:1] <= {flags[16], flags[14]};
+		prgbank   <= 0;
+		chrbank   <= 0;
+		nametable <= 0;
 	end else if (ce) begin
 		if (prg_ain[15] & prg_write) begin
-			{mirror[0], chrbank, prgbank}   <= prg_din[7:0];
+			{nametable, chrbank, prgbank}   <= prg_din[7:0];
 		end
 	end
 end
 
 always begin
 	// mirroring mode
-	casez({mirror[2:1],chr_ain[13]})
-		3'b001   :   vram_a10 = {chr_ain[11]};    // horizontal
-		3'b011   :   vram_a10 = {chr_ain[10]};    // vertical
-		3'b101   :   vram_a10 = {mirror[0]};      // 1 screen
-		3'b111   :   vram_a10 = {chr_ain[10]};    // 4 screen
-		default  :   vram_a10 = {chr_ain[10]};    // pattern table
+	casez({flags[16], flags[14]})
+		3'b00   :   vram_a10 = chr_ain[11];    // horizontal
+		3'b01   :   vram_a10 = chr_ain[10];    // vertical
+		3'b10   :   vram_a10 = nametable;      // 1 screen
+		default :   vram_a10 = chr_ain[10];    // 4 screen
 	endcase
 end
 
-assign prg_aout = {3'b000, prg_ain[14] ? 5'b11111 : prgbank, prg_ain[13:0]};
+assign prg_aout = {3'b000, (prg_ain[15:14] == 2'b11) ? 5'b11111 : prgbank, prg_ain[13:0]};
 assign prg_allow = prg_ain[15] && !prg_write;
 assign chr_allow = flags[15];
-assign chr_aout = {flags[15] ? 7'b11_1111_1 : 7'b10_0000_0, (four_screen && (chr_ain[13])) ? 2'b11 : chrbank, chr_ain[12:11], vram_a10, chr_ain[9:0]};
+assign chr_aout = {flags[15] ? 7'b11_1111_1 : 7'b10_0000_0, (four_screen && chr_ain[13]) ? 2'b11 : chrbank, chr_ain[12:0]};
 assign vram_ce = chr_ain[13] && !four_screen;
 
 endmodule
