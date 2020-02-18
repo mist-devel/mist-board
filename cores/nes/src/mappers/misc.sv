@@ -285,7 +285,7 @@ wire [7:0] ram_addr;
 wire ram_read;
 assign mapper_addr[17:8] = 0;
 assign mapper_addr[7:0] = ram_addr;
-assign mapper_ovr = 1'b1;
+assign mapper_ovr = mapper159 || submapper5;
 
 EEPROM_24C0x eeprom(
 	.type_24C01(mapper159),         //24C01 is 128 bytes, 24C02 is 256 bytes
@@ -1792,7 +1792,6 @@ wire [7:0] prg_dout;
 wire prg_allow, chr_allow;
 wire vram_ce, vram_a10;
 wire [15:0] audio = audio_in;
-wire [18:15] ramprgaout;
 wire irq;
 
 reg [15:0] flags_out = 0;
@@ -1822,5 +1821,217 @@ assign chr_allow = 1'b1;
 assign prg_dout = 8'hFF;
 assign vram_ce = 1'b0;
 assign irq = 1'b0;
+
+endmodule
+
+
+// 83 Cony/Yoko - Unlicensed fighting game bootlegs
+// Street Fighter II Pro, Fatal Fury 2, World Heroes 2
+module Mapper83(
+	input        clk,         // System clock
+	input        ce,          // M2 ~cpu_clk
+	input        enable,      // Mapper enabled
+	input [31:0] flags,       // Cart flags
+	input [15:0] prg_ain,     // prg address
+	inout [21:0] prg_aout_b,  // prg address out
+	input        prg_read,    // prg read
+	input        prg_write,   // prg write
+	input  [7:0] prg_din,     // prg data in
+	inout  [7:0] prg_dout_b,  // prg data out
+	inout        prg_allow_b, // Enable access to memory for the specified operation.
+	input [13:0] chr_ain,     // chr address in
+	inout [21:0] chr_aout_b,  // chr address out
+	input        chr_read,    // chr ram read
+	inout        chr_allow_b, // chr allow write
+	inout        vram_a10_b,  // Value for A10 address line
+	inout        vram_ce_b,   // True if the address should be routed to the internal 2kB VRAM.
+	inout        irq_b,       // IRQ
+	input [15:0] audio_in,    // Inverted audio from APU
+	inout [15:0] audio_b,     // Mixed audio output
+	inout [15:0] flags_out_b  // flags {0, 0, 0, 0, 0, prg_conflict, prg_bus_write, has_chr_dout}
+);
+
+assign prg_aout_b   = enable ? prg_aout : 22'hZ;
+assign prg_dout_b   = enable ? prg_dout : 8'hZ;
+assign prg_allow_b  = enable ? prg_allow : 1'hZ;
+assign chr_aout_b   = enable ? chr_aout : 22'hZ;
+assign chr_allow_b  = enable ? chr_allow : 1'hZ;
+assign vram_a10_b   = enable ? vram_a10 : 1'hZ;
+assign vram_ce_b    = enable ? vram_ce : 1'hZ;
+assign irq_b        = enable ? irq : 1'hZ;
+assign flags_out_b  = enable ? flags_out : 16'hZ;
+assign audio_b      = enable ? audio : 16'hZ;
+
+wire [21:0] prg_aout, chr_aout;
+reg [7:0] prg_dout;
+wire prg_allow, chr_allow;
+wire vram_ce, vram_a10;
+wire [15:0] audio = audio_in;
+wire [15:0] flags_out = {14'h0, prg_bus_write, 1'h0};
+wire prg_bus_write;
+
+wire submapper1 = flags[21];
+wire submapper2 = flags[22];
+
+// mode register bits
+reg [1:0] prgbank_mode; // determines PRG banking mode
+reg [1:0] mirroring;
+reg prg_reg3_enable;    // if 1, maps 8 KiB PRG bank to 0x6000-0x7FFF for submapper 0 and 1
+reg irq_mode, irq_latch;
+
+reg irq;
+reg irq_enable;
+reg [15:0] irq_counter;
+
+reg [4:0] prgbank_reg[3:0];
+reg [3:0] prgbank_reg4;
+reg [7:0] chrbank_reg[7:0];
+
+reg [1:0] dipswitch; // alters title screen, wrong dipswitch can result in garbled graphics
+
+reg [7:0] scratch_ram[3:0];
+
+// Submapper 2 only
+// outer 256 KiB PRG/CHR-ROM bank
+reg [1:0] outer_bank;
+// select 8 KiB WRAM bank
+reg [1:0] wrambank;
+
+always@(posedge clk) begin
+    if (~enable) begin
+        {irq, irq_mode, irq_latch, irq_enable, irq_counter} <= 0;
+        {prg_reg3_enable, prgbank_mode, mirroring}          <= 0;
+        outer_bank   <= 0;
+        wrambank     <= 0;
+        dipswitch    <= 0;
+        chrbank_reg  <= '{default:0};
+        prgbank_reg  <= '{default:0};
+        prgbank_reg4 <= 0;
+        scratch_ram  <= '{default:0};
+    end else if(ce) begin
+        if (prg_write) begin
+            casez(prg_ain[15:8])
+                8'b1???_??00 : begin
+                    {wrambank, outer_bank} <= prg_din[7:4];
+                    {prgbank_reg4}         <= prg_din[3:0];
+                end
+                8'b1???_??01 : begin
+                    {irq_latch, irq_mode, prg_reg3_enable, prgbank_mode} <= prg_din[7:3];
+                    mirroring <= prg_din[1:0];
+                end
+                8'b1???_??10 : begin
+                    if (prg_ain[0]) begin
+                        irq_counter[15:8] <= prg_din;
+                        irq_enable        <= irq_latch;
+                    end else begin
+                        irq_counter[7:0]  <= prg_din;
+                        irq               <= 1'b0; // IRQ ACK
+                    end
+                end
+                8'b1???_??11 : begin
+                    if (prg_ain[4]) begin
+                        if (!prg_ain[3])
+                            chrbank_reg[prg_ain[2:0]] <= prg_din;
+                    end else
+                        prgbank_reg[prg_ain[1:0]] <= prg_din[4:0];
+                end
+                8'b0101_???? : begin
+                    if (|prg_ain[11:8])
+                        scratch_ram[prg_ain[1:0]] <= prg_din;
+                end
+            endcase
+        end
+
+        if (irq_enable) begin
+            if (irq_mode)
+                irq_counter <= irq_counter - 16'd1;
+            else
+                irq_counter <= irq_counter + 16'd1;
+        end
+
+        if (irq_enable && (irq_counter == 16'h0000)) begin
+            irq        <= 1'b1;
+            irq_enable <= 1'b0;
+        end
+    end
+end
+
+always_comb begin
+    // mirroring
+    casez(mirroring[1:0])
+        2'b00:   vram_a10 = {chr_ain[10]};    // vertical
+        2'b01:   vram_a10 = {chr_ain[11]};    // horizontal
+        2'b1?:   vram_a10 = {mirroring[0]};   // single screen
+    endcase
+end
+
+// PRG address space mapping
+reg [4:0] prgsel;
+always_comb begin
+    casez ({prgbank_mode, prg_ain[15:13]})
+        // mode 0
+        5'b00_10? : prgsel = {prgbank_reg4, prg_ain[13]}; // 0x8000-0xBFFF
+        5'b00_11? : prgsel = {4'b1111,      prg_ain[13]}; // 0xC000-0xFFFF
+        // mode 1
+        5'b01_1?? : prgsel = {prgbank_reg4[3:1], prg_ain[14:13]}; // 0x8000-0xFFFF
+        // mode 2 and 3
+        5'b1?_100 : prgsel = prgbank_reg[0]; // 0x8000-0x9FFF
+        5'b1?_101 : prgsel = prgbank_reg[1]; // 0xA000-0xBFFF
+        5'b1?_110 : prgsel = prgbank_reg[2]; // 0xC000-0xDFFF
+        5'b1?_111 : prgsel = 5'b11_111;      // 0xE000-0xFFFF
+        // all modes
+        5'b??_011 : prgsel = prgbank_reg[3]; // 0x6000-0x7FFF
+        default   : prgsel = {2'd0, prg_ain[15:13]};
+    endcase
+end
+
+// CHR address space mapping
+reg [9:0] chrsel;
+always_comb begin
+    chrsel = 0;
+    casez({submapper1, chr_ain[13:11]})
+        // submapper 1
+        4'b1_000 : chrsel = {1'b0, chrbank_reg[0], chr_ain[10]};
+        4'b1_001 : chrsel = {1'b0, chrbank_reg[1], chr_ain[10]};
+        4'b1_010 : chrsel = {1'b0, chrbank_reg[6], chr_ain[10]};
+        4'b1_011 : chrsel = {1'b0, chrbank_reg[7], chr_ain[10]};
+        // submapper 0 and 2
+        4'b0_0?? : chrsel = {submapper2 ? outer_bank : 2'b00, chrbank_reg[chr_ain[12:10]]};
+        // all submappers
+        default   : chrsel = {6'd0, chr_ain[13:10]};
+    endcase
+end
+
+// handle reads from scratch RAM and dipswitch
+always_comb begin
+    casez(prg_ain[15:12])
+        4'h5 : begin
+            if (|prg_ain[11:8]) begin
+                prg_dout = scratch_ram[prg_ain[1:0]];
+            end else
+                prg_dout = {6'b1111_11, dipswitch};
+        end
+        default : begin
+            prg_dout = 8'hFF;
+        end
+    endcase
+end
+
+wire prg_read_blocked = (prg_ain[15:13] == 3'b011) && !submapper2 && !prg_reg3_enable;
+assign prg_bus_write  = (prg_ain[15:12] == 4'h5) || prg_read_blocked;
+
+wire is_wram = submapper2 && (prg_ain[15:13] == 3'b011);
+
+assign chr_aout[21:20] = 2'b10;
+assign chr_aout[19:10] = chrsel;
+assign chr_aout[9:0]   = chr_ain[9:0];
+
+assign prg_aout[21:18] = is_wram ? 4'b11_11 : {2'b00, submapper2 ? outer_bank : 2'b00};
+assign prg_aout[17:13] = is_wram ? {3'b00_0, wrambank} : prgsel;
+assign prg_aout[12:0]  = prg_ain[12:0];
+
+assign prg_allow = (prg_ain[15] && !prg_write) || is_wram;
+assign chr_allow = flags[15];
+assign vram_ce = chr_ain[13];
 
 endmodule
