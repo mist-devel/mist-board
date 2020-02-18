@@ -291,14 +291,12 @@ set_location_assignment PLL_1 -to clock_21mhz|altpll_component|auto_generated|pl
 set_global_assignment -name ENABLE_CONFIGURATION_PINS OFF
 set_global_assignment -name ENABLE_NCE_PIN OFF
 set_global_assignment -name ENABLE_BOOT_SEL_PIN OFF
+set_global_assignment -name QIP_FILE "../../mist-modules/mist.qip"
 set_global_assignment -name SYSTEMVERILOG_FILE mist/NES_mist.sv
 set_global_assignment -name VERILOG_FILE mist/ps2_intf.v
 set_global_assignment -name VERILOG_FILE mist/keyboard.v
 set_global_assignment -name VERILOG_FILE mist/sigma_delta_dac.v
-set_global_assignment -name VERILOG_FILE mist/data_io.v
 set_global_assignment -name VERILOG_FILE mist/sdram.v
-set_global_assignment -name VERILOG_FILE mist/user_io.v
-set_global_assignment -name VERILOG_FILE mist/osd.v
 set_global_assignment -name VERILOG_FILE mist/clk.v
 set_global_assignment -name SDC_FILE mist/constraints.sdc
 set_global_assignment -name VERILOG_FILE src/nes.v
@@ -306,9 +304,7 @@ set_global_assignment -name SYSTEMVERILOG_FILE src/cart.sv
 set_global_assignment -name SYSTEMVERILOG_FILE src/apu.sv
 set_global_assignment -name SYSTEMVERILOG_FILE src/ppu.sv
 set_global_assignment -name VERILOG_FILE src/compat.v
-set_global_assignment -name SYSTEMVERILOG_FILE src/video_mixer.sv
 set_global_assignment -name VERILOG_FILE src/video.v
-set_global_assignment -name VERILOG_FILE src/hq2x.v
 set_global_assignment -name VERILOG_FILE src/dsp.v
 set_global_assignment -name VHDL_FILE src/dpram.vhd
 set_global_assignment -name SYSTEMVERILOG_FILE src/EEPROM_24C0x.sv

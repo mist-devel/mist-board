@@ -71,7 +71,7 @@ module GameLoader(input clk, input reset,
       // Read 16 bytes of ines header
       0: if (indata_clk) begin
 			  error <= 0;
-           ctr <= ctr + 1;
+           ctr <= ctr + 1'd1;
            ines[ctr] <= indata;
            bytes_left <= {prgrom, 14'b0};
            if (ctr == 4'b1111)
@@ -81,8 +81,8 @@ module GameLoader(input clk, input reset,
       1, 2: begin // Read the next |bytes_left| bytes into |mem_addr|
           if (bytes_left != 0) begin
             if (indata_clk) begin
-              bytes_left <= bytes_left - 1;
-              mem_addr <= mem_addr + 1;
+              bytes_left <= bytes_left - 1'd1;
+              mem_addr <= mem_addr + 1'd1;
             end
           end else if (state == 1) begin
             state <= 2;
@@ -150,8 +150,7 @@ module NES_mist(
 parameter CONF_STR = {
 			"NES;NES;",
 			"O12,System Type,NTSC,PAL,Dendy;",
-			"O3,HQ2X(VGA-Only),OFF,ON;",
-			"O4,Scanlines,OFF,ON;",
+			"O34,Scanlines,OFF,25%,50%,75%;",
 			"O5,Joystick swap,OFF,ON;",
 			"O6,Invert mirroring,OFF,ON;",
 			"O7,Hide overscan,OFF,ON;",
@@ -164,8 +163,8 @@ wire [31:0] status;
 
 wire arm_reset = status[0];
 wire [1:0] system_type = status[2:1];
-wire smoothing_osd = status[3];
-wire scanlines_osd = status[4];
+wire pal_video = |system_type;
+wire [1:0] scanlines = status[4:3];
 wire joy_swap = status[5];
 wire mirroring_osd = status[6];
 wire overscan_osd = status[7];
@@ -174,6 +173,7 @@ wire reset_osd = status[9];
 
 wire scandoubler_disable;
 wire ypbpr;
+wire no_csync;
 wire ps2_kbd_clk, ps2_kbd_data;
 
 wire [7:0] core_joy_A;
@@ -195,6 +195,7 @@ user_io #(.STRLEN($size(CONF_STR)>>3)) user_io(
    .buttons(buttons),
    .scandoubler_disable(scandoubler_disable),
    .ypbpr(ypbpr),
+   .no_csync(no_csync),
 
    .joystick_0(core_joy_A),
    .joystick_1(core_joy_B),
@@ -208,10 +209,8 @@ user_io #(.STRLEN($size(CONF_STR)>>3)) user_io(
 wire [7:0] joyA = joy_swap ? core_joy_B : core_joy_A;
 wire [7:0] joyB = joy_swap ? core_joy_A : core_joy_B;
 
-wire [7:0] nes_joy_A = (reset_nes || osd_visible) ? 8'd0 : 
-							  { joyA[0], joyA[1], joyA[2], joyA[3], joyA[7], joyA[6], joyA[5], joyA[4] } | kbd_joy0;
-wire [7:0] nes_joy_B = (reset_nes || osd_visible) ? 8'd0 : 
-							  { joyB[0], joyB[1], joyB[2], joyB[3], joyB[7], joyB[6], joyB[5], joyB[4] } | kbd_joy1;
+wire [7:0] nes_joy_A = { joyA[0], joyA[1], joyA[2], joyA[3], joyA[7], joyA[6], joyA[5], joyA[4] } | kbd_joy0;
+wire [7:0] nes_joy_B = { joyB[0], joyB[1], joyB[2], joyB[3], joyB[7], joyB[6], joyB[5], joyB[4] } | kbd_joy1;
  
   wire clock_locked;
   wire clk85;
@@ -305,8 +304,6 @@ wire [7:0] nes_joy_B = (reset_nes || osd_visible) ? 8'd0 :
 	end
  
 	assign LED = downloading ? 1'b0 : loader_fail ? led_blink[23] : 1'b1;
-
-  wire osd_visible;
 
   wire reset_nes = (init_reset || buttons[1] || arm_reset || reset_osd || download_reset || loader_fail);
 
@@ -407,43 +404,79 @@ sdram sdram (
 wire downloading;
 
 data_io data_io (
-	.sck            ( SPI_SCK      ),
-	.ss             ( SPI_SS2      ),
-	.sdi            ( SPI_DI       ),
+	.clk_sys        ( clk          ),
 
-	.downloading    ( downloading  ),
-	.size           (              ),
+	.SPI_SCK        ( SPI_SCK      ),
+	.SPI_SS2        ( SPI_SS2      ),
+	.SPI_DI         ( SPI_DI       ),
+
+	.ioctl_download ( downloading  ),
 
    // ram interface
-	.clk            ( clk          ),
-	.wr             ( loader_clk   ),
-	.a              (              ),
-	.d              ( loader_input )
+	.ioctl_wr       ( loader_clk   ),
+	.ioctl_dout     ( loader_input )
 );
+
+wire nes_hs, nes_vs;
+wire [4:0] nes_r;
+wire [4:0] nes_g;
+wire [4:0] nes_b;
 
 video video (
 	.clk(clk),
-	.sdi(SPI_DI),
-	.sck(SPI_SCK),
-	.ss(SPI_SS3),
-		
 	.color(color),
 	.count_v(scanline),
 	.count_h(cycle),
-	.mode(scandoubler_disable),
-	.ypbpr(ypbpr),
-	.smoothing(!smoothing_osd),
-	.scanlines(scanlines_osd),
+	.pal_video(pal_video),
 	.overscan(overscan_osd),
 	.palette(palette2_osd),
-	
-	.VGA_HS(VGA_HS),
-	.VGA_VS(VGA_VS),
-	.VGA_R(VGA_R),
-	.VGA_G(VGA_G),
-	.VGA_B(VGA_B),
-	
-	.osd_visible(osd_visible)
+
+	.sync_h(nes_hs),
+	.sync_v(nes_vs),
+	.r(nes_r),
+	.g(nes_g),
+	.b(nes_b)
+);
+
+mist_video #(.COLOR_DEPTH(5), .OSD_COLOR(3'd5), .SD_HCNT_WIDTH(10)) mist_video (
+	.clk_sys     ( clk        ),
+
+	// OSD SPI interface
+	.SPI_SCK     ( SPI_SCK    ),
+	.SPI_SS3     ( SPI_SS3    ),
+	.SPI_DI      ( SPI_DI     ),
+
+	// scanlines (00-none 01-25% 10-50% 11-75%)
+	.scanlines   ( scanlines  ),
+
+	// non-scandoubled pixel clock divider 0 - clk_sys/4, 1 - clk_sys/2
+	.ce_divider  ( 1'b0       ),
+
+	// 0 = HVSync 31KHz, 1 = CSync 15KHz
+	.scandoubler_disable ( scandoubler_disable ),
+	// disable csync without scandoubler
+	.no_csync    ( no_csync   ),
+	// YPbPr always uses composite sync
+	.ypbpr       ( ypbpr      ),
+	// Rotate OSD [0] - rotate [1] - left or right
+	.rotate      ( 2'b00      ),
+	// composite-like blending
+	.blend       ( 1'b0       ),
+
+	// video in
+	.R           ( nes_r      ),
+	.G           ( nes_g      ),
+	.B           ( nes_b      ),
+
+	.HSync       ( ~nes_hs    ),
+	.VSync       ( ~nes_vs    ),
+
+	// MiST video output signals
+	.VGA_R       ( VGA_R      ),
+	.VGA_G       ( VGA_G      ),
+	.VGA_B       ( VGA_B      ),
+	.VGA_VS      ( VGA_VS     ),
+	.VGA_HS      ( VGA_HS     )
 );
 
 assign AUDIO_R = audio;
