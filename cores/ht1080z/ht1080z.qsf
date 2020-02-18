@@ -41,7 +41,7 @@
 # ========================
 set_global_assignment -name ORIGINAL_QUARTUS_VERSION 13.1
 set_global_assignment -name PROJECT_CREATION_TIME_DATE "21:40:24  MAY 17, 2014"
-set_global_assignment -name LAST_QUARTUS_VERSION 13.1
+set_global_assignment -name LAST_QUARTUS_VERSION "13.1 SP4.26"
 set_global_assignment -name PROJECT_OUTPUT_DIRECTORY output_files
 set_global_assignment -name NUM_PARALLEL_PROCESSORS ALL
 set_global_assignment -name SMART_RECOMPILE ON
@@ -118,7 +118,6 @@ set_location_assignment PIN_66 -to SDRAM_nWE
 set_location_assignment PIN_59 -to SDRAM_nCS
 set_location_assignment PIN_33 -to SDRAM_CKE
 set_location_assignment PIN_43 -to SDRAM_CLK
-set_location_assignment PLL_1 -to "pll:pll|altpll:altpll_component"
 
 # Classic Timing Assignments
 # ==========================
@@ -329,7 +328,6 @@ set_global_assignment -name ALLOW_POWER_UP_DONT_CARE ON
 set_location_assignment PLL_1 -to clkmgr|altpll_component|auto_generated|pll1
 set_global_assignment -name USE_SIGNALTAP_FILE output_files/vid.stp
 set_global_assignment -name ADV_NETLIST_OPT_SYNTH_WYSIWYG_REMAP ON
-set_global_assignment -name QIP_FILE mist/mist.qip
 set_global_assignment -name VHDL_FILE videoctrl.vhd
 set_global_assignment -name VHDL_FILE YM2149_linmix.vhd
 set_global_assignment -name VERILOG_FILE sdram.v
@@ -341,4 +339,5 @@ set_global_assignment -name VHDL_FILE ht1080z.vhd
 set_global_assignment -name QIP_FILE pll.qip
 set_global_assignment -name SIGNALTAP_FILE output_files/vid.stp
 set_global_assignment -name QIP_FILE t80/T80.qip
+set_global_assignment -name QIP_FILE "../../mist-modules/mist.qip"
 set_instance_assignment -name PARTITION_HIERARCHY root_partition -to | -section_id Top

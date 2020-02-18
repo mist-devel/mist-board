@@ -83,18 +83,18 @@ end ht1080z;
 architecture Behavioral of ht1080z is
 
 component data_io
-  port ( sck, ss, sdi 	:	in std_logic;
+  port (
+    clk_sys : in std_logic;
 
-			-- download info
-			downloading  	:  out std_logic;
-			--size				:  out std_logic_vector(24 downto 0);
-			index				:  out std_logic_vector(4 downto 0);
-  
-			-- external ram interface
-			clk				:	in std_logic;
-			wr					:  out std_logic;
-			addr   			:  out std_logic_vector(24 downto 0);
-			data				:  out std_logic_vector(7 downto 0)
+    SPI_SCK, SPI_SS2, SPI_DI : in std_logic;
+    -- download info
+    ioctl_download : out std_logic;
+    ioctl_index    : out std_logic_vector(4 downto 0);
+
+    -- external ram interface
+    ioctl_wr       :  out std_logic;
+    ioctl_addr     :  out std_logic_vector(24 downto 0);
+    ioctl_dout     :  out std_logic_vector(7 downto 0)
 );
 end component data_io;
 
@@ -161,6 +161,7 @@ signal autores : std_logic;
   
 signal scandoubler_disable : std_logic;
 signal ypbpr : std_logic;
+signal no_csync : std_logic;
 signal buttons : std_logic_vector(1 downto 0);
 
 signal PS2CLK : std_logic;
@@ -403,40 +404,42 @@ begin
   user_io: work.mist.user_io
    generic map (STRLEN => CONF_STR'length)
    port map (
-		clk_sys   => clk42m,
+	    clk_sys   => clk42m,
 	    conf_str => to_slv(CONF_STR),
 	
-		SPI_CLK   => SPI_SCK    ,
+	    SPI_CLK   => SPI_SCK    ,
       SPI_SS_IO => CONF_DATA0 ,
       SPI_MISO  => SPI_DO     ,
       SPI_MOSI  => SPI_DI     ,
 
-		status    => status,
-		buttons   => buttons,
+	    status    => status,
+	    buttons   => buttons,
 		 
-		-- ps2 interface
-		ps2_kbd_clk    => ps2CLK,
-		ps2_kbd_data   => ps2DAT,
-		ps2_mouse_clk  => mps2CLK,
-		ps2_mouse_data => mps2DAT,
+	    -- ps2 interface
+	    ps2_kbd_clk    => ps2CLK,
+	    ps2_kbd_data   => ps2DAT,
+	    ps2_mouse_clk  => mps2CLK,
+	    ps2_mouse_data => mps2DAT,
 		 
-		joystick_0 => joy0,
-      joystick_1 => joy1,
+	    joystick_0 => joy0,
+	    joystick_1 => joy1,
 		
-		scandoubler_disable => scandoubler_disable,
-		ypbpr => ypbpr
+	    scandoubler_disable => scandoubler_disable,
+	    ypbpr => ypbpr,
+      no_csync => no_csync
 	); 
 
 mist_video : work.mist.mist_video
-	generic map (
-		SD_HCNT_WIDTH => 10,
-		OSD_COLOR => "110")
-	port map (
-		clk_sys => clk42m,
-		scandoubler_disable => scandoubler_disable,
-		scanlines => status(2 downto 1),
-		ypbpr   => ypbpr,
-		rotate  => "00",
+  generic map (
+    SD_HCNT_WIDTH => 10,
+    OSD_COLOR => "110")
+  port map (
+      clk_sys => clk42m,
+    scandoubler_disable => scandoubler_disable,
+    scanlines => status(2 downto 1),
+      ypbpr   => ypbpr,
+     no_csync => no_csync,
+      rotate  => "00",
       SPI_SCK => SPI_SCK,
       SPI_SS3 => SPI_SS3,
        SPI_DI => SPI_DI,
@@ -450,10 +453,10 @@ mist_video : work.mist.mist_video
         VGA_R => VGA_R,
         VGA_G => VGA_G,
         VGA_B => VGA_B,
-		 VGA_HS => VGA_HS,
-		 VGA_VS => VGA_VS
+       VGA_HS => VGA_HS,
+       VGA_VS => VGA_VS
 );
-  
+
   sdram_inst : sdram
     port map( sd_data => SDRAM_DQ,
               sd_addr => SDRAM_A,
@@ -485,22 +488,20 @@ mist_video : work.mist.mist_video
   SDRAM_DQMH <= sdram_dqm(1);
   SDRAM_DQML <= sdram_dqm(0); 	 
 
-  
   dataio : data_io
     port map (
-	   sck 	=> 	SPI_SCK,
-		ss    =>  	SPI_SS2,
-		sdi	=>		SPI_DI,
+    clk_sys        => clk42m,
+    SPI_SCK        => SPI_SCK,
+    SPI_SS2        => SPI_SS2,
+		SPI_DI         => SPI_DI,
 
-		downloading => dn_go,
-		--size        => ioctl_size,
-		index       => dn_idx,
+    ioctl_download => dn_go,
+    ioctl_index    => dn_idx,
 
-		-- ram interface
-		clk 	=> 	clk42m,
-		wr    =>    dn_wr,
-		addr  =>		dn_addr,
-		data  =>		dn_data	 
+    -- ram interface
+    ioctl_wr       => dn_wr,
+		ioctl_addr     => dn_addr,
+    ioctl_dout     => dn_data
 	 );
 
   process(clk42m)
@@ -510,7 +511,11 @@ mist_video : work.mist.mist_video
 	   if dn_wr='1' then
 		  dn_wr_new <= '1';
 		  dn_data_r <= dn_data;
-		  dn_addr_r <= dn_addr;
+			if dn_idx = x"00" then
+				dn_addr_r <= dn_addr;
+			else
+				dn_addr_r <= dn_addr + x"10000";
+			end if;
 		end if;
 		if clkref = '1' then
 			if dn_wr_new = '1' then
