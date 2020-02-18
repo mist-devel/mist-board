@@ -41,7 +41,7 @@ set_global_assignment -name DEVICE EP3C25E144C8
 set_global_assignment -name TOP_LEVEL_ENTITY bbc_mist_top
 set_global_assignment -name ORIGINAL_QUARTUS_VERSION 13.1
 set_global_assignment -name PROJECT_CREATION_TIME_DATE "13:11:51  AUGUST 27, 2015"
-set_global_assignment -name LAST_QUARTUS_VERSION 13.1
+set_global_assignment -name LAST_QUARTUS_VERSION "13.1 SP4.26"
 set_global_assignment -name PROJECT_OUTPUT_DIRECTORY output_files
 set_global_assignment -name MIN_CORE_JUNCTION_TEMP 0
 set_global_assignment -name MAX_CORE_JUNCTION_TEMP 85
@@ -55,10 +55,6 @@ set_global_assignment -name PARTITION_COLOR 16764057 -section_id Top
 set_global_assignment -name POWER_PRESET_COOLING_SOLUTION "23 MM HEAT SINK WITH 200 LFPM AIRFLOW"
 set_global_assignment -name POWER_BOARD_THERMAL_MODEL "NONE (CONSERVATIVE)"
 
-set_location_assignment PIN_22 -to CLOCK_50[0]
-set_location_assignment PIN_23 -to CLOCK_50[1]
-set_location_assignment PIN_128 -to CLOCK_32[0]
-set_location_assignment PIN_129 -to CLOCK_32[1]
 set_location_assignment PIN_54 -to CLOCK_27[0]
 set_location_assignment PIN_55 -to CLOCK_27[1]
 set_location_assignment PIN_144 -to VGA_R[5]
@@ -133,7 +129,7 @@ set_location_assignment PIN_65 -to AUDIO_L
 set_location_assignment PIN_80 -to AUDIO_R
 
 set_global_assignment -name ENABLE_SIGNALTAP OFF
-set_global_assignment -name USE_SIGNALTAP_FILE output_files/stp2.stp
+set_global_assignment -name USE_SIGNALTAP_FILE output_files/dio.stp
 set_global_assignment -name ENABLE_CONFIGURATION_PINS OFF
 set_global_assignment -name ENABLE_NCE_PIN OFF
 set_global_assignment -name ENABLE_BOOT_SEL_PIN OFF
@@ -165,17 +161,9 @@ set_global_assignment -name PHYSICAL_SYNTHESIS_ASYNCHRONOUS_SIGNAL_PIPELINING ON
 set_global_assignment -name PHYSICAL_SYNTHESIS_REGISTER_DUPLICATION ON
 set_global_assignment -name PHYSICAL_SYNTHESIS_COMBO_LOGIC_FOR_AREA ON
 set_global_assignment -name PHYSICAL_SYNTHESIS_MAP_LOGIC_TO_MEMORY_FOR_AREA ON
-set_global_assignment -name VERILOG_FILE bbc_mist_top.v
-set_global_assignment -name SYSTEMVERILOG_FILE rgb2ypbpr.sv
-set_global_assignment -name VERILOG_FILE sdram.v
-set_global_assignment -name VERILOG_FILE sd_card.v
-set_global_assignment -name VERILOG_FILE user_io.v
-set_global_assignment -name VERILOG_FILE osd.v
-set_global_assignment -name VERILOG_FILE data_io.v
-set_global_assignment -name VERILOG_FILE clockgen.v
+set_location_assignment PLL_1 -to CLOCKS|altpll_component|auto_generated|pll1
 set_global_assignment -name VERILOG_FILE ../rtl/sigma_delta_dac.v
 set_global_assignment -name VERILOG_FILE ../rtl/audio.v
-set_global_assignment -name VERILOG_FILE ../rtl/scandoubler.v
 set_global_assignment -name VERILOG_FILE ../../rtl/adc.v
 set_global_assignment -name VERILOG_FILE ../../rtl/mc6845.v
 set_global_assignment -name VERILOG_FILE ../../rtl/ps2_intf.v
@@ -206,4 +194,9 @@ set_global_assignment -name QIP_FILE os12.qip
 set_global_assignment -name QIP_FILE basic2.qip
 set_global_assignment -name QIP_FILE dfs09.qip
 set_global_assignment -name SDC_FILE bbc_mist.sdc
+set_global_assignment -name SYSTEMVERILOG_FILE bbc_mist_top.sv
+set_global_assignment -name VERILOG_FILE sdram.v
+set_global_assignment -name VERILOG_FILE clockgen.v
+set_global_assignment -name QIP_FILE "../../../../mist-modules/mist.qip"
+set_global_assignment -name VERILOG_FILE "../../../../mist-modules/sd_card.v"
 set_instance_assignment -name PARTITION_HIERARCHY root_partition -to | -section_id Top
