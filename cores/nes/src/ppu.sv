@@ -354,6 +354,11 @@ always @* begin
 end
 
 wire [7:0] oam_ptr_tmp = oam_ptr_load ? data_in : new_oam_ptr;
+wire [7:0] oam_addr = reset_line ? 8'd0 : oam_ptr_tmp;
+reg  [7:0] oam_dout;
+
+always @(posedge clk) oam_dout <= oam[oam_addr];
+
 always @(posedge clk) if (ce) begin
 
 	// Some bits of the OAM are hardwired to zero.
@@ -364,7 +369,7 @@ always @(posedge clk) if (ce) begin
 
 	if((cycle[0] && sprites_enabled) || oam_load || oam_ptr_load) begin
 		oam_ptr <= oam_ptr_tmp;
-		oam_data <= oam[oam_ptr_tmp];
+		oam_data <= oam_dout;
 	end
 	// Set overflow flag?
 	if (sprites_enabled && state == 2'b11 && spr_is_inside)
@@ -400,7 +405,7 @@ always @(posedge clk) if (ce) begin
 		state <= 0;
 		p <= 0;
 		oam_ptr <= 0;
-		oam_data <= oam[0];
+		oam_data <= oam_dout;
 		sprite0_curr <= 0;
 		sprite0 <= sprite0_curr;
 	end
