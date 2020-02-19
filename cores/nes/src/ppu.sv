@@ -312,6 +312,7 @@ reg [7:0] new_oam_ptr;     // [wire] New value for oam ptr
 reg [1:0] oam_inc;         // [wire] How much to increment oam ptr
 reg sprite0_curr;          // If sprite0 is included on the line being processed.
 reg oam_wrapped;           // [wire] if new_oam or new_p wrapped.
+reg overflow;
 
 wire [7:0] sprtemp_data = sprtemp[sprtemp_ptr];
 always @*  begin
@@ -367,7 +368,11 @@ always @(posedge clk) if (ce) begin
 	end
 	// Set overflow flag?
 	if (sprites_enabled && state == 2'b11 && spr_is_inside)
-		spr_overflow <= 1;
+		overflow <= 1;
+
+	// XXX: This delay is nessisary probably because the OAM handling is a cycle early
+	spr_overflow <= overflow;
+
 	// Remember if sprite0 is included on the scanline, needed for hit test later.
 	sprite0_curr <= (state == 2'b01 && oam_ptr[7:2] == 0 && spr_is_inside || sprite0_curr);
 
@@ -399,8 +404,10 @@ always @(posedge clk) if (ce) begin
 		sprite0_curr <= 0;
 		sprite0 <= sprite0_curr;
 	end
-	if (cycle == 340 && is_vbe) // Confirmed with visual 2C02. Effective by Line 261, pixel 1, but visible on 0.
+	if (cycle == 340 && is_vbe) begin// Confirmed with visual 2C02. Effective by Line 261, pixel 1, but visible on 0.
+		overflow <= 0;
 		spr_overflow <= 0;
+	end
 end
 
 endmodule  // SpriteRAM
