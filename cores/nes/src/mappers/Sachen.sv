@@ -23,7 +23,7 @@ module Sachen8259(
 	inout        irq_b,       // IRQ
 	input [15:0] audio_in,    // Inverted audio from APU
 	inout [15:0] audio_b,     // Mixed audio output
-	inout [15:0] flags_out_b  // flags {0, 0, 0, 0, 0, prg_conflict, prg_bus_write, has_chr_dout}
+	inout [15:0] flags_out_b  // flags {0, 0, 0, 0, 0, prg_conflict, prg_open_bus, has_chr_dout}
 );
 
 assign prg_aout_b   = enable ? prg_aout : 22'hZ;
@@ -42,11 +42,10 @@ wire prg_allow;
 wire chr_allow;
 wire vram_a10;
 wire vram_ce;
-wire [15:0] flags_out = {14'd0, prg_bus_write, 1'b0};
+reg [15:0] flags_out = 0;
 
 // 0x4100
 wire [7:0] prg_dout = {5'b00111, (~register)}; // ^ (counter & 0x1)
-wire prg_bus_write = ({prg_ain[15:14], prg_ain[8], prg_ain[0]} == 4'b0110);
 
 wire mapper137 = (flags[7:0] == 137);
 wire mapper138 = (flags[7:0] == 138);
@@ -165,7 +164,7 @@ module SachenJV001(
 	inout        irq_b,       // IRQ
 	input [15:0] audio_in,    // Inverted audio from APU
 	inout [15:0] audio_b,     // Mixed audio output
-	inout [15:0] flags_out_b  // flags {0, 0, 0, 0, 0, prg_conflict, prg_bus_write, has_chr_dout}
+	inout [15:0] flags_out_b  // flags {0, 0, 0, 0, 0, prg_conflict, prg_open_bus, has_chr_dout}
 );
 
 assign prg_aout_b   = enable ? prg_aout : 22'hZ;
@@ -184,7 +183,7 @@ wire prg_allow;
 wire chr_allow;
 wire vram_a10;
 wire vram_ce;
-wire [15:0] flags_out = {14'd0, prg_bus_write, 1'b0};
+reg [15:0] flags_out = 0;
 
 reg [5:0] input_reg; //s_reg = input_reg[3]
 reg [5:0] output_reg;
@@ -205,8 +204,6 @@ wire [7:0] prg_din_adj = mapper147 ? {2'b00, prg_din[7:2]} :
                          mapper36 ?  {4'b0000, prg_din[7:4]} : 
 								 mapper172 ? {2'b00, prg_din[0], prg_din[1], prg_din[2], prg_din[3], prg_din[4], prg_din[5]} :
 								             prg_din;
-
-wire prg_bus_write = (prg_ain[15:13] == 3'b010 && prg_ain[8]); //0x4100-3
 
 always @(posedge clk)
 if (~enable) begin
@@ -282,7 +279,7 @@ module SachenNROM(
 	inout        irq_b,       // IRQ
 	input [15:0] audio_in,    // Inverted audio from APU
 	inout [15:0] audio_b,     // Mixed audio output
-	inout [15:0] flags_out_b  // flags {0, 0, 0, 0, 0, prg_conflict, prg_bus_write, has_chr_dout}
+	inout [15:0] flags_out_b  // flags {0, 0, 0, 0, 0, prg_conflict, prg_open_bus, has_chr_dout}
 );
 
 assign prg_aout_b   = enable ? prg_aout : 22'hZ;
@@ -301,12 +298,12 @@ wire prg_allow;
 wire chr_allow;
 wire vram_a10;
 wire vram_ce;
-wire prg_bus_write;
-wire [15:0] flags_out = {14'h0, prg_bus_write, 1'b0};
+wire prg_open_bus;
+wire [15:0] flags_out = {14'h0, prg_open_bus, 1'b0};
 
 // 0x4100
 wire [7:0] prg_dout = {2'b01, ~prg_ain[5:0]}; // top 2 bits are actually open bus
-assign prg_bus_write = ((prg_ain[15:13] == 3'b010) && prg_ain[8]);
+assign prg_open_bus = ~((prg_ain[15:13] == 3'b010) && prg_ain[8]);
 
 assign prg_aout = {7'b00_0000_0, prg_ain[14:0]};
 assign prg_allow = prg_ain[15] && !prg_write;

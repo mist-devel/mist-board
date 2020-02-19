@@ -30,14 +30,12 @@ module cart_top (
 	output reg  [7:0] prg_dout,       // CPU Data Out
 	input       [7:0] prg_from_ram,   // PRG Data from RAM
 	output reg        prg_allow,      // PRG Allow write access
-	output reg        prg_bus_write,  // PRG Data Driven
+	output reg        prg_open_bus,   // PRG Data Not Driven
 	output reg        prg_conflict,   // PRG Data is ROM & prg_din
-	input             chr_ex,         // chr_addr is from an extra sprite read if high
 	input             chr_read,       // Read from CHR
 	input             chr_write,      // Write to CHR
 	input       [7:0] chr_din,        // PPU Data In
-	input      [13:0] chr_ain_orig,   // Better known as "PPU Address in"
-	input      [13:0] chr_ain_ex,     // Address for extra sprite fetches
+	input      [13:0] chr_ain,        // Better known as "PPU Address in"
 	output reg [21:0] chr_aout,       // CHR Input / Output Address Lines
 	output reg  [7:0] chr_dout,       // Value to override CHR data with
 	output reg        has_chr_dout,   // True if CHR data should be overridden
@@ -62,8 +60,6 @@ tri0 prg_allow_b, vram_a10_b, vram_ce_b, chr_allow_b, irq_b;
 tri0 [21:0] prg_addr_b, chr_addr_b;
 tri0 [15:0] flags_out_b, audio_out_b;
 tri1 [7:0] prg_dout_b, chr_dout_b;
-
-wire [13:0] chr_ain = chr_ex ? chr_ain_ex : chr_ain_orig;
 
 // This mapper used to be default if no other mapper was found
 // It seems MMC0 is handled by map28. Does it have any purpose?
@@ -95,7 +91,7 @@ MMC0 mmc0(
 
 //*****************************************************************************//
 // Name   : MMC1                                                               //
-// Mappers: 1, 155, 171 (hard wired vertical mirroring)                        //
+// Mappers: 1, 155                                                             //
 // Status : Working                                                            //
 // Notes  :                                                                    //
 // Games  : Simon's Quest                                                      //
@@ -103,7 +99,7 @@ MMC0 mmc0(
 MMC1 mmc1(
 	.clk        (clk),
 	.ce         (ce),
-	.enable     (me[171] | me[155] | me[1]),
+	.enable     (me[155] | me[1]),
 	.flags      (flags),
 	.prg_ain    (prg_ain),
 	.prg_aout_b (prg_addr_b),
@@ -247,9 +243,7 @@ MMC2 mmc2(
 	.irq_b      (irq_b),
 	.flags_out_b(flags_out_b),
 	.audio_in   (audio_in),
-	.audio_b    (audio_out_b),
-	// Special ports
-	.chr_ain_o  (chr_ain_orig)
+	.audio_b    (audio_out_b)
 );
 
 //*****************************************************************************//
@@ -285,9 +279,7 @@ MMC3 mmc3 (
 	.irq_b      (irq_b),
 	.flags_out_b(flags_out_b),
 	.audio_in   (audio_in),
-	.audio_b    (audio_out_b),
-	// Special ports
-	.chr_ain_o  (chr_ain_orig)
+	.audio_b    (audio_out_b)
 );
 
 //*****************************************************************************//
@@ -318,9 +310,7 @@ MMC4 mmc4(
 	.irq_b      (irq_b),
 	.flags_out_b(flags_out_b),
 	.audio_in   (audio_in),
-	.audio_b    (audio_out_b),
-	// Special ports
-	.chr_ain_o  (chr_ain_orig)
+	.audio_b    (audio_out_b)
 );
 
 //*****************************************************************************//
@@ -350,10 +340,9 @@ MMC5 mmc5(
 	.vram_ce_b  (vram_ce_b),
 	.irq_b      (irq_b),
 	.flags_out_b(flags_out_b),
-	.audio_in   (mmc5_audio),
+	.audio_in   (audio_in),
 	.audio_b    (audio_out_b),
 	// Special ports
-	.audio_dout	(mmc5_data),
 	.chr_din    (chr_din),
 	.chr_write  (chr_write),
 	.chr_dout_b (chr_dout_b),
@@ -425,10 +414,10 @@ Mapper15 map15(
 
 //*****************************************************************************//
 // Name   : Bandai 16                                                          //
-// Mappers: 159, 153, 16                                                       //
+// Mappers: 159, 16                                                            //
 // Status : Working/EEPROM needs testing                                       //
 // Notes  :                                                                    //
-// Games  : SD Gundam Gaiden, Dragon Ball 3, Famicom Jump II                   //
+// Games  : SD Gundam Gaiden, Dragon Ball 3                                    //
 //*****************************************************************************//
 wire map16_prg_write, map16_ovr;
 wire [7:0] map16_data_out;
@@ -436,7 +425,7 @@ wire [17:0] map16_mapper_addr;
 Mapper16 map16(
 	.clk        (clk),
 	.ce         (ce),
-	.enable     (me[159] | me[153] | me[16]),
+	.enable     (me[159] | me[16]),
 	.flags      (flags),
 	.prg_ain    (prg_ain),
 	.prg_aout_b (prg_addr_b),
@@ -620,12 +609,12 @@ Mapper65 map65(
 
 //*****************************************************************************//
 // Name   : GxROM                                                              //
-// Mappers: 11, 38, 46, 66, 86, 87, 101, 140                                       //
+// Mappers: 11, 38, 66, 86, 87, 101, 140                                       //
 // Status : 38/66 - Working, 38/87/101/140 - Needs eval, 86 - No Audio Samples //
 // Notes  :                                                                    //
 // Games  : Doraemon, Dragon Power, Sidewinder (145), Taiwan Mahjong 16 (149)  //
 //*****************************************************************************//
-wire mapper66_en = me[11] | me[38] | me[46] | me[86] | me[87] | me[101] | me[140] | me[66] | me[145] | me[149];
+wire mapper66_en = me[11] | me[38] | me[86] | me[87] | me[101] | me[140] | me[66] | me[145] | me[149];
 Mapper66 map66(
 	.clk        (clk),
 	.ce         (ce),
@@ -739,7 +728,7 @@ Mapper69 map69(
 	.vram_ce_b  (vram_ce_b),
 	.irq_b      (irq_b),
 	.flags_out_b(flags_out_b),
-	.audio_in   (ss5b_audio),
+	.audio_in   (audio_in),
 	.audio_b    (audio_out_b)
 );
 
@@ -962,37 +951,6 @@ Mapper107 map107(
 );
 
 //*****************************************************************************//
-// Name   : GTROM                                                              //
-// Mappers: 111                                                                //
-// Status : Passes all tests except reflash test                               //
-// Notes  : No LED or self-reflash support                                     //
-// Games  : Super Homebrew War, Candelabra: Estoscerro, more homebrew          //
-//*****************************************************************************//
-Mapper111 map111(
-	.clk        (clk),
-	.ce         (ce),
-	.enable     (me[111]),
-	.flags      (flags),
-	.prg_ain    (prg_ain),
-	.prg_aout_b (prg_addr_b),
-	.prg_read   (prg_read),
-	.prg_write  (prg_write),
-	.prg_din    (prg_din),
-	.prg_dout_b (prg_dout_b),
-	.prg_allow_b(prg_allow_b),
-	.chr_ain    (chr_ain),
-	.chr_aout_b (chr_addr_b),
-	.chr_read   (chr_read),
-	.chr_allow_b(chr_allow_b),
-	.vram_a10_b (vram_a10_b),
-	.vram_ce_b  (vram_ce_b),
-	.irq_b      (irq_b),
-	.flags_out_b(flags_out_b),
-	.audio_in   (audio_in),
-	.audio_b    (audio_out_b)
-);
-
-//*****************************************************************************//
 // Name   : Mapper 165                                                         //
 // Mappers: 165                                                                //
 // Status : Corrupt Graphics                                                   //
@@ -1020,9 +978,7 @@ Mapper165 map165(
 	.irq_b      (irq_b),
 	.flags_out_b(flags_out_b),
 	.audio_in   (audio_in),
-	.audio_b    (audio_out_b),
-	// Special ports
-	.chr_ain_o  (chr_ain_orig)
+	.audio_b    (audio_out_b)
 );
 
 //*****************************************************************************//
@@ -1123,9 +1079,9 @@ Mapper234 map234(
 //*****************************************************************************//
 // Name   : RAMBO1 (Tengen MMC3)                                               //
 // Mappers: 64, 158                                                            //
-// Status : Needs testing.  Irq might be slightly off.                         //
+// Status : Significant graphical errors                                       //
 // Notes  : Consider merging with MMC3                                         //
-// Games  : Rolling Thunder, Klax, Skull and Crossbones, Alien Syndrome (158)  //
+// Games  : Shinobi, Rolling Thunder, Klax                                     //
 //*****************************************************************************//
 Rambo1 rambo1(
 	.clk        (clk),
@@ -1148,9 +1104,7 @@ Rambo1 rambo1(
 	.irq_b      (irq_b),
 	.flags_out_b(flags_out_b),
 	.audio_in   (audio_in),
-	.audio_b    (audio_out_b),
-	// Special ports
-	.chr_ain_o  (chr_ain_orig)
+	.audio_b    (audio_out_b)
 );
 
 //*****************************************************************************//
@@ -1249,7 +1203,7 @@ VRC3 vrc3(
 
 //*****************************************************************************//
 // Name   : Konami VRC2/4                                                      //
-// Mappers: 21, 22, 23, 25, 27 (pirate of 23)                                  //
+// Mappers: 21, 22, 23, 25                                                     //
 // Status : Needs Evaluation                                                   //
 // Notes  :                                                                    //
 // Games  : Wai Wai World 2, Twinbee 3, Contra (j), Gradius II (j)             //
@@ -1257,7 +1211,7 @@ VRC3 vrc3(
 VRC24 vrc24(
 	.clk        (clk),
 	.ce         (ce),
-	.enable     (me[21] | me[22] | me[23] | me[25] | me[27]),
+	.enable     (me[21] | me[22] | me[23] | me[25]),
 	.flags      (flags),
 	.prg_ain    (prg_ain),
 	.prg_aout_b (prg_addr_b),
@@ -1305,7 +1259,7 @@ VRC6 vrc6(
 	.vram_ce_b  (vram_ce_b),
 	.irq_b      (irq_b),
 	.flags_out_b(flags_out_b),
-	.audio_in   (vrc6_audio),
+	.audio_in   (audio_in),
 	.audio_b    (audio_out_b)
 );
 
@@ -1336,7 +1290,7 @@ VRC7 vrc7(
 	.vram_ce_b  (vram_ce_b),
 	.irq_b      (irq_b),
 	.flags_out_b(flags_out_b),
-	.audio_in   (vrc7_audio),
+	.audio_in   (audio_in),
 	.audio_b    (audio_out_b)
 );
 
@@ -1347,7 +1301,7 @@ VRC7 vrc7(
 // Notes  : This mapper requires submappers for correct operation              //
 // Games  : Digital Devil Story, Battle Fleet, Famista                         //
 //*****************************************************************************//
-N163 n163(
+N106 n106(
 	.clk        (clk),
 	.ce         (ce),
 	.enable     (me[210] | me[19]),
@@ -1367,10 +1321,8 @@ N163 n163(
 	.vram_ce_b  (vram_ce_b),
 	.irq_b      (irq_b),
 	.flags_out_b(flags_out_b),
-	.audio_in   (n163_audio),
-	.audio_b    (audio_out_b),
-	// Special ports
-	.audio_dout	(n163_data)
+	.audio_in   (audio_in),
+	.audio_b    (audio_out_b)
 );
 
 //*****************************************************************************//
@@ -1383,7 +1335,7 @@ N163 n163(
 Mapper162 map162(
 	.clk        (clk),
 	.ce         (ce),
-	.enable     (me[162]),
+	.enable     (me[162] | me[163]),
 	.flags      (flags),
 	.prg_ain    (prg_ain),
 	.prg_aout_b (prg_addr_b),
@@ -1403,41 +1355,6 @@ Mapper162 map162(
 	.audio_in   (audio_in),
 	.audio_b    (audio_out_b)
 );
-
-//*****************************************************************************//
-// Name   : Nanjing 163                                                        //
-// Mappers: 163                                                                //
-// Status : Working                                                            //
-// Notes  :                                                                    //
-// Games  : Final Fantasy VII (163), Pokemon Yellow (163)                      //
-//*****************************************************************************//
-Nanjing map163(
-	.clk        (clk),
-	.ce         (ce),
-	.enable     (me[163]),
-	.flags      (flags),
-	.prg_ain    (prg_ain),
-	.prg_aout_b (prg_addr_b),
-	.prg_read   (prg_read),
-	.prg_write  (prg_write),
-	.prg_din    (prg_din),
-	.prg_dout_b (prg_dout_b),
-	.prg_allow_b(prg_allow_b),
-	.chr_ain    (chr_ain),
-	.chr_aout_b (chr_addr_b),
-	.chr_read   (chr_read),
-	.chr_allow_b(chr_allow_b),
-	.vram_a10_b (vram_a10_b),
-	.vram_ce_b  (vram_ce_b),
-	.irq_b      (irq_b),
-	.flags_out_b(flags_out_b),
-	.audio_in   (audio_in),
-	.audio_b    (audio_out_b),
-	// Special Ports
-	.ppu_ce     (ppu_ce),
-	.ppuflags   (ppuflags)
-);
-
 
 //*****************************************************************************//
 // Name   : Waixing 164                                                        //
@@ -1596,15 +1513,14 @@ JYCompany jycompany(
 	.audio_in   (audio_in),
 	.audio_b    (audio_out_b),
 	// Special ports
-	.ppu_ce     (ppu_ce),
-	.chr_ain_o  (chr_ain_orig)
+	.ppu_ce     (ppu_ce)
 );
 
 //*****************************************************************************//
 // Name   : Mapper 225                                                         //
 // Mappers: 225, 255                                                           //
 // Status : Working                                                            //
-// Notes  : Defining 225 as with 74'670 (4-nybble RAM) and 255 as without      //
+// Notes  : Defining 225 as with 74'670 (4-byte RAM) and 255 as without        //
 // Games  : 64-in-1 (225), 110-in-1 (255 - with glitched menu selection)       //
 //*****************************************************************************//
 Mapper225 map225(
@@ -1659,137 +1575,14 @@ MapperFDS mapfds(
 	.vram_ce_b  (vram_ce_b),
 	.irq_b      (irq_b),
 	.flags_out_b(flags_out_b),
-	.audio_in   (fds_audio),
+	.audio_in   (audio_in),
 	.audio_b    (audio_out_b),
 	// Special ports
-	.audio_dout	(fds_data),
 	.diskside_auto_b (fds_diskside_auto),
 	.diskside   (diskside),
 	.fds_busy   (fds_busy),
 	.fds_eject  (fds_eject)
 );
-
-//*****************************************************************************//
-// Name   : Mapper 31                                                          //
-// Mappers: 31 and NSF Player                                                  //
-// Status : Testing                                                            //
-// Notes  : Uses Mapper 31.15 (submapper) for NSF Player; NSF 1.0 only         //
-// Games  : Famicompo Pico 2014, NSF 1.0                                       //
-//*****************************************************************************//
-wire [5:0] exp_audioe;
-NSF nsfplayer(
-	.clk        (clk),
-	.ce         (ce),
-	.enable     (me[31]),
-	.flags      (flags),
-	.prg_ain    (prg_ain),
-	.prg_aout_b (prg_addr_b),
-	.prg_read   (prg_read),
-	.prg_write  (prg_write),
-	.prg_din    (prg_din),
-	.prg_dout_b (prg_dout_b),
-	.prg_allow_b(prg_allow_b),
-	.chr_ain    (chr_ain),
-	.chr_aout_b (chr_addr_b),
-	.chr_read   (chr_read),
-	.chr_allow_b(chr_allow_b),
-	.vram_a10_b (vram_a10_b),
-	.vram_ce_b  (vram_ce_b),
-	.irq_b      (irq_b),
-	.flags_out_b(flags_out_b),
-	.audio_in   (exp_audioe[5] ? ss5b_audio :
-	             exp_audioe[4] ? n163_audio :
-	             exp_audioe[3] ? mmc5_audio :
-	             exp_audioe[2] ? fds_audio  :
-	             exp_audioe[1] ? vrc7_audio :
-	             exp_audioe[0] ? vrc6_audio :
-					 audio_in),
-	.exp_audioe (exp_audioe),  // Expansion Enabled (0x0=None, 0x1=VRC6, 0x2=VRC7, 0x4=FDS, 0x8=MMC5, 0x10=N163, 0x20=SS5B
-	.audio_b    (audio_out_b),
-	.fds_din    (fds_data)
-);
-
-wire [15:0] ss5b_audio;
-SS5b_mixed snd_5bm (
-	.clk(clk),
-	.ce(ce),
-	.enable(me[69] | (me[31] && exp_audioe[5])),
-	.wren(prg_write),
-	.addr_in(prg_ain),
-	.data_in(prg_din),
-	.audio_in(audio_in),
-	.audio_out(ss5b_audio)
-);
-
-wire [15:0] n163_audio;
-wire [7:0] n163_data;
-namco163_mixed snd_n163 (
-	.clk(clk),
-	.ce(ce),
-	.submapper(flags[24:21]),
-	.enable(me[19] | (me[31] && exp_audioe[4])),
-	.wren(prg_write),
-	.addr_in(prg_ain),
-	.data_in(prg_din),
-	.data_out(n163_data),
-	.audio_in(audio_in),
-	.audio_out(n163_audio)
-);
-
-wire [15:0] mmc5_audio;
-wire [7:0] mmc5_data;
-mmc5_mixed snd_mmc5 (
-	.clk(clk),
-	.ce(ce),
-	.enable(me[5] | (me[31] && exp_audioe[3])),
-	.wren(prg_write),
-	.rden(prg_read),
-	.addr_in(prg_ain),
-	.data_in(prg_din),
-	.data_out(mmc5_data),
-	.audio_in(audio_in),
-	.audio_out(mmc5_audio)
-);
-
-wire [15:0] fds_audio;
-wire [7:0] fds_data;
-fds_mixed snd_fds (
-	.clk(clk),
-	.ce(ce),
-	.enable(me[20] | (me[31] && exp_audioe[2])),
-	.wren(prg_write),
-	.addr_in(prg_ain),
-	.data_in(prg_din),
-	.data_out(fds_data),
-	.audio_in(audio_in),
-	.audio_out(fds_audio)
-);
-
-wire [15:0] vrc7_audio;
-vrc7_mixed snd_vrc7 (
-	.clk(clk),
-	.ce(ce),
-	.enable(me[85] | (me[31] && exp_audioe[1])),
-	.wren(prg_write),
-	.addr_in(prg_ain),
-	.data_in(prg_din),
-	.audio_in(audio_in),
-	.audio_out(vrc7_audio)
-);
-
-wire [15:0] vrc6_audio;
-vrc6_mixed snd_vrc6 (
-	.clk(clk),
-	.ce(ce),
-	.enable(me[24] | me[26] | (me[31] && exp_audioe[0])),
-	.wren(prg_write),
-	.addr_invert(me[26]),
-	.addr_in(prg_ain),
-	.data_in(prg_din),
-	.audio_in(audio_in),
-	.audio_out(vrc6_audio)
-);
-
 
 wire [6:0] prg_mask;
 wire [6:0] chr_mask;
@@ -1832,7 +1625,7 @@ always @* begin
 	{diskside_auto} = {fds_diskside_auto};
 
 	// Behavior helper flags
-	{prg_conflict, prg_bus_write, has_chr_dout} = {flags_out_b[2], flags_out_b[1], flags_out_b[0]};
+	{prg_conflict, prg_open_bus, has_chr_dout} = {flags_out_b[2], flags_out_b[1], flags_out_b[0]};
 
 	// Address translation for SDRAM
 	if (prg_aout[21] == 1'b0)

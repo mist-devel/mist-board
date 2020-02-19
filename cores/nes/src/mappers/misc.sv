@@ -1,5 +1,5 @@
 // These are misc small one-off mappers. Some may end up being merged with Generic mappers.
-// altera message_off 10027
+
 // #15 -  100-in-1 Contra Function 16
 module Mapper15(
 	input        clk,         // System clock
@@ -22,7 +22,7 @@ module Mapper15(
 	inout        irq_b,       // IRQ
 	input [15:0] audio_in,    // Inverted audio from APU
 	inout [15:0] audio_b,     // Mixed audio output
-	inout [15:0] flags_out_b  // flags {0, 0, 0, 0, 0, prg_conflict, prg_bus_write, has_chr_dout}
+	inout [15:0] flags_out_b  // flags {0, 0, 0, 0, 0, prg_conflict, prg_open_bus, has_chr_dout}
 );
 
 assign prg_aout_b   = enable ? prg_aout : 22'hZ;
@@ -102,7 +102,7 @@ assign vram_a10 = mirroring ? chr_ain[11] : chr_ain[10];
 endmodule
 
 
-// Mapper 16, 153, 159 Bandai
+// Mapper 16, 159 Bandai
 module Mapper16(
 	input        clk,         // System clock
 	input        ce,          // M2 ~cpu_clk
@@ -124,7 +124,7 @@ module Mapper16(
 	inout        irq_b,       // IRQ
 	input [15:0] audio_in,    // Inverted audio from APU
 	inout [15:0] audio_b,     // Mixed audio output
-	inout [15:0] flags_out_b, // flags {0, 0, 0, 0, 0, prg_conflict, prg_bus_write, has_chr_dout}
+	inout [15:0] flags_out_b, // flags {0, 0, 0, 0, 0, prg_conflict, prg_open_bus, has_chr_dout}
 	// Special ports
 	output [17:0] mapper_addr,
 	input   [7:0] mapper_data_in,
@@ -150,11 +150,10 @@ wire chr_allow;
 reg vram_a10;
 wire vram_ce;
 reg irq;
-wire [15:0] flags_out = {14'd0, prg_bus_write, 1'b0};
+reg [15:0] flags_out = 0;
 wire [7:0] prg_dout;
 
-reg outer_prg_bank;
-reg [3:0] inner_prg_bank;
+reg [3:0] prg_bank;
 reg [7:0] chr_bank_0, chr_bank_1, chr_bank_2, chr_bank_3,
 			chr_bank_4, chr_bank_5, chr_bank_6, chr_bank_7;
 reg [3:0] prg_sel;
@@ -165,14 +164,12 @@ reg [15:0] irq_counter;
 reg [15:0] irq_latch;
 reg eeprom_scl, eeprom_sda;
 wire submapper5 = (flags[24:21] == 5);
-wire mapper153 = (flags[7:0] == 153);
 wire mapper159 = (flags[7:0] == 159);
-wire mapperalt = submapper5 | mapper159 | mapper153;
+wire mapperalt = submapper5 | mapper159;
 
 always @(posedge clk) begin
 	if (~enable) begin
-		outer_prg_bank <= 0;
-		inner_prg_bank <= 0;
+		prg_bank <= 4'hF;
 		chr_bank_0 <= 0;
 		chr_bank_1 <= 0;
 		chr_bank_2 <= 0;
@@ -192,15 +189,15 @@ always @(posedge clk) begin
 		if (prg_write)
 			if(((prg_ain[14:13] == 2'b11) && (!mapperalt)) || (prg_ain[15])) // Cover all from $6000 to $FFFF to maximize compatibility
 				case(prg_ain & 'hf) // Registers are mapped every 16 bytes
-					'h0: if (!mapper153) chr_bank_0 <= prg_din[7:0]; else outer_prg_bank <= prg_din[0];
-					'h1: if (!mapper153) chr_bank_1 <= prg_din[7:0]; else outer_prg_bank <= prg_din[0];
-					'h2: if (!mapper153) chr_bank_2 <= prg_din[7:0]; else outer_prg_bank <= prg_din[0];
-					'h3: if (!mapper153) chr_bank_3 <= prg_din[7:0]; else outer_prg_bank <= prg_din[0];
-					'h4: if (!mapper153) chr_bank_4 <= prg_din[7:0]; else outer_prg_bank <= prg_din[0];
-					'h5: if (!mapper153) chr_bank_5 <= prg_din[7:0]; else outer_prg_bank <= prg_din[0];
-					'h6: if (!mapper153) chr_bank_6 <= prg_din[7:0]; else outer_prg_bank <= prg_din[0];
-					'h7: if (!mapper153) chr_bank_7 <= prg_din[7:0]; else outer_prg_bank <= prg_din[0];
-					'h8: inner_prg_bank <= prg_din[3:0];
+					'h0: chr_bank_0 <= prg_din[7:0];
+					'h1: chr_bank_1 <= prg_din[7:0];
+					'h2: chr_bank_2 <= prg_din[7:0];
+					'h3: chr_bank_3 <= prg_din[7:0];
+					'h4: chr_bank_4 <= prg_din[7:0];
+					'h5: chr_bank_5 <= prg_din[7:0];
+					'h6: chr_bank_6 <= prg_din[7:0];
+					'h7: chr_bank_7 <= prg_din[7:0];
+					'h8: prg_bank <= prg_din[3:0];
 					'h9: mirroring <= prg_din[1:0];
 					'ha: {irq_up, irq_enable} <= {1'b1, prg_din[0]};
 					'hb: begin
@@ -243,11 +240,11 @@ always begin
 	endcase
 end
 
-reg [4:0] prgsel;
+reg [3:0] prgsel;
 always begin
 	case(prg_ain[15:14])
-		2'b10: 	 prgsel = {outer_prg_bank, inner_prg_bank};  // $8000 is swapable
-		2'b11: 	 prgsel = {outer_prg_bank, 4'hF};            // $C000 is hardwired to last inner bank
+		2'b10: 	prgsel = prg_bank;    // $8000 is swapable
+		2'b11: 	prgsel = 4'hF;        // $C000 is hardwired to last bank
 		default: prgsel = 0;
 	endcase
 end
@@ -266,17 +263,16 @@ always begin
 	endcase
 end
 
-assign chr_aout = mapper153 ? {9'b10_0000_000, chr_ain[12:0]} : {4'b10_00, chrsel, chr_ain[9:0]}; // 1kB banks or 8kb unbanked
-wire [21:0] prg_aout_tmp = {3'b00_0, prgsel, prg_ain[13:0]};  // 16kB banks
+assign chr_aout = {4'b10_00, chrsel, chr_ain[9:0]};            // 1kB banks
+wire [21:0] prg_aout_tmp = {4'b00_00, prgsel, prg_ain[13:0]};  // 16kB banks
 
 wire prg_is_ram = (prg_ain >= 'h6000) && (prg_ain < 'h8000);
 wire [21:0] prg_ram = {9'b11_1100_000, prg_ain[12:0]};
 assign prg_aout = prg_is_ram ? prg_ram : prg_aout_tmp;
 // EEPROM - not used - Could use write to EEPROM cycle for both reads and write accesses, but this is easier
-assign prg_dout = (!mapper153 && prg_is_ram) ? prg_write ? mapper_data_out : {3'b111, sda_out, 4'b1111} : 8'hFF;
-wire prg_bus_write = (!mapper153 && prg_is_ram);
+assign prg_dout = prg_is_ram ? prg_write ? mapper_data_out : {3'b111, sda_out, 4'b1111} : 8'hFF;
 
-assign prg_allow = (prg_ain[15] && !prg_write) || (prg_is_ram && eeprom_scl && mapper153);
+assign prg_allow = (prg_ain[15] && !prg_write);
 assign chr_allow = flags[15];
 assign vram_ce = chr_ain[13];
 
@@ -285,7 +281,7 @@ wire [7:0] ram_addr;
 wire ram_read;
 assign mapper_addr[17:8] = 0;
 assign mapper_addr[7:0] = ram_addr;
-assign mapper_ovr = mapper159 || submapper5;
+assign mapper_ovr = 1'b1;
 
 EEPROM_24C0x eeprom(
 	.type_24C01(mapper159),         //24C01 is 128 bytes, 24C02 is 256 bytes
@@ -329,7 +325,7 @@ module Mapper18(
 	inout        irq_b,       // IRQ
 	input [15:0] audio_in,    // Inverted audio from APU
 	inout [15:0] audio_b,     // Mixed audio output
-	inout [15:0] flags_out_b  // flags {0, 0, 0, 0, 0, prg_conflict, prg_bus_write, has_chr_dout}
+	inout [15:0] flags_out_b  // flags {0, 0, 0, 0, 0, prg_conflict, prg_open_bus, has_chr_dout}
 );
 
 assign prg_aout_b   = enable ? prg_aout : 22'hZ;
@@ -518,7 +514,7 @@ module Mapper32(
 	inout        irq_b,       // IRQ
 	input [15:0] audio_in,    // Inverted audio from APU
 	inout [15:0] audio_b,     // Mixed audio output
-	inout [15:0] flags_out_b  // flags {0, 0, 0, 0, 0, prg_conflict, prg_bus_write, has_chr_dout}
+	inout [15:0] flags_out_b  // flags {0, 0, 0, 0, 0, prg_conflict, prg_open_bus, has_chr_dout}
 );
 
 assign prg_aout_b   = enable ? prg_aout : 22'hZ;
@@ -563,7 +559,7 @@ end else if (ce) begin
 		casez ({prg_ain[13:12], submapper1, prg_ain[2:0]})
 			6'b00_?_???:  prgreg0            <= prg_din[4:0];
 			6'b01_0_???:  {prgmode, mirror}  <= prg_din[1:0];
-			6'b10_?_???:  prgreg1            <= prg_din[4:0];
+			6'b10_0_???:  prgreg1            <= prg_din[4:0];
 			6'b11_?_000:  chrreg0            <= prg_din;
 			6'b11_?_001:  chrreg1            <= prg_din;
 			6'b11_?_010:  chrreg2            <= prg_din;
@@ -637,7 +633,7 @@ module Mapper42(
 	inout        irq_b,       // IRQ
 	input [15:0] audio_in,    // Inverted audio from APU
 	inout [15:0] audio_b,     // Mixed audio output
-	inout [15:0] flags_out_b  // flags {0, 0, 0, 0, 0, prg_conflict, prg_bus_write, has_chr_dout}
+	inout [15:0] flags_out_b  // flags {0, 0, 0, 0, 0, prg_conflict, prg_open_bus, has_chr_dout}
 );
 
 assign prg_aout_b   = enable ? prg_aout : 22'hZ;
@@ -743,7 +739,7 @@ module Mapper65(
 	inout        irq_b,       // IRQ
 	input [15:0] audio_in,    // Inverted audio from APU
 	inout [15:0] audio_b,     // Mixed audio output
-	inout [15:0] flags_out_b  // flags {0, 0, 0, 0, 0, prg_conflict, prg_bus_write, has_chr_dout}
+	inout [15:0] flags_out_b  // flags {0, 0, 0, 0, 0, prg_conflict, prg_open_bus, has_chr_dout}
 );
 
 assign prg_aout_b   = enable ? prg_aout : 22'hZ;
@@ -883,7 +879,7 @@ module Mapper41(
 	inout        irq_b,       // IRQ
 	input [15:0] audio_in,    // Inverted audio from APU
 	inout [15:0] audio_b,     // Mixed audio output
-	inout [15:0] flags_out_b  // flags {0, 0, 0, 0, 0, prg_conflict, prg_bus_write, has_chr_dout}
+	inout [15:0] flags_out_b  // flags {0, 0, 0, 0, 0, prg_conflict, prg_open_bus, has_chr_dout}
 );
 
 assign prg_aout_b   = enable ? prg_aout : 22'hZ;
@@ -955,7 +951,7 @@ module Mapper218(
 	inout        irq_b,       // IRQ
 	input [15:0] audio_in,    // Inverted audio from APU
 	inout [15:0] audio_b,     // Mixed audio output
-	inout [15:0] flags_out_b  // flags {0, 0, 0, 0, 0, prg_conflict, prg_bus_write, has_chr_dout}
+	inout [15:0] flags_out_b  // flags {0, 0, 0, 0, 0, prg_conflict, prg_open_bus, has_chr_dout}
 );
 
 assign prg_aout_b   = enable ? prg_aout : 22'hZ;
@@ -1007,7 +1003,7 @@ module Mapper228(
 	inout        irq_b,       // IRQ
 	input [15:0] audio_in,    // Inverted audio from APU
 	inout [15:0] audio_b,     // Mixed audio output
-	inout [15:0] flags_out_b  // flags {0, 0, 0, 0, 0, prg_conflict, prg_bus_write, has_chr_dout}
+	inout [15:0] flags_out_b  // flags {0, 0, 0, 0, 0, prg_conflict, prg_open_bus, has_chr_dout}
 );
 
 assign prg_aout_b   = enable ? prg_aout : 22'hZ;
@@ -1078,7 +1074,7 @@ module Mapper234(
 	inout        irq_b,       // IRQ
 	input [15:0] audio_in,    // Inverted audio from APU
 	inout [15:0] audio_b,     // Mixed audio output
-	inout [15:0] flags_out_b  // flags {0, 0, 0, 0, 0, prg_conflict, prg_bus_write, has_chr_dout}
+	inout [15:0] flags_out_b  // flags {0, 0, 0, 0, 0, prg_conflict, prg_open_bus, has_chr_dout}
 );
 
 assign prg_aout_b   = enable ? prg_aout : 22'hZ;
@@ -1157,7 +1153,7 @@ module Mapper72(
 	inout        irq_b,       // IRQ
 	input [15:0] audio_in,    // Inverted audio from APU
 	inout [15:0] audio_b,     // Mixed audio output
-	inout [15:0] flags_out_b  // flags {0, 0, 0, 0, 0, prg_conflict, prg_bus_write, has_chr_dout}
+	inout [15:0] flags_out_b  // flags {0, 0, 0, 0, 0, prg_conflict, prg_open_bus, has_chr_dout}
 );
 
 assign prg_aout_b   = enable ? prg_aout : 22'hZ;
@@ -1235,7 +1231,7 @@ module Mapper162(
 	inout        irq_b,       // IRQ
 	input [15:0] audio_in,    // Inverted audio from APU
 	inout [15:0] audio_b,     // Mixed audio output
-	inout [15:0] flags_out_b  // flags {0, 0, 0, 0, 0, prg_conflict, prg_bus_write, has_chr_dout}
+	inout [15:0] flags_out_b  // flags {0, 0, 0, 0, 0, prg_conflict, prg_open_bus, has_chr_dout}
 );
 
 assign prg_aout_b   = enable ? prg_aout : 22'hZ;
@@ -1317,7 +1313,7 @@ module Mapper164(
 	inout        irq_b,       // IRQ
 	input [15:0] audio_in,    // Inverted audio from APU
 	inout [15:0] audio_b,     // Mixed audio output
-	inout [15:0] flags_out_b  // flags {0, 0, 0, 0, 0, prg_conflict, prg_bus_write, has_chr_dout}
+	inout [15:0] flags_out_b  // flags {0, 0, 0, 0, 0, prg_conflict, prg_open_bus, has_chr_dout}
 );
 
 assign prg_aout_b   = enable ? prg_aout : 22'hZ;
@@ -1365,147 +1361,10 @@ assign vram_a10 = flags[14] ? chr_ain[10] : chr_ain[11];
 
 endmodule
 
-// 163 Nanjing
-module Nanjing(
-	input        clk,         // System clock
-	input        ce,          // M2 ~cpu_clk
-	input        enable,      // Mapper enabled
-	input [31:0] flags,       // Cart flags
-	input [15:0] prg_ain,     // prg address
-	inout [21:0] prg_aout_b,  // prg address out
-	input        prg_read,    // prg read
-	input        prg_write,   // prg write
-	input  [7:0] prg_din,     // prg data in
-	inout  [7:0] prg_dout_b,  // prg data out
-	inout        prg_allow_b, // Enable access to memory for the specified operation.
-	input [13:0] chr_ain,     // chr address in
-	inout [21:0] chr_aout_b,  // chr address out
-	input        chr_read,    // chr ram read
-	inout        chr_allow_b, // chr allow write
-	inout        vram_a10_b,  // Value for A10 address line
-	inout        vram_ce_b,   // True if the address should be routed to the internal 2kB VRAM.
-	inout        irq_b,       // IRQ
-	input [15:0] audio_in,    // Inverted audio from APU
-	inout [15:0] audio_b,     // Mixed audio output
-	inout [15:0] flags_out_b, // flags {0, 0, 0, 0, 0, prg_conflict, prg_bus_write, has_chr_dout}
-	input [19:0] ppuflags,
-	input        ppu_ce
-);
-
-assign prg_aout_b   = enable ? prg_aout : 22'hZ;
-assign prg_dout_b   = enable ? prg_dout : 8'hZ;
-assign prg_allow_b  = enable ? prg_allow : 1'hZ;
-assign chr_aout_b   = enable ? chr_aout : 22'hZ;
-assign chr_allow_b  = enable ? chr_allow : 1'hZ;
-assign vram_a10_b   = enable ? vram_a10 : 1'hZ;
-assign vram_ce_b    = enable ? vram_ce : 1'hZ;
-assign irq_b        = enable ? 1'b0 : 1'hZ;
-assign flags_out_b  = enable ? flags_out : 16'hZ;
-assign audio_b      = enable ? {1'b0, audio_in[15:1]} : 16'hZ;
-
-wire [21:0] prg_aout, chr_aout;
-wire prg_allow;
-wire chr_allow;
-wire vram_a10;
-wire vram_ce;
-reg [7:0] prg_dout;
-wire [15:0] flags_out = {14'd0, prg_bus_write, 1'b0};
-reg prg_bus_write;
-
-reg [7:0] prg_bank;
-reg chr_bank;
-reg chr_switch;
-reg trigger;
-reg trig_comp;
-
-reg [7:0] security[4];
-
-wire [8:0] scanline = ppuflags[19:11];
-wire [8:0] cycle = ppuflags[10:2];
-
-always @(posedge clk) begin
-	if (~enable) begin
-		prg_bank <= 8'h0F;
-		trigger <= 0; // Initial value 0
-		security <= '{8'h00, 8'h00, 8'h00, 8'h00};
-		chr_switch <= 0;
-		trig_comp <= 1; // Initial value 1
-	end else if (ce) begin
-		prg_dout <= prg_din;
-		prg_bus_write <= 0;
-		if (prg_write) begin
-			if (prg_ain == 16'h5101) begin
-				if (trig_comp && ~|prg_din)
-					trigger <= ~trigger;
-				trig_comp <= |prg_din;
-			end else begin
-				case (prg_ain & 16'h7300)
-					// If the most significant bit of this register is set, it does automatic CHR RAM switching
-					'h5000: begin
-						prg_bank[3:0] <= prg_din[3:0];
-						chr_switch <= prg_din[7];
-						security[0] <= prg_din;
-					end
-
-					'h5100: begin
-						security[1] <= prg_din;
-						if (prg_din == 6)
-							prg_bank <= 8'h3;
-					end
-
-					'h5200: begin
-						prg_bank[7:4] <= prg_din[3:0];
-						security[2] <= prg_din;
-					end
-
-					'h5300: security[3] <= prg_din;
-				endcase
-			end
-		end else if (prg_read) begin // Security stuff as Mesen does it
-			prg_bus_write <= 1'b1;
-			case (prg_ain & 16'h7700)
-				'h5100: prg_dout <= security[0] | security[1] | security[3] | (security[2] ^ 8'hFF);
-				'h5500: prg_dout <= trigger ? (security[3] | security[0]) : 8'h0;
-				default: begin
-					prg_dout <= 8'hFF;
-					prg_bus_write <= 0;
-				end
-			endcase
-		end
-	end
-
-	// The exact way this works is unknown but is conjectured
-	// to resemble iNES Mapper 096, latching PA9 at start of nametable reads.
-	// When turned on, both 4K CHR RAM banks 0000-0FFF and 1000-1FFF map to 0000-0FFF 
-	// for scanline 240 until scanline 128. Then at scanline 128, both 4K CHR banks 
-	// point to 1000-1FFF.
-	if(~enable) begin
-		chr_bank <= 0;
-	end else if (ppu_ce) begin
-		if (cycle > 254) begin
-			if (scanline == 239)
-				chr_bank <= 0;
-			else if(scanline == 127)
-				chr_bank <= 1;
-		end
-	end
-end
-
-wire prg_is_ram = prg_ain >= 'h6000 && prg_ain < 'h8000;
-wire [21:0] prg_ram = {9'b11_1100_000, prg_ain[12:0]};
-
-assign prg_aout = prg_is_ram ? prg_ram : {prg_bank[5:0], prg_ain[14:0]};
-assign prg_allow = prg_ain[15] && !prg_write || prg_is_ram;
-assign chr_allow = flags[15];
-assign chr_aout = {9'b10_0000_000, chr_switch ? chr_bank : chr_ain[12], chr_ain[11:0]};
-assign vram_ce = chr_ain[13];
-assign vram_a10 = flags[14] ? chr_ain[10] : chr_ain[11];
-
-endmodule
 // Combine with other mapper (15?)
 // #225 -  64-in-1
 // #255 -  110-in-1 - This runs with buggy menu selection.  It runs correctly as mapper 225.
-//  Unsure if any games require simulating missing 74-670 RAM (4 nybbles).
+//  Unsure if any games require simulating missing 74-670 RAM (4 bytes).
 module Mapper225(
 	input        clk,         // System clock
 	input        ce,          // M2 ~cpu_clk
@@ -1527,7 +1386,7 @@ module Mapper225(
 	inout        irq_b,       // IRQ
 	input [15:0] audio_in,    // Inverted audio from APU
 	inout [15:0] audio_b,     // Mixed audio output
-	inout [15:0] flags_out_b  // flags {0, 0, 0, 0, 0, prg_conflict, prg_bus_write, has_chr_dout}
+	inout [15:0] flags_out_b  // flags {0, 0, 0, 0, 0, prg_conflict, prg_open_bus, has_chr_dout}
 );
 
 assign prg_aout_b   = enable ? prg_aout : 22'hZ;
@@ -1547,9 +1406,9 @@ wire chr_allow;
 wire vram_a10;
 wire vram_ce;
 wire [7:0] prg_dout;
-wire prg_bus_write = (~mapper255 & prg_ram);
+wire prg_open_bus = mapper255 && prg_ram || (!prg_ram && !prg_ain[15]);
 wire prg_ram = (prg_ain[15:11] == 5'b01011);
-wire [15:0] flags_out = {14'h0, prg_bus_write, 1'b0};
+wire [15:0] flags_out = {14'h0, prg_open_bus, 1'b0};
 
 wire [7:0] mapper = flags[7:0];
 wire mapper255 = (mapper == 8'd255);
@@ -1589,449 +1448,5 @@ assign chr_allow = flags[15]; // CHR RAM?
 assign chr_aout = {2'b10, bank_mode[14], bank_mode[5:0], chr_ain[12:0]};
 assign vram_ce = chr_ain[13];
 assign vram_a10 = mirroring ? chr_ain[11] : chr_ain[10];
-
-endmodule
-
-
-// #31 -  NSF Player
-module NSF(
-	input        clk,         // System clock
-	input        ce,          // M2 ~cpu_clk
-	input        enable,      // Mapper enabled
-	input [31:0] flags,       // Cart flags
-	input [15:0] prg_ain,     // prg address
-	inout [21:0] prg_aout_b,  // prg address out
-	input        prg_read,    // prg read
-	input        prg_write,   // prg write
-	input  [7:0] prg_din,     // prg data in
-	inout  [7:0] prg_dout_b,  // prg data out
-	inout        prg_allow_b, // Enable access to memory for the specified operation.
-	input [13:0] chr_ain,     // chr address in
-	inout [21:0] chr_aout_b,  // chr address out
-	input        chr_read,    // chr ram read
-	inout        chr_allow_b, // chr allow write
-	inout        vram_a10_b,  // Value for A10 address line
-	inout        vram_ce_b,   // True if the address should be routed to the internal 2kB VRAM.
-	inout        irq_b,       // IRQ
-	input [15:0] audio_in,    // Inverted audio from APU
-	inout [15:0] audio_b,     // Mixed audio output
-	output [5:0] exp_audioe,  // Expansion Enabled (0x0=None, 0x1=VRC6, 0x2=VRC7, 0x4=FDS, 0x8=MMC5, 0x10=N163, 0x20=SS5B
-	inout [15:0] flags_out_b, // flags {0, 0, 0, 0, 0, prg_conflict, prg_bus_write, has_chr_dout}
-	input  [7:0] fds_din      // fds data in
-);
-
-assign prg_aout_b   = enable ? prg_aout : 22'hZ;
-assign prg_dout_b   = enable ? prg_dout : 8'hZ;
-assign prg_allow_b  = enable ? prg_allow : 1'hZ;
-assign chr_aout_b   = enable ? chr_aout : 22'hZ;
-assign chr_allow_b  = enable ? chr_allow : 1'hZ;
-assign vram_a10_b   = enable ? vram_a10 : 1'hZ;
-assign vram_ce_b    = enable ? vram_ce : 1'hZ;
-assign irq_b        = enable ? 1'b0 : 1'hZ;
-assign flags_out_b  = enable ? flags_out : 16'hZ;
-assign audio_b      = enable ? {audio_in[15:0]} : 16'hZ;
-assign exp_audioe   = enable ? nsf_reg[3][5:0] : 6'h00;
-
-wire [21:0] prg_aout, chr_aout;
-wire [7:0] prg_dout;
-wire prg_allow;
-wire chr_allow;
-wire vram_a10;
-wire vram_ce;
-wire [15:0] flags_out = {14'd0, prg_bus_write, 1'b0};
-reg prg_bus_write;
-
-wire [3:0] submapper = flags[24:21];
-reg [7:0] nsf_reg [15:0];
-reg [15:0] counter;
-reg [5:0] clk1MHz;
-
-// Resuse MMC5 multiplier instead?
-reg [7:0] multiplier_1;
-reg [7:0] multiplier_2;
-wire [15:0] multiply_result = multiplier_1 * multiplier_2;
-
-/*
-;----------------------------------
-; NSF player for PowerPak
-;
-; Player rom is at $4100-4FFF (NSF header at $4100)
-;
-; PowerPak registers:
-;
-;  5FF0: timer latch LSB
-;  5FF1: timer latch MSB
-;  5FF2: timer status (Read: bit7=timer wrapped,  Write: clear status)
-;  5FF3: Expansion audio control (copy header[0x7B] here)
-;  5FF6-5FFF: banking registers (as described in NSF spec)
-;
-;  Timer details:
-;      PowerPak NSF mapper has a 16bit 1MHz counter that counts down from [5FF1:5FF0] to 0.
-;      After the counter reaches 0, it's automatically reloaded and timer status bit is set.
-;      Clear the status bit by writing to $5FF2.
-;
-;-----------------------------------
-*/
-always @(posedge clk) begin
-	// 21.477272MHz/1MHz
-	// Using 21.5; Replace with actual pll?
-	clk1MHz <= clk1MHz + 1'b1;
-	if (clk1MHz == 6'd42)
-		clk1MHz <= 6'd0;
-	if (clk1MHz == 6'd21 || clk1MHz == 6'd42) begin
-		counter <= counter - 1'b1;
-		if (counter == 16'h0000)
-		begin
-			counter <= {nsf_reg[1], nsf_reg[0]};
-			nsf_reg[2] <= 8'h80;
-		end
-	end
-
-
-	if (~enable) begin
-		nsf_reg[4'h3] <= 8'h00;
-		nsf_reg[4'h6] <= 8'h06;
-		nsf_reg[4'h7] <= 8'h07;
-		nsf_reg[4'h8] <= 8'h00;
-		nsf_reg[4'h9] <= 8'h01;
-		nsf_reg[4'hA] <= 8'h02;
-		nsf_reg[4'hB] <= 8'h03;
-		nsf_reg[4'hC] <= 8'h04;
-		nsf_reg[4'hD] <= 8'h05;
-		nsf_reg[4'hE] <= 8'h06;
-		nsf_reg[4'hF] <= 8'hFF;
-	end else if (ce) begin
-		if ((prg_ain[15:4]==12'h5FF) && prg_write)
-			nsf_reg[prg_ain[3:0]] <= prg_din;
-		if ((prg_ain==16'h5FF2) && prg_write)
-			nsf_reg[2] <= 8'h00;
-		if ((prg_ain==16'h5205) && prg_write)
-			multiplier_1 <= prg_din;
-		if ((prg_ain==16'h5206) && prg_write)
-			multiplier_2 <= prg_din;
-	end
-end
-
-wire [9:0] prg_bank;
-always begin
-	casez({prg_ain[15:12], exp_audioe[2]})
-		5'b00???: prg_bank = 10'h0;//{10'b11_1110_0000};
-		5'b0100?: prg_bank = 10'h0;//{10'b11_1110_0000};
-		5'b0101?: prg_bank = {10'b11_1110_0000};
-		5'b011?0: prg_bank = {9'b11_1100_000, prg_ain[12]};
-		5'b011?1: prg_bank = {2'b01, nsf_reg[{3'b011, prg_ain[12]}]};
-		5'b1????: prg_bank = {2'b01, nsf_reg[{1'b1, prg_ain[14:12]}]};
-	endcase
-end
-
-always begin
-	prg_bus_write = 1'b1;
-	if (prg_ain == 16'h5205) begin
-		prg_dout = multiply_result[7:0];
-	end else if (prg_ain == 16'h5206) begin
-		prg_dout = multiply_result[15:8];
-	end else if (prg_ain[15:8] == 8'h40) begin
-		prg_dout = fds_din;
-	end else if (prg_ain == 16'h5FF2) begin
-		prg_dout = nsf_reg[4'h2];
-	end else begin
-		prg_dout = prg_din;
-		prg_bus_write = 0;
-	end
-end
-
-assign prg_aout = ((submapper == 4'hF) && ({prg_ain[15:1],1'b0} == 16'hFFFC)) ? {10'h0, prg_ain[11:0]} : {prg_bank, prg_ain[11:0]};
-assign prg_allow = (((prg_ain[15] || ((prg_ain>=16'h4080) && (prg_ain<16'h4FFF))) && !prg_write) || (prg_ain[15:13]==3'b011)
-                   || (prg_ain[15:10]==6'b010111 && prg_ain[9:4]!=6'b111111) || ((prg_ain>=16'h8000) && (prg_ain<16'hDFFF) && exp_audioe[2]));
-assign chr_allow = flags[15]; // CHR RAM always...
-assign chr_aout = {9'b10_0000_000, chr_ain[12:0]};
-assign vram_ce = chr_ain[13];
-assign vram_a10 = flags[14] ? chr_ain[10] : chr_ain[11];
-
-endmodule
-
-// 111 - Cheapocabra/GTROM
-// Supports all features except LED and self-reflashing support
-module Mapper111(
-	input        clk,         // System clock
-	input        ce,          // M2 ~cpu_clk
-	input        enable,      // Mapper enabled
-	input [31:0] flags,       // Cart flags
-	input [15:0] prg_ain,     // prg address
-	inout [21:0] prg_aout_b,  // prg address out
-	input        prg_read,    // prg read
-	input        prg_write,   // prg write
-	input  [7:0] prg_din,     // prg data in
-	inout  [7:0] prg_dout_b,  // prg data out
-	inout        prg_allow_b, // Enable access to memory for the specified operation.
-	input [13:0] chr_ain,     // chr address in
-	inout [21:0] chr_aout_b,  // chr address out
-	input        chr_read,    // chr ram read
-	inout        chr_allow_b, // chr allow write
-	inout        vram_a10_b,  // Value for A10 address line
-	inout        vram_ce_b,   // True if the address should be routed to the internal 2kB VRAM.
-	inout        irq_b,       // IRQ
-	input [15:0] audio_in,    // Inverted audio from APU
-	inout [15:0] audio_b,     // Mixed audio output
-	inout [15:0] flags_out_b  // flags {0, 0, 0, 0, 0, prg_conflict, prg_bus_write, has_chr_dout}
-);
-
-assign prg_aout_b   = enable ? prg_aout : 22'hZ;
-assign prg_dout_b   = enable ? prg_dout : 8'hZ;
-assign prg_allow_b  = enable ? prg_allow : 1'hZ;
-assign chr_aout_b   = enable ? chr_aout : 22'hZ;
-assign chr_allow_b  = enable ? chr_allow : 1'hZ;
-assign vram_a10_b   = enable ? vram_a10 : 1'hZ;
-assign vram_ce_b    = enable ? vram_ce : 1'hZ;
-assign irq_b        = enable ? irq : 1'hZ;
-assign flags_out_b  = enable ? flags_out : 16'hZ;
-assign audio_b      = enable ? audio : 16'hZ;
-
-wire [21:0] prg_aout, chr_aout;
-wire [7:0] prg_dout;
-wire prg_allow, chr_allow;
-wire vram_ce, vram_a10;
-wire [15:0] audio = audio_in;
-wire irq;
-
-reg [15:0] flags_out = 0;
-reg [3:0] prgbank_reg;
-reg chrbank_reg;
-reg namebank_reg;
-
-always@(posedge clk) begin // register mask: 01x1 xxxx xxxx xxxx
-    if (~enable) begin
-        {prgbank_reg, chrbank_reg, namebank_reg} <= 0;
-    end else if(ce & prg_write & prg_ain[12] & prg_ain[14] & !prg_ain[15]) begin
-        prgbank_reg <= prg_din[3:0];
-        chrbank_reg <= prg_din[4];
-        namebank_reg <= prg_din[5];
-    end
-end
-
-assign chr_aout[21:15] = 7'b11_1100_0;
-assign chr_aout[14:13] = {chr_ain[13], chr_ain[13]?namebank_reg:chrbank_reg};
-assign chr_aout[12:0] = chr_ain[12:0];
-assign vram_a10 = chr_aout[10];
-assign prg_aout[21:19] = 3'b000;
-assign prg_aout[18:15] = prgbank_reg;
-assign prg_aout[14:0] = prg_ain[14:0];
-assign prg_allow = prg_ain[15] && !prg_write;
-assign chr_allow = 1'b1;
-assign prg_dout = 8'hFF;
-assign vram_ce = 1'b0;
-assign irq = 1'b0;
-
-endmodule
-
-
-// 83 Cony/Yoko - Unlicensed fighting game bootlegs
-// Street Fighter II Pro, Fatal Fury 2, World Heroes 2
-module Mapper83(
-	input        clk,         // System clock
-	input        ce,          // M2 ~cpu_clk
-	input        enable,      // Mapper enabled
-	input [31:0] flags,       // Cart flags
-	input [15:0] prg_ain,     // prg address
-	inout [21:0] prg_aout_b,  // prg address out
-	input        prg_read,    // prg read
-	input        prg_write,   // prg write
-	input  [7:0] prg_din,     // prg data in
-	inout  [7:0] prg_dout_b,  // prg data out
-	inout        prg_allow_b, // Enable access to memory for the specified operation.
-	input [13:0] chr_ain,     // chr address in
-	inout [21:0] chr_aout_b,  // chr address out
-	input        chr_read,    // chr ram read
-	inout        chr_allow_b, // chr allow write
-	inout        vram_a10_b,  // Value for A10 address line
-	inout        vram_ce_b,   // True if the address should be routed to the internal 2kB VRAM.
-	inout        irq_b,       // IRQ
-	input [15:0] audio_in,    // Inverted audio from APU
-	inout [15:0] audio_b,     // Mixed audio output
-	inout [15:0] flags_out_b  // flags {0, 0, 0, 0, 0, prg_conflict, prg_bus_write, has_chr_dout}
-);
-
-assign prg_aout_b   = enable ? prg_aout : 22'hZ;
-assign prg_dout_b   = enable ? prg_dout : 8'hZ;
-assign prg_allow_b  = enable ? prg_allow : 1'hZ;
-assign chr_aout_b   = enable ? chr_aout : 22'hZ;
-assign chr_allow_b  = enable ? chr_allow : 1'hZ;
-assign vram_a10_b   = enable ? vram_a10 : 1'hZ;
-assign vram_ce_b    = enable ? vram_ce : 1'hZ;
-assign irq_b        = enable ? irq : 1'hZ;
-assign flags_out_b  = enable ? flags_out : 16'hZ;
-assign audio_b      = enable ? audio : 16'hZ;
-
-wire [21:0] prg_aout, chr_aout;
-reg [7:0] prg_dout;
-wire prg_allow, chr_allow;
-wire vram_ce, vram_a10;
-wire [15:0] audio = audio_in;
-wire [15:0] flags_out = {14'h0, prg_bus_write, 1'h0};
-wire prg_bus_write;
-
-wire submapper1 = flags[21];
-wire submapper2 = flags[22];
-
-// mode register bits
-reg [1:0] prgbank_mode; // determines PRG banking mode
-reg [1:0] mirroring;
-reg prg_reg3_enable;    // if 1, maps 8 KiB PRG bank to 0x6000-0x7FFF for submapper 0 and 1
-reg irq_mode, irq_latch;
-
-reg irq;
-reg irq_enable;
-reg [15:0] irq_counter;
-
-reg [4:0] prgbank_reg[3:0];
-reg [3:0] prgbank_reg4;
-reg [7:0] chrbank_reg[7:0];
-
-reg [1:0] dipswitch; // alters title screen, wrong dipswitch can result in garbled graphics
-
-reg [7:0] scratch_ram[3:0];
-
-// Submapper 2 only
-// outer 256 KiB PRG/CHR-ROM bank
-reg [1:0] outer_bank;
-// select 8 KiB WRAM bank
-reg [1:0] wrambank;
-
-always@(posedge clk) begin
-    if (~enable) begin
-        {irq, irq_mode, irq_latch, irq_enable, irq_counter} <= 0;
-        {prg_reg3_enable, prgbank_mode, mirroring}          <= 0;
-        outer_bank   <= 0;
-        wrambank     <= 0;
-        dipswitch    <= 0;
-        chrbank_reg  <= '{default:0};
-        prgbank_reg  <= '{default:0};
-        prgbank_reg4 <= 0;
-        scratch_ram  <= '{default:0};
-    end else if(ce) begin
-        if (prg_write) begin
-            casez(prg_ain[15:8])
-                8'b1???_??00 : begin
-                    {wrambank, outer_bank} <= prg_din[7:4];
-                    {prgbank_reg4}         <= prg_din[3:0];
-                end
-                8'b1???_??01 : begin
-                    {irq_latch, irq_mode, prg_reg3_enable, prgbank_mode} <= prg_din[7:3];
-                    mirroring <= prg_din[1:0];
-                end
-                8'b1???_??10 : begin
-                    if (prg_ain[0]) begin
-                        irq_counter[15:8] <= prg_din;
-                        irq_enable        <= irq_latch;
-                    end else begin
-                        irq_counter[7:0]  <= prg_din;
-                        irq               <= 1'b0; // IRQ ACK
-                    end
-                end
-                8'b1???_??11 : begin
-                    if (prg_ain[4]) begin
-                        if (!prg_ain[3])
-                            chrbank_reg[prg_ain[2:0]] <= prg_din;
-                    end else
-                        prgbank_reg[prg_ain[1:0]] <= prg_din[4:0];
-                end
-                8'b0101_???? : begin
-                    if (|prg_ain[11:8])
-                        scratch_ram[prg_ain[1:0]] <= prg_din;
-                end
-            endcase
-        end
-
-        if (irq_enable) begin
-            if (irq_mode)
-                irq_counter <= irq_counter - 16'd1;
-            else
-                irq_counter <= irq_counter + 16'd1;
-        end
-
-        if (irq_enable && (irq_counter == 16'h0000)) begin
-            irq        <= 1'b1;
-            irq_enable <= 1'b0;
-        end
-    end
-end
-
-always_comb begin
-    // mirroring
-    casez(mirroring[1:0])
-        2'b00:   vram_a10 = {chr_ain[10]};    // vertical
-        2'b01:   vram_a10 = {chr_ain[11]};    // horizontal
-        2'b1?:   vram_a10 = {mirroring[0]};   // single screen
-    endcase
-end
-
-// PRG address space mapping
-reg [4:0] prgsel;
-always_comb begin
-    casez ({prgbank_mode, prg_ain[15:13]})
-        // mode 0
-        5'b00_10? : prgsel = {prgbank_reg4, prg_ain[13]}; // 0x8000-0xBFFF
-        5'b00_11? : prgsel = {4'b1111,      prg_ain[13]}; // 0xC000-0xFFFF
-        // mode 1
-        5'b01_1?? : prgsel = {prgbank_reg4[3:1], prg_ain[14:13]}; // 0x8000-0xFFFF
-        // mode 2 and 3
-        5'b1?_100 : prgsel = prgbank_reg[0]; // 0x8000-0x9FFF
-        5'b1?_101 : prgsel = prgbank_reg[1]; // 0xA000-0xBFFF
-        5'b1?_110 : prgsel = prgbank_reg[2]; // 0xC000-0xDFFF
-        5'b1?_111 : prgsel = 5'b11_111;      // 0xE000-0xFFFF
-        // all modes
-        5'b??_011 : prgsel = prgbank_reg[3]; // 0x6000-0x7FFF
-        default   : prgsel = {2'd0, prg_ain[15:13]};
-    endcase
-end
-
-// CHR address space mapping
-reg [9:0] chrsel;
-always_comb begin
-    chrsel = 0;
-    casez({submapper1, chr_ain[13:11]})
-        // submapper 1
-        4'b1_000 : chrsel = {1'b0, chrbank_reg[0], chr_ain[10]};
-        4'b1_001 : chrsel = {1'b0, chrbank_reg[1], chr_ain[10]};
-        4'b1_010 : chrsel = {1'b0, chrbank_reg[6], chr_ain[10]};
-        4'b1_011 : chrsel = {1'b0, chrbank_reg[7], chr_ain[10]};
-        // submapper 0 and 2
-        4'b0_0?? : chrsel = {submapper2 ? outer_bank : 2'b00, chrbank_reg[chr_ain[12:10]]};
-        // all submappers
-        default   : chrsel = {6'd0, chr_ain[13:10]};
-    endcase
-end
-
-// handle reads from scratch RAM and dipswitch
-always_comb begin
-    casez(prg_ain[15:12])
-        4'h5 : begin
-            if (|prg_ain[11:8]) begin
-                prg_dout = scratch_ram[prg_ain[1:0]];
-            end else
-                prg_dout = {6'b1111_11, dipswitch};
-        end
-        default : begin
-            prg_dout = 8'hFF;
-        end
-    endcase
-end
-
-wire prg_read_blocked = (prg_ain[15:13] == 3'b011) && !submapper2 && !prg_reg3_enable;
-assign prg_bus_write  = (prg_ain[15:12] == 4'h5) || prg_read_blocked;
-
-wire is_wram = submapper2 && (prg_ain[15:13] == 3'b011);
-
-assign chr_aout[21:20] = 2'b10;
-assign chr_aout[19:10] = chrsel;
-assign chr_aout[9:0]   = chr_ain[9:0];
-
-assign prg_aout[21:18] = is_wram ? 4'b11_11 : {2'b00, submapper2 ? outer_bank : 2'b00};
-assign prg_aout[17:13] = is_wram ? {3'b00_0, wrambank} : prgsel;
-assign prg_aout[12:0]  = prg_ain[12:0];
-
-assign prg_allow = (prg_ain[15] && !prg_write) || is_wram;
-assign chr_allow = flags[15];
-assign vram_ce = chr_ain[13];
 
 endmodule

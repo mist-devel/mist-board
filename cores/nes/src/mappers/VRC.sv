@@ -22,7 +22,7 @@ module VRC1(
 	inout        irq_b,       // IRQ
 	input [15:0] audio_in,    // Inverted audio from APU
 	inout [15:0] audio_b,     // Mixed audio output
-	inout [15:0] flags_out_b  // flags {0, 0, 0, 0, 0, prg_conflict, prg_bus_write, has_chr_dout}
+	inout [15:0] flags_out_b  // flags {0, 0, 0, 0, 0, prg_conflict, prg_open_bus, has_chr_dout}
 );
 
 assign prg_aout_b   = enable ? prg_aout : 22'hZ;
@@ -119,7 +119,7 @@ module VRC3(
 	inout        irq_b,       // IRQ
 	input [15:0] audio_in,    // Inverted audio from APU
 	inout [15:0] audio_b,     // Mixed audio output
-	inout [15:0] flags_out_b  // flags {0, 0, 0, 0, 0, prg_conflict, prg_bus_write, has_chr_dout}
+	inout [15:0] flags_out_b  // flags {0, 0, 0, 0, 0, prg_conflict, prg_open_bus, has_chr_dout}
 );
 
 assign prg_aout_b   = enable ? prg_aout : 22'hZ;
@@ -223,7 +223,7 @@ module VRC24(
 	inout        irq_b,       // IRQ
 	input [15:0] audio_in,    // Inverted audio from APU
 	inout [15:0] audio_b,     // Mixed audio output
-	inout [15:0] flags_out_b  // flags {0, 0, 0, 0, 0, prg_conflict, prg_bus_write, has_chr_dout}
+	inout [15:0] flags_out_b  // flags {0, 0, 0, 0, 0, prg_conflict, prg_open_bus, has_chr_dout}
 );
 
 assign prg_aout_b   = enable ? prg_aout : 22'hZ;
@@ -254,7 +254,7 @@ reg [8:0] chr_tmp;
 reg prg_invert;
 wire mapper21 = (flags[7:0] == 21);
 wire mapper22 = (flags[7:0] == 22);
-wire mapper23 = (flags[7:0] == 23 | flags[7:0] == 27);
+wire mapper23 = (flags[7:0] == 23);
 //wire mapper25 = (flags[7:0] == 25); //default
 wire mapperVRC4 = (flags[7:0] != 22) && (flags[24:21] != 3);
 wire [1:0] registers = {mapper21 ?  {(prg_ain[7]|prg_ain[2]),(prg_ain[6]|prg_ain[1])} :
@@ -378,7 +378,7 @@ module VRC6(
 	inout        irq_b,       // IRQ
 	input [15:0] audio_in,    // Inverted audio from APU
 	inout [15:0] audio_b,     // Mixed audio output
-	inout [15:0] flags_out_b  // flags {0, 0, 0, 0, 0, prg_conflict, prg_bus_write, has_chr_dout}
+	inout [15:0] flags_out_b  // flags {0, 0, 0, 0, 0, prg_conflict, prg_open_bus, has_chr_dout}
 );
 
 assign prg_aout_b   = enable ? prg_aout : 22'hZ;
@@ -399,7 +399,7 @@ wire chr_allow;
 wire vram_a10;
 wire vram_ce;
 wire irq;
-wire [15:0] audio = audio_in;
+wire [15:0] audio;
 reg [15:0] flags_out = 0;
 
 wire nesprg_oe;
@@ -411,7 +411,7 @@ wire prgram_we;
 wire chrram_oe;
 wire prgram_oe;
 wire [18:13] ramprgaout;
-//wire exp6;
+wire exp6;
 reg [7:0] m2;
 wire m2_n = 1;//~ce;  //m2_n not used as clk.  Invert m2 (ce).
 
@@ -423,9 +423,18 @@ end
 MAPVRC6 vrc6(m2[7], m2_n, clk, enable, prg_write, nesprg_oe, 0,
 	1, prg_ain, chr_ain, prg_din, 8'b0, prg_dout,
 	neschrdout, neschr_oe, chr_allow, chrram_oe, wram_oe, wram_we, prgram_we,
-	prgram_oe, chr_aout[18:10], ramprgaout, irq, vram_ce,// exp6,
+	prgram_oe, chr_aout[18:10], ramprgaout, irq, vram_ce, exp6,
 	0, 7'b1111111, 6'b111111, flags[14], flags[16], flags[15],
-	ce, flags[1]);
+	ce, exp_audio, flags[1]);
+
+// VRC6 audio is much louder than APU audio, so match the levels we have to reduce it 
+// to about 43% to match the audio ratio of the original Famicom with AD3. Note that the
+// VRC6 audio is opposite polarity from APU audio.
+
+wire [15:0] exp_audio;
+wire [16:0] mixed_audio = audio_in + (exp_audio[15:1] + exp_audio[15:3]);
+assign audio = mixed_audio[16:1];
+
 
 assign chr_aout[21:19] = 3'b100;
 assign chr_aout[9:0] = chr_ain[9:0];
@@ -460,7 +469,7 @@ module VRC7(
 	inout        irq_b,       // IRQ
 	input [15:0] audio_in,    // Inverted audio from APU
 	inout [15:0] audio_b,     // Mixed audio output
-	inout [15:0] flags_out_b  // flags {0, 0, 0, 0, 0, prg_conflict, prg_bus_write, has_chr_dout}
+	inout [15:0] flags_out_b  // flags {0, 0, 0, 0, 0, prg_conflict, prg_open_bus, has_chr_dout}
 );
 
 assign prg_aout_b   = enable ? prg_aout : 22'hZ;
@@ -481,7 +490,7 @@ wire vram_a10;
 wire vram_ce;
 wire irq;
 reg [15:0] flags_out = 0;
-wire [15:0] audio = audio_in;
+wire [15:0] audio;
 
 assign chr_aout[21:18] = 4'b1000;
 assign chr_aout[9:0] = chr_ain[9:0];
@@ -504,13 +513,14 @@ reg [5:0] prgbank8;
 reg [5:0] prgbankA;
 reg [5:0] prgbankC;
 wire prg_ain43 = prg_ain[4] ^ prg_ain[3];
-reg ramw;
+reg ramw, soff;
 
 always@(posedge clk) begin
 	if (~enable) begin
+		soff <= 1'b0;
 		{chrbank0, chrbank1, chrbank2, chrbank3, chrbank4, chrbank5, chrbank6, chrbank7} <= 0;
 		{prgbank8, prgbankA, prgbankC} <= 0;
-		ramw <= 0;
+		{ramw, soff} <= 0;
 	end else if(ce && prg_write) begin
 		casex({prg_ain[15:12],prg_ain43})
 			5'b10000:prgbank8<=prg_din[5:0]; //8000
@@ -524,7 +534,7 @@ always@(posedge clk) begin
 			5'b11001:chrbank5<=prg_din;      //C008/10
 			5'b11010:chrbank6<=prg_din;      //D000
 			5'b11011:chrbank7<=prg_din;      //D008/10
-			5'b11100:{ramw,mirror}<={prg_din[7],prg_din[1:0]};   //E000
+			5'b11100:{ramw,soff,mirror}<={prg_din[7:6],prg_din[1:0]};   //E000
 			//5'b11101:irqlatch<=nesprgdin;      //E008/10
 			//5'b11110:{irqM,irqA}<={nesprgdin[2],nesprgdin[0]}; //F000
 		endcase
@@ -558,6 +568,35 @@ wire irqc = {prg_ain[15:12],prg_ain43}==5'b11110; // 0xF000
 wire irqa = {prg_ain[15:12],prg_ain43}==5'b11111; // 0xF008 or 0xF010
 
 vrcIRQ vrc7irq(clk,enable,prg_write,{irql,irql},irqc,irqa,prg_din,irq,ce);
+
+reg [3:0] ce_count;
+always@(posedge clk) begin
+	if (~enable)
+		ce_count <= 0;
+	else if (ce)
+		ce_count <= 0;
+	else
+		ce_count <= ce_count + 4'd1;
+end
+
+wire ack;
+wire ce_ym2143 = ce | (ce_count==4'd5);
+wire signed [13:0] ym2143audio;
+wire wr_audio = prg_write && (prg_ain[15:6]==10'b1001_0000_00) && (prg_ain[4:0]==5'b1_0000); //0x9010 or 0x9030
+eseopll ym2143vrc7 (clk,~enable, ce_ym2143,wr_audio,ce_ym2143,ack,wr_audio,{15'b0,prg_ain[5]},prg_din,ym2143audio);
+
+// The strategy here:
+// VRC7 sound is very low, and the top two bit is seldom (if ever) used. It's output as signed, so
+// what we do is convert to unsigned, then drop the top bit, clipping if needed. It's still very
+// low compared to NES audio, so we drop the bottom bit of NES audio, mix the two, then boost the
+// mixed result times two, again clipping if needed. The result is audio mixed more or less correctly
+// and at a similar level to the audio from regular games. I do not know the polarity of
+// VRC7 audio.
+
+wire [13:0] audio_exp = ym2143audio + 13'd4095;
+wire [15:0] audio_clip = audio_exp[13] ? 16'hFFFF : {audio_exp[12:0], audio_exp[13:11]};
+wire [16:0] audio_mixed = audio_in[15:1] + audio_clip;
+assign audio = soff ? 16'h8000 : (audio_mixed[16] ? 16'hFFFF : audio_mixed[15:0]);
 
 endmodule
 
@@ -594,7 +633,7 @@ module MAPVRC6(     //signal descriptions in powerpak.v
 	output irq,
 	output ciram_ce,
 
-//	output exp6,
+	output exp6,
 
 	input cfg_boot,
 	input [18:12] cfg_chrmask,
@@ -604,7 +643,7 @@ module MAPVRC6(     //signal descriptions in powerpak.v
 	input cfg_chrram,
 
 	input ce,// add
-	//output [15:0] audio,
+	output [15:0] audio,
 	input mapper26
 
 );
@@ -698,6 +737,18 @@ module MAPVRC6(     //signal descriptions in powerpak.v
 	assign nesprgdout=8'b0;
 	assign nesprg_oe=wram_oe | prgram_oe | config_rd;
 
+//sound
+//    wire [5:0] vrc6_out;
+	assign exp6 = 0;
+	wire [3:0] vrc6sq1_out;
+	wire [3:0] vrc6sq2_out;
+	wire [4:0] vrc6saw_out;
+	vrc6sound snd(clk20, ce, enable, nesprg_we, ain, nesprgdin, vrc6sq1_out, vrc6sq2_out, vrc6saw_out);
+
+	// VRC6 sound is mixed before amplification, and them amplified linearly
+	wire [5:0] exp_audio = vrc6sq1_out + vrc6sq2_out + vrc6saw_out;
+	assign audio = {exp_audio, exp_audio, exp_audio[5:2]};
+
 endmodule
 
 module vrcIRQ(
@@ -780,118 +831,17 @@ assign irq=timeout & irqE;
 
 endmodule
 
-module vrc7_mixed (
-	input         clk,
-	input         ce,    // Negedge M2 (aka CPU ce)
-	input         enable,
-	input         wren,
-	input  [15:0] addr_in,
-	input   [7:0] data_in,
-	input  [15:0] audio_in,    // Inverted audio from APU
-	output [15:0] audio_out
-);
-
-reg soff;
-wire prg_ain43 = addr_in[4] ^ addr_in[3];
-
-always@(posedge clk) begin
-	if (~enable) begin
-		soff <= 1'b0;
-	end else if(ce && wren && {addr_in[15:12],prg_ain43} == 5'b11100) begin
-		soff<=data_in[6];   //E000
-	end
-end
-
-reg [3:0] ce_count;
-always@(posedge clk) begin
-	if (~enable)
-		ce_count <= 0;
-	else if (ce)
-		ce_count <= 0;
-	else
-		ce_count <= ce_count + 4'd1;
-end
-
-wire ack;
-wire ce_ym2143 = ce | (ce_count==4'd5);
-wire signed [13:0] ym2143audio;
-wire wr_audio = wren && (addr_in[15:6]==10'b1001_0000_00) && (addr_in[4:0]==5'b1_0000); //0x9010 or 0x9030
-eseopll ym2143vrc7 (clk,~enable, ce_ym2143,wr_audio,ce_ym2143,ack,wr_audio,{15'b0,addr_in[5]},data_in,ym2143audio);
-
-// The strategy here:
-// VRC7 sound is very low, and the top bit is seldom (if ever) used. It's output as signed with
-// an actual used range of 6 * +/-512 = +/-3072.  What we do is convert to unsigned (+2048),
-// then clip to 4095. This clips the top 50% of the values, which are unlikely to be needed. This volume
-// is low compared to NES audio, so we mix accordingly, again clipping if needed. The result
-// is audio mixed more or less correctly and at a similar level to the audio from regular games.
-
-wire [13:0] audio_exp = ym2143audio + 14'h800;
-wire [13:0] audio_clip = audio_exp > 14'hFFF ? 14'hFFF : audio_exp;
-wire [15:0] audio_boost = {audio_clip[11:0], 4'b0000};
-wire [16:0] audio_mixed = audio_in[15:1] + audio_boost[15:1] + audio_boost[15:2] + audio_boost[15:4];
-assign audio_out = soff ? audio_in[15:1] : (audio_mixed[16] ? 16'hFFFF : audio_mixed[15:0]);
-
-endmodule
-
-module vrc6_mixed (
-	input         clk,
-	input         ce,    // Negedge M2 (aka CPU ce)
-	input         enable,
-	input         wren,
-	input         addr_invert,
-	input  [15:0] addr_in,
-	input   [7:0] data_in,
-	input  [15:0] audio_in,    // Inverted audio from APU
-	output [15:0] audio_out
-);
-
-vrc6sound snd_vrc6 (
-	.clk(clk),
-	.ce(ce),
-	.enable(enable),
-	.wr(wren),
-	.addr_invert(addr_invert),
-	.addr_in(addr_in),
-	.din(data_in),
-	.outSq1(vrc6sq1_out),
-	.outSq2(vrc6sq2_out),
-	.outSaw(vrc6saw_out)
-);
-
-//sound
-//    wire [5:0] vrc6_out;
-//	assign exp6 = 0;
-	wire [3:0] vrc6sq1_out;
-	wire [3:0] vrc6sq2_out;
-	wire [4:0] vrc6saw_out;
-
-	// VRC6 sound is mixed before amplification, and them amplified linearly
-	wire [5:0] exp_audio = vrc6sq1_out + vrc6sq2_out + vrc6saw_out;
-	wire [15:0] audio = {exp_audio, exp_audio, exp_audio[5:2]};
-
-// VRC6 audio is much louder than APU audio, so match the levels we have to reduce it 
-// to about 43% to match the audio ratio of the original Famicom with AD3. Note that the
-// VRC6 audio is opposite polarity from APU audio.
-
-	wire [16:0] mixed_audio = audio_in + (audio[15:1] + audio[15:3]);
-	assign audio_out = mixed_audio[16:1];
-
-endmodule
-
 module vrc6sound(
 	input clk,
 	input ce,
 	input enable,
 	input wr,
-	input addr_invert,
-	input [15:0] addr_in,
+	input [15:0] ain,
 	input [7:0] din,
 	output [3:0] outSq1,       //range=0..0x0F
 	output [3:0] outSq2,       //range=0..0x0F
 	output [4:0] outSaw        //range=0..0x1F
 );
-
-wire [15:0] ain=addr_invert ? {addr_in[15:2],addr_in[0],addr_in[1]} :  addr_in; //MAP1A : MAP18
 
 reg mode0, mode1;
 reg [3:0] vol0, vol1;

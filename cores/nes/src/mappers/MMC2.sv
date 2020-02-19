@@ -22,8 +22,7 @@ module MMC2(
 	inout        irq_b,       // IRQ
 	input [15:0] audio_in,    // Inverted audio from APU
 	inout [15:0] audio_b,     // Mixed audio output
-	inout [15:0] flags_out_b, // flags {0, 0, 0, 0, 0, prg_conflict, prg_bus_write, has_chr_dout}
-	input [13:0] chr_ain_o
+	inout [15:0] flags_out_b  // flags {0, 0, 0, 0, 0, prg_conflict, prg_open_bus, has_chr_dout}
 );
 
 assign prg_aout_b   = enable ? prg_aout : 22'hZ;
@@ -124,8 +123,8 @@ always @(posedge clk)
 if (~enable)
 	{latch_0, latch_1} <= 0;
 else if (ce && chr_read) begin
-	latch_0 <= (chr_ain_o & 14'h3fff) == 14'h0fd8 ? 1'd0 : (chr_ain_o & 14'h3fff) == 14'h0fe8 ? 1'd1 : latch_0;
-	latch_1 <= (chr_ain_o & 14'h3ff8) == 14'h1fd8 ? 1'd0 : (chr_ain_o & 14'h3ff8) == 14'h1fe8 ? 1'd1 : latch_1;
+	latch_0 <= (chr_ain & 14'h3fff) == 14'h0fd8 ? 1'd0 : (chr_ain & 14'h3fff) == 14'h0fe8 ? 1'd1 : latch_0;
+	latch_1 <= (chr_ain & 14'h3ff8) == 14'h1fd8 ? 1'd0 : (chr_ain & 14'h3ff8) == 14'h1fe8 ? 1'd1 : latch_1;
 end
 
 // The PRG bank to load. Each increment here is 8kb. So valid values are 0..15.
@@ -183,8 +182,7 @@ module MMC4(
 	inout        irq_b,       // IRQ
 	input [15:0] audio_in,    // Inverted audio from APU
 	inout [15:0] audio_b,     // Mixed audio output
-	inout [15:0] flags_out_b, // flags {0, 0, 0, 0, 0, prg_conflict, prg_bus_write, has_chr_dout}
-	input [13:0] chr_ain_o
+	inout [15:0] flags_out_b  // flags {0, 0, 0, 0, 0, prg_conflict, prg_open_bus, has_chr_dout}
 );
 
 assign prg_aout_b   = enable ? prg_aout : 22'hZ;
@@ -283,8 +281,8 @@ end
 // PPU reads $1FE8 through $1FEF: latch 1 is set to $FE for subsequent reads
 always @(posedge clk)
 if (ce & chr_read) begin
-	latch_0 <= (chr_ain_o & 14'h3ff8) == 14'h0fd8 ? 1'd0 : (chr_ain_o & 14'h3ff8) == 14'h0fe8 ? 1'd1 : latch_0;
-	latch_1 <= (chr_ain_o & 14'h3ff8) == 14'h1fd8 ? 1'd0 : (chr_ain_o & 14'h3ff8) == 14'h1fe8 ? 1'd1 : latch_1;
+	latch_0 <= (chr_ain & 14'h3ff8) == 14'h0fd8 ? 1'd0 : (chr_ain & 14'h3ff8) == 14'h0fe8 ? 1'd1 : latch_0;
+	latch_1 <= (chr_ain & 14'h3ff8) == 14'h1fd8 ? 1'd0 : (chr_ain & 14'h3ff8) == 14'h1fe8 ? 1'd1 : latch_1;
 end
 
 // The PRG bank to load. Each increment here is 16kb. So valid values are 0..15.

@@ -22,8 +22,7 @@ module Rambo1(
 	inout        irq_b,       // IRQ
 	input [15:0] audio_in,    // Inverted audio from APU
 	inout [15:0] audio_b,     // Mixed audio output
-	inout [15:0] flags_out_b, // flags {0, 0, 0, 0, 0, prg_conflict, prg_bus_write, has_chr_dout}
-	input [13:0] chr_ain_o
+	inout [15:0] flags_out_b  // flags {0, 0, 0, 0, 0, prg_conflict, prg_open_bus, has_chr_dout}
 );
 
 assign prg_aout_b   = enable ? prg_aout : 22'hZ;
@@ -54,27 +53,25 @@ reg chr_a12_invert;                // Mode for CHR banking
 reg mirroring;                     // 0 = vertical, 1 = horizontal
 reg irq_enable, irq_reload;        // IRQ enabled, and IRQ reload requested
 reg [7:0] irq_latch, counter;      // IRQ latch value and current counter
-reg [1:0] irq_delay;
-wire irq_imm;
+reg want_irq;
 reg [7:0] chr_bank_0, chr_bank_1;  // Selected CHR banks
 reg [7:0] chr_bank_2, chr_bank_3, chr_bank_4, chr_bank_5;
 reg [7:0] chr_bank_8, chr_bank_9;
 reg [5:0] prg_bank_0, prg_bank_1, prg_bank_2;  // Selected PRG banks
-reg irq_cycle_mode, next_irq_cycle_mode;
+reg irq_cycle_mode;
 reg [1:0] cycle_counter;
 
 // Mapper has vram_a10 wired to CHR A17
-//wire mapper64 = (flags[7:0] == 64);//default
-wire mapper158 = (flags[7:0] == 158);
+wire mapper64 = (flags[7:0] == 64);
 
 // This code detects rising edges on a12.
 reg old_a12_edge;
 reg [1:0] a12_ctr;
-wire a12_edge = (chr_ain_o[12] && a12_ctr == 0) || old_a12_edge;
+wire a12_edge = (chr_ain[12] && a12_ctr == 0) || old_a12_edge;
 
 always @(posedge clk) begin
 	old_a12_edge <= a12_edge && !ce;
-	a12_ctr <= chr_ain_o[12] ? 2'b11 : (a12_ctr != 0 && ce) ? a12_ctr - 2'b01 : a12_ctr;
+	a12_ctr <= chr_ain[12] ? 2'b11 : (a12_ctr != 0 && ce) ? a12_ctr - 2'b01 : a12_ctr;
 end
 
 always @(posedge clk)
@@ -86,38 +83,16 @@ if (~enable) begin
 	mirroring <= 0;
 	{irq_enable, irq_reload} <= 0;
 	{irq_latch, counter} <= 0;
+	want_irq <= 0;
 	{chr_bank_0, chr_bank_1} <= 0;
 	{chr_bank_2, chr_bank_3, chr_bank_4, chr_bank_5} <= 0;
 	{chr_bank_8, chr_bank_9} <= 0;
 	{prg_bank_0, prg_bank_1, prg_bank_2} <= 6'b111111;
 	irq_cycle_mode <= 0;
-	next_irq_cycle_mode <= 0;
 	cycle_counter <= 0;
 	irq <= 0;
 end else if (ce) begin
-	// Process these before writes so irq_reload and cycle_counter register writes take precedence.
 	cycle_counter <= cycle_counter + 1'd1;
-	irq_delay <= {1'b0, irq_delay[1]};
-	if ((cycle_counter == 3) || (!irq_cycle_mode))
-		irq_cycle_mode <= next_irq_cycle_mode;
-
-	irq_imm = 1'b0;
-	if (irq_cycle_mode ? (cycle_counter == 3) : a12_edge) begin
-		if (irq_reload || counter == 8'h00) begin
-			counter <= irq_latch + ((irq_reload && (|irq_latch[7:1])) ? 1'd1 : 1'd0);
-			irq_imm = irq_latch == 0;
-		end else begin
-			counter <= counter - 1'd1;
-		end
-
-		if (((counter == 1) || (irq_imm)) && irq_enable)
-			irq_delay <= irq_cycle_mode ? 2'b01 : 2'b10;
-		irq_reload <= 0;
-	end
-	if (irq_delay[0]) begin
-		irq <= 1;
-		irq_delay <= 2'b00;
-	end
 
 	if (prg_write && prg_ain[15]) begin
 		case({prg_ain[14:13], prg_ain[0]})
@@ -142,12 +117,26 @@ end else if (ce) begin
 			3'b01_1: begin end
 			3'b10_0: irq_latch <= prg_din;                      // IRQ latch ($C000-$DFFE, even)
 			3'b10_1: begin
-						{irq_reload, next_irq_cycle_mode} <= {1'b1, prg_din[0]}; // IRQ reload ($C001-$DFFF, odd)
+						{irq_reload, irq_cycle_mode} <= {1'b1, prg_din[0]}; // IRQ reload ($C001-$DFFF, odd)
 						cycle_counter <= 0;
 					end
-			3'b11_0: {irq_enable, irq} <= 2'b00;                 // IRQ disable ($E000-$FFFE, even)
-			3'b11_1: {irq_enable, irq} <= 2'b10;                 // IRQ enable ($E001-$FFFF, odd)
+			3'b11_0: {irq_enable, irq} <= 2'b0;                 // IRQ disable ($E000-$FFFE, even)
+			3'b11_1: irq_enable <= 1;                           // IRQ enable ($E001-$FFFF, odd)
 		endcase
+	end
+
+	if (irq_cycle_mode ? (cycle_counter == 3) : a12_edge) begin
+		if (irq_reload || counter == 0) begin
+			counter <= irq_latch;
+			want_irq <= irq_reload;
+		end else begin
+			counter <= counter - 1'd1;
+			want_irq <= 1;
+		end
+
+		if (counter == 0 && want_irq && !irq_reload && irq_enable)
+			irq <= 1;
+		irq_reload <= 0;
 	end
 end
 
@@ -187,7 +176,7 @@ end
 assign prg_aout = {3'b00_0,  prgsel, prg_ain[12:0]};
 assign {chr_allow, chr_aout} = {flags[15], 4'b10_00, chrsel, chr_ain[9:0]};
 assign prg_allow = prg_ain[15] && !prg_write;
-assign vram_a10 = mapper158 ? chrsel[7] :  // Mapper 158 controls mirroring by switching the top bits of the CHR address
+assign vram_a10 = mapper64 ? chrsel[7] :  // Mapper 64 controls mirroring by switching the top bits of the CHR address
 		mirroring ? chr_ain[11] : chr_ain[10];
 assign vram_ce = chr_ain[13];
 endmodule
@@ -214,8 +203,7 @@ module MMC3 (
 	inout        irq_b,       // IRQ
 	input [15:0] audio_in,    // Inverted audio from APU
 	inout [15:0] audio_b,     // Mixed audio output
-	inout [15:0] flags_out_b, // flags {0, 0, 0, 0, 0, prg_conflict, prg_bus_write, has_chr_dout}
-	input [13:0] chr_ain_o
+	inout [15:0] flags_out_b  // flags {0, 0, 0, 0, 0, prg_conflict, prg_open_bus, has_chr_dout}
 );
 
 assign prg_aout_b   = enable ? prg_aout : 22'hZ;
@@ -249,13 +237,12 @@ reg ram6_enabled, ram6_enable, ram6_protect; //extra bits for mmc6
 reg [7:0] chr_bank_0, chr_bank_1;  // Selected CHR banks
 reg [7:0] chr_bank_2, chr_bank_3, chr_bank_4, chr_bank_5;
 reg [5:0] prg_bank_0, prg_bank_1, prg_bank_2;  // Selected PRG banks
-reg last_a12;
 wire prg_is_ram;
 reg [4:0] irq_reg;
 assign irq = mapper48 ? irq_reg[4] : irq_reg[0];
 
 // The alternative behavior has slightly different IRQ counter semantics.
-wire mmc3_alt_behavior = acclaim;
+wire mmc3_alt_behavior = 0;
 
 wire TQROM =     (flags[7:0] == 119); 	// TQROM maps 8kB CHR RAM
 wire TxSROM =    (flags[7:0] == 118); 	// Connects CHR A17 to CIRAM A10
@@ -278,9 +265,8 @@ wire mapper192 = (flags[7:0] == 192);   // Has 4KB CHR RAM
 wire mapper194 = (flags[7:0] == 194);   // Has 2KB CHR RAM
 wire mapper195 = (flags[7:0] == 195);   // Has 4KB CHR RAM
 wire MMC6 = ((flags[7:0] == 4) && (flags[24:21] == 1)); // mapper 4, submapper 1 = MMC6
-wire acclaim = ((flags[7:0] == 4) && (flags[24:21] == 3)); // Acclaim mapper
 
-wire four_screen_mirroring = flags[16];// | DxROM; // not all DxROM are 4-screen
+wire four_screen_mirroring = flags[16] | DxROM;
 reg mapper47_multicart;
 reg [2:0] mapper37_multicart;
 wire [7:0] new_counter = (counter == 0 || irq_reload) ? irq_latch : counter - 1'd1;
@@ -308,7 +294,6 @@ if (~enable) begin
 	{prg_bank_0, prg_bank_1} <= 0;
 	prg_bank_2 <= 6'b111110;
 	a12_ctr <= 0;
-	last_a12 <= 0;
 	mapper37_multicart <= 3'b000;
 end else if (ce) begin
 	irq_reg[4:1] <= irq_reg[3:0]; // 4 cycle delay
@@ -337,7 +322,7 @@ end else if (ce) begin
 			endcase
 		end else if (!mapper112) begin
 			casez({prg_ain[14:13], prg_ain[1:0], mapper48})
-				5'b00_00_0: {mirroring, prg_bank_0} <= prg_din[6:0] ^ 7'h40; // Select 8 KB PRG ROM bank at $8000-$9FFF
+				5'b00_00_0: begin prg_bank_0 <= prg_din[5:0]; mirroring <= prg_din[6]; end // Select 8 KB PRG ROM bank at $8000-$9FFF
 				5'b00_00_1: prg_bank_0 <= prg_din[5:0];  // Select 8 KB PRG ROM bank at $8000-$9FFF
 				5'b00_01_?: prg_bank_1 <= prg_din[5:0];  // Select 8 KB PRG ROM bank at $A000-$BFFF
 				5'b00_10_?: chr_bank_0 <= prg_din;  // Select 2 KB CHR bank at PPU $0000-$07FF
@@ -350,7 +335,7 @@ end else if (ce) begin
 				5'b10_00_1: irq_latch <= prg_din ^ 8'hFF;              // IRQ latch ($C000-$DFFC)
 				5'b10_01_1: irq_reload <= 1;                           // IRQ reload ($C001-$DFFD)
 				5'b10_10_1: irq_enable <= 1;                           // IRQ enable ($C002-$DFFE)
-				5'b10_11_1: {irq_enable, irq_reg[0]} <= 2'b00;         // IRQ disable ($C003-$DFFF)
+				5'b10_11_1: begin irq_enable <= 0; irq_reg[0] <= 0; end// IRQ disable ($C003-$DFFF)
 
 				5'b11_00_1: mirroring <= !prg_din[6];  // Mirroring
 			endcase
@@ -375,10 +360,9 @@ end else if (ce) begin
 			endcase
 		end
 
-		if (mapper154)
-			mirroring <= !prg_din[6];
-		if (DxROM || mapper76)
-			mirroring <= flags[14]; // Hard-wired mirroring
+	if (mapper154) begin
+		mirroring <= !prg_din[6];
+		end
 	end
 	else if (regs_7e && prg_write && prg_ain[15:4]==12'h7EF) begin
 		casez({prg_ain[3:0], mapper82})
@@ -421,26 +405,17 @@ end else if (ce) begin
 	// All MMC3C's and Sharp MMC3B's will generate an IRQ on each scanline while $C000 is $00.
 	// This is because this version of the MMC3 generates IRQs when the scanline counter is equal to 0.
 	// In the community, this is known as the "normal" or "new" behavior.
-
-	last_a12 <= chr_ain_o[12];
-	if ((acclaim && (!last_a12 && chr_ain_o[12]) && (a12_ctr == 6)) ||
-		(~acclaim && chr_ain_o[12] && (a12_ctr == 0))) begin
+	if (chr_ain[12] && a12_ctr == 0) begin
 		counter <= new_counter;
 
 		// MMC Scanline
-		if ( (!mmc3_alt_behavior || counter != 0 || irq_reload) && new_counter == 0 && irq_enable && irq_support) begin
+		if ( (!mmc3_alt_behavior  || counter != 0 || irq_reload) && new_counter == 0 && irq_enable && irq_support) begin
 			irq_reg[0] <= 1;
 		end
 		irq_reload <= 0;
 	end
 
-	if (acclaim) begin
-		if (!last_a12 && chr_ain_o[12]) // acclaim mapper counts down 8 pulses, or 16 edges total
-			a12_ctr <= (a12_ctr != 0) ? a12_ctr - 4'b0001 : 4'b0111;
-		if (prg_ain == 16'hC001 && prg_write) a12_ctr <= 4'b0111;
-	end else begin // nintendo mapper 'cools down' for 16 low cycles
-		a12_ctr <= chr_ain_o[12] ? 4'b1111 : (a12_ctr != 0) ? a12_ctr - 4'b0001 : a12_ctr;
-	end
+	a12_ctr <= chr_ain[12] ? 4'b1111 : (a12_ctr != 0) ? a12_ctr - 4'b0001 : a12_ctr;
 end
 
 // The PRG bank to load. Each increment here is 8kb. So valid values are 0..63.
@@ -493,14 +468,23 @@ always @* begin
 end
 
 wire [21:0] prg_aout_tmp = {3'b00_0,  prgsel, prg_ain[12:0]};
+wire ram_enable_a = MMC6 ?
+						(ram6_enabled && ram6_enable && prg_ain[12] == 1'b1 && prg_ain[9] == 1'b0)
+					|| (ram6_enabled && ram_enable[3] && prg_ain[12] == 1'b1 && prg_ain[9] == 1'b1)
+					:
+						(ram_enable[0] && prg_ain[12:11] == 2'b00)
+					|| (ram_enable[1] && prg_ain[12:11] == 2'b01)
+					|| (ram_enable[2] && prg_ain[12:11] == 2'b10)
+					|| (ram_enable[3] && prg_ain[12:11] == 2'b11);
 
-wire ram_enable_a = !MMC6 ? (ram_enable[prg_ain[12:11]])
-						:   (ram6_enabled && ram6_enable && prg_ain[12] == 1'b1 && prg_ain[9] == 1'b0)
-						 || (ram6_enabled && ram_enable[3] && prg_ain[12] == 1'b1 && prg_ain[9] == 1'b1);
-
-wire ram_protect_a = !MMC6 ? (ram_protect[prg_ain[12:11]])
-						:   !(ram6_enabled && ram6_enable && ram6_protect && prg_ain[12] == 1'b1 && prg_ain[9] == 1'b0)
-						 && !(ram6_enabled && ram_enable[3] && ram_protect[3] && prg_ain[12] == 1'b1 && prg_ain[9] == 1'b1);
+wire ram_protect_a = MMC6 ?
+						!(ram6_enabled && ram6_enable && ram6_protect && prg_ain[12] == 1'b1 && prg_ain[9] == 1'b0)
+					&& !(ram6_enabled && ram_enable[3] && ram_protect[3] && prg_ain[12] == 1'b1 && prg_ain[9] == 1'b1)
+					:
+						(ram_protect[0] && prg_ain[12:11] == 2'b00)
+					|| (ram_protect[1] && prg_ain[12:11] == 2'b01)
+					|| (ram_protect[2] && prg_ain[12:11] == 2'b10)
+					|| (ram_protect[3] && prg_ain[12:11] == 2'b11);
 
 assign {chr_allow, chr_aout} =
 	(TQROM && chrsel[6])                    ? {1'b1, 9'b11_1111_111,    chrsel[2:0], chr_ain[9:0]} :   // TQROM 8kb CHR-RAM
@@ -549,8 +533,7 @@ module Mapper165(
 	inout        irq_b,       // IRQ
 	input [15:0] audio_in,    // Inverted audio from APU
 	inout [15:0] audio_b,     // Mixed audio output
-	inout [15:0] flags_out_b, // flags {0, 0, 0, 0, 0, prg_conflict, prg_bus_write, has_chr_dout}
-	input [13:0] chr_ain_o
+	inout [15:0] flags_out_b  // flags {0, 0, 0, 0, 0, prg_conflict, prg_open_bus, has_chr_dout}
 );
 
 assign prg_aout_b   = enable ? prg_aout : 22'hZ;
@@ -636,7 +619,7 @@ end else if (ce) begin
 	// All MMC3C's and Sharp MMC3B's will generate an IRQ on each scanline while $C000 is $00.
 	// This is because this version of the MMC3 generates IRQs when the scanline counter is equal to 0.
 	// In the community, this is known as the "normal" or "new" behavior.
-	if (chr_ain_o[12] && a12_ctr == 0) begin
+	if (chr_ain[12] && a12_ctr == 0) begin
 		counter <= new_counter;
 
 		if ((counter != 0 || irq_reload) && new_counter == 0 && irq_enable) begin
@@ -646,7 +629,7 @@ end else if (ce) begin
 		irq_reload <= 0;
 	end
 
-	a12_ctr <= chr_ain_o[12] ? 4'b1111 : (a12_ctr != 0) ? a12_ctr - 4'b0001 : a12_ctr;
+	a12_ctr <= chr_ain[12] ? 4'b1111 : (a12_ctr != 0) ? a12_ctr - 4'b0001 : a12_ctr;
 end
 
 // The PRG bank to load. Each increment here is 8kb. So valid values are 0..63.
