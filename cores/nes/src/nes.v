@@ -179,10 +179,10 @@ wire cpu_ce  = (div_cpu == div_cpu_n);
 wire ppu_ce  = (div_ppu == div_ppu_n);
 wire cart_ce = (cart_pre & ppu_ce); // First PPU cycle where cpu data is visible.
 
-// Prefetch
+// Signals
 wire cart_pre  = (ppu_tick == (cpu_tick_count[2] ? 1 : 0));
-wire ppu_fetch = (ppu_tick == (cpu_tick_count[2] ? 2 : 1));
-wire ppu_io    = (ppu_tick == (cpu_tick_count[2] ? 2 : 1));
+wire ppu_read  = (ppu_tick == (cpu_tick_count[2] ? 2 : 1));
+wire ppu_write = (ppu_tick == (cpu_tick_count[2] ? 1 : 0));
 
 // The infamous NES jitter is important for accuracy, but wreks havok on modern devices and scalers,
 // so what I do here is pause the whole system for one PPU clock and insert a "fake" ppu clock to
@@ -378,8 +378,8 @@ assign joypad_clock = {joypad2_cs && mr_int, joypad1_cs && mr_int};
 // 7 and 1/2 master cycles on NTSC. Therefore, the PPU should read or write once per cpu cycle, and
 // with our alignment, this should occur at PPU cycle 2 (the *third* cycle).
 
-wire mr_ppu     = mr_int && ppu_io; // Read *from* the PPU.
-wire mw_ppu     = mw_int && ppu_io; // Write *to* the PPU.
+wire mr_ppu     = mr_int && ppu_read; // Read *from* the PPU.
+wire mw_ppu     = mw_int && ppu_write; // Write *to* the PPU.
 wire ppu_cs = addr >= 'h2000 && addr < 'h4000;
 wire [7:0] ppu_dout;            // Data from PPU to CPU
 wire chr_read, chr_write;       // If PPU reads/writes from VRAM
@@ -402,8 +402,6 @@ PPU ppu(
 	.read             (ppu_cs && mr_ppu),
 	.write            (ppu_cs && mw_ppu),
 	.nmi              (nmi),
-	.pre_read         (ppu_fetch & mr_int & ppu_cs),
-	.pre_write        (ppu_fetch & mw_int & ppu_cs),
 	.vram_r           (chr_read),
 	.vram_w           (chr_write),
 	.vram_a           (chr_addr),

@@ -603,8 +603,6 @@ module PPU(
 	input         read,             // read
 	input         write,            // write
 	output reg    nmi,              // one while inside vblank
-	input         pre_read,
-	input         pre_write,
 	output        vram_r,           // read from vram active
 	output        vram_w,           // write to vram active
 	output [13:0] vram_a,           // vram address
@@ -829,12 +827,12 @@ assign vram_a =
 	{1'b0, bg_patt, bg_name_table, cycle[1], loopy[14:12]};                          // Pattern table bitmap #0, #1
 
 // Read from VRAM, either when user requested a manual read, or when we're generating pixels.
-wire vram_r_ppudata = pre_read && (ain == 7);
+wire vram_r_ppudata = read && (ain == 7);
 
 assign vram_r = vram_r_ppudata || is_rendering && cycle[0] == 0 && !end_of_line;
 
 // Write to VRAM?
-assign vram_w = pre_write && (ain == 7) && !is_pal_address && !is_rendering;
+assign vram_w = write && (ain == 7) && !is_pal_address && !is_rendering;
 
 wire [5:0] color2;
 wire [4:0] pram_addr = is_rendering ?
@@ -855,6 +853,8 @@ wire pal_mask = ~|scanline || cycle < 2 || cycle > 253;
 assign color = (|sys_type && pal_mask) ? 6'h0E : (grayscale ? {color2[5:4], 4'b0} : color2);
 
 reg enable_playfield, enable_objects;
+wire clear_nmi = (exiting_vblank | (read && ain == 2));
+wire set_nmi = entering_vblank & ~clear_nmi;
 
 always @(posedge clk)
 if (ce) begin
@@ -882,15 +882,9 @@ if (ce) begin
 			end
 		endcase
 	end
-	// https://wiki.nesdev.com/w/index.php/NMI
-	// Reset frame specific counters upon exiting vblank
-	if (exiting_vblank)
-		nmi_occured <= 0;
-	// Set the
-	if (entering_vblank)
+	if (set_nmi)
 		nmi_occured <= 1;
-	// Reset NMI register when reading from Status
-	if (read && ain == 2)
+	if (clear_nmi)
 		nmi_occured <= 0;
 end
 
