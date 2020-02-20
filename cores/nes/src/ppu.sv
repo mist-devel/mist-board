@@ -160,7 +160,7 @@ assign at_last_cycle_group = (cycle[8:3] == 42);
 // Every second pre-render frame is only 340 cycles instead of 341.
 assign short_frame = end_of_line & skip_pixel;
 
-wire skip_pixel = is_pre_render && ~even_frame_toggle && is_rendering;
+wire skip_pixel = is_pre_render && ~even_frame_toggle && is_rendering && skip_en;
 assign end_of_line = at_last_cycle_group && (cycle[3:0] == (skip_pixel ? 3 : 4));
 
 // Confimed with Visual 2C02
@@ -194,7 +194,7 @@ end else if (ce && end_of_line) begin
 
 	// Visual 2C02 shows the register flipping here
 	if (scanline == 255)
-		even_frame_toggle <= skip_en ? ~even_frame_toggle : 1'b1;
+		even_frame_toggle <= ~even_frame_toggle;
 end
 
 endmodule // ClockGen
