@@ -3,105 +3,6 @@
 
 `timescale 1ns / 1ps
 
-
-// Module reads bytes and writes to proper address in ram.
-// Done is asserted when the whole game is loaded.
-// This parses iNES headers too.
-module GameLoader(input clk, input reset,
-                  input [7:0] indata, input indata_clk, input invert_mirroring,
-                  output reg [21:0] mem_addr, output [7:0] mem_data, output mem_write,
-                  output [31:0] mapper_flags,
-                  output reg done,
-                  output reg error);
-  reg [1:0] state = 0;
-  reg [7:0] prgsize;
-  reg [3:0] ctr;
-  reg [7:0] ines[0:15]; // 16 bytes of iNES header
-  reg [21:0] bytes_left;
-  
-  wire [7:0] prgrom = ines[4];	// Number of 16384 byte program ROM pages
-  wire [7:0] chrrom = ines[5];	// Number of 8192 byte character ROM pages (0 indicates CHR RAM)
-  wire has_chr_ram = (chrrom == 0);
-  assign mem_data = indata;
-  assign mem_write = (bytes_left != 0) && (state == 1 || state == 2) && indata_clk;
-  
-  wire [2:0] prg_size = prgrom <= 1  ? 0 :		// 16KB
-                        prgrom <= 2  ? 1 : 		// 32KB
-                        prgrom <= 4  ? 2 : 		// 64KB
-                        prgrom <= 8  ? 3 : 		// 128KB
-                        prgrom <= 16 ? 4 : 		// 256KB
-                        prgrom <= 32 ? 5 : 		// 512KB
-                        prgrom <= 64 ? 6 : 7;	// 1MB/2MB
-                        
-  wire [2:0] chr_size = chrrom <= 1  ? 0 : 		// 8KB
-                        chrrom <= 2  ? 1 : 		// 16KB
-                        chrrom <= 4  ? 2 : 		// 32KB
-                        chrrom <= 8  ? 3 : 		// 64KB
-                        chrrom <= 16 ? 4 : 		// 128KB
-                        chrrom <= 32 ? 5 : 		// 256KB
-                        chrrom <= 64 ? 6 : 7;	// 512KB/1MB
-  
-  // detect iNES2.0 compliant header
-  wire is_nes20 = (ines[7][3:2] == 2'b10);
-  // differentiate dirty iNES1.0 headers from proper iNES2.0 ones
-  wire is_dirty = !is_nes20 && ((ines[8]  != 0) 
-									  || (ines[9]  != 0)
-									  || (ines[10] != 0)
-									  || (ines[11] != 0)
-									  || (ines[12] != 0)
-									  || (ines[13] != 0)
-									  || (ines[14] != 0)
-									  || (ines[15] != 0));
-  
-  // Read the mapper number
-  wire [7:0] mapper = {is_dirty ? 4'b0000 : ines[7][7:4], ines[6][7:4]};
-  
-  // ines[6][0] is mirroring
-  // ines[6][3] is 4 screen mode
-  assign mapper_flags = {15'b0, ines[6][3], has_chr_ram, ines[6][0] ^ invert_mirroring, chr_size, prg_size, mapper};
-  
-  always @(posedge clk) begin
-    if (reset) begin
-      state <= 0;
-      done <= 0;
-      ctr <= 0;
-      mem_addr <= 0;  // Address for PRG
-    end else begin
-      case(state)
-      // Read 16 bytes of ines header
-      0: if (indata_clk) begin
-			  error <= 0;
-           ctr <= ctr + 1'd1;
-           ines[ctr] <= indata;
-           bytes_left <= {prgrom, 14'b0};
-           if (ctr == 4'b1111)
-				 // Check the 'NES' header. Also, we don't support trainers.
-             state <= (ines[0] == 8'h4E) && (ines[1] == 8'h45) && (ines[2] == 8'h53) && (ines[3] == 8'h1A) && !ines[6][2] ? 1 : 3;
-         end
-      1, 2: begin // Read the next |bytes_left| bytes into |mem_addr|
-          if (bytes_left != 0) begin
-            if (indata_clk) begin
-              bytes_left <= bytes_left - 1'd1;
-              mem_addr <= mem_addr + 1'd1;
-            end
-          end else if (state == 1) begin
-            state <= 2;
-            mem_addr <= 22'b10_0000_0000_0000_0000_0000; // Address for CHR
-            bytes_left <= {1'b0, chrrom, 13'b0};
-          end else if (state == 2) begin
-            done <= 1;
-          end
-			end
-		3: begin
-            done <= 1;
-				error <= 1;
-         end
-      endcase
-    end
-  end
-endmodule
-
-
 module NES_mist(  
 	// clock input
   input [1:0]   CLOCK_27, // 27 MHz
@@ -289,9 +190,28 @@ wire [7:0] nes_joy_B = { joyB[0], joyB[1], joyB[2], joyB[3], joyB[7], joyB[6], j
   wire [31:0] loader_flags;
   reg [31:0] mapper_flags;
   wire loader_done, loader_fail;
-  GameLoader loader(clk, loader_reset, loader_input, loader_clk, mirroring_osd,
-                    loader_addr, loader_write_data, loader_write,
-                    loader_flags, loader_done, loader_fail);
+	wire type_bios, type_nes = 1, type_fds, type_nsf;
+  
+GameLoader loader
+(
+	.clk              ( clk               ),
+	.reset            ( loader_reset      ),
+	.downloading      ( downloading       ),
+	.filetype         ( {4'b0000, type_nsf, type_fds, type_nes, type_bios} ),
+	.is_bios          ( is_bios           ),
+	.indata           ( loader_input      ),
+	.indata_clk       ( loader_clk        ),
+	.invert_mirroring ( mirroring_osd     ),
+	.mem_addr         ( loader_addr       ),
+	.mem_data         ( loader_write_data ),
+	.mem_write        ( loader_write      ),
+	.bios_download    ( bios_download     ),
+	.mapper_flags     ( loader_flags      ),
+	.busy             ( loader_busy       ),
+	.done             ( loader_done       ),
+	.error            ( loader_fail       ),
+	.rom_loaded       ( rom_loaded        )
+);
 
   always @(posedge clk)
 	if (loader_done)

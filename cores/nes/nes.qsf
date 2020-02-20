@@ -299,6 +299,7 @@ set_global_assignment -name VERILOG_FILE mist/sigma_delta_dac.v
 set_global_assignment -name VERILOG_FILE mist/sdram.v
 set_global_assignment -name VERILOG_FILE mist/clk.v
 set_global_assignment -name SDC_FILE mist/constraints.sdc
+set_global_assignment -name SYSTEMVERILOG_FILE src/GameLoader.sv
 set_global_assignment -name VERILOG_FILE src/nes.v
 set_global_assignment -name SYSTEMVERILOG_FILE src/cart.sv
 set_global_assignment -name SYSTEMVERILOG_FILE src/apu.sv
