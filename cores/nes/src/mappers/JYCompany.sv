@@ -19,11 +19,11 @@ module multiplier (
 
   always @(posedge clk) begin
     if (start && ce) begin
-	  bindex <= 1 << 1;
+	  bindex <= 9'd1 << 1;
 	  product <= {8'h00, b[0] ? a : 8'h00};
 	  shift_a <= a << 1;
     end else if (bindex < 9'h100) begin
-	  product <= product + ((bindex[7:0] & b) ? shift_a : 0);
+	  product <= product + ((bindex[7:0] & b) ? shift_a : 16'd0);
 	  bindex <= bindex << 1;
 	  shift_a <= shift_a << 1;
     end
@@ -53,7 +53,7 @@ module JYCompany(
 	inout        irq_b,       // IRQ
 	input [15:0] audio_in,    // Inverted audio from APU
 	inout [15:0] audio_b,     // Mixed audio output
-	inout [15:0] flags_out_b, // flags {0, 0, 0, 0, 0, prg_conflict, prg_open_bus, has_chr_dout}
+	inout [15:0] flags_out_b, // flags {0, 0, 0, 0, 0, prg_conflict, prg_bus_write, has_chr_dout}
 	// Special ports
 	input        ppu_ce
 );
@@ -76,9 +76,9 @@ wire chr_allow;
 wire vram_a10;
 reg [7:0] chr_dout, prg_dout;
 wire vram_ce;
-wire [15:0] flags_out = {14'h0, prg_open_bus, 1'b0};
+wire [15:0] flags_out = {14'h0, prg_bus_write, 1'b0};
 wire irq;
-wire prg_open_bus, prg_conflict;
+reg prg_bus_write;
 
 wire mapper90 = (flags[7:0] == 90);
 wire mapper211 = (flags[7:0] == 211);  // Should just be 209 with correct behavior below
@@ -197,13 +197,12 @@ multiplier mp(
   .done()
   );
 
-wire prg_6xxx = prg_ain[15:13] == 2'b011;
+wire prg_6xxx = prg_ain[15:13] == 2'b011; // $6000-$7FFF
 wire prg_ram = prg_6xxx && !bank_mode[7];
 
 // Read from JYCompany
 always @* begin
-	prg_dout = 8'hFF; // By default open bus.
-	prg_open_bus = 0;
+	prg_bus_write = 1'b1;
 	if ((prg_ain == 16'h5000) || (prg_ain == 16'h5400)) begin // || (prg_ain == 16'h5C00)) begin
 		prg_dout = {dip, 6'h00};
 	end else if (prg_ain == 16'h5800) begin
@@ -215,7 +214,8 @@ always @* begin
 	end else if (prg_ain == 16'h5803) begin
 		prg_dout = accumtest;
 	end else begin
-		prg_open_bus = ((prg_ain[15] == 1'b0) && ((&prg_ain[14:12]) || (prg_ram && ~ram_support)));
+		prg_dout = 8'hFF; // By default open bus.
+		prg_bus_write = 0;
 	end
 end
 
@@ -242,7 +242,7 @@ always @* begin
 	endcase
 end
 assign prg_aout = prg_ram && ram_support ? {9'b11_1100_000, prg_ain[12:0]} : {1'b0, outer_bank[2:1], prg_sel, prg_ain[12:0]};
-assign prg_allow = (prg_ain >= 16'h6000) && (!prg_write || (prg_ram && ram_support));
+assign prg_allow = (prg_ain >= 16'h6000) && (prg_ram ? ram_support : !prg_write);
 
 reg [1:0] chr_latch;
 // latch is set to 0 when the PPU reads from $0FD8-$0FDF/$1FD8-$1FDF and to 1 when the PPU reads from $0FE8-$0FEF/$1FE8-$1FEF.

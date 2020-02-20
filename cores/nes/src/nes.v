@@ -425,7 +425,7 @@ wire [7:0] prg_din = dbus & (prg_conflict ? cpumem_din : 8'hFF);
 wire prg_read  = mr_int && cart_pre && !apu_cs && !ppu_cs;
 wire prg_write = mw_int && cart_pre && !apu_cs && !ppu_cs;
 
-wire prg_allow, prg_open_bus, prg_conflict, vram_a10, vram_ce, chr_allow;
+wire prg_allow, prg_bus_write, prg_conflict, vram_a10, vram_ce, chr_allow;
 wire [21:0] prg_linaddr, chr_linaddr;
 wire [7:0] prg_dout_mapper, chr_from_ppu_mapper;
 wire has_chr_from_ppu_mapper;
@@ -472,7 +472,7 @@ cart_top multi_mapper (
 	.ppu_ce            (ppu_ce),                  // PPU Clock (cheat for MMC5/2/4)
 	// Behavior helper flags
 	.has_chr_dout      (has_chr_from_ppu_mapper), // Output specific data for CHR rather than from SDRAM
-	.prg_open_bus      (prg_open_bus),            // Simulate open bus
+	.prg_bus_write     (prg_bus_write),           // PRG data driven to bus
 	.prg_conflict      (prg_conflict),            // Simulate bus conflicts
 	// User input/FDS controls
 	.fds_eject         (fds_eject),               // Used to trigger FDS disk changes
@@ -512,10 +512,6 @@ assign ppumem_read  = chr_read;
 assign ppumem_write = chr_write && (chr_allow || vram_ce);
 assign ppumem_dout  = chr_from_ppu;
 
-
-// These registers are open bus if FDS is not in use
-// Some games hacks (Super Mario All-Stars) rely on this behavior
-wire bus_is_open = (mapper_flags[7:0] == 8'd20) ? 1'b0 : (addr >= 16'h4018 && addr < 16'h4100);
 reg [7:0] open_bus_data;
 
 always @(posedge clk) begin
@@ -536,16 +532,14 @@ always @* begin
 			raw_data_bus = {open_bus_data[7:5], joypad_data[3:2], 2'b00, joypad_data[1]};
 		else
 			raw_data_bus = (addr == 16'h4015) ? apu_dout : open_bus_data;
-	end else if (bus_is_open) begin
-		raw_data_bus = open_bus_data;
 	end else if (ppu_cs) begin
 		raw_data_bus = ppu_dout;
 	end else if (prg_allow) begin
 		raw_data_bus = cpumem_din;
-	end else if (prg_open_bus) begin
-		raw_data_bus = open_bus_data;
-	end else begin
+	end else if (prg_bus_write) begin
 		raw_data_bus = prg_dout_mapper;
+	end else begin
+		raw_data_bus = open_bus_data;
 	end
 end
 

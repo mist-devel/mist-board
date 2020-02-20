@@ -21,8 +21,9 @@ module MMC5(
 	inout        irq_b,       // IRQ
 	input [15:0] audio_in,    // Inverted audio from APU
 	inout [15:0] audio_b,     // Mixed audio output
-	inout [15:0] flags_out_b, // flags {0, 0, 0, 0, 0, prg_conflict, prg_open_bus, has_chr_dout}
+	inout [15:0] flags_out_b, // flags {0, 0, 0, 0, 0, prg_conflict, prg_bus_write, has_chr_dout}
 	// Special ports
+	input  [7:0] audio_dout,
 	input  [7:0] chr_din,     // CHR Data in
 	input        chr_write,   // CHR Write
 	inout  [7:0] chr_dout_b,  // chr data (non standard)
@@ -40,7 +41,7 @@ assign vram_a10_b   = enable ? vram_a10 : 1'hZ;
 assign vram_ce_b    = enable ? vram_ce : 1'hZ;
 assign irq_b        = enable ? irq : 1'hZ;
 assign flags_out_b  = enable ? flags_out : 16'hZ;
-assign audio_b      = enable ? audio_out[16:1] : 16'hZ;
+assign audio_b      = enable ? audio : 16'hZ;
 
 wire [21:0] prg_aout;
 reg [21:0] chr_aout;
@@ -49,13 +50,10 @@ wire chr_allow;
 wire vram_a10;
 reg [7:0] chr_dout, prg_dout;
 wire vram_ce;
-wire [15:0] flags_out = {15'h0, has_chr_dout};
+wire [15:0] flags_out = {14'h0, prg_bus_write, has_chr_dout};
 wire irq;
-wire prg_open_bus, prg_conflict, has_chr_dout;
-wire [15:0] audio;
-
-// NOTE: The apu volume is 100% of MMC5 and the polarity is reversed.
-wire [16:0] audio_out = audio + audio_in;
+wire prg_bus_write, has_chr_dout;
+wire [15:0] audio = audio_in;
 
 reg [1:0] prg_mode, chr_mode;
 reg prg_protect_1, prg_protect_2;
@@ -180,7 +178,7 @@ end
 
 // Read from MMC5
 always @* begin
-	prg_dout = 8'hFF; // By default open bus.
+	prg_bus_write = 1'b1;
 	if (prg_ain[15:10] == 6'b010111 && extended_ram_mode[1]) begin
 		prg_dout = last_read_ram;
 	end else if (prg_ain == 16'h5204) begin
@@ -190,8 +188,11 @@ always @* begin
 	end else if (prg_ain == 16'h5206) begin
 		prg_dout = multiply_result[15:8];
 	end else if (prg_ain == 16'h5015) begin
-		prg_dout = {6'h00, apu_dout[1:0]};
+		prg_dout = {6'h00, audio_dout[1:0]};
 	// TODO: 5010
+	end else begin
+		prg_dout = 8'hFF; // By default open bus.
+		prg_bus_write = 0;
 	end
 end
 
@@ -412,8 +413,27 @@ assign prg_allow = (prg_ain >= 16'h6000) && (!prg_write || ((!prgsel[7]) && prg_
 // MMC5 boards typically have no CHR RAM.
 assign chr_allow = flags[15];
 
-wire [7:0] apu_dout;
-wire apu_cs = (prg_ain[15:5]==11'b0101_0000_000) && (prg_ain[3]==0);
+endmodule
+
+module mmc5_mixed (
+	input         clk,
+	input         ce,    // Negedge M2 (aka CPU ce)
+	input         enable,
+	input         wren,
+	input         rden,
+	input  [15:0] addr_in,
+	input   [7:0] data_in,
+	output  [7:0] data_out,
+	input  [15:0] audio_in,    // Inverted audio from APU
+	output [15:0] audio_out
+);
+
+// NOTE: The apu volume is 100% of MMC5 and the polarity is reversed.
+wire [16:0] audio_o = audio + audio_in;
+wire [15:0] audio;
+assign audio_out = audio_o[16:1];
+
+wire apu_cs = (addr_in[15:5]==11'b0101_0000_000) && (addr_in[3]==0);
 wire DmaReq;          // 1 when DMC wants DMA
 wire [15:0] DmaAddr;  // Address DMC wants to read
 reg odd_or_even;
@@ -431,11 +451,11 @@ APU mmc5apu(
 	.clk            (clk),
 	.ce             (ce),
 	.reset          (~enable),
-	.ADDR           (prg_ain[4:0]),
-	.DIN            (prg_din),
-	.DOUT           (apu_dout),
-	.MW             (prg_write && apu_cs),
-	.MR             (prg_read && apu_cs),
+	.ADDR           (addr_in[4:0]),
+	.DIN            (data_in),
+	.DOUT           (data_out),
+	.MW             (wren && apu_cs),
+	.MR             (rden && apu_cs),
 	.audio_channels (5'b10011),
 	.Sample         (audio),
 	.DmaReq         (DmaReq),
