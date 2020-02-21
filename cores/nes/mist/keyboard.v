@@ -10,7 +10,8 @@ module keyboard
 	output [7:0] joystick_0,
 	output [7:0] joystick_1,
 	
-	output reg [11:0] powerpad	
+	output reg [11:0] powerpad,
+	output reg fds_eject
 );
 
 reg        pressed;
@@ -77,6 +78,8 @@ always @(posedge reset or posedge clk) begin
 					9'H02A: powerpad[9] <= pressed;	// V
 					9'H032: powerpad[10] <= pressed;	// B
 					9'H031: powerpad[11] <= pressed;	// N
+
+					9'H17D: fds_eject <= pressed; //PgUp
 				endcase;
 
 				pressed <= 1'b1;

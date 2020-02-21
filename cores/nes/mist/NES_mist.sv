@@ -45,19 +45,21 @@ module NES_mist(
 	input 		  UART_RX,
 	input 		  UART_TX
 );
-					  
+
 // the configuration string is returned to the io controller to allow
 // it to control the menu on the OSD 
 parameter CONF_STR = {
-			"NES;NES;",
+			"NES;NESFDSNSF;",
+			"F,BIN,Load FDS BIOS;",
 			"O12,System Type,NTSC,PAL,Dendy;",
 			"O34,Scanlines,OFF,25%,50%,75%;",
 			"O5,Joystick swap,OFF,ON;",
 			"O6,Invert mirroring,OFF,ON;",
 			"O7,Hide overscan,OFF,ON;",
 			"O8,Palette,FCEUX,Unsaturated-V6;",
-			"T9,Reset;",
-			"V,v1.0;"
+			"O9B,Disk side,Auto,A,B,C,D;",
+			"T0,Reset;",
+			"V,v2.0-test1;"
 };
 
 wire [31:0] status;
@@ -70,7 +72,7 @@ wire joy_swap = status[5];
 wire mirroring_osd = status[6];
 wire overscan_osd = status[7];
 wire palette2_osd = status[8];
-wire reset_osd = status[9];
+wire [2:0] diskside_osd = status[11:9];
 
 wire scandoubler_disable;
 wire ypbpr;
@@ -125,7 +127,7 @@ wire [7:0] nes_joy_B = { joyB[0], joyB[1], joyB[2], joyB[3], joyB[7], joyB[6], j
   always @(posedge clk) begin
 	if(downloading)
 		download_reset_cnt <= 8'd255;
-	else if(download_reset_cnt != 0)
+	else if(!loader_busy && download_reset_cnt != 0)
 		download_reset_cnt <= download_reset_cnt - 8'd1;
  end
 
@@ -181,7 +183,7 @@ wire [7:0] nes_joy_B = { joyB[0], joyB[1], joyB[2], joyB[3], joyB[7], joyB[6], j
   end
   
   // Loader
-  wire [7:0] loader_input;
+  wire [7:0] loader_input =  (loader_busy && !downloading) ? nsf_data : ioctl_dout;
   wire       loader_clk;
   wire [21:0] loader_addr;
   wire [7:0] loader_write_data;
@@ -190,8 +192,13 @@ wire [7:0] nes_joy_B = { joyB[0], joyB[1], joyB[2], joyB[3], joyB[7], joyB[6], j
   wire [31:0] loader_flags;
   reg [31:0] mapper_flags;
   wire loader_done, loader_fail;
-	wire type_bios, type_nes = 1, type_fds, type_nsf;
-  
+	wire loader_busy;
+	wire type_bios = (menu_index == 2);
+	wire is_bios = 0;//type_bios;
+	wire type_nes = (menu_index == 0) || (menu_index == {2'd0, 6'h1});
+	wire type_fds = (menu_index == {2'd1, 6'h1});
+	wire type_nsf = (menu_index == {2'd2, 6'h1});
+
 GameLoader loader
 (
 	.clk              ( clk               ),
@@ -205,12 +212,12 @@ GameLoader loader
 	.mem_addr         ( loader_addr       ),
 	.mem_data         ( loader_write_data ),
 	.mem_write        ( loader_write      ),
-	.bios_download    ( bios_download     ),
+	.bios_download    (                   ),
 	.mapper_flags     ( loader_flags      ),
 	.busy             ( loader_busy       ),
 	.done             ( loader_done       ),
 	.error            ( loader_fail       ),
-	.rom_loaded       ( rom_loaded        )
+	.rom_loaded       (                   )
 );
 
   always @(posedge clk)
@@ -222,13 +229,24 @@ GameLoader loader
 	always @(posedge clk) begin
 		led_blink <= led_blink + 13'd1;
 	end
- 
-	assign LED = downloading ? 1'b0 : loader_fail ? led_blink[23] : 1'b1;
 
-  wire reset_nes = (init_reset || buttons[1] || arm_reset || reset_osd || download_reset || loader_fail);
+// Loopy's NSF player ROM
+reg [7:0] nsf_player [4096];
+reg [7:0] nsf_data;
+initial begin
+  $readmemh("nsf.hex", nsf_player);
+end
+always @(posedge clk) nsf_data <= nsf_player[loader_addr[11:0]];
 
-  wire ext_audio = 1;
-  wire int_audio = 1;
+assign LED = downloading ? 1'b0 : loader_fail ? led_blink[23] : 1'b1;
+
+wire reset_nes = (init_reset || buttons[1] || arm_reset || download_reset || loader_fail);
+
+wire ext_audio = 1;
+wire int_audio = 1;
+
+wire [1:0] diskside_req;
+wire [1:0] diskside = (diskside_osd == 0) ? diskside_req : (diskside_osd - 1'd1);
 
 NES nes(
 	.clk(clk),
@@ -243,12 +261,10 @@ NES nes(
 	.joypad_data({powerpad_d4[0],powerpad_d3[0],joypad_bits2[0],joypad_bits[0]}),
 	.mic(),
 	.fds_busy(),
-	.fds_eject(0),
-	.diskside_req(),
-	.diskside(),
+	.fds_eject(fds_eject),
+	.diskside_req(diskside_req),
+	.diskside(diskside),
 	.audio_channels(5'b11111),  // enable all channels
-	.ex_sprites(),
-	.mask(),
 	.cpumem_addr(memory_addr_cpu),
 	.cpumem_read(memory_read_cpu),
 	.cpumem_din(memory_din_cpu),
@@ -281,7 +297,8 @@ always @(posedge clk) begin
 		loader_write_data_mem <= loader_write_data;
 	end
 
-	if(nes_ce == 1) begin
+	// signal write in the PPU memory phase
+	if(nes_ce == 3) begin
 		loader_write_mem <= loader_write_triggered;
 		if(loader_write_triggered)
 			loader_write_triggered <= 1'b0;
@@ -305,16 +322,16 @@ sdram sdram (
 	.init           ( !clock_locked            ),
 
 	// cpu/chipset interface
-	.addrA     	    ( downloading ? {3'b000, loader_addr_mem} : {3'b000, memory_addr_cpu} ),
+	.addrA     	    ( (downloading | loader_busy) ? {3'b000, loader_addr_mem} : {3'b000, memory_addr_cpu} ),
 	.addrB          ( {3'b000, memory_addr_ppu} ),
 	
-	.weA            ( memory_write_cpu || loader_write_mem	),
+	.weA            ( loader_write_mem || memory_write_cpu ),
 	.weB            ( memory_write_ppu ),
 
-	.dinA           ( downloading ? loader_write_data_mem : memory_dout_cpu ),
+	.dinA           ( (downloading | loader_busy) ? loader_write_data_mem : memory_dout_cpu ),
 	.dinB           ( memory_dout_ppu ),
 
-	.oeA            ( memory_read_cpu ),
+	.oeA            ( ~(downloading | loader_busy) & memory_read_cpu ),
 	.doutA          ( memory_din_cpu  ),
 
 	.oeB            ( memory_read_ppu ),
@@ -322,6 +339,8 @@ sdram sdram (
 );
 
 wire downloading;
+wire [7:0] menu_index;
+wire [7:0] ioctl_dout;
 
 data_io data_io (
 	.clk_sys        ( clk          ),
@@ -331,10 +350,11 @@ data_io data_io (
 	.SPI_DI         ( SPI_DI       ),
 
 	.ioctl_download ( downloading  ),
+	.ioctl_index    ( menu_index   ),
 
    // ram interface
 	.ioctl_wr       ( loader_clk   ),
-	.ioctl_dout     ( loader_input )
+	.ioctl_dout     ( ioctl_dout )
 );
 
 wire nes_hs, nes_vs;
@@ -412,6 +432,7 @@ sigma_delta_dac sigma_delta_dac (
 wire [7:0] kbd_joy0;
 wire [7:0] kbd_joy1;
 wire [11:0] powerpad;
+wire fds_eject;
 
 keyboard keyboard (
 	.clk(clk),
@@ -422,7 +443,8 @@ keyboard keyboard (
 	.joystick_0(kbd_joy0),
 	.joystick_1(kbd_joy1),
 	
-	.powerpad(powerpad)
+	.powerpad(powerpad),
+	.fds_eject(fds_eject)
 );
 			
 endmodule

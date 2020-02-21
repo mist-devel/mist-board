@@ -123,7 +123,7 @@ set_location_assignment PIN_43 -to SDRAM_CLK
 set_global_assignment -name CYCLONEII_OPTIMIZATION_TECHNIQUE BALANCED
 set_global_assignment -name SMART_RECOMPILE ON
 set_global_assignment -name ENABLE_SIGNALTAP OFF
-set_global_assignment -name USE_SIGNALTAP_FILE out/sdram.stp
+set_global_assignment -name USE_SIGNALTAP_FILE out/cpu.stp
 set_global_assignment -name PHYSICAL_SYNTHESIS_COMBO_LOGIC ON
 set_global_assignment -name PHYSICAL_SYNTHESIS_REGISTER_DUPLICATION ON
 set_global_assignment -name PHYSICAL_SYNTHESIS_EFFORT NORMAL
@@ -323,4 +323,6 @@ set_global_assignment -name SYSTEMVERILOG_FILE src/mappers/misc.sv
 set_global_assignment -name SYSTEMVERILOG_FILE src/mappers/JYCompany.sv
 set_global_assignment -name SYSTEMVERILOG_FILE src/mappers/generic.sv
 set_global_assignment -name SYSTEMVERILOG_FILE src/mappers/FDS.sv
+set_global_assignment -name SIGNALTAP_FILE out/loader.stp
+set_global_assignment -name SIGNALTAP_FILE out/cpu.stp
 set_instance_assignment -name PARTITION_HIERARCHY root_partition -to | -section_id Top

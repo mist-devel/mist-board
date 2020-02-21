@@ -200,9 +200,10 @@ always @(posedge clk) begin
 					mem_addr <= mem_addr + 1'd1;
 				end
 			 end else begin
-				mem_addr <= 22'b00_0000_0000_0000_0000_0000;
-				bytes_left <= 21'h2000;
-				state <= S_COPYBIOS;
+//				mem_addr <= 22'b00_0000_0000_0000_0000_0000;
+//				bytes_left <= 21'h2000;
+//				state <= S_COPYBIOS;
+				state <= S_DONE;
 				clearclk <= 4'h0;
 			 end
 			end
