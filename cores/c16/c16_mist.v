@@ -522,7 +522,7 @@ c1530 c1530
 // ---------------------------------------------------------------------------------
 wire hs, vs;
 
-mist_video #(.COLOR_DEPTH(4), .OSD_COLOR(3'd5), .SD_HCNT_WIDTH(10)) mist_video (
+mist_video #(.COLOR_DEPTH(4), .OSD_COLOR(3'd5), .SD_HCNT_WIDTH(10), .OSD_AUTO_CE(0)) mist_video (
 	.clk_sys     ( clk28      ),
 
 	// OSD SPI interface
