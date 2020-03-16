@@ -69,6 +69,7 @@ entity c64_mist is port
    SPI_DI     : in    std_logic;
    SPI_SS2    : in    std_logic;
    SPI_SS3    : in    std_logic;
+   SPI_SS4    : in    std_logic;
    CONF_DATA0 : in    std_logic;
 
    UART_RX    : in    std_logic;
@@ -144,16 +145,21 @@ constant FILE_TAP  : std_logic_vector(7 downto 0) := x"42";
 constant FILE_CRT  : std_logic_vector(7 downto 0) := x"82";
 constant FILE_ROM  : std_logic_vector(7 downto 0) := x"03";
 
-component data_io port
+component data_io 
+generic
+(
+	ROM_DIRECT_UPLOAD : boolean := true
+);
+port
 (
 	clk_sys			  : in std_logic;
-	SPI_SCK, SPI_SS2, SPI_DI :in std_logic;
+	SPI_SCK, SPI_SS2, SPI_SS4, SPI_DI, SPI_DO :in std_logic;
 	ioctl_download    : out std_logic;
 	ioctl_index       : out std_logic_vector(7 downto 0);
 	ioctl_wr          : out std_logic;
 	ioctl_addr        : out std_logic_vector(24 downto 0);
 	ioctl_dout        : out std_logic_vector(7 downto 0)
-	);
+);
 end component data_io;
 
 ---------
@@ -532,7 +538,9 @@ begin
 		clk_sys => clk_c64,
 		SPI_SCK => SPI_SCK,
 		SPI_SS2 => SPI_SS2,
+		SPI_SS4 => SPI_SS4,
 		SPI_DI => SPI_DI,
+		SPI_DO => SPI_DO,
 
 		ioctl_download => ioctl_download,
 		ioctl_index => ioctl_index,
