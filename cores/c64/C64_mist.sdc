@@ -39,8 +39,8 @@ set_clock_groups -asynchronous -group [get_clocks {pll_2|altpll_component|auto_g
 
 
 # Some relaxed constrain to the VGA pins. The signals should arrive together, the delay is not really important.
-set_output_delay -clock [get_clocks {pll|altpll_component|auto_generated|pll1|clk[0]}] -max 0 [get_ports {VGA_*}]
-set_output_delay -clock [get_clocks {pll|altpll_component|auto_generated|pll1|clk[0]}] -min -5 [get_ports {VGA_*}]
+set_output_delay -clock [get_clocks {pll|altpll_component|auto_generated|pll1|clk[1]}] -max 0 [get_ports {VGA_*}]
+set_output_delay -clock [get_clocks {pll|altpll_component|auto_generated|pll1|clk[1]}] -min -5 [get_ports {VGA_*}]
 
 # SDRAM delays
 set_input_delay -clock [get_clocks {pll|altpll_component|auto_generated|pll1|clk[0]}] -reference_pin [get_ports {SDRAM_CLK}] -max 6.4 [get_ports SDRAM_DQ[*]]
@@ -49,11 +49,8 @@ set_input_delay -clock [get_clocks {pll|altpll_component|auto_generated|pll1|clk
 set_output_delay -clock [get_clocks {pll|altpll_component|auto_generated|pll1|clk[0]}] -reference_pin [get_ports {SDRAM_CLK}] -max 1.5 [get_ports {SDRAM_D* SDRAM_A* SDRAM_BA* SDRAM_n* SDRAM_CKE}]
 set_output_delay -clock [get_clocks {pll|altpll_component|auto_generated|pll1|clk[0]}] -reference_pin [get_ports {SDRAM_CLK}] -min -0.8 [get_ports {SDRAM_D* SDRAM_A* SDRAM_BA* SDRAM_n* SDRAM_CKE}]
 
-set_multicycle_path -from {video_mixer:vmixer|scandoubler:scandoubler|Hq2x:Hq2x|*} -setup 4
-set_multicycle_path -from {video_mixer:vmixer|scandoubler:scandoubler|Hq2x:Hq2x|*} -hold 3
-
-set_multicycle_path -to {VGA_*[*]} -setup 4
-set_multicycle_path -to {VGA_*[*]} -hold 3
+set_multicycle_path -to {VGA_*[*]} -setup 2
+set_multicycle_path -to {VGA_*[*]} -hold 1
 
 set_false_path -to [get_ports {SDRAM_CLK}]
 set_false_path -from [get_ports {UART_RX}]

@@ -41,7 +41,7 @@
 # ========================
 set_global_assignment -name ORIGINAL_QUARTUS_VERSION 13.1
 set_global_assignment -name PROJECT_CREATION_TIME_DATE "21:40:24  MAY 17, 2014"
-set_global_assignment -name LAST_QUARTUS_VERSION 13.1
+set_global_assignment -name LAST_QUARTUS_VERSION "13.1 SP4.26"
 set_global_assignment -name PROJECT_OUTPUT_DIRECTORY output_files
 set_global_assignment -name SMART_RECOMPILE ON
 set_global_assignment -name FLOW_ENABLE_IO_ASSIGNMENT_ANALYSIS ON
@@ -166,7 +166,7 @@ set_global_assignment -name USE_CONFIGURATION_DEVICE OFF
 # SignalTap II Assignments
 # ========================
 set_global_assignment -name ENABLE_SIGNALTAP OFF
-set_global_assignment -name USE_SIGNALTAP_FILE output_files/ioctl.stp
+set_global_assignment -name USE_SIGNALTAP_FILE output_files/erase.stp
 
 # Power Estimation Assignments
 # ============================
@@ -342,6 +342,7 @@ set_location_assignment PIN_31 -to UART_RX
 set_location_assignment PLL_1 -to pll|altpll_component|auto_generated|pll1
 set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to UART_TX
 
+set_instance_assignment -name FAST_INPUT_REGISTER ON -to UART_RX
 set_global_assignment -name VHDL_FILE rtl/tap_fifo.vhd
 set_global_assignment -name VHDL_FILE rtl/c1530.vhd
 set_global_assignment -name VERILOG_FILE rtl/sid8580/sid_voice.v
@@ -349,14 +350,8 @@ set_global_assignment -name VERILOG_FILE rtl/sid8580/sid_filters.v
 set_global_assignment -name VERILOG_FILE rtl/sid8580/sid_envelope.v
 set_global_assignment -name VERILOG_FILE rtl/sid8580/sid8580.v
 set_global_assignment -name VERILOG_FILE rtl/mist/sigma_delta_dac.v
-set_global_assignment -name SYSTEMVERILOG_FILE rtl/mist/video_mixer.sv
-set_global_assignment -name VERILOG_FILE rtl/mist/user_io.v
 set_global_assignment -name VERILOG_FILE rtl/mist/sdram.v
-set_global_assignment -name VERILOG_FILE rtl/mist/scandoubler.v
 set_global_assignment -name VHDL_FILE rtl/mist/pll.vhd
-set_global_assignment -name VERILOG_FILE rtl/mist/osd.v
-set_global_assignment -name SYSTEMVERILOG_FILE rtl/mist/hq2x.sv
-set_global_assignment -name VERILOG_FILE rtl/mist/data_io.v
 set_global_assignment -name VHDL_FILE rtl/mist/c64_mist.vhd
 set_global_assignment -name VHDL_FILE rtl/fpga64_sid_iec.vhd
 set_global_assignment -name VHDL_FILE rtl/video_vicII_656x_e.vhd
@@ -400,6 +395,7 @@ set_global_assignment -name VHDL_FILE rtl/t65/T65_MCode.vhd
 set_global_assignment -name VHDL_FILE rtl/t65/T65_ALU.vhd
 set_global_assignment -name VHDL_FILE rtl/t65/T65.vhd
 set_global_assignment -name SIGNALTAP_FILE output_files/sid.stp
+set_global_assignment -name QIP_FILE "../../mist-modules/mist.qip"
 set_global_assignment -name QIP_FILE rtl/mist/pll.qip
 set_global_assignment -name QIP_FILE rtl/mist/pll_c64.qip
 set_global_assignment -name QIP_FILE rtl/mist/pll_c64_reconfig.qip
@@ -407,5 +403,4 @@ set_global_assignment -name QIP_FILE rtl/mist/rom_reconfig_pal.qip
 set_global_assignment -name QIP_FILE rtl/mist/rom_reconfig_ntsc.qip
 set_global_assignment -name SIGNALTAP_FILE output_files/pll.stp
 set_global_assignment -name SIGNALTAP_FILE output_files/ioctl.stp
-set_instance_assignment -name FAST_INPUT_REGISTER ON -to UART_RX
 set_instance_assignment -name PARTITION_HIERARCHY root_partition -to | -section_id Top

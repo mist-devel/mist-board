@@ -29,6 +29,7 @@ library IEEE;
 use IEEE.std_logic_1164.all;
 use IEEE.std_logic_unsigned.ALL;
 use IEEE.numeric_std.all;
+use work.mist.ALL;
 
 entity c64_mist is port
 (
@@ -112,7 +113,7 @@ constant CONF_STR : string :=
 	"OI,Tape sound,Off,On;"&
 	"OG,Disk Write,Enable,Disable;"&
 	"O2,Video standard,PAL,NTSC;"&
-	"O8A,Scandoubler Fx,None,HQ2x-320,HQ2x-160,CRT 25%,CRT 50%;"&
+	"O89,Scandoubler Fx,None,CRT 25%,CRT 50%,CRT 75%;"&
 	"ODF,SID,6581 Mono,6581 Stereo,8580 Mono,8580 Stereo,Pseudo Stereo;"&
 	"O6,Audio filter,On,Off;"&
 	"O3,Joysticks,normal,swapped;"&
@@ -136,52 +137,6 @@ begin
   return rval; 
 end function; 
 
-component user_io generic(STRLEN : integer := 0 ); port
-(
-	clk_sys : in std_logic;
-	clk_sd  : in std_logic;
-	SPI_CLK, SPI_SS_IO, SPI_MOSI :in std_logic;
-	SPI_MISO : out std_logic;
-	conf_str : in std_logic_vector(8*STRLEN-1 downto 0);
-	joystick_0 : out std_logic_vector(31 downto 0);
-	joystick_1 : out std_logic_vector(31 downto 0);
-	joystick_2 : out std_logic_vector(31 downto 0);
-	joystick_3 : out std_logic_vector(31 downto 0);
-	joystick_4 : out std_logic_vector(31 downto 0);
-	joystick_analog_0 : out std_logic_vector(15 downto 0);
-	joystick_analog_1 : out std_logic_vector(15 downto 0);
-	status: out std_logic_vector(31 downto 0);
-	switches : out std_logic_vector(1 downto 0);
-	buttons : out std_logic_vector(1 downto 0);
-	scandoubler_disable : out std_logic;
-	ypbpr : out std_logic;
-
-	sd_lba            : in  std_logic_vector(31 downto 0);
-	sd_rd             : in  std_logic;
-	sd_wr             : in  std_logic;
-	sd_ack            : out std_logic;
-	sd_ack_conf       : out std_logic;
-	sd_conf           : in  std_logic;
-	sd_sdhc           : in  std_logic;
-	img_mounted       : out std_logic;
-
-	sd_buff_addr      : out std_logic_vector(8 downto 0);
-	sd_dout           : out std_logic_vector(7 downto 0);
-	sd_din            : in  std_logic_vector(7 downto 0);
-	sd_dout_strobe    : out std_logic;
-	
-	ps2_kbd_clk       : out std_logic;
-	ps2_kbd_data      : out std_logic;
-
-	ps2_mouse_clk     : out std_logic;
-	ps2_mouse_data    : out std_logic;
-	mouse_x           : out signed(8 downto 0);
-	mouse_y           : out signed(8 downto 0);
-	mouse_flags       : out std_logic_vector(8 downto 0); -- YOvfl, XOvfl, dy8, dx8, 1, mbtn, rbtn, lbtn
-	mouse_strobe      : out std_logic
-	);
-end component user_io;
-
 -- constants for ioctl_index 
 constant FILE_BOOT : std_logic_vector(7 downto 0) := x"00";      -- ROM files sent at boot time
 constant FILE_PRG  : std_logic_vector(7 downto 0) := x"02";
@@ -200,22 +155,6 @@ component data_io port
 	ioctl_dout        : out std_logic_vector(7 downto 0)
 	);
 end component data_io;
-
-component video_mixer
-	generic ( LINE_LENGTH : integer := 512; HALF_DEPTH : integer := 0 );
-	port (
-			clk_sys, ce_pix, ce_pix_actual : in std_logic;
-			SPI_SCK, SPI_SS3, SPI_DI : in std_logic;
-			scanlines : in std_logic_vector(1 downto 0);
-			scandoubler_disable, hq2x, ypbpr, ypbpr_full : in std_logic;
-
-			R, G, B : in std_logic_vector(5 downto 0);
-			HSync, VSync, line_start, mono : in std_logic;
-
-			VGA_R,VGA_G, VGA_B : out std_logic_vector(5 downto 0);
-			VGA_VS, VGA_HS : out std_logic
-	);
-end component video_mixer;
 
 ---------
 -- audio
@@ -385,7 +324,7 @@ end component cartridge;
 	signal st_disk_readonly    : std_logic;                    -- status(16)
 	signal st_sid_mode         : std_logic_vector(2 downto 0); -- status(15 downto 13)
 	signal st_c64gs            : std_logic;                    -- status(11)
-	signal st_scandoubler_fx   : std_logic_vector(2 downto 0); -- status(10 downto 8)
+	signal st_scandoubler_fx   : std_logic_vector(1 downto 0); -- status(9 downto 8)
 	signal st_user_port_uart   : std_logic;                    -- status(7)
 	signal st_audio_filter_off : std_logic;                    -- status(6)
 	signal st_detach_cartdrige : std_logic;                    -- status(5)
@@ -394,9 +333,6 @@ end component cartridge;
 	signal st_ntsc             : std_logic;                    -- status(2)
 	signal st_reset            : std_logic;                    -- status(0)
 
-	signal scanlines      : std_logic_vector(1 downto 0);
-	signal hq2x           : std_logic;
-	signal ce_pix_actual  : std_logic;
 	signal sd_lba         : std_logic_vector(31 downto 0);
 	signal sd_rd          : std_logic;
 	signal sd_wr          : std_logic;
@@ -421,7 +357,7 @@ end component cartridge;
 	signal mouse_x_pos  : signed(10 downto 0);
 	signal mouse_y      : signed( 8 downto 0);
 	signal mouse_y_pos  : signed(10 downto 0);
-	signal mouse_flags  : std_logic_vector(8 downto 0);
+	signal mouse_flags  : std_logic_vector(7 downto 0);
 	signal mouse_btns   : std_logic_vector(1 downto 0);
 	signal mouse_strobe : std_logic;
 
@@ -447,6 +383,7 @@ end component cartridge;
 
 	signal tv15Khz_mode   : std_logic;
 	signal ypbpr          : std_logic;
+	signal no_csync       : std_logic;
 	signal ntsc_init_mode : std_logic := '0';
 	signal ntsc_init_mode_d: std_logic;
 	signal ntsc_init_mode_d2: std_logic;
@@ -463,11 +400,6 @@ end component cartridge;
 	signal clk_c64 : std_logic;	-- 31.527mhz (PAL), 32.727mhz(NTSC) clock source
 	signal clk_ram : std_logic; -- 2 x clk_c64
 	signal clk32   : std_logic; -- 32mhz
-	signal ce_8  : std_logic;
-	signal ce_4  : std_logic;
-	signal hq2x160 : std_logic;
-	signal osdclk : std_logic;
-	signal clkdiv : std_logic_vector(9 downto 0);
 	signal todclk : std_logic;
 	signal toddiv : std_logic_vector(19 downto 0);
 	signal toddiv3 : std_logic_vector(1 downto 0);
@@ -559,6 +491,7 @@ begin
 		buttons => buttons,
 		scandoubler_disable => tv15Khz_mode,
 		ypbpr => ypbpr,
+		no_csync => no_csync,
 
 		sd_lba => sd_lba,
 		sd_rd => sd_rd,
@@ -585,7 +518,7 @@ begin
 	st_disk_readonly    <= status(16);
 	st_sid_mode         <= status(15 downto 13);
 	st_c64gs            <= status(11);
-	st_scandoubler_fx   <= status(10 downto 8);
+	st_scandoubler_fx   <= status(9 downto 8);
 	st_user_port_uart   <= status(7);
 	st_audio_filter_off <= status(6);
 	st_detach_cartdrige <= status(5);
@@ -812,23 +745,6 @@ begin
 	end process;
 
 	c1541rom_wr <= ioctl_wr when (ioctl_index = FILE_BOOT) and (ioctl_addr(14) = '1') and (ioctl_download = '1') else '0';
-
-	process(clk_c64)
-	begin
-		if rising_edge(clk_c64) then
-			clkdiv <= std_logic_vector(unsigned(clkdiv)+1);
-			if(clkdiv(1 downto 0) = "00") then
-				ce_8 <= '1';
-			else
-				ce_8 <= '0';
-			end if;
-			if(clkdiv(2 downto 0) = "000") then
-				ce_4 <= '1';
-			else
-				ce_4 <= '0';
-			end if;
-		end if;
-	end process;
 
 	-- UART_RX synchronizer
 	process(clk_c64)
@@ -1291,54 +1207,38 @@ begin
 	c64_r <= (others => '0') when blank = '1' else std_logic_vector(r(7 downto 2));
 	c64_g <= (others => '0') when blank = '1' else std_logic_vector(g(7 downto 2));
 	c64_b <= (others => '0') when blank = '1' else std_logic_vector(b(7 downto 2));
-	
-	scanlines <= st_scandoubler_fx(2 downto 1);
-	hq2x <= st_scandoubler_fx(1) xor st_scandoubler_fx(0);
-	ce_pix_actual <= ce_4 when hq2x160='1' else ce_8;
-	
-	process(clk_c64)
-	begin
-		if rising_edge(clk_c64) then
-			if((old_vsync = '0') and (vsync_out = '1')) then
-				if(st_scandoubler_fx="010") then
-					hq2x160 <= '1';
-				else
-					hq2x160 <= '0';
-				end if;
-			end if;
-			old_vsync <= vsync_out;
-		end if;
-	end process;
 
-	vmixer : video_mixer
+	mist_video : work.mist.mist_video
+	generic map (
+		SD_HCNT_WIDTH => 10,
+		COLOR_DEPTH => 6,
+		OSD_COLOR => "011",
+		OSD_AUTO_CE => false
+	)
 	port map (
-		clk_sys => clk_ram,
-		ce_pix  => ce_8,
-		ce_pix_actual => ce_pix_actual,
-
-		SPI_SCK => SPI_SCK, 
-		SPI_SS3 => SPI_SS3,
-		SPI_DI => SPI_DI,
-
-		scanlines => scanlines,
+		clk_sys     => clk_c64,
+		scanlines   => st_scandoubler_fx,
 		scandoubler_disable => tv15Khz_mode,
-		hq2x => hq2x,
-		ypbpr => ypbpr,
-		ypbpr_full => '1',
+		ypbpr       => ypbpr,
+		no_csync    => no_csync,
+		rotate      => "00",
+		blend       => '0',
 
-		R => c64_r,
-		G => c64_g,
-		B => c64_b,
-		HSync => hsync_out,
-		VSync => vsync_out,
-		line_start => '0',
-		mono => '0',
+		SPI_SCK     => SPI_SCK,
+		SPI_SS3     => SPI_SS3,
+		SPI_DI      => SPI_DI,
 
-		VGA_R => VGA_R,
-		VGA_G => VGA_G,
-		VGA_B => VGA_B,
-		VGA_VS => VGA_VS,
-		VGA_HS => VGA_HS
+		HSync       => not hsync_out,
+		VSync       => not vsync_out,
+		R           => c64_r,
+		G           => c64_g,
+		B           => c64_b,
+
+		VGA_HS      => VGA_HS,
+		VGA_VS      => VGA_VS,
+		VGA_R       => VGA_R,
+		VGA_G       => VGA_G,
+		VGA_B       => VGA_B
 	);
 
 end struct;
