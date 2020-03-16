@@ -39,7 +39,6 @@ entity fpga64_sid_iec is
 	port(
 		clk32       : in  std_logic;
 		reset_n     : in  std_logic;
-		c64gs       : in std_logic;
 		-- keyboard interface (use any ordinairy PS2 keyboard)
 		kbd_clk     : in  std_logic;
 		kbd_dat     : in  std_logic;
@@ -50,9 +49,11 @@ entity fpga64_sid_iec is
 		ramAddr     : out unsigned(15 downto 0);
 		ramDataIn   : in  unsigned(7 downto 0);
 		ramDataOut  : out unsigned(7 downto 0);
+		romAddr     : out unsigned(15 downto 0);
 
 		ramCE       : out std_logic;
 		ramWe       : out std_logic;
+		romCE       : out std_logic;
 
 		idle        : out std_logic;
 
@@ -136,11 +137,7 @@ entity fpga64_sid_iec is
 		cass_sense  : in  std_logic;
 		cass_read   : in  std_logic;
 
-		disk_num    : out std_logic_vector(7 downto 0);
-
-		c64rom_addr : in std_logic_vector(13 downto 0);
-		c64rom_data : in std_logic_vector(7 downto 0);
-		c64rom_wr   : in std_logic
+		disk_num    : out std_logic_vector(7 downto 0)
 );
 end fpga64_sid_iec;
 
@@ -198,8 +195,9 @@ architecture rtl of fpga64_sid_iec is
 	signal cs_cia1: std_logic;
 	signal cs_cia2: std_logic;
 	signal cs_ram: std_logic;
-   signal cs_ioE: std_logic;
-   signal cs_ioF: std_logic;	
+	signal cs_rom: std_logic;
+	signal cs_ioE: std_logic;
+	signal cs_ioF: std_logic;
 	signal cs_romL: std_logic;
 	signal cs_romH: std_logic;
 	signal cs_UMAXromH: std_logic;							-- romH VIC II read flag
@@ -456,7 +454,6 @@ begin
 	port map (
 		clk => clk32,
 		reset => reset,
-		c64gs => c64gs,
 		cpuHasBus => cpuHasBus,
 
 		bankSwitch => cpuIO(2 downto 0),
@@ -494,15 +491,12 @@ begin
 		cs_cia1 => cs_cia1,
 		cs_cia2 => cs_cia2,
 		cs_ram => cs_ram,
+		cs_rom => cs_rom,
 		cs_ioE => cs_ioE,
 		cs_ioF => cs_ioF,
 		cs_romL => cs_romL,
 		cs_romH => cs_romH,
-		cs_UMAXromH => cs_UMAXromH,
-
-		c64rom_addr => c64rom_addr,
-		c64rom_data => c64rom_data,
-		c64rom_wr => c64rom_wr
+		cs_UMAXromH => cs_UMAXromH
 	);
 
 	process(clk32)
@@ -854,6 +848,14 @@ div1m: process(clk32)				-- this process devides 32 MHz to 1MHz (for the SID)
 		   sysCycle /= CYCLE_IEC0 and sysCycle /= CYCLE_IEC1 and sysCycle /= CYCLE_IEC2 and 
 		   sysCycle /= CYCLE_IEC3 and sysCycle /= CYCLE_CPU0 and sysCycle /= CYCLE_CPU1 and sysCycle /= CYCLE_CPUF and
 			cs_ram = '1' else '1';
+
+	romAddr <= "00" & cpuAddr(14) & cpuAddr(12 downto 0);
+	romCE <= '0' when sysCycle /= CYCLE_IDLE0 and sysCycle /= CYCLE_IDLE1 and sysCycle /= CYCLE_IDLE2 and 
+		   sysCycle /= CYCLE_IDLE3 and sysCycle /= CYCLE_IDLE4 and sysCycle /= CYCLE_IDLE5 and
+		   sysCycle /= CYCLE_IDLE6 and sysCycle /= CYCLE_IDLE7 and sysCycle /= CYCLE_IDLE8 and
+		   sysCycle /= CYCLE_IEC0 and sysCycle /= CYCLE_IEC1 and sysCycle /= CYCLE_IEC2 and 
+		   sysCycle /= CYCLE_IEC3 and sysCycle /= CYCLE_CPU0 and sysCycle /= CYCLE_CPU1 and sysCycle /= CYCLE_CPUF and
+			cs_rom = '1' else '1';
 
 	process(clk32)
 	begin

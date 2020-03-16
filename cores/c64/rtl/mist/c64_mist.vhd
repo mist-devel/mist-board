@@ -356,8 +356,6 @@ end component cartridge;
 	signal CPU_hasbus		: std_logic;
 	
 	signal c1541rom_wr   : std_logic;
-	signal c64rom_wr     : std_logic;
-	signal c64rom_addr   : std_logic_vector(13 downto 0);
 
 	signal joyA : std_logic_vector(31 downto 0);
 	signal joyB : std_logic_vector(31 downto 0);
@@ -459,6 +457,9 @@ end component cartridge;
 	signal c64_data_in16: std_logic_vector(15 downto 0);
 	alias  c64_data_out_int   : unsigned is unsigned(c64_data_out);
 
+	signal rom_ce : std_logic;
+	signal c64_rom_addr : unsigned(15 downto 0);
+
 	signal clk_c64 : std_logic;	-- 31.527mhz (PAL), 32.727mhz(NTSC) clock source
 	signal clk_ram : std_logic; -- 2 x clk_c64
 	signal clk32   : std_logic; -- 32mhz
@@ -513,9 +514,8 @@ end component cartridge;
 	signal c64_addr_temp : std_logic_vector(24 downto 0);	
 	signal cart_blk_len     : std_logic_vector(31 downto 0);	
 	signal cart_hdr_cnt     : std_logic_vector(3 downto 0);
-	signal erase_cram       : std_logic := '0';
+	signal erase_cartram    : std_logic := '0';
 	signal force_erase      : std_logic;
-	signal erase_to         : std_logic_vector(4 downto 0) := (others => '0');
 	signal mem_ce           : std_logic;
 	
 	signal uart_rxD         : std_logic;
@@ -523,7 +523,8 @@ end component cartridge;
 
 	-- sdram layout 
 	constant C64_MEM_START : std_logic_vector(24 downto 0) := '0' & X"000000"; -- normal C64 RAM
-	constant CRT_MEM_START : std_logic_vector(24 downto 0) := '0' & X"100000"; -- cartdriges
+	constant C64_ROM_START : std_logic_vector(24 downto 0) := '0' & X"0F0000"; -- kernal/basic ROM
+	constant CRT_MEM_START : std_logic_vector(24 downto 0) := '0' & X"100000"; -- cartridges
 	constant TAP_MEM_START : std_logic_vector(24 downto 0) := '0' & X"200000"; -- .tap files 
 	
 begin
@@ -651,7 +652,7 @@ begin
 		nmi => nmi,
 		nmi_ack => nmi_ack
 	);
-	
+
 	-- rearrange joystick contacta for c64
 	joyA_int <= joyA(6 downto 5) & (joyA(4) or (mouse_en and mouse_btns(0))) & joyA(0) & joyA(1) & joyA(2) & (joyA(3) or (mouse_en and mouse_btns(1)));
 	joyB_int <= joyB(6 downto 5) & (joyB(4) or (mouse_en and mouse_btns(0))) & joyB(0) & joyB(1) & joyB(2) & (joyB(3) or (mouse_en and mouse_btns(1)));
@@ -662,11 +663,14 @@ begin
 	joyA_c64 <= joyB_int when st_swap_joystick='1' else joyA_int;
 	joyB_c64 <= joyA_int when st_swap_joystick='1' else joyB_int;
 
-	sdram_addr <= c64_addr_temp when iec_cycle='0' else ioctl_ram_addr when ioctl_download = '1' or erasing = '1' else tap_play_addr;
+	sdram_addr <= std_logic_vector(unsigned(C64_ROM_START) + c64_rom_addr) when iec_cycle = '0' and rom_ce = '0' else
+	              c64_addr_temp when iec_cycle='0' else
+	              ioctl_ram_addr when ioctl_download = '1' or erasing = '1' else
+	              tap_play_addr;
 	sdram_data_out <= c64_data_out when iec_cycle='0' else ioctl_ram_data;
 
-	-- ram_we and ce are active low
-	sdram_ce <= mem_ce when iec_cycle='0' else ioctl_iec_cycle_used or tap_mem_ce;
+	-- ram_we and rom_ce are active low
+	sdram_ce <= (mem_ce or not rom_ce) when iec_cycle='0' else ioctl_iec_cycle_used or tap_mem_ce;
 	sdram_we <= not ram_we when iec_cycle='0' else ioctl_iec_cycle_used when ioctl_download = '1' or erasing = '1' else '0';
 
 	process(clk_c64)
@@ -697,11 +701,23 @@ begin
 			end if;
 
 			if ioctl_wr='1' then
+				if ioctl_index = FILE_BOOT or ioctl_index = FILE_ROM then
+					if ioctl_addr = 0 then
+						ioctl_load_addr <= C64_ROM_START;
+						if ioctl_index = FILE_ROM then
+							ioctl_load_addr <= C64_ROM_START + x"2000";
+						end if;
+					end if;
+					if ioctl_addr(24 downto 14) = 0 then
+						ioctl_ram_wr <= '1';
+					end if;
+				end if;
+
 				if ioctl_index = FILE_PRG then
 					if ioctl_addr = 0 then
 						ioctl_load_addr(7 downto 0) <= ioctl_data;
 					elsif(ioctl_addr = 1) then
-						ioctl_load_addr(15 downto 8) <= ioctl_data;
+						ioctl_load_addr(24 downto 8) <= '0'&x"00"&ioctl_data;
 					else
 						ioctl_ram_wr <= '1';
 					end if;
@@ -758,37 +774,43 @@ begin
 				end if;
 
 			end if;
-			
+
+			-- cart added
 			if old_download /= ioctl_download and ioctl_index = FILE_CRT then
 				cart_attached <= old_download;
-				erase_cram <= '1';
 			end if;
 
+			-- cart removed
 			if st_detach_cartdrige='1' or buttons(1)='1' then
 				cart_attached <= '0';
+				erase_cartram <= '1';
 			end if;
-			
+
+			-- start RAM erasing
 			if erasing='0' and force_erase = '1' then
 				erasing <='1';
 				ioctl_load_addr <= (others => '0');
 			end if;
 
-			if erasing = '1' and ioctl_ram_wr = '0' then
-				erase_to <= erase_to + "1";
-				if erase_to = "11111" then
-					if ioctl_load_addr < (erase_cram & X"FFFF") then 
-						ioctl_ram_wr <= '1';
+			-- RAM erasing control
+			if erasing = '1' and iec_cycle = '1' and iec_cycleD = '1' then
+					-- erase up to 0xFFFF
+					if ioctl_load_addr(16 downto 0) = '1'&x"0000" then
+						if ioctl_load_addr < CRT_MEM_START and erase_cartram = '1' then
+							ioctl_load_addr <= CRT_MEM_START;
+							ioctl_ram_wr <= '1';
+						else
+							erasing <= '0';
+							erase_cartram <= '0';
+						end if;
 					else
-						erasing <= '0';
-						erase_cram <= '0';
+						ioctl_ram_wr <= '1';
 					end if;
-				end if;
 			end if;
+
 		end if;
 	end process;
 
-	c64rom_wr   <= ioctl_wr when (((ioctl_index = FILE_BOOT) and (ioctl_addr(14) = '0')) or (ioctl_index = FILE_ROM)) and (ioctl_download = '1') else '0';
-	c64rom_addr <= ioctl_addr(13 downto 0) when ioctl_index = FILE_BOOT else '1' & ioctl_addr(12 downto 0);
 	c1541rom_wr <= ioctl_wr when (ioctl_index = FILE_BOOT) and (ioctl_addr(14) = '1') and (ioctl_download = '1') else '0';
 
 	process(clk_c64)
@@ -933,20 +955,17 @@ begin
 				reset_counter <= 1000000;
 				reset_n <= '0';
 			elsif buttons(1)='1' or st_detach_cartdrige='1' or reset_key = '1' or reset_crt='1' or
-			(ioctl_download='1' and (ioctl_index = FILE_ROM or ioctl_index = FILE_CRT)) then 
+			(ioctl_download='1' and (ioctl_index = FILE_BOOT or ioctl_index = FILE_ROM or ioctl_index = FILE_CRT)) then 
 				reset_counter <= 255;
 				reset_n <= '0';
-			elsif ioctl_download ='1' then
 			elsif erasing ='1' then
 				force_erase <= '0';
-			else
-				if reset_counter = 0 then
-					reset_n <= '1';
-				else
-					reset_counter <= reset_counter - 1;
-					if reset_counter = 100 then
+			elsif reset_counter = 0 then
+				reset_n <= '1';
+			elsif ioctl_download = '0' then
+				reset_counter <= reset_counter - 1;
+				if reset_counter = 100 then
 						force_erase <='1';
-					end if;
 				end if;
 			end if;
 		end if;
@@ -994,7 +1013,6 @@ begin
 	port map(
 		clk32 => clk_c64,
 		reset_n => reset_n,
-		c64gs => st_c64gs,-- not enough BRAM
 		kbd_clk => not ps2_clk,
 		kbd_dat => ps2_dat,
 		ramAddr => c64_addr_int,
@@ -1002,6 +1020,8 @@ begin
 		ramDataIn => c64_data_in_int,
 		ramCE => ram_ce,
 		ramWe => ram_we,
+		romAddr => c64_rom_addr,
+		romCE => rom_ce,
 		ntscInitMode => ntsc_init_mode,
 		hsync => hsync,
 		vsync => vsync,
@@ -1059,10 +1079,7 @@ begin
 		cass_write => cass_write,
 		cass_read  => cass_read,
 		cass_sense => cass_sense,
-		
-		c64rom_addr => c64rom_addr,
-		c64rom_data => ioctl_data,
-		c64rom_wr => c64rom_wr,
+
 		tap_playstop_key => tap_playstop_key,
 		reset_key => reset_key
 	);

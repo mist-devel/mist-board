@@ -26,7 +26,6 @@ entity fpga64_buslogic is
 	port (
 		clk : in std_logic;
 		reset : in std_logic;
-		c64gs : in std_logic;
 
 		cpuHasBus : in std_logic;
 
@@ -43,10 +42,6 @@ entity fpga64_buslogic is
 		ioE_rom : in std_logic;
 		ioF_rom : in std_logic;
 		max_ram : in std_logic;
-
-		c64rom_addr: in std_logic_vector(13 downto 0);
-		c64rom_data: in std_logic_vector(7 downto 0);
-		c64rom_wr:   in std_logic;
 
 		cpuWe: in std_logic;
 		cpuAddr: in unsigned(15 downto 0);
@@ -70,6 +65,7 @@ entity fpga64_buslogic is
 		cs_cia1: out std_logic;
 		cs_cia2: out std_logic;
 		cs_ram: out std_logic;
+		cs_rom: out std_logic;
 
 		-- To catridge port
 		cs_ioE: out std_logic;
@@ -98,9 +94,6 @@ architecture rtl of fpga64_buslogic is
 	signal charData: unsigned(7 downto 0);
 	signal basicData: unsigned(7 downto 0);
 	signal romData: std_logic_vector(7 downto 0);
-	signal romData_c64: std_logic_vector(7 downto 0);
-	signal romData_c64gs: std_logic_vector(7 downto 0);
-	signal c64gs_ena : std_logic := '0';
 
 	signal cs_CharReg : std_logic;
 	signal cs_romReg : std_logic;
@@ -129,44 +122,7 @@ begin
 			do => charData
 		);
 
-	kernelrom: entity work.rom_C64
-		port map 
-		(
-			clock => clk,
-
-			wren => c64rom_wr,
-			data => c64rom_data,
-			wraddress => c64rom_addr,
-
-			rdaddress => std_logic_vector(cpuAddr(14) & cpuAddr(12 downto 0)),
-			q => romData_c64
-		);
-
--- not enough BRAM on MIST FPGA		
---	kernelromGS: entity work.rom_GS64
---		port map 
---		(
---			clock => clk,
-
---			wren => '0',
---			data => (others => '0'),
---			wraddress => (others => '0'),
-
---			rdaddress => std_logic_vector(cpuAddr(14) & cpuAddr(12 downto 0)),
---			q => romData_c64gs
---		);
-		
-
-	romData <= romData_c64gs when c64gs_ena = '1' else romData_c64;
-
-	process(clk)
-	begin
-		if rising_edge(clk) then
-			if reset = '1' then 
-				c64gs_ena <= c64gs;
-			end if;
-		end if;
-	end process;
+	romData <= std_logic_vector(ramData);
 
 	--
 	--begin
@@ -325,6 +281,7 @@ begin
 	end process;
 
 	cs_ram <= cs_ramReg or cs_romLReg or cs_romHReg or cs_UMAXromHReg;  -- need to keep ram active for cartridges LCA
+	cs_rom <= cs_romReg;
 	cs_vic <= cs_vicReg;
 	cs_sid <= cs_sidReg;
 	cs_color <= cs_colorReg;
