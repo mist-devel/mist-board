@@ -42,7 +42,6 @@ architecture rtl of video_vicii_656x is
 
 -- State machine
 	signal lastLineFlag : boolean; -- True for on last line of the frame.
-	signal beyondFrameFlag : boolean; -- Y>frame lines
 	signal vicCycle : vicCycles := cycleRefresh1;
 	signal sprite : unsigned(2 downto 0) := "000";
 	signal shiftChars : boolean;
@@ -662,14 +661,12 @@ rasterCounters: process(clk)
 			if phi = '1'
 			and enaData = '1'
 			and baSync = '0' then
-				beyondFrameFlag <= false;
 				if (vicCycle = cycleSpriteB)
 				and (sprite = 2) then
 					rasterY <= rasterY + 1;
-					beyondFrameFlag <= lastLineFlag;
-				end if;
-				if beyondFrameFlag then
-					rasterY <= (others => '0');
+					if lastLineFlag then
+						rasterY <= (others => '0');
+					end if;
 				end if;
 			end if;
 		end if;
