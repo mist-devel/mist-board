@@ -55,6 +55,7 @@ entity fpga64_sid_iec is
 		ramWe       : out std_logic;
 		romCE       : out std_logic;
 
+		idle0       : out std_logic;
 		idle        : out std_logic;
 
 		-- VGA/SCART interface
@@ -318,13 +319,14 @@ begin
 -- -----------------------------------------------------------------------
 	ba <= baLoc;
 
-	idle <= '1' when
+	idle0 <= '1' when
 		(sysCycle = CYCLE_IDLE0) or (sysCycle = CYCLE_IDLE1) or
-		(sysCycle = CYCLE_IDLE2) or (sysCycle = CYCLE_IDLE3) or
+		(sysCycle = CYCLE_IDLE2) or (sysCycle = CYCLE_IDLE3) else '0';
+	idle <= '1' when
 		(sysCycle = CYCLE_IDLE4) or (sysCycle = CYCLE_IDLE5) or
 		(sysCycle = CYCLE_IDLE6) or (sysCycle = CYCLE_IDLE7) or
 		(sysCycle = CYCLE_IDLE8) else '0';
-	
+
 -- -----------------------------------------------------------------------
 -- System state machine, controls bus accesses
 -- and triggers enables of other components

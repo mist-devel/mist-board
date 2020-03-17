@@ -248,13 +248,15 @@ end component cartridge;
 	signal pll_rom_q : std_logic;
 
 	signal c1541_reset: std_logic;
+	signal idle0: std_logic;
 	signal idle: std_logic;
 	signal ces: std_logic_vector(3 downto 0);
-	signal iec_cycle: std_logic;
-	signal iec_cycleD: std_logic;
-	signal iec_cycle_rD: std_logic;
+	signal mist_cycle: std_logic;
+	signal mist_cycle_wr: std_logic;
+	signal mist_cycleD: std_logic;
+	signal mist_cycle_rD: std_logic;
 	signal buttons: std_logic_vector(1 downto 0);
-	
+
 	-- signals to connect "data_io" for direct PRG injection
 	signal ioctl_wr: std_logic;
 	signal ioctl_addr: std_logic_vector(24 downto 0);
@@ -264,7 +266,6 @@ end component cartridge;
 	signal ioctl_ram_data: std_logic_vector(7 downto 0);
 	signal ioctl_load_addr  : std_logic_vector(24 downto 0);
 	signal ioctl_ram_wr: std_logic;
-	signal ioctl_iec_cycle_used: std_logic;
 	signal ioctl_download: std_logic;
 	signal c64_addr: std_logic_vector(15 downto 0);
 	signal c64_data_in: std_logic_vector(7 downto 0);
@@ -470,13 +471,17 @@ begin
 	-- 1541/tape activity led
 	LED <= not ioctl_download and not led_disk and cass_motor;
 
-	iec_cycle <= '1' when ces = "1011" else '0';
+	-- use iec and the first set of idle cycles for mist access
+	mist_cycle <= '1' when ces = "1011" or idle0 = '1' else '0'; 
 
 	sd_sdhc <= '1';
 	sd_conf <= '0';
 	-- User io
 	user_io_d : user_io
-	generic map (STRLEN => CONF_STR'length)
+	generic map (
+		STRLEN => CONF_STR'length,
+		ROM_DIRECT_UPLOAD => 1
+	)
 	port map (
 		clk_sys => clk_c64,
 		clk_sd  => clk32,
@@ -604,25 +609,26 @@ begin
 	joyA_c64 <= joyB_int when st_swap_joystick='1' else joyA_int;
 	joyB_c64 <= joyA_int when st_swap_joystick='1' else joyB_int;
 
-	sdram_addr <= std_logic_vector(unsigned(C64_ROM_START) + c64_rom_addr) when iec_cycle = '0' and rom_ce = '0' else
-	              c64_addr_temp when iec_cycle='0' else
+	sdram_addr <= std_logic_vector(unsigned(C64_ROM_START) + c64_rom_addr) when mist_cycle = '0' and rom_ce = '0' else
+	              c64_addr_temp when mist_cycle='0' else
 	              ioctl_ram_addr when ioctl_download = '1' or erasing = '1' else
 	              tap_play_addr;
-	sdram_data_out <= c64_data_out when iec_cycle='0' else ioctl_ram_data;
+	sdram_data_out <= c64_data_out when mist_cycle='0' else ioctl_ram_data;
 
 	-- ram_we and rom_ce are active low
-	sdram_ce <= (mem_ce or not rom_ce) when iec_cycle='0' else ioctl_iec_cycle_used or tap_mem_ce;
-	sdram_we <= not ram_we when iec_cycle='0' else ioctl_iec_cycle_used when ioctl_download = '1' or erasing = '1' else '0';
+	sdram_ce <= (mem_ce or not rom_ce) when mist_cycle='0' else mist_cycle_wr or tap_mem_ce;
+	sdram_we <= not ram_we when mist_cycle='0' else mist_cycle_wr when ioctl_download = '1' or erasing = '1' else '0';
 
 	process(clk_c64)
 	begin
 		if rising_edge(clk_c64) then
 
 			old_download <= ioctl_download;
-			iec_cycleD <= iec_cycle;
+			mist_cycleD <= mist_cycle;
 			cart_hdr_wr <= '0';
 
-			if iec_cycle = '0' and iec_cycleD = '1' and ioctl_ram_wr = '1' then
+			-- prepare mist cycle write
+			if mist_cycle = '0' and mist_cycle_wr = '0' and ioctl_ram_wr = '1' then
 				ioctl_ram_wr <= '0';
 				ioctl_ram_addr <= ioctl_load_addr;
 				ioctl_load_addr <= ioctl_load_addr + 1;
@@ -634,11 +640,11 @@ begin
 				else
 					ioctl_ram_data <= ioctl_data;
 				end if;
-				ioctl_iec_cycle_used <= '1';
+				mist_cycle_wr <= '1';
 			end if;
-			-- second IEC cycle - SDRAM data written, disable WE on the next
-			if iec_cycle = '1' and iec_cycleD = '1' and ioctl_iec_cycle_used = '1' then
-				ioctl_iec_cycle_used <= '0';
+			-- second mist cycle - SDRAM data written, disable WE on the next
+			if mist_cycle = '1' and mist_cycleD = '1' and mist_cycle_wr = '1' then
+				mist_cycle_wr <= '0';
 			end if;
 
 			if ioctl_wr='1' then
@@ -734,7 +740,7 @@ begin
 			end if;
 
 			-- RAM erasing control
-			if erasing = '1' and iec_cycle = '1' and iec_cycleD = '1' then
+			if erasing = '1' and mist_cycle = '1' and mist_cycleD = '1' then
 					-- erase up to 0xFFFF
 					if ioctl_load_addr(16 downto 0) = '1'&x"0000" then
 						if ioctl_load_addr < CRT_MEM_START and erase_cartram = '1' then
@@ -979,7 +985,8 @@ begin
 		ces => ces,
 		SIDclk => open,
 		still => open,
-		idle => idle,
+		idle0 => idle0, -- first set of idle cycles
+		idle => idle, -- second set of idle cycles
 		audio_data_l => audio_data_l,
 		audio_data_r => audio_data_r,
 		extfilter_en => not st_audio_filter_off,
@@ -1168,14 +1175,14 @@ begin
 
 --			if tap_fifo_error = '1' then tap_play <= '0'; end if;
 
-			iec_cycle_rD <= iec_cycle;
+			mist_cycle_rD <= mist_cycle;
 			tap_wrreq <= '0';
-			if iec_cycle = '0' and iec_cycle_rD = '1' and
+			if mist_cycle = '0' and mist_cycle_rD = '1' and
 			  ioctl_download = '0' and tap_play_addr /= tap_last_addr and tap_wrfull = '0' then
 				tap_mem_ce <= '1';
 			end if;
-			-- second IEC cycle - SDRAM data ready on the next
-			if iec_cycle = '1' and iec_cycle_rD = '1' and tap_mem_ce = '1' then
+			-- second mist cycle - SDRAM data ready on the next
+			if mist_cycle = '1' and mist_cycle_rD = '1' and tap_mem_ce = '1' then
 				tap_mem_ce <= '0';
 				tap_wrreq <= '1';
 				tap_play_addr <= tap_play_addr + 1;
