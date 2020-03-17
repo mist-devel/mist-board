@@ -267,6 +267,12 @@ end component cartridge;
 	signal ioctl_load_addr  : std_logic_vector(24 downto 0);
 	signal ioctl_ram_wr: std_logic;
 	signal ioctl_download: std_logic;
+
+	signal prg_reg_update: std_logic;
+	signal prg_start: std_logic_vector(15 downto 0);
+	signal prg_end: std_logic_vector(15 downto 0);
+	signal prg_data: std_logic_vector(7 downto 0);
+
 	signal c64_addr: std_logic_vector(15 downto 0);
 	signal c64_data_in: std_logic_vector(7 downto 0);
 	signal c64_data_out: std_logic_vector(7 downto 0);
@@ -611,13 +617,13 @@ begin
 
 	sdram_addr <= std_logic_vector(unsigned(C64_ROM_START) + c64_rom_addr) when mist_cycle = '0' and rom_ce = '0' else
 	              c64_addr_temp when mist_cycle='0' else
-	              ioctl_ram_addr when ioctl_download = '1' or erasing = '1' else
+	              ioctl_ram_addr when prg_reg_update = '1' or ioctl_download = '1' or erasing = '1' else
 	              tap_play_addr;
 	sdram_data_out <= c64_data_out when mist_cycle='0' else ioctl_ram_data;
 
 	-- ram_we and rom_ce are active low
 	sdram_ce <= (mem_ce or not rom_ce) when mist_cycle='0' else mist_cycle_wr or tap_mem_ce;
-	sdram_we <= not ram_we when mist_cycle='0' else mist_cycle_wr when ioctl_download = '1' or erasing = '1' else '0';
+	sdram_we <= not ram_we when mist_cycle='0' else mist_cycle_wr;
 
 	process(clk_c64)
 	begin
@@ -637,6 +643,8 @@ begin
 					-- same as VICE uses
 					-- Freeload and probably some more code depend on some kind of pattern
 					ioctl_ram_data  <= (others => ioctl_load_addr(6));
+				elsif prg_reg_update = '1' then
+					ioctl_ram_data <= prg_data;
 				else
 					ioctl_ram_data <= ioctl_data;
 				end if;
@@ -663,8 +671,10 @@ begin
 				if ioctl_index = FILE_PRG then
 					if ioctl_addr = 0 then
 						ioctl_load_addr(7 downto 0) <= ioctl_data;
+						prg_start(7 downto 0) <= ioctl_data;
 					elsif(ioctl_addr = 1) then
 						ioctl_load_addr(24 downto 8) <= '0'&x"00"&ioctl_data;
+						prg_start(15 downto 8) <= ioctl_data;
 					else
 						ioctl_ram_wr <= '1';
 					end if;
@@ -720,6 +730,29 @@ begin
 					ioctl_ram_wr <= '1';
 				end if;
 
+			end if;
+
+			-- PRG download finished, start updating system variables
+			if old_download ='1' and ioctl_download = '0' and ioctl_index = FILE_PRG then
+				ioctl_load_addr <= (others => '0');
+				prg_end <= ioctl_ram_addr(15 downto 0);
+				prg_reg_update <= '1';
+			end if;
+
+			-- PRG system variable updating control
+			if prg_reg_update = '1' and mist_cycle = '1' and mist_cycleD = '1' then
+				case ioctl_load_addr(7 downto 0) is
+				when x"2b"|x"ac" => prg_data <= prg_start(7 downto 0); ioctl_ram_wr <= '1';
+				when x"2c"|x"ad" => prg_data <= prg_start(15 downto 8); ioctl_ram_wr <= '1';
+				when x"2d"|x"2f"|x"31"|x"ae" => prg_data <= prg_end(7 downto 0); ioctl_ram_wr <= '1';
+				when x"2e"|x"30"|x"32"|x"af" => prg_data <= prg_end(15 downto 8); ioctl_ram_wr <= '1';
+				when others => ioctl_load_addr <= ioctl_load_addr + 1;
+				end case;
+
+				-- finish at $100
+				if ioctl_load_addr(15 downto 0) = x"0100" then
+					prg_reg_update <= '0';
+				end if;
 			end if;
 
 			-- cart added
