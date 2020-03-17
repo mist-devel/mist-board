@@ -1171,8 +1171,7 @@ spriteSpriteCollision: process(clk)
 			and (collision /= "00010000")
 			and (collision /= "00100000")
 			and (collision /= "01000000")
-			and (collision /= "10000000")
-			and (TBBorder = '0') then
+			and (collision /= "10000000") then
 				M2M <= M2M or collision;
 				
 				-- Give collision interrupt but only once until clear of register
