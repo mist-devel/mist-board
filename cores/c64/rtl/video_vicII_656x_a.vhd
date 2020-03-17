@@ -1087,16 +1087,22 @@ calcBitmap: process(clk)
 			muxColor := "00";
 			muxSprite := (others => '-');
 			for i in 7 downto 0 loop
-				if (MPRIO(i) = '0') or (pixelBgFlag = '0') then
-					if MC(i) = '1' then
-						if MCurrentPixel(i) /= "00" then
+				if MC(i) = '1' then
+					if MCurrentPixel(i) /= "00" then
+						if (MPRIO(i) = '0') or (pixelBgFlag = '0') then
 							muxColor := MCurrentPixel(i);
-							muxSprite := to_unsigned(i, 3);
+						else
+							muxColor := "00";
 						end if;
-					elsif MCurrentPixel(i)(1) = '1' then
-						muxColor := "10";
 						muxSprite := to_unsigned(i, 3);
 					end if;
+				elsif MCurrentPixel(i)(1) = '1' then
+					if (MPRIO(i) = '0') or (pixelBgFlag = '0') then
+						muxColor := "10";
+					else
+						muxColor := "00";
+					end if;
+					muxSprite := to_unsigned(i, 3);
 				end if;
 			end loop;
 
