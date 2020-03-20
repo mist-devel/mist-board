@@ -98,8 +98,9 @@ architecture rtl of video_vicii_656x is
 	signal spriteColors: spriteColorsDef;
 
 -- borders and blanking
-	signal LRBorder: std_logic;
+	signal MainBorder: std_logic;
 	signal TBBorder: std_logic;
+	signal setTBBorder: boolean;
 	signal hBlack: std_logic;
 	signal vBlanking : std_logic;
 	signal hBlanking : std_logic;
@@ -136,6 +137,8 @@ architecture rtl of video_vicii_656x is
 -- Raster counters
 	signal rasterX : unsigned(9 downto 0) := (others => '0');
 	signal rasterY : unsigned(8 downto 0) := (others => '0');
+	signal rasterY_next : unsigned(8 downto 0);
+	signal cycleLast : boolean;
 
 -- Light pen
 	signal lightPenHit: std_logic;
@@ -643,6 +646,9 @@ vicStateMachine: process(clk)
 -- -----------------------------------------------------------------------
 -- X/Y Raster counter
 -- -----------------------------------------------------------------------
+cycleLast <= (vicCycle = cycleSpriteB) and (sprite = 2);
+rasterY_next <= (others => '0') when lastLineFlag else RasterY + 1;
+
 rasterCounters: process(clk)
 	begin
 		if rising_edge(clk) then
@@ -661,12 +667,8 @@ rasterCounters: process(clk)
 			if phi = '1'
 			and enaData = '1'
 			and baSync = '0' then
-				if (vicCycle = cycleSpriteB)
-				and (sprite = 2) then
-					rasterY <= rasterY + 1;
-					if lastLineFlag then
-						rasterY <= (others => '0');
-					end if;
+				if cycleLast then
+					rasterY <= rasterY_next;
 				end if;
 			end if;
 		end if;
@@ -780,47 +782,57 @@ doHBlanking: process(clk)
 -- Borders
 -- -----------------------------------------------------------------------
 calcBorders: process(clk)
-		variable newTBBorder: std_logic;
+	variable newTBBorder: std_logic;
 	begin
 		if rising_edge(clk) then
 			if enaPixel = '1' then
-				--
-				-- Calc top/bottom border
 				newTBBorder := TBBorder;
---				if (rasterY = 55) and (RSEL = '0') and (rasterEnable = '1') then
-				if (rasterY = 55) and (rasterEnable = '1') then
+				-- 1. If the X coordinate reaches the right comparison value, the main border
+				--   flip flop is set.
+				if (rasterX = (335+1) and CSEL = '0') or (rasterX = (344+1) and CSEL = '1')  then
+					MainBorder <= '1';
+				end if;
+				-- 2. If the Y coordinate reaches the bottom comparison value in cycle 63, the
+				-- vertical border flip flop is set. FIX: compare during the whole line, but set at cycle 63
+				-- 3. If the Y coordinate reaches the top comparison value in cycle 63 and the
+				-- DEN bit in register $d011 is set, the vertical border flip flop is
+				-- reset. FIX: compare during the whole line and act immediately
+				if (rasterY = 247 and RSEL = '0') or (rasterY = 251 and RSEL = '1') then
+					setTBBorder <= true;
+				end if;
+				if ((rasterY = 55 and RSEL = '0') or (rasterY = 51 and RSEL = '1')) and DEN = '1' then
 					newTBBorder := '0';
 				end if;
-				if (rasterY = 51) and (RSEL = '1') and (rasterEnable = '1') then
-					newTBBorder := '0';
+				if cycleLast then
+					if setTBBorder then
+						newTBBorder := '1';
+						setTBBorder <= false;
+					end if;
 				end if;
-				if (rasterY = 247) and (RSEL = '0') then
-					newTBBorder := '1';
+				if (rasterX = (31+1) and CSEL = '0') or (rasterX = (24+1) and CSEL = '1') then
+					-- 4. If the X coordinate reaches the left comparison value and the Y
+					-- coordinate reaches the bottom one, the vertical border flip flop is set.
+					-- FIX: act on the already triggered condition
+					if setTBBorder then
+						newTBBorder := '1';
+						setTBBorder <= false;
+					end if;
+					-- 5. If the X coordinate reaches the left comparison value and the Y
+					-- coordinate reaches the top one and the DEN bit in register $d011 is set,
+					-- the vertical border flip flop is reset.
+					if ((rasterY = 55 and RSEL = '0') or (rasterY = 51 and RSEL = '1')) and DEN = '1' then
+						newTBBorder := '0';
+					end if;
+					-- 6. If the X coordinate reaches the left comparison value and the vertical
+					-- border flip flop is not set, the main flip flop is reset.
+					if newTBBorder = '0' and setTBBorder = false then
+						MainBorder <= '0';
+					end if;
 				end if;
-				if (rasterY = 251) and (RSEL = '1') then
-					newTBBorder := '1';
-				end if;
-
-				--
-				-- Calc left/right border
-				if (rasterX = (31+1)) and (CSEL = '0') then
-					LRBorder <= newTBBorder;
-					TBBorder <= newTBBorder;
-				end if;
-				if (rasterX = (24+1)) and (CSEL = '1') then
-					LRBorder <= newTBBorder;
-					TBBorder <= newTBBorder;
-				end if;
-				if (rasterX = (335+1)) and (CSEL = '0') then
-					LRBorder <= '1';
-				end if;
-				if (rasterX = (344+1)) and (CSEL = '1') then
-					LRBorder <= '1';
-				end if;
+				TBBorder <= newTBBorder;
 			end if;
 		end if;
 	end process;
-
 
 -- -----------------------------------------------------------------------
 -- Pixel generator for Text/Bitmap screen
@@ -1139,7 +1151,7 @@ calcBitmap: process(clk)
 --				if (cs = '1' and aRegisters = "011100") then
 --					colorIndex <= "1111";
 --				end if;
-				if (LRBorder = '1') or (TBBorder = '1') then
+				if MainBorder = '1' then
 					colorIndex <= EC;
 				end if;
 				if (hBlack = '1') then
