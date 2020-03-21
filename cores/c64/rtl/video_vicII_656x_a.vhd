@@ -168,10 +168,17 @@ architecture rtl of video_vicii_656x is
 -- Sprite work registers
 	signal MPtr : unsigned(7 downto 0); -- sprite base pointer
 	signal MPixels : MPixelsDef; -- Sprite 24 bit shift register
-	signal MActive : MFlags; -- Sprite is active (derived from MCnt)
+	signal MActive : MFlags; -- Sprite is active
+	signal MActive_next : MFlags; -- Sprite is active
+	signal MDMA : MFlags; -- Sprite DMA is enabled
+	signal MDMA_next : MFlags; -- Sprite DMA is enabled
 	signal MCnt : MCntDef;
+	signal MCnt_next : MCntDef;
+	signal MCBase : MCntDef;
+	signal MCBase_next : MCntDef;
 	signal MXE_ff : unsigned(7 downto 0); -- Sprite X expansion flipflop
 	signal MYE_ff : unsigned(7 downto 0); -- Sprite Y expansion flipflop
+	signal MYE_ff_next : unsigned(7 downto 0); -- Sprite Y expansion flipflop
 	signal MC_ff : unsigned(7 downto 0); -- controls sprite shift-register in multicolor
 	signal MShift : MFlags; -- Sprite is shifting
 	signal MCurrentPixel : MCurrentPixelDef;
@@ -408,7 +415,7 @@ vicStateMachine: process(clk)
 			and enaData = '1'
 			and vicCycle = cycleSpriteA then
 				MPtr <= (others => '1');
-				if MActive(to_integer(sprite)) then
+				if MActive_next(to_integer(sprite)) then
 					MPtr <= di;
 				end if;
 
@@ -540,28 +547,28 @@ vicStateMachine: process(clk)
 					baSprite37 <= '1';
 				end if;
 				
-				if MActive(0) and (vicCycle = cycleCalcSprites) then
+				if MDMA_next(0) and (vicCycle = cycleCalcSprites) then
 					baSprite04 <= '0';
 				end if;
-				if MActive(1) and (vicCycle = cycleSpriteBa2) then
+				if MDMA(1) and (vicCycle = cycleSpriteBa2) then
 					baSprite15 <= '0';
 				end if;
-				if MActive(2) and (vicCycle = cycleSpriteB) and (sprite = 0) then
+				if MDMA(2) and (vicCycle = cycleSpriteB) and (sprite = 0) then
 					baSprite26 <= '0';
 				end if;
-				if MActive(3) and (vicCycle = cycleSpriteB) and (sprite = 1) then
+				if MDMA(3) and (vicCycle = cycleSpriteB) and (sprite = 1) then
 					baSprite37 <= '0';
 				end if;
-				if MActive(4) and (vicCycle = cycleSpriteB) and (sprite = 2) then
+				if MDMA(4) and (vicCycle = cycleSpriteB) and (sprite = 2) then
 					baSprite04 <= '0';
 				end if;
-				if MActive(5) and (vicCycle = cycleSpriteB) and (sprite = 3) then
+				if MDMA(5) and (vicCycle = cycleSpriteB) and (sprite = 3) then
 					baSprite15 <= '0';
 				end if;
-				if MActive(6) and (vicCycle = cycleSpriteB) and (sprite = 4) then
+				if MDMA(6) and (vicCycle = cycleSpriteB) and (sprite = 4) then
 					baSprite26 <= '0';
 				end if;
-				if MActive(7) and (vicCycle = cycleSpriteB) and (sprite = 5) then
+				if MDMA(7) and (vicCycle = cycleSpriteB) and (sprite = 5) then
 					baSprite37 <= '0';
 				end if;
 			end if;
@@ -941,81 +948,129 @@ calcBitmap: process(clk)
 	end process;
 
 -- -----------------------------------------------------------------------
--- Which sprites are active?
--- -----------------------------------------------------------------------
-	process(MCnt)
-	begin
-		for i in 0 to 7 loop
-			MActive(i) <= false;
-			if MCnt(i) /= 63 then
-				MActive(i) <= true;
-			end if;
-		end loop;
-	end process;
-
--- -----------------------------------------------------------------------
 -- Sprite byte counter
 -- Y expansion flipflop
 -- -----------------------------------------------------------------------
+
+	process(rasterY, MDMA, MCnt, MCBase, MActive, MYE_ff, ME, MY, MYE, vicCycle, sprite)
+	begin
+		MCBase_next <= MCBase;
+		MDMA_next <= MDMA;
+		MYE_ff_next <= MYE_ff;
+		MCnt_next <= MCnt;
+		MActive_next <= MActive;
+
+		case vicCycle is
+
+		when cycleRefresh4 =>
+			-- 7. In the first phase of cycle 15, it is checked if the expansion flip flop
+			-- is set. If so, MCBASE is incremented by 2.
+			for i in 0 to 7 loop
+				if MDMA(i) and MYE_ff(i) = '1' then
+					MCBase_next(i) <= MCBase(i) + 2;
+				end if;
+			end loop;
+
+		when cycleRefresh5 =>
+			-- 8. In the first phase of cycle 16, it is checked if the expansion flip flop
+			-- is set. If so, MCBASE is incremented by 1. After that, the VIC checks if
+			-- MCBASE is equal to 63 and turns of the DMA and the display of the sprite if it is.
+			for i in 0 to 7 loop
+				if MDMA(i) then
+					if MYE_ff(i) = '1' then
+						MCBase_next(i) <= MCBase(i) + 1;
+						if MCBase(i) = 62 then
+							MDMA_next(i) <= false;
+							MActive_next(i) <= false;
+						end if;
+					else
+						if MYE(i) = '0' then
+							-- this is from debugging Robocop fixed cart intro
+							MCBase_next(i) <= MCBase(i) - 1;
+						elsif MCBASE(i) = 63 then
+							MDMA_next(i) <= false;
+							MActive_next(i) <= false;
+						end if;
+					end if;
+				end if;
+			end loop;
+
+		when cycleCalcSprites =>
+			-- 2. If the MxYE bit is set in the first phase of cycle 55, the expansion
+			-- flip flop is inverted.
+			for i in 0 to 7 loop
+				if MYE(i) = '1' then
+					MYE_ff_next(i) <= not MYE_ff(i);
+				end if;
+			end loop;
+			-- 3. In the first phases of cycle 55 and 56, the VIC checks for every sprite
+			-- if the corresponding MxE bit in register $d015 is set and the Y
+			-- coordinate of the sprite (odd registers $d001-$d00f) match the lower 8
+			-- bits of RASTER. If this is the case and the DMA for the sprite is still
+			-- off, the DMA is switched on, MCBASE is cleared, and if the MxYE bit is
+			-- set the expansion flip flip is reset.
+			for i in 0 to 7 loop
+				if not MDMA(i) and ME(i) = '1' and rasterY(7 downto 0) = MY(i) then
+					MCBase_Next(i) <= (others => '0');
+					MDMA_Next(i) <= true;
+					if MYE(i) = '1' then
+						MYE_ff_Next(i) <= '0';
+					end if;
+				end if;
+			end loop;
+
+		when cycleSpriteA =>
+			-- 4. In the first phase of cycle 58, the MC of every sprite is loaded from
+			-- its belonging MCBASE (MCBASE->MC) and it is checked if the DMA for the
+			-- sprite is turned on and the Y coordinate of the sprite matches the lower
+			-- 8 bits of RASTER. If this is the case, the display of the sprite is
+			-- turned on.
+			if sprite = "000" then
+				for i in 0 to 7 loop
+					MCnt_Next(i) <= MCBase(i);
+					if MDMA(i) and ME(i) = '1' and rasterY(7 downto 0) = MY(i) then
+						MActive_Next(i) <= true;
+					end if;
+				end loop;
+			end if;
+
+		when others => null;
+		end case;
+
+		-- 1. The expansion flip flip is set as long as the bit in MxYE in register
+		-- $d017 corresponding to the sprite is cleared.
+		for i in 0 to 7 loop
+			if MYE(i) = '0' then
+				MYE_ff_next(i) <= '1';
+			end if;
+		end loop;
+
+	end process;
+
 	process(clk)
 	begin
 		if rising_edge(clk) then
+
 			if phi = '0'
 			and enaData = '1' then
-				case vicCycle is
-				when cycleRefresh5 =>
-					for i in 0 to 7 loop
-						MYE_ff(i) <= not MYE_ff(i);
-						if MActive(i) then
-							if MYE_ff(i) = MYE(i) then
-								MCnt(i) <= MCnt(i) + 1;
-							else
-								MCnt(i) <= MCnt(i) - 2;
-							end if;
-						end if;
-					end loop;
-				when others =>
-					null;
-				end case;
+					MCBase <= MCBase_Next;
+					MDMA <= MDMA_Next;
+					MYE_ff <= MYE_ff_Next;
+					MCnt <= MCnt_Next;
+					MActive <= MActive_Next;
 			end if;
-			for i in 0 to 7 loop
-				if MYE(i) = '0'
-				or not MActive(i) then
-					MYE_ff(i) <= '0';
-				end if;
-			end loop;
-			
-			--
-			-- On cycleCalcSprite check for each inactive sprite if
-			-- there is a Y match. Reset MCnt if this is so.
-			--
-			-- The RasterX counter is used here to multiplex the compare logic.
-			-- This saves a few logic cells in the FPGA.
-			if vicCycle = cycleCalcSprites then
-				if (not MActive(to_integer(RasterX(2 downto 0))))
-				and (ME(to_integer(RasterX(2 downto 0))) = '1')
-				and (rasterY(7 downto 0) = MY(to_integer(RasterX(2 downto 0)))) then
-					MCnt(to_integer(RasterX(2 downto 0))) <= (others => '0');
-				end if;
-			end if;
-			--
-			-- Original non-multiplexed version
---				if vicCycle = cycleCalcSprites then
---					for i in 0 to 7 loop
---						if (not MActive(i))
---						and (ME(i) = '1')
---						and (rasterY(7 downto 0) = MY(i)) then
---							MCnt(i) <= (others => '0');
---						end if;
---					end loop;						
---				end if;
-			
-			--
-			-- Increment MCnt after fetching data.
+
+			-- 5. If the DMA for a sprite is turned on, three s-accesses are done in
+			-- sequence in the corresponding cycles assigned to the sprite (see the
+			-- diagrams in section 3.6.3.). The p-accesses are always done, even if the
+			-- sprite is turned off. The read data of the first access is stored in the
+			-- upper 8 bits of the shift register, that of the second one in the middle
+			-- 8 bits and that of the third one in the lower 8 bits.
+			-- MC is incremented by one after each s-access.
 			if enaData = '1' then
 				if (vicCycle = cycleSpriteA and phi = '1')
 				or (vicCycle = cycleSpriteB and phi = '0') then
-					if MActive(to_integer(sprite)) then
+					if MDMA(to_integer(sprite)) then
 						MCnt(to_integer(sprite)) <= MCnt(to_integer(sprite)) + 1;
 					end if;
 				end if;
@@ -1064,7 +1119,7 @@ calcBitmap: process(clk)
 					MShift(to_integer(sprite)) <= false;
 				end if;
 
-				if Mactive(to_integer(sprite)) then
+				if Mactive_Next(to_integer(sprite)) then
 					if phi = '0' then
 						case vicCycle is
 						when cycleSpriteB =>
