@@ -36,9 +36,12 @@ architecture rtl of video_vicii_656x is
 	type MCntDef is array(0 to 7) of unsigned(5 downto 0);
 	type MPixelsDef is array(0 to 7) of unsigned(23 downto 0);
 	type MCurrentPixelDef is array(0 to 7) of unsigned(1 downto 0);
+	type MCurrentPixelsDef is array(0 to 7) of unsigned(7 downto 0);
 	type charStoreDef is array(38 downto 0) of unsigned(11 downto 0);
 	type spriteColorsDef is array(7 downto 0) of unsigned(3 downto 0);
 	type pixelColorStoreDef is array(7 downto 0) of unsigned(3 downto 0);
+
+	constant PIX_DELAY : integer := 2;
 
 -- State machine
 	signal lastLineFlag : boolean; -- True for on last line of the frame.
@@ -113,8 +116,8 @@ architecture rtl of video_vicii_656x is
 	signal vicAddrLoc : unsigned(13 downto 0);
 
 -- Address counters
-	signal ColCounter: unsigned(9 downto 0) := (others => '0');
-	signal ColRestart: unsigned(9 downto 0) := (others => '0');
+	signal ColCounter: unsigned(9 downto 0) := (others => '0'); -- VC
+	signal ColRestart: unsigned(9 downto 0) := (others => '0'); -- VCBASE
 	signal RowCounter: unsigned(2 downto 0) := (others => '0');
 
 -- IRQ Registers
@@ -130,7 +133,9 @@ architecture rtl of video_vicii_656x is
 
 -- Collision detection registers
 	signal M2M: unsigned(7 downto 0); -- Sprite to sprite collision
+	signal M2MDelay: unsigned(7 downto 0); -- Sprite to sprite collision
 	signal M2D: unsigned(7 downto 0); -- Sprite to character collision
+	signal M2DDelay: unsigned(7 downto 0); -- Sprite to character collision
 	signal M2Mhit : std_logic;
 	signal M2Dhit : std_logic;
 
@@ -154,12 +159,11 @@ architecture rtl of video_vicii_656x is
 -- Character generation
 	signal charStore: charStoreDef;
 	signal nextChar : unsigned(11 downto 0);
-	-- Char/Pixels just coming from memory
-	signal readChar : unsigned(11 downto 0);
-	signal readPixels : unsigned(7 downto 0);
 	-- Char/Pixels pair waiting to be shifted
 	signal waitingChar : unsigned(11 downto 0);
+	signal waitingChar_r : unsigned(11 downto 0);
 	signal waitingPixels : unsigned(7 downto 0);
+	signal waitingPixels_r : unsigned(7 downto 0);
 	-- Stores colorinfo and the Pixels that are currently in shift register
 	signal shiftingChar : unsigned(11 downto 0);
 	signal shiftingPixels : unsigned(7 downto 0);
@@ -182,11 +186,13 @@ architecture rtl of video_vicii_656x is
 	signal MC_ff : unsigned(7 downto 0); -- controls sprite shift-register in multicolor
 	signal MShift : MFlags; -- Sprite is shifting
 	signal MCurrentPixel : MCurrentPixelDef;
+	signal MCurrentPixelDelay: MCurrentPixelsDef;
 
 -- Current colors and pixels
 	signal pixelColor: ColorDef;
 	signal pixelBgFlag: std_logic; -- For collision detection
 	signal pixelDelay: pixelColorStoreDef;
+	signal pixelBgFlagDelay: std_logic_vector(7 downto 0);
 
 -- Read/Write lines
 	signal myWr : std_logic;
@@ -283,14 +289,14 @@ vicStateMachine: process(clk)
 						end if;
 					when cycleIdle1 => vicCycle <= cycleRefresh2;
 					when cycleRefresh2 => vicCycle <= cycleRefresh3;
-					when cycleRefresh3 => vicCycle <= cycleRefresh4;
-					when cycleRefresh4 => vicCycle <= cycleRefresh5;  -- X=0..7 on this cycle
+					when cycleRefresh3 => vicCycle <= cycleRefresh4;  -- X=0..7 on this cycle
+					when cycleRefresh4 => vicCycle <= cycleRefresh5;
 					when cycleRefresh5 => vicCycle <= cycleChar;
 					when cycleChar =>
-						if ((mode6569  = '1') and rasterX(9 downto 3) = "0100111") -- PAL
-						or ((mode6567old  = '1') and rasterX(9 downto 3) = "0100111") -- Old NTSC
-						or ((mode6567R8  = '1') and rasterX(9 downto 3) = "0101000") -- New NTSC
-						or ((mode6572  = '1') and rasterX(9 downto 3) = "0101000") then -- PAL-N
+						if ((mode6569  = '1') and rasterX(9 downto 3) = "0101000") -- PAL
+						or ((mode6567old  = '1') and rasterX(9 downto 3) = "0101000") -- Old NTSC
+						or ((mode6567R8  = '1') and rasterX(9 downto 3) = "0101001") -- New NTSC
+						or ((mode6572  = '1') and rasterX(9 downto 3) = "0101001") then -- PAL-N
 							vicCycle <= cycleCalcSprites;
 						end if;
 					when cycleCalcSprites => vicCycle <= cycleSpriteBa1;
@@ -506,7 +512,7 @@ vicStateMachine: process(clk)
 						baChars <= '0';
 					end if;
 				when others =>
-					if rasterX(9 downto 3) < "0101000"
+					if rasterX(9 downto 3) < "0101001"
 					and badLine then
 						baChars <= '0';
 					end if;
@@ -596,8 +602,8 @@ vicStateMachine: process(clk)
 	process(rasterX)
 	begin
 		shiftChars <= false;
-		if rasterX(9 downto 3) > "0000000"
-		and rasterX(9 downto 3) < "0101001" then
+		if rasterX(9 downto 3) > "0000001"
+		and rasterX(9 downto 3) <= "0101001" then
 			shiftChars <= true;
 		end if;
 	end process;
@@ -611,17 +617,26 @@ vicStateMachine: process(clk)
 			if phi = '0'
 			and enaData = '1'
 			and baSync = '0' then
+				-- 4. VC and VMLI are incremented after each g-access in display state.
 				if shiftChars
 				and idle = '0' then
 					colCounter <= colCounter + 1;
 				end if;
+
 				case vicCycle is
 				when cycleRefresh4 =>
+					-- 2. In the first phase of cycle 14 of each line, VC is loaded from VCBASE
+					-- (VCBASE->VC) and VMLI is cleared. If there is a Bad Line Condition in
+					-- this phase, RC is also reset to zero.
 					colCounter <= colRestart;
 					if badline then
 						rowCounter <= (others => '0');
 					end if;
 				when cycleSpriteA =>
+					-- 5. In the first phase of cycle 58, the VIC checks if RC=7. If so, the video
+					-- logic goes to idle state and VCBASE is loaded from VC (VC->VCBASE). If
+					-- the video logic is in display state afterwards (this is always the case
+					-- if there is a Bad Line Condition), RC is incremented.
 					if sprite = "000" then
 						if rowCounter = 7 then
 							colRestart <= colCounter;
@@ -637,7 +652,10 @@ vicStateMachine: process(clk)
 					null;					
 				end case;
 				if lastLineFlag then
-					-- Reset column counter outside visible range.
+					-- 1. Once somewhere outside of the range of raster lines $30-$f7 (i.e.
+					-- outside of the Bad Line range), VCBASE is reset to zero. This is
+					-- presumably done in raster line 0, the exact moment cannot be determined
+					-- and is irrelevant.
 					colRestart <= (others => '0');
 				end if;
 
@@ -667,7 +685,7 @@ rasterCounters: process(clk)
 			and baSync = '0' then
 				rasterX(9 downto 3) <= rasterX(9 downto 3) + 1;
 				rasterX(2 downto 0) <= (others => '0');
-				if vicCycle = cycleRefresh4 then
+				if vicCycle = cycleRefresh3 then
 					rasterX <= (others => '0');
 				end if;
 			end if;
@@ -771,16 +789,18 @@ doVBlanking: process(clk, mode6569, mode6567old, mode6567R8)
 doHBlanking: process(clk)
 	begin
 		if rising_edge(clk) then
-			if sprite = 3 then
-				hBlack <= '1';
-			end if;
-			if vicCycle = cycleRefresh1 then
-				hBlack <= '0';
-			end if;
-			if sprite = 3 then -- dar 5 then
-				hBlanking <= '1';
-			else
-				hBlanking <= '0';
+			if enaPixel = '1' then
+				if sprite = 2 then
+					hBlack <= '1';
+				end if;
+				if vicCycle = cycleRefresh1 then
+					hBlack <= '0';
+				end if;
+				if rasterX = 396 then -- from VIC II datasheet
+					hBlanking <= '1';
+				elsif rasterX = 496 then -- from VIC II datasheet
+					hBlanking <= '0';
+				end if;
 			end if;
 		end if;
 	end process;
@@ -795,8 +815,8 @@ calcBorders: process(clk)
 			if enaPixel = '1' then
 				newTBBorder := TBBorder;
 				-- 1. If the X coordinate reaches the right comparison value, the main border
-				--   flip flop is set.
-				if (rasterX = (335+1) and CSEL = '0') or (rasterX = (344+1) and CSEL = '1')  then
+				--   flip flop is set (comparison values are from VIC II datasheet).
+				if (rasterX = 339-1 and CSEL = '0') or (rasterX = 348-1 and CSEL = '1')  then
 					MainBorder <= '1';
 				end if;
 				-- 2. If the Y coordinate reaches the bottom comparison value in cycle 63, the
@@ -816,7 +836,7 @@ calcBorders: process(clk)
 						setTBBorder <= false;
 					end if;
 				end if;
-				if (rasterX = (31+1) and CSEL = '0') or (rasterX = (24+1) and CSEL = '1') then
+				if (rasterX = 35-1 and CSEL = '0') or (rasterX = 28-1 and CSEL = '1') then
 					-- 4. If the X coordinate reaches the left comparison value and the Y
 					-- coordinate reaches the bottom one, the vertical border flip flop is set.
 					-- FIX: act on the already triggered condition
@@ -846,6 +866,8 @@ calcBorders: process(clk)
 -- -----------------------------------------------------------------------
 calcBitmap: process(clk)
 		variable multiColor : std_logic;
+		variable pixelColor : ColorDef;
+		variable pixelBgFlag: std_logic;
 	begin
 		if rising_edge(clk) then
 			if enaPixel = '1' then
@@ -873,23 +895,23 @@ calcBitmap: process(clk)
 
 				--
 				-- Calculate if pixel is in foreground or background
-				pixelBgFlag <= shiftingPixels(7);
+				pixelBgFlag := shiftingPixels(7);
 
 				--
 				-- Calculate color of next pixel				
-				pixelColor <= B0C;
+				pixelColor := B0C;
 				if (BMM = '0') and (ECM='0') then
 					if (multiColor = '0') then
 						-- normal character mode
 						if shiftingPixels(7) = '1' then
-							pixelColor <= shiftingChar(11 downto 8);
+							pixelColor := shiftingChar(11 downto 8);
 						end if;
 					else
 						-- multi-color character mode
 						case shiftingPixels(7 downto 6) is
-						when "01" => pixelColor <= B1C;
-						when "10" => pixelColor <= B2C;
-						when "11" => pixelColor <= '0' & shiftingChar(10 downto 8);
+						when "01" => pixelColor := B1C;
+						when "10" => pixelColor := B2C;
+						when "11" => pixelColor := '0' & shiftingChar(10 downto 8);
 						when others => null;
 						end case;
 					end if;
@@ -897,34 +919,37 @@ calcBitmap: process(clk)
 					-- extended-color character mode
 					-- multiple background colors but only 64 characters
 					if shiftingPixels(7) = '1' then
-						pixelColor <= shiftingChar(11 downto 8);
+						pixelColor := shiftingChar(11 downto 8);
 					else
 						case shiftingChar(7 downto 6) is
-						when "01" => pixelColor <= B1C;
-						when "10" => pixelColor <= B2C;
-						when "11" => pixelColor <= B3C;
+						when "01" => pixelColor := B1C;
+						when "10" => pixelColor := B2C;
+						when "11" => pixelColor := B3C;
 						when others	=> null;
 						end case;
 					end if;
 				elsif emulateGraphics and (MCM = '0') and (BMM = '1') and (ECM='0') then
 					-- highres bitmap mode
 					if shiftingPixels(7) = '1' then
-						pixelColor <= shiftingChar(7 downto 4);
+						pixelColor := shiftingChar(7 downto 4);
 					else
-						pixelColor <= shiftingChar(3 downto 0);
+						pixelColor := shiftingChar(3 downto 0);
 					end if;
 				elsif emulateGraphics and (MCM = '1') and (BMM = '1') and (ECM='0') then
 					-- Multi-color bitmap mode
 					case shiftingPixels(7 downto 6) is
-					when "01" => pixelColor <= shiftingChar(7 downto 4);
-					when "10" => pixelColor <= shiftingChar(3 downto 0);
-					when "11" => pixelColor <= shiftingChar(11 downto 8);
+					when "01" => pixelColor := shiftingChar(7 downto 4);
+					when "10" => pixelColor := shiftingChar(3 downto 0);
+					when "11" => pixelColor := shiftingChar(11 downto 8);
 					when others => null;
 					end case;
 				else
 					-- illegal display mode, the output is black
-					pixelColor <= "0000";
+					pixelColor := "0000";
 				end if;
+
+				pixelDelay <= pixelDelay(6 downto 0) & pixelColor;
+				pixelBgFlagDelay <= pixelBgFlagDelay(6 downto 0) & pixelBgFlag;
 			end if;
 
 			--
@@ -932,18 +957,16 @@ calcBitmap: process(clk)
 			-- and shift-register is empty.
 			if enaData = '1'
 			and phi = '0' then
-				readPixels <= (others => '0');
+				-- Store the characters until shiftregister is empty
+				waitingPixels <= (others => '0');
 				if shiftChars then
-					readPixels <= di;
-					readChar <= (others => '0');
+					waitingPixels <= di;
 					if idle = '0' then
-						readChar <= nextChar;
+						waitingChar <= nextChar;
 					end if;
 				end if;
-				-- Store the characters until shiftregister is empty
-				waitingPixels <= readPixels;
-				waitingChar <= readChar;
 			end if;
+
 		end if;
 	end process;
 
@@ -952,7 +975,7 @@ calcBitmap: process(clk)
 -- Y expansion flipflop
 -- -----------------------------------------------------------------------
 
-	process(rasterY, MDMA, MCnt, MCBase, MActive, MYE_ff, ME, MY, MYE, vicCycle, sprite)
+	process(rasterX, rasterY, MDMA, MCnt, MCBase, MActive, MYE_ff, ME, MY, MYE, vicCycle, sprite)
 	begin
 		MCBase_next <= MCBase;
 		MDMA_next <= MDMA;
@@ -960,9 +983,17 @@ calcBitmap: process(clk)
 		MCnt_next <= MCnt;
 		MActive_next <= MActive;
 
+		-- 1. The expansion flip flip is set as long as the bit in MxYE in register
+		-- $d017 corresponding to the sprite is cleared.
+		for i in 0 to 7 loop
+			if MYE(i) = '0' then
+				MYE_ff_next(i) <= '1';
+			end if;
+		end loop;
+
 		case vicCycle is
 
-		when cycleRefresh4 =>
+		when cycleRefresh5 =>
 			-- 7. In the first phase of cycle 15, it is checked if the expansion flip flop
 			-- is set. If so, MCBASE is incremented by 2.
 			for i in 0 to 7 loop
@@ -971,35 +1002,37 @@ calcBitmap: process(clk)
 				end if;
 			end loop;
 
-		when cycleRefresh5 =>
+		when cycleChar =>
 			-- 8. In the first phase of cycle 16, it is checked if the expansion flip flop
 			-- is set. If so, MCBASE is incremented by 1. After that, the VIC checks if
 			-- MCBASE is equal to 63 and turns of the DMA and the display of the sprite if it is.
-			for i in 0 to 7 loop
-				if MDMA(i) then
-					if MYE_ff(i) = '1' then
-						MCBase_next(i) <= MCBase(i) + 1;
-						if MCBase(i) = 62 then
-							MDMA_next(i) <= false;
-							MActive_next(i) <= false;
-						end if;
-					else
-						if MYE(i) = '0' then
-							-- this is from debugging Robocop fixed cart intro
-							MCBase_next(i) <= MCBase(i) - 1;
-						elsif MCBASE(i) = 63 then
-							MDMA_next(i) <= false;
-							MActive_next(i) <= false;
+			if rasterX(9 downto 3) = "0000010" then
+				for i in 0 to 7 loop
+					if MDMA(i) then
+						if MYE_ff(i) = '1' then
+							MCBase_next(i) <= MCBase(i) + 1;
+							if MCBase(i) = 62 then
+								MDMA_next(i) <= false;
+								MActive_next(i) <= false;
+							end if;
+						else
+							if MYE(i) = '0' then
+								-- this is from debugging Robocop fixed cart intro
+								MCBase_next(i) <= MCBase(i) - 1;
+							elsif MCBASE(i) = 63 then
+								MDMA_next(i) <= false;
+								MActive_next(i) <= false;
+							end if;
 						end if;
 					end if;
-				end if;
-			end loop;
+				end loop;
+			end if;
 
-		when cycleCalcSprites =>
+		when cycleCalcSprites | cycleSpriteBa1 =>
 			-- 2. If the MxYE bit is set in the first phase of cycle 55, the expansion
-			-- flip flop is inverted.
+			-- flip flop is inverted. FIX: VirtualC64 does it at cycle 56, FLI demos likes it
 			for i in 0 to 7 loop
-				if MYE(i) = '1' then
+				if MYE(i) = '1' and vicCycle = cycleSpriteBa1 then
 					MYE_ff_next(i) <= not MYE_ff(i);
 				end if;
 			end loop;
@@ -1014,7 +1047,11 @@ calcBitmap: process(clk)
 					MCBase_Next(i) <= (others => '0');
 					MDMA_Next(i) <= true;
 					if MYE(i) = '1' then
-						MYE_ff_Next(i) <= '0';
+						if vicCycle = cycleCalcSprites then
+							MYE_ff_Next(i) <= '1'; -- will inverted in the next cycle
+						else
+							MYE_ff_Next(i) <= '0';
+						end if;
 					end if;
 				end if;
 			end loop;
@@ -1036,14 +1073,6 @@ calcBitmap: process(clk)
 
 		when others => null;
 		end case;
-
-		-- 1. The expansion flip flip is set as long as the bit in MxYE in register
-		-- $d017 corresponding to the sprite is cleared.
-		for i in 0 to 7 loop
-			if MYE(i) = '0' then
-				MYE_ff_next(i) <= '1';
-			end if;
-		end loop;
 
 	end process;
 
@@ -1082,6 +1111,7 @@ calcBitmap: process(clk)
 -- Sprite pixel Shift register
 -- -----------------------------------------------------------------------
 	process(clk)
+	variable MCurrentPixel: unsigned(1 downto 0);
 	begin
 		if rising_edge(clk) then
 			if enaPixel = '1' then
@@ -1094,20 +1124,23 @@ calcBitmap: process(clk)
 
 				-- Shift one pixel of the sprite from the shift register.
 				for i in 0 to 7 loop
+					MCurrentPixel := MCurrentPixelDelay(i)(1 downto 0);
 					if MShift(i) then
 						MXE_ff(i) <= (not MXE_ff(i)) and MXE(i);
 						if MXE_ff(i) = '0' then
 							MC_ff(i) <= (not MC_ff(i)) and MC(i);
 							if MC_ff(i) = '0' then
-								MCurrentPixel(i) <= MPixels(i)(23 downto 22);
+								MCurrentPixel := MPixels(i)(23 downto 22);
 							end if;
 							MPixels(i) <= MPixels(i)(22 downto 0) & '0';
 						end if;
 					else
 						MXE_ff(i) <= '0';
 						MC_ff(i) <= '0';
-						MCurrentPixel(i) <= "00";
+						MCurrentPixel := "00";
 					end if;
+
+					MCurrentPixelDelay(i) <= MCurrentPixelDelay(i)(5 downto 0) & MCurrentPixel;
 				end loop;
 			end if;
 
@@ -1141,6 +1174,16 @@ calcBitmap: process(clk)
 -- -----------------------------------------------------------------------
 -- Video output
 -- -----------------------------------------------------------------------
+	pixelBgFlag <= pixelBgFlagDelay(PIX_DELAY);
+	pixelColor <= pixelDelay(PIX_DELAY);
+
+	process(MCurrentPixelDelay)
+	begin
+		for i in 7 downto 0 loop
+			MCurrentPixel(i) <= MCurrentPixelDelay(i)(PIX_DELAY * 2 + 1 downto PIX_DELAY * 2);
+		end loop;
+	end process;
+
 	process(clk)
 		variable myColor: unsigned(3 downto 0);
 		variable muxSprite : unsigned(2 downto 0);
@@ -1230,13 +1273,14 @@ spriteSpriteCollision: process(clk)
 			if (myRd = '1')
 			and	(aRegisters = "011110") then
 				M2M <= (others => '0');
+				M2MDelay <= (others => '0');
 				M2Mhit <= '0';
 			end if;
 
 			for i in 0 to 7 loop
 				collision(i) := MCurrentPixel(i)(1);
 			end loop;
-			if (collision /= "00000000")
+			if  (collision /= "00000000")
 			and (collision /= "00000001")
 			and (collision /= "00000010")
 			and (collision /= "00000100")
@@ -1245,14 +1289,20 @@ spriteSpriteCollision: process(clk)
 			and (collision /= "00100000")
 			and (collision /= "01000000")
 			and (collision /= "10000000") then
-				M2M <= M2M or collision;
-				
+				M2MDelay <= M2MDelay or collision;
+
+			end if;
+
+			if phi = '1'
+			and enaData = '1' then
+				M2M <= M2MDelay;
 				-- Give collision interrupt but only once until clear of register
-				if M2Mhit = '0' then
+				if M2MDelay /= 0 and M2Mhit = '0' then
 					IMMC <= '1';
 					M2Mhit <= '1';
 				end if;
 			end if;
+
 		end if;
 	end process;
 
@@ -1269,22 +1319,27 @@ spriteBackgroundCollision: process(clk)
 			if (myRd = '1')
 			and	(aRegisters = "011111") then
 				M2D <= (others => '0');
+				M2DDelay <= (others => '0');
 				M2Dhit <= '0';
 			end if;
 
 			for i in 0 to 7 loop
-				if MCurrentPixel(i)(1) = '1'
+				if  MCurrentPixel(i)(1) = '1'
 				and pixelBgFlag = '1'
 				and (TBBorder = '0') then
-					M2D(i) <= '1';
-					
-					-- Give collision interrupt but only once until clear of register
-					if M2Dhit = '0' then
-						IMBC <= '1';
-						M2Dhit <= '1';
-					end if;
+					M2DDelay(i) <= '1';
 				end if;
 			end loop;
+
+			if phi = '1'
+			and enaData = '1' then
+				M2D <= M2DDelay;
+				-- Give collision interrupt but only once until clear of register
+				if M2DDelay /= 0 and M2Dhit = '0' then
+					IMBC <= '1';
+					M2Dhit <= '1';
+				end if;
+			end if;
 		end if;
 	end process;
 
