@@ -43,6 +43,7 @@ end gcr_floppy;
 architecture struct of gcr_floppy is
 
 signal bit_clk_en  : std_logic;
+signal bit_clk_div : std_logic_vector(7 downto 0);
 signal sync_cnt    : std_logic_vector(5 downto 0) := (others => '0');
 signal byte_cnt    : std_logic_vector(8 downto 0) := (others => '0');
 signal nibble      : std_logic := '0';
@@ -134,7 +135,7 @@ with nibble select
 
 gcr_bit <= gcr_nibble(to_integer(unsigned(gcr_bit_cnt)));
 
-sector_max <=  "10100" when track_num < std_logic_vector(to_unsigned(18,6)) else 
+sector_max <=  "10100" when track_num < std_logic_vector(to_unsigned(18,6)) else
                "10010" when track_num < std_logic_vector(to_unsigned(25,6)) else
 				   "10001" when track_num < std_logic_vector(to_unsigned(31,6)) else
  	         	"10000" ;
@@ -159,6 +160,11 @@ with gcr_nibble_out select
 						X"E" when "11110",--"01111",
 						X"F" when others; --"10101",			
 
+bit_clk_div <=  x"67" when track_num < std_logic_vector(to_unsigned(18,6)) else
+                x"6F" when track_num < std_logic_vector(to_unsigned(25,6)) else
+                x"77" when track_num < std_logic_vector(to_unsigned(31,6)) else
+                x"7F";
+
 process (clk32)
 	variable bit_clk_cnt : std_logic_vector(7 downto 0) := (others => '0');
 begin
@@ -172,7 +178,7 @@ begin
 			bit_clk_en <= '0';
 		else
 			bit_clk_en <= '0';
-			if bit_clk_cnt = X"6F" then
+			if bit_clk_cnt = bit_clk_div then
 				bit_clk_en <= '1';
 				bit_clk_cnt := (others => '0');
 			else
