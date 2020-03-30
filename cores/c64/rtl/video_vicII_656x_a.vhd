@@ -398,7 +398,7 @@ vicStateMachine: process(clk)
 			if enaData = '1'
 			and shiftChars
 			and phi = '1' then
-				if badLine then
+				if baChars = '0' then
 					nextChar(7 downto 0) <= di;
 					nextChar(11 downto 8) <= diColor;
 				else
