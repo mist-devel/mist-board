@@ -161,9 +161,7 @@ architecture rtl of video_vicii_656x is
 	signal nextChar : unsigned(11 downto 0);
 	-- Char/Pixels pair waiting to be shifted
 	signal waitingChar : unsigned(11 downto 0);
-	signal waitingChar_r : unsigned(11 downto 0);
 	signal waitingPixels : unsigned(7 downto 0);
-	signal waitingPixels_r : unsigned(7 downto 0);
 	-- Stores colorinfo and the Pixels that are currently in shift register
 	signal shiftingChar : unsigned(11 downto 0);
 	signal shiftingPixels : unsigned(7 downto 0);
@@ -961,6 +959,7 @@ calcBitmap: process(clk)
 				waitingPixels <= (others => '0');
 				if shiftChars then
 					waitingPixels <= di;
+					waitingChar <= (others => '0');
 					if idle = '0' then
 						waitingChar <= nextChar;
 					end if;
