@@ -974,7 +974,7 @@ calcBitmap: process(clk)
 -- Y expansion flipflop
 -- -----------------------------------------------------------------------
 
-	process(rasterX, rasterY, MDMA, MCnt, MCBase, MActive, MYE_ff, ME, MY, MYE, vicCycle, sprite)
+	process(rasterX, rasterY, MDMA, MCnt, MCBase, MCBase_next, MActive, MYE_ff, ME, MY, MYE, vicCycle, sprite)
 	begin
 		MCBase_next <= MCBase;
 		MDMA_next <= MDMA;
@@ -992,36 +992,24 @@ calcBitmap: process(clk)
 
 		case vicCycle is
 
-		when cycleRefresh5 =>
-			-- 7. In the first phase of cycle 15, it is checked if the expansion flip flop
-			-- is set. If so, MCBASE is incremented by 2.
-			for i in 0 to 7 loop
-				if MDMA(i) and MYE_ff(i) = '1' then
-					MCBase_next(i) <= MCBase(i) + 2;
-				end if;
-			end loop;
-
 		when cycleChar =>
-			-- 8. In the first phase of cycle 16, it is checked if the expansion flip flop
-			-- is set. If so, MCBASE is incremented by 1. After that, the VIC checks if
-			-- MCBASE is equal to 63 and turns of the DMA and the display of the sprite if it is.
+			-- 7. In the first phase of cycle 16, it is checked if the expansion flip flop
+			-- is set. If so, MCBASE load from MC (MC->MCBASE), unless the CPU cleared
+			-- the Y expansion bit in $d017 in the second phase of cycle 15, in which case
+			-- MCBASE is set to X = (101010 & (MCBASE & MC)) | (010101 & (MCBASE | MC)).
+			-- After the MCBASE update, the VIC checks if MCBASE is equal to 63 and turns
+			-- off the DMA of the sprite if it is. (VIC Addendum)
 			if rasterX(9 downto 3) = "0000010" then
 				for i in 0 to 7 loop
 					if MDMA(i) then
 						if MYE_ff(i) = '1' then
-							MCBase_next(i) <= MCBase(i) + 1;
-							if MCBase(i) = 62 then
-								MDMA_next(i) <= false;
-								MActive_next(i) <= false;
-							end if;
-						else
-							if MYE(i) = '0' then
-								-- this is from debugging Robocop fixed cart intro
-								MCBase_next(i) <= MCBase(i) - 1;
-							elsif MCBASE(i) = 63 then
-								MDMA_next(i) <= false;
-								MActive_next(i) <= false;
-							end if;
+							MCBase_next(i) <= MCnt(i);
+						elsif MYE(i) = '0' then
+							-- MYE just turned off
+							MCBase_next(i) <= ("101010" and (MCBase(i) and MCnt(i))) or ("010101" and (MCBase(i) or MCnt(i)));
+						end if;
+						if MCBase_next(i) = 63 then
+							MDMA_next(i) <= false;
 						end if;
 					end if;
 				end loop;
@@ -1061,11 +1049,18 @@ calcBitmap: process(clk)
 			-- sprite is turned on and the Y coordinate of the sprite matches the lower
 			-- 8 bits of RASTER. If this is the case, the display of the sprite is
 			-- turned on.
+			-- VIC Addendum: the actual disabling of sprite display is likely handled
+			-- during the first phase of cycle 58 (see rule 4).
+
 			if sprite = "000" then
 				for i in 0 to 7 loop
 					MCnt_Next(i) <= MCBase(i);
-					if MDMA(i) and ME(i) = '1' and rasterY(7 downto 0) = MY(i) then
-						MActive_Next(i) <= true;
+					if MDMA(i) then
+						if ME(i) = '1' and rasterY(7 downto 0) = MY(i) then
+							MActive_Next(i) <= true;
+						end if;
+					else
+						MActive_next(i) <= false;
 					end if;
 				end loop;
 			end if;
@@ -1097,7 +1092,7 @@ calcBitmap: process(clk)
 			-- MC is incremented by one after each s-access.
 			if enaData = '1' then
 				if (vicCycle = cycleSpriteA and phi = '1')
-				or (vicCycle = cycleSpriteB and phi = '0') then
+				or (vicCycle = cycleSpriteB) then
 					if MDMA(to_integer(sprite)) then
 						MCnt(to_integer(sprite)) <= MCnt(to_integer(sprite)) + 1;
 					end if;
