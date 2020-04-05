@@ -154,6 +154,7 @@ port
 (
 	clk_sys			  : in std_logic;
 	SPI_SCK, SPI_SS2, SPI_SS4, SPI_DI, SPI_DO :in std_logic;
+	clkref_n          : in  std_logic := '0';
 	ioctl_download    : out std_logic;
 	ioctl_index       : out std_logic_vector(7 downto 0);
 	ioctl_wr          : out std_logic;
