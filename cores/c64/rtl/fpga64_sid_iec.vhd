@@ -164,6 +164,7 @@ architecture rtl of fpga64_sid_iec is
 	signal phi0_cpu : std_logic;
 	signal phi0_vic : std_logic;
 	signal cpuHasBus : std_logic;
+	signal cpuHasBusLoc : std_logic;
 	
 	signal cycleRestart : std_logic;
 	signal cycleRestartReg1 : std_logic;
@@ -377,12 +378,12 @@ begin
 			if sysCycle = sysCycleDef'pred(CYCLE_CPU0) then
 				phi0_cpu <= '1';
 				if baLoc = '1' or cpuWe = '1' then
-					cpuHasBus <= '1';
+					cpuHasBusLoc <= '1';
 				end if;
 			end if;
 			if sysCycle = sysCycleDef'high then
 				phi0_cpu <= '0';
-				cpuHasBus <= '0';
+				cpuHasBusLoc <= '0';
 			end if;
 			if sysCycle = sysCycleDef'pred(CYCLE_VIC0) then
 				phi0_vic <= '1';
@@ -392,6 +393,8 @@ begin
 			end if;
 		end if;
 	end process;
+
+	cpuHasBus <= cpuHasBusLoc or not aec;
 
 	process(clk32)
 	begin
@@ -447,7 +450,14 @@ begin
 	begin
 		if rising_edge(clk32) then
 			colorWe <= (cs_color and pulseWrRam);
-			colorData <= colorQ;
+			if aec = '1' then
+				colorData <= colorQ;
+			else
+			-- In the first three cycles after BA went low, the VIC reads 
+			-- $ff as character pointers and 
+			-- as color information the lower 4 bits of the opcode after the access to $d011.
+				colorData <= cpuDi(3 downto 0);
+			end if;
 		end if;
 	end process;
 

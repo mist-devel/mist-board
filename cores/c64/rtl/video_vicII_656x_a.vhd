@@ -583,14 +583,12 @@ vicStateMachine: process(clk)
 -- -----------------------------------------------------------------------
 -- Address valid?
 -- -----------------------------------------------------------------------
-	process(clk)
+	process(phi, baCnt)
 	begin
-		if rising_edge(clk) then
-			addrValid <= '0';
-			if phi = '0'
-			or baCnt(2) = '1' then
-				addrValid <= '1';
-			end if;
+		addrValid <= '0';
+		if phi = '0'
+		or baCnt(2) = '1' then
+			addrValid <= '1';
 		end if;
 	end process;
 
