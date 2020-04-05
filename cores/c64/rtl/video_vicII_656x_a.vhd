@@ -41,7 +41,7 @@ architecture rtl of video_vicii_656x is
 	type spriteColorsDef is array(7 downto 0) of unsigned(3 downto 0);
 	type pixelColorStoreDef is array(7 downto 0) of unsigned(3 downto 0);
 
-	constant PIX_DELAY : integer := 2;
+	constant PIX_DELAY : integer := 3;
 
 -- State machine
 	signal lastLineFlag : boolean; -- True for on last line of the frame.
@@ -812,7 +812,7 @@ calcBorders: process(clk)
 				newTBBorder := TBBorder;
 				-- 1. If the X coordinate reaches the right comparison value, the main border
 				--   flip flop is set (comparison values are from VIC II datasheet).
-				if (rasterX = 339-1 and CSEL = '0') or (rasterX = 348-1 and CSEL = '1')  then
+				if (rasterX = 339 and CSEL = '0') or (rasterX = 348 and CSEL = '1')  then
 					MainBorder <= '1';
 				end if;
 				-- 2. If the Y coordinate reaches the bottom comparison value in cycle 63, the
@@ -832,7 +832,7 @@ calcBorders: process(clk)
 						setTBBorder <= false;
 					end if;
 				end if;
-				if (rasterX = 35-1 and CSEL = '0') or (rasterX = 28-1 and CSEL = '1') then
+				if (rasterX = 35 and CSEL = '0') or (rasterX = 28 and CSEL = '1') then
 					-- 4. If the X coordinate reaches the left comparison value and the Y
 					-- coordinate reaches the bottom one, the vertical border flip flop is set.
 					-- FIX: act on the already triggered condition
