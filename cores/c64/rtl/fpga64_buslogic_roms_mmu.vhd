@@ -28,6 +28,7 @@ entity fpga64_buslogic is
 		reset : in std_logic;
 
 		cpuHasBus : in std_logic;
+		aec : in std_logic;
 
 		ramData: in unsigned(7 downto 0);
 
@@ -265,8 +266,12 @@ begin
 
 				systemWe <= cpuWe;
 			else
-				-- The VIC-II has the bus.
-				currentAddr <= vicAddr;
+				-- The VIC-II has the bus, but only when aec is asserted
+				if aec = '1' then
+					currentAddr <= vicAddr;
+				else
+					currentAddr <= cpuAddr;
+				end if;
 
 				if ultimax = '0' and vicAddr(14 downto 12)="001" then
 					vicCharReg <= '1';

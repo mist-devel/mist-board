@@ -164,7 +164,6 @@ architecture rtl of fpga64_sid_iec is
 	signal phi0_cpu : std_logic;
 	signal phi0_vic : std_logic;
 	signal cpuHasBus : std_logic;
-	signal cpuHasBusLoc : std_logic;
 	
 	signal cycleRestart : std_logic;
 	signal cycleRestartReg1 : std_logic;
@@ -379,12 +378,12 @@ begin
 			if sysCycle = sysCycleDef'pred(CYCLE_CPU0) then
 				phi0_cpu <= '1';
 				if baLoc = '1' or cpuWe = '1' then
-					cpuHasBusLoc <= '1';
+					cpuHasBus <= '1';
 				end if;
 			end if;
 			if sysCycle = sysCycleDef'high then
 				phi0_cpu <= '0';
-				cpuHasBusLoc <= '0';
+				cpuHasBus <= '0';
 			end if;
 			if sysCycle = sysCycleDef'pred(CYCLE_VIC0) then
 				phi0_vic <= '1';
@@ -394,8 +393,6 @@ begin
 			end if;
 		end if;
 	end process;
-
-	cpuHasBus <= cpuHasBusLoc or not aec;
 
 	process(clk32)
 	begin
@@ -463,6 +460,7 @@ begin
 		clk => clk32,
 		reset => reset,
 		cpuHasBus => cpuHasBus,
+		aec => aec,
 
 		bankSwitch => cpuIO(2 downto 0),
 
