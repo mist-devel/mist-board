@@ -172,6 +172,7 @@ architecture rtl of video_vicii_656x is
 -- Sprite work registers
 	signal MPtr : unsigned(7 downto 0); -- sprite base pointer
 	signal MPixels : MPixelsDef; -- Sprite 24 bit shift register
+	signal MPixelStore : unsigned(15 downto 0); -- Store fetched sprite bytes until ready to load into the shift register
 	signal MActive : MFlags; -- Sprite is active
 	signal MActive_next : MFlags; -- Sprite is active
 	signal MDMA : MFlags; -- Sprite DMA is enabled
@@ -1152,19 +1153,19 @@ calcBitmap: process(clk)
 				end if;
 
 				if Mactive_Next(to_integer(sprite)) then
-					if phi = '0' then
-						case vicCycle is
-						when cycleSpriteB =>
-							MPixels(to_integer(sprite)) <= MPixels(to_integer(sprite))(15 downto 0) & di;
+					case vicCycle is
+					when cycleSpriteA =>
+						if phi = '1' then
+							MPixelStore(15 downto 8) <= di;
+						end if;
+					when cycleSpriteB =>
+						if phi = '0' then
+							MPixelStore(7 downto 0) <= di;
+						else
+							MPixels(to_integer(sprite)) <= MPixelStore & di;
+						end if;
 						when others => null;
-						end case;
-					else
-						case vicCycle is
-						when cycleSpriteA | cycleSpriteB =>
-							MPixels(to_integer(sprite)) <= MPixels(to_integer(sprite))(15 downto 0) & di;
-						when others => null;
-						end case;
-					end if;
+					end case;
 				end if;
 			end if;
 		end if;
