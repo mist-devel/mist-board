@@ -167,7 +167,7 @@ set_global_assignment -name USE_CONFIGURATION_DEVICE OFF
 # SignalTap II Assignments
 # ========================
 set_global_assignment -name ENABLE_SIGNALTAP OFF
-set_global_assignment -name USE_SIGNALTAP_FILE output_files/erase.stp
+set_global_assignment -name USE_SIGNALTAP_FILE output_files/cpu.stp
 
 # Power Estimation Assignments
 # ============================
@@ -359,15 +359,12 @@ set_global_assignment -name VHDL_FILE rtl/video_vicII_656x_e.vhd
 set_global_assignment -name VHDL_FILE rtl/video_vicII_656x_a.vhd
 set_global_assignment -name VHDL_FILE rtl/fpga64_rgbcolor.vhd
 set_global_assignment -name VHDL_FILE rtl/fpga64_keyboard_matrix_mark_mcdougall.vhd
-set_global_assignment -name VHDL_FILE rtl/fpga64_bustiming.vhd
 set_global_assignment -name VHDL_FILE rtl/fpga64_buslogic_roms_mmu.vhd
 set_global_assignment -name VERILOG_FILE rtl/mos6526.v
 set_global_assignment -name VHDL_FILE rtl/mos6526.vhd
 set_global_assignment -name VHDL_FILE rtl/cpu_6510.vhd
 set_global_assignment -name VERILOG_FILE rtl/cartridge.v
 set_global_assignment -name VHDL_FILE rtl/rom_c64_chargen.vhd
-set_global_assignment -name VHDL_FILE rtl/rom_C64.vhd
-set_global_assignment -name VHDL_FILE rtl/rom_GS64.vhd
 set_global_assignment -name VHDL_FILE rtl/io_ps2_keyboard.vhd
 set_global_assignment -name VHDL_FILE rtl/gen_ram.vhd
 set_global_assignment -name VHDL_FILE rtl/composite_sync.vhd
