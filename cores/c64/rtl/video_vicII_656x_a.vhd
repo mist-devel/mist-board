@@ -161,7 +161,9 @@ architecture rtl of video_vicii_656x is
 	signal nextChar : unsigned(11 downto 0);
 	-- Char/Pixels pair waiting to be shifted
 	signal waitingChar : unsigned(11 downto 0);
+	signal waitingChar_r : unsigned(11 downto 0);
 	signal waitingPixels : unsigned(7 downto 0);
+	signal waitingPixels_r : unsigned(7 downto 0);
 	-- Stores colorinfo and the Pixels that are currently in shift register
 	signal shiftingChar : unsigned(11 downto 0);
 	signal shiftingPixels : unsigned(7 downto 0);
@@ -189,8 +191,6 @@ architecture rtl of video_vicii_656x is
 -- Current colors and pixels
 	signal pixelColor: ColorDef;
 	signal pixelBgFlag: std_logic; -- For collision detection
-	signal pixelDelay: pixelColorStoreDef;
-	signal pixelBgFlagDelay: std_logic_vector(7 downto 0);
 
 -- Read/Write lines
 	signal myWr : std_logic;
@@ -862,27 +862,36 @@ calcBorders: process(clk)
 -- -----------------------------------------------------------------------
 calcBitmap: process(clk)
 		variable multiColor : std_logic;
-		variable pixelColor : ColorDef;
-		variable pixelBgFlag: std_logic;
+		variable rasterXDelay : unsigned(9 downto 0);
 	begin
 		if rising_edge(clk) then
 			if enaPixel = '1' then
 				--
 				-- Toggle flipflop for multicolor 2-bits shift.
 				shifting_ff <= not shifting_ff;
-				
+
 				--
 				-- Multicolor mode is active with MCM, but for character
 				-- mode it depends on bit3 of color ram too.
 				multiColor := MCM and (BMM or ECM or shiftingChar(11));
 
+				-- delayed X coordinate
+				rasterXDelay := rasterX - PIX_DELAY;
+
+				-- store the waiting values to be ready at the start of the delayed cell matrix,
+				-- otherwise they'll be overwritten too soon
+				if rasterXDelay(2 downto 0) = "111" then
+					waitingChar_r <= waitingChar;
+					waitingPixels_r <= waitingPixels;
+				end if;
+
 				--
 				-- Reload shift register when xscroll=rasterX
 				-- otherwise shift pixels
-				if xscroll = rasterX(2 downto 0) then
+				if xscroll = rasterXDelay(2 downto 0) then
 					shifting_ff <= '0';
-					shiftingChar <= waitingChar;
-					shiftingPixels <= waitingPixels;
+					shiftingChar <= waitingChar_r;
+					shiftingPixels <= waitingPixels_r;
 				elsif multiColor = '0' then
 					shiftingPixels <= shiftingPixels(6 downto 0) & '0';
 				elsif shifting_ff = '1' then
@@ -891,23 +900,23 @@ calcBitmap: process(clk)
 
 				--
 				-- Calculate if pixel is in foreground or background
-				pixelBgFlag := shiftingPixels(7);
+				pixelBgFlag <= shiftingPixels(7);
 
 				--
 				-- Calculate color of next pixel				
-				pixelColor := B0C;
+				pixelColor <= B0C;
 				if (BMM = '0') and (ECM='0') then
 					if (multiColor = '0') then
 						-- normal character mode
 						if shiftingPixels(7) = '1' then
-							pixelColor := shiftingChar(11 downto 8);
+							pixelColor <= shiftingChar(11 downto 8);
 						end if;
 					else
 						-- multi-color character mode
 						case shiftingPixels(7 downto 6) is
-						when "01" => pixelColor := B1C;
-						when "10" => pixelColor := B2C;
-						when "11" => pixelColor := '0' & shiftingChar(10 downto 8);
+						when "01" => pixelColor <= B1C;
+						when "10" => pixelColor <= B2C;
+						when "11" => pixelColor <= '0' & shiftingChar(10 downto 8);
 						when others => null;
 						end case;
 					end if;
@@ -915,37 +924,35 @@ calcBitmap: process(clk)
 					-- extended-color character mode
 					-- multiple background colors but only 64 characters
 					if shiftingPixels(7) = '1' then
-						pixelColor := shiftingChar(11 downto 8);
+						pixelColor <= shiftingChar(11 downto 8);
 					else
 						case shiftingChar(7 downto 6) is
-						when "01" => pixelColor := B1C;
-						when "10" => pixelColor := B2C;
-						when "11" => pixelColor := B3C;
+						when "01" => pixelColor <= B1C;
+						when "10" => pixelColor <= B2C;
+						when "11" => pixelColor <= B3C;
 						when others	=> null;
 						end case;
 					end if;
 				elsif emulateGraphics and (MCM = '0') and (BMM = '1') and (ECM='0') then
 					-- highres bitmap mode
 					if shiftingPixels(7) = '1' then
-						pixelColor := shiftingChar(7 downto 4);
+						pixelColor <= shiftingChar(7 downto 4);
 					else
-						pixelColor := shiftingChar(3 downto 0);
+						pixelColor <= shiftingChar(3 downto 0);
 					end if;
 				elsif emulateGraphics and (MCM = '1') and (BMM = '1') and (ECM='0') then
 					-- Multi-color bitmap mode
 					case shiftingPixels(7 downto 6) is
-					when "01" => pixelColor := shiftingChar(7 downto 4);
-					when "10" => pixelColor := shiftingChar(3 downto 0);
-					when "11" => pixelColor := shiftingChar(11 downto 8);
+					when "01" => pixelColor <= shiftingChar(7 downto 4);
+					when "10" => pixelColor <= shiftingChar(3 downto 0);
+					when "11" => pixelColor <= shiftingChar(11 downto 8);
 					when others => null;
 					end case;
 				else
 					-- illegal display mode, the output is black
-					pixelColor := "0000";
+					pixelColor <= "0000";
 				end if;
 
-				pixelDelay <= pixelDelay(6 downto 0) & pixelColor;
-				pixelBgFlagDelay <= pixelBgFlagDelay(6 downto 0) & pixelBgFlag;
 			end if;
 
 			--
@@ -1166,8 +1173,6 @@ calcBitmap: process(clk)
 -- -----------------------------------------------------------------------
 -- Video output
 -- -----------------------------------------------------------------------
-	pixelBgFlag <= pixelBgFlagDelay(PIX_DELAY);
-	pixelColor <= pixelDelay(PIX_DELAY);
 
 	process(MCurrentPixelDelay)
 	begin
