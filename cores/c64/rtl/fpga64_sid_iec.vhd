@@ -65,7 +65,7 @@ entity fpga64_sid_iec is
 		r           : out unsigned(7 downto 0);
 		g           : out unsigned(7 downto 0);
 		b           : out unsigned(7 downto 0);
-		
+
 		-- cartridge port
 		game        : in  std_logic;
 		exrom       : in  std_logic;
@@ -77,12 +77,12 @@ entity fpga64_sid_iec is
 		nmi_ack     : out std_logic;
 		dma_n       : in  std_logic;
 		ba          : out std_logic;
-		romL			: out std_logic;													-- cart signals LCA
-		romH			: out std_logic;													-- cart signals LCA
-		UMAXromH 	: out std_logic;													-- cart signals LCA
-		IOE			: out std_logic;													-- cart signals LCA
-		IOF			: out std_logic;													-- cart signals LCA
-		CPU_hasbus  : out std_logic;													-- CPU has the bus STROBE
+		romL        : out std_logic;        -- cart signals LCA
+		romH        : out std_logic;        -- cart signals LCA
+		UMAXromH    : out std_logic;        -- cart signals LCA
+		IOE         : out std_logic;        -- cart signals LCA
+		IOF         : out std_logic;        -- cart signals LCA
+		CPU_hasbus  : out std_logic;        -- CPU has the bus STROBE
 		freeze_key  : out std_logic;
 
 		-- joystick interface
@@ -278,7 +278,6 @@ architecture rtl of fpga64_sid_iec is
 	signal vgaHSync : std_logic;
 	signal debuggerOn : std_logic;
 	signal traceStep : std_logic;
-   signal scanline : std_logic;
 	
 	-- config
 	signal videoKey : std_logic;
@@ -315,7 +314,7 @@ architecture rtl of fpga64_sid_iec is
 			extfilter_en : in std_logic
 	  );
 	end component sid8580;
-	
+
 begin
 -- -----------------------------------------------------------------------
 -- Local signal to outside world
@@ -323,12 +322,12 @@ begin
 	ba <= baLoc;
 
 	idle0 <= '1' when
-		(sysCycle = CYCLE_IDLE0) or (sysCycle = CYCLE_IDLE1) or
-		(sysCycle = CYCLE_IDLE2) or (sysCycle = CYCLE_IDLE3) else '0';
+	  (sysCycle = CYCLE_IDLE0) or (sysCycle = CYCLE_IDLE1) or
+	  (sysCycle = CYCLE_IDLE2) or (sysCycle = CYCLE_IDLE3) else '0';
 	idle <= '1' when
-		(sysCycle = CYCLE_IDLE4) or (sysCycle = CYCLE_IDLE5) or
-		(sysCycle = CYCLE_IDLE6) or (sysCycle = CYCLE_IDLE7) or
-		(sysCycle = CYCLE_IDLE8) else '0';
+	  (sysCycle = CYCLE_IDLE4) or (sysCycle = CYCLE_IDLE5) or
+	  (sysCycle = CYCLE_IDLE6) or (sysCycle = CYCLE_IDLE7) or
+	  (sysCycle = CYCLE_IDLE8) else '0';
 
 -- -----------------------------------------------------------------------
 -- System state machine, controls bus accesses
@@ -590,7 +589,7 @@ begin
 			or sysCycle = CYCLE_CPU2
 			or sysCycle = CYCLE_CPU6
 			or sysCycle = CYCLE_CPUB       -- CPUA
-  			or sysCycle = CYCLE_CPUF then  -- CPUE
+			or sysCycle = CYCLE_CPUF then  -- CPUE
 				enablePixel <= '1';
 			end if;
 		end if;
@@ -616,10 +615,10 @@ div1m: process(clk32)				-- this process devides 32 MHz to 1MHz (for the SID)
 	audio_data_r <= std_logic_vector(voice_l) when sid_mode="000" else
 	                std_logic_vector(voice_r) when sid_mode="001" else
 	                (audio_8580_r & "00")     when sid_mode="011" else
-					(audio_8580_l & "00");
+	                (audio_8580_l & "00");
 	sid_do <= sid_do6581 when sid_mode(1)='0' else
 	          sid_do8580_l when second_sid_en='0' else
-			  sid_do8580_r;
+	          sid_do8580_r;
 
 	-- CD4066 analogue switch
 	cd4066_sigA <= x"FF" when cia1_pao(7) = '0' else potA_x;
@@ -631,9 +630,9 @@ div1m: process(clk32)				-- this process devides 32 MHz to 1MHz (for the SID)
 	pot_y <= cd4066_sigB and cd4066_sigD;
 
 	second_sid_en <= '0' when sid_mode(0) = '0' else
-                     '1' when cpuAddr(11 downto 8) = x"4" and cpuAddr(5) = '1' else -- D420
-                     '1' when cpuAddr(11 downto 8) = x"5" else -- D500
-                     '0';
+	                 '1' when cpuAddr(11 downto 8) = x"4" and cpuAddr(5) = '1' else -- D420
+	                 '1' when cpuAddr(11 downto 8) = x"5" else -- D500
+	                 '0';
 
 	sid_6581: entity work.sid_top
 	generic map (
@@ -700,60 +699,60 @@ div1m: process(clk32)				-- this process devides 32 MHz to 1MHz (for the SID)
 		port map (
 			mode => cia_mode,
 			clk => clk32,
-            phi2_p => enableCia_p,
-            phi2_n => enableCia_n,
-            res_n => not reset,
-            cs_n => not cs_cia1,
-            rw => not cpuWe,
+			phi2_p => enableCia_p,
+			phi2_n => enableCia_n,
+			res_n => not reset,
+			cs_n => not cs_cia1,
+			rw => not cpuWe,
 
-            rs => std_logic_vector(cpuAddr)(3 downto 0),
-            db_in => std_logic_vector(cpuDo),
-            unsigned(db_out) => cia1Do,
+			rs => std_logic_vector(cpuAddr)(3 downto 0),
+			db_in => std_logic_vector(cpuDo),
+			unsigned(db_out) => cia1Do,
 
-            pa_in => std_logic_vector(cia1_pai),
-            unsigned(pa_out) => cia1_pao,
-            pb_in => std_logic_vector(cia1_pbi),
-            unsigned(pb_out) => cia1_pbo,
+			pa_in => std_logic_vector(cia1_pai),
+			unsigned(pa_out) => cia1_pao,
+			pb_in => std_logic_vector(cia1_pbi),
+			unsigned(pb_out) => cia1_pbo,
 
-            flag_n => cass_read,
-            sp_in => sp1_in,
-            sp_out => sp1_out,
-            cnt_in => cnt1_in,
-            cnt_out => cnt1_out,
+			flag_n => cass_read,
+			sp_in => sp1_in,
+			sp_out => sp1_out,
+			cnt_in => cnt1_in,
+			cnt_out => cnt1_out,
 
-            pc_n => open,
-            tod => todclk,
-            irq_n => irq_cia1
+			pc_n => open,
+			tod => todclk,
+			irq_n => irq_cia1
 		);
 
 	cia2: mos6526
 		port map (
 			mode => cia_mode,
 			clk => clk32,
-            phi2_p => enableCia_p,
-            phi2_n => enableCia_n,
-            res_n => not reset,
-            cs_n => not cs_cia2,
-            rw => not cpuWe,
+			phi2_p => enableCia_p,
+			phi2_n => enableCia_n,
+			res_n => not reset,
+			cs_n => not cs_cia2,
+			rw => not cpuWe,
 
-            rs => std_logic_vector(cpuAddr)(3 downto 0),
-            db_in => std_logic_vector(cpuDo),
-            unsigned(db_out) => cia2Do,
+			rs => std_logic_vector(cpuAddr)(3 downto 0),
+			db_in => std_logic_vector(cpuDo),
+			unsigned(db_out) => cia2Do,
 
-            pa_in => std_logic_vector(cia2_pai),
-            unsigned(pa_out) => cia2_pao,
-            pb_in => std_logic_vector(cia2_pbi),
-            unsigned(pb_out) => cia2_pbo,
+			pa_in => std_logic_vector(cia2_pai),
+			unsigned(pa_out) => cia2_pao,
+			pb_in => std_logic_vector(cia2_pbi),
+			unsigned(pb_out) => cia2_pbo,
 
-            flag_n => flag2_n,
-            sp_in => sp2_in,
-            sp_out => sp2_out,
-            cnt_in => cnt2_in,
-            cnt_out => cnt2_out,
+			flag_n => flag2_n,
+			sp_in => sp2_in,
+			sp_out => sp2_out,
+			cnt_in => cnt2_in,
+			cnt_out => cnt2_out,
 
-            pc_n => pc2_n,
-            tod => todclk,
-            irq_n => irq_cia2
+			pc_n => pc2_n,
+			tod => todclk,
+			irq_n => irq_cia2
 		);
 
 -- -----------------------------------------------------------------------
@@ -856,19 +855,19 @@ div1m: process(clk32)				-- this process devides 32 MHz to 1MHz (for the SID)
 	ramAddr <= systemAddr when (phi0_cpu = '1') or (phi0_vic = '1') else (others => '0');
 	ramWe <= '0' when sysCycle = CYCLE_IEC2 or sysCycle = CYCLE_IEC3 else not systemWe;
 	ramCE <= '0' when sysCycle /= CYCLE_IDLE0 and sysCycle /= CYCLE_IDLE1 and sysCycle /= CYCLE_IDLE2 and 
-		   sysCycle /= CYCLE_IDLE3 and sysCycle /= CYCLE_IDLE4 and sysCycle /= CYCLE_IDLE5 and
-		   sysCycle /= CYCLE_IDLE6 and sysCycle /= CYCLE_IDLE7 and sysCycle /= CYCLE_IDLE8 and
-		   sysCycle /= CYCLE_IEC0 and sysCycle /= CYCLE_IEC1 and sysCycle /= CYCLE_IEC2 and 
-		   sysCycle /= CYCLE_IEC3 and sysCycle /= CYCLE_CPU0 and sysCycle /= CYCLE_CPU1 and sysCycle /= CYCLE_CPUF and
-			cs_ram = '1' else '1';
+	                  sysCycle /= CYCLE_IDLE3 and sysCycle /= CYCLE_IDLE4 and sysCycle /= CYCLE_IDLE5 and
+	                  sysCycle /= CYCLE_IDLE6 and sysCycle /= CYCLE_IDLE7 and sysCycle /= CYCLE_IDLE8 and
+	                  sysCycle /= CYCLE_IEC0 and sysCycle /= CYCLE_IEC1 and sysCycle /= CYCLE_IEC2 and 
+	                  sysCycle /= CYCLE_IEC3 and sysCycle /= CYCLE_CPU0 and sysCycle /= CYCLE_CPU1 and sysCycle /= CYCLE_CPUF and
+	                  cs_ram = '1' else '1';
 
 	romAddr <= "00" & cpuAddr(14) & cpuAddr(12 downto 0);
 	romCE <= '0' when sysCycle /= CYCLE_IDLE0 and sysCycle /= CYCLE_IDLE1 and sysCycle /= CYCLE_IDLE2 and 
-		   sysCycle /= CYCLE_IDLE3 and sysCycle /= CYCLE_IDLE4 and sysCycle /= CYCLE_IDLE5 and
-		   sysCycle /= CYCLE_IDLE6 and sysCycle /= CYCLE_IDLE7 and sysCycle /= CYCLE_IDLE8 and
-		   sysCycle /= CYCLE_IEC0 and sysCycle /= CYCLE_IEC1 and sysCycle /= CYCLE_IEC2 and 
-		   sysCycle /= CYCLE_IEC3 and sysCycle /= CYCLE_CPU0 and sysCycle /= CYCLE_CPU1 and sysCycle /= CYCLE_CPUF and
-			cs_rom = '1' else '1';
+	                  sysCycle /= CYCLE_IDLE3 and sysCycle /= CYCLE_IDLE4 and sysCycle /= CYCLE_IDLE5 and
+	                  sysCycle /= CYCLE_IDLE6 and sysCycle /= CYCLE_IDLE7 and sysCycle /= CYCLE_IDLE8 and
+	                  sysCycle /= CYCLE_IEC0 and sysCycle /= CYCLE_IEC1 and sysCycle /= CYCLE_IEC2 and 
+	                  sysCycle /= CYCLE_IEC3 and sysCycle /= CYCLE_CPU0 and sysCycle /= CYCLE_CPU1 and sysCycle /= CYCLE_CPUF and
+	                  cs_rom = '1' else '1';
 
 	process(clk32)
 	begin
@@ -959,8 +958,7 @@ div1m: process(clk32)				-- this process devides 32 MHz to 1MHz (for the SID)
 -- Dummy silence audio output
 -- -----------------------------------------------------------------------
 	still <= X"4000";
-	
-	
+
 -- -----------------------------------------------------------------------
 -- Cartridge port lines LCA
 -- -----------------------------------------------------------------------
