@@ -36,7 +36,6 @@ architecture rtl of video_vicii_656x is
 	type MCntDef is array(0 to 7) of unsigned(5 downto 0);
 	type MPixelsDef is array(0 to 7) of unsigned(23 downto 0);
 	type MCurrentPixelDef is array(0 to 7) of unsigned(1 downto 0);
-	type MCurrentPixelsDef is array(0 to 7) of unsigned(7 downto 0);
 	type charStoreDef is array(38 downto 0) of unsigned(11 downto 0);
 	type spriteColorsDef is array(7 downto 0) of unsigned(3 downto 0);
 	type pixelColorStoreDef is array(7 downto 0) of unsigned(3 downto 0);
@@ -77,6 +76,8 @@ architecture rtl of video_vicii_656x is
 
 	-- !!! Krestage 3 hacks
 	signal MCDelay : unsigned(7 downto 0); -- sprite multi color
+	signal MCDelay2: unsigned(7 downto 0); -- sprite multi color
+	signal MCDelay3: unsigned(7 downto 0); -- sprite multi color
 
 	-- mode
 	signal BMM: std_logic; -- Bitmap mode
@@ -132,8 +133,10 @@ architecture rtl of video_vicii_656x is
 	signal IRQ: std_logic;
 
 -- Collision detection registers
+	signal collision : unsigned(7 downto 0);
 	signal M2M: unsigned(7 downto 0); -- Sprite to sprite collision
-	signal M2MDelay: unsigned(7 downto 0); -- Sprite to sprite collision
+	signal M2MDelay: unsigned(7 downto 0); -- Sprite to sprite collision delayed1
+	signal M2MDelay2: unsigned(7 downto 0); -- Sprite to sprite collision delayed2
 	signal M2D: unsigned(7 downto 0); -- Sprite to character collision
 	signal M2DDelay: unsigned(7 downto 0); -- Sprite to character collision
 	signal M2Mhit : std_logic;
@@ -144,6 +147,7 @@ architecture rtl of video_vicii_656x is
 	signal rasterY : unsigned(8 downto 0) := (others => '0');
 	signal rasterY_next : unsigned(8 downto 0);
 	signal cycleLast : boolean;
+	signal rasterXDelay : unsigned(9 downto 0);
 
 -- Light pen
 	signal lightPenHit: std_logic;
@@ -187,7 +191,6 @@ architecture rtl of video_vicii_656x is
 	signal MC_ff : unsigned(7 downto 0); -- controls sprite shift-register in multicolor
 	signal MShift : MFlags; -- Sprite is shifting
 	signal MCurrentPixel : MCurrentPixelDef;
-	signal MCurrentPixelDelay: MCurrentPixelsDef;
 
 -- Current colors and pixels
 	signal pixelColor: ColorDef;
@@ -216,7 +219,7 @@ begin
 -- -----------------------------------------------------------------------
 -- debug signals
 -- -----------------------------------------------------------------------
-	debugX <= rasterX;
+	debugX <= rasterXDelay;
 	debugY <= rasterY;
 
 -- -----------------------------------------------------------------------
@@ -671,11 +674,15 @@ vicStateMachine: process(clk)
 cycleLast <= (vicCycle = cycleSpriteB) and (sprite = 2);
 rasterY_next <= (others => '0') when lastLineFlag else RasterY + 1;
 
-rasterCounters: process(clk)
+rasterCounters: process(clk, rasterX, rasterXDelay)
 	begin
 		if rising_edge(clk) then
 			if enaPixel = '1' then
 				rasterX(2 downto 0) <= rasterX(2 downto 0) + 1;
+				rasterXDelay <= rasterXDelay + 1;
+				if rasterX = PIX_DELAY - 1 then
+					rasterXDelay <= (others => '0');
+				end if;
 			end if;
 			if phi = '0'
 			and enaData = '1'
@@ -863,7 +870,6 @@ calcBorders: process(clk)
 -- -----------------------------------------------------------------------
 calcBitmap: process(clk)
 		variable multiColor : std_logic;
-		variable rasterXDelay : unsigned(9 downto 0);
 	begin
 		if rising_edge(clk) then
 			if enaPixel = '1' then
@@ -875,9 +881,6 @@ calcBitmap: process(clk)
 				-- Multicolor mode is active with MCM, but for character
 				-- mode it depends on bit3 of color ram too.
 				multiColor := MCM and (BMM or ECM or shiftingChar(11));
-
-				-- delayed X coordinate
-				rasterXDelay := rasterX - PIX_DELAY;
 
 				-- store the waiting values to be ready at the start of the delayed cell matrix,
 				-- otherwise they'll be overwritten too soon
@@ -1111,47 +1114,46 @@ calcBitmap: process(clk)
 -- Sprite pixel Shift register
 -- -----------------------------------------------------------------------
 	process(clk)
-	variable MCurrentPixel: unsigned(1 downto 0);
 	begin
+
 		if rising_edge(clk) then
 			if enaPixel = '1' then
-				-- Enable sprites on the correct X position
 				for i in 0 to 7 loop
-					if rasterX = MX(i) then
+					-- Stop shifting in the s cycles
+					if (sprite = i and ((vicCycle = cycleSpriteA and phi = '1') or vicCycle = cycleSpriteB)) then
+						MShift(i) <= false;
+					end if;
+					--if MPixels(i) = 0 then
+						--MShift(i) <= false;
+					--end if;
+					-- Enable sprites on the correct X position
+					if MActive_next(i) and rasterXDelay = MX(i) then
 						MShift(i) <= true;
 					end if;
 				end loop;
 
 				-- Shift one pixel of the sprite from the shift register.
 				for i in 0 to 7 loop
-					MCurrentPixel := MCurrentPixelDelay(i)(1 downto 0);
 					if MShift(i) then
 						MXE_ff(i) <= (not MXE_ff(i)) and MXE(i);
 						if MXE_ff(i) = '0' then
 							MC_ff(i) <= (not MC_ff(i)) and MC(i);
 							if MC_ff(i) = '0' then
-								MCurrentPixel := MPixels(i)(23 downto 22);
+								MCurrentPixel(i) <= MPixels(i)(23 downto 22);
 							end if;
 							MPixels(i) <= MPixels(i)(22 downto 0) & '0';
 						end if;
 					else
 						MXE_ff(i) <= '0';
 						MC_ff(i) <= '0';
-						MCurrentPixel := "00";
+						MCurrentPixel(i) <= "00";
 					end if;
-
-					MCurrentPixelDelay(i) <= MCurrentPixelDelay(i)(5 downto 0) & MCurrentPixel;
 				end loop;
 			end if;
 
 			--
 			-- Fill Sprite shift-register with new data.
 			if enaData = '1' then
-				if phi = '0'
-				and vicCycle = cycleSpriteA then
-					MShift(to_integer(sprite)) <= false;
-				end if;
-
 				if Mactive_Next(to_integer(sprite)) then
 					case vicCycle is
 					when cycleSpriteA =>
@@ -1174,13 +1176,6 @@ calcBitmap: process(clk)
 -- -----------------------------------------------------------------------
 -- Video output
 -- -----------------------------------------------------------------------
-
-	process(MCurrentPixelDelay)
-	begin
-		for i in 7 downto 0 loop
-			MCurrentPixel(i) <= MCurrentPixelDelay(i)(PIX_DELAY * 2 + 1 downto PIX_DELAY * 2);
-		end loop;
-	end process;
 
 	process(clk)
 		variable myColor: unsigned(3 downto 0);
@@ -1261,44 +1256,44 @@ calcBitmap: process(clk)
 -- Sprite to sprite collision
 -- -----------------------------------------------------------------------
 spriteSpriteCollision: process(clk)
-		variable collision : unsigned(7 downto 0);
 	begin
 		if rising_edge(clk) then			
 			if resetIMMC = '1' then
 				IMMC <= '0';
 			end if;
 
-			if (myRd = '1')
-			and	(aRegisters = "011110") then
-				M2M <= (others => '0');
-				M2MDelay <= (others => '0');
-				M2Mhit <= '0';
-			end if;
+			if enaPixel = '1' then
+				for i in 0 to 7 loop
+					collision(i) <= MCurrentPixel(i)(1);
+				end loop;
+				if  (collision /= "00000000")
+				and (collision /= "00000001")
+				and (collision /= "00000010")
+				and (collision /= "00000100")
+				and (collision /= "00001000")
+				and (collision /= "00010000")
+				and (collision /= "00100000")
+				and (collision /= "01000000")
+				and (collision /= "10000000") then
+					M2MDelay <= M2MDelay or collision;
 
-			for i in 0 to 7 loop
-				collision(i) := MCurrentPixel(i)(1);
-			end loop;
-			if  (collision /= "00000000")
-			and (collision /= "00000001")
-			and (collision /= "00000010")
-			and (collision /= "00000100")
-			and (collision /= "00001000")
-			and (collision /= "00010000")
-			and (collision /= "00100000")
-			and (collision /= "01000000")
-			and (collision /= "10000000") then
-				M2MDelay <= M2MDelay or collision;
+				end if;
 
-			end if;
-
-			if phi = '1'
-			and enaData = '1' then
-				M2M <= M2MDelay;
+				M2MDelay2 <= M2MDelay;
+				M2M <= M2MDelay2;
 				-- Give collision interrupt but only once until clear of register
 				if M2MDelay /= 0 and M2Mhit = '0' then
 					IMMC <= '1';
 					M2Mhit <= '1';
 				end if;
+			end if;
+
+			if (myRd = '1')
+			and	(aRegisters = "011110") then
+				M2M <= (others => '0');
+				M2MDelay <= (others => '0');
+				M2MDelay2 <= (others => '0');
+				M2Mhit <= '0';
 			end if;
 
 		end if;
@@ -1314,29 +1309,28 @@ spriteBackgroundCollision: process(clk)
 				IMBC <= '0';
 			end if;
 
-			if (myRd = '1')
-			and	(aRegisters = "011111") then
-				M2D <= (others => '0');
-				M2DDelay <= (others => '0');
-				M2Dhit <= '0';
-			end if;
+			if enaPixel = '1' then
+				for i in 0 to 7 loop
+					if  MCurrentPixel(i)(1) = '1'
+					and pixelBgFlag = '1'
+					and (TBBorder = '0') then
+						M2DDelay(i) <= '1';
+					end if;
+				end loop;
 
-			for i in 0 to 7 loop
-				if  MCurrentPixel(i)(1) = '1'
-				and pixelBgFlag = '1'
-				and (TBBorder = '0') then
-					M2DDelay(i) <= '1';
-				end if;
-			end loop;
-
-			if phi = '1'
-			and enaData = '1' then
 				M2D <= M2DDelay;
 				-- Give collision interrupt but only once until clear of register
 				if M2DDelay /= 0 and M2Dhit = '0' then
 					IMBC <= '1';
 					M2Dhit <= '1';
 				end if;
+			end if;
+
+			if (myRd = '1')
+			and	(aRegisters = "011111") then
+				M2D <= (others => '0');
+				M2DDelay <= (others => '0');
+				M2Dhit <= '0';
 			end if;
 		end if;
 	end process;
@@ -1352,9 +1346,11 @@ spriteBackgroundCollision: process(clk)
 	process(clk)
 	begin
 		if rising_edge(clk) then
-			if phi = '1'
-			and enaData = '1' then
-				MC <= MCDelay;
+			if enaPixel = '1' then
+				-- test with ss-hires-mc.prg
+				MCDelay2 <= MCDelay;
+				MCDelay3 <= MCDelay2;
+				MC <= MCDelay3;
 			end if;
 		end if;
 	end process;
@@ -1512,6 +1508,7 @@ writeRegisters: process(clk)
 readRegisters: process(clk)
 	begin
 		if rising_edge(clk) then
+			if myRd = '1' then
 			case aRegisters is
 			when "000000" => do <= MX(0)(7 downto 0);
 			when "000001" => do <= MY(0);
@@ -1564,6 +1561,7 @@ readRegisters: process(clk)
 			when "101110" => do <= "1111" & spriteColors(7);
 			when others => do <= (others => '1');
 			end case;
+			end if;
 		end if;
 	end process;
 end architecture;

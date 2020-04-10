@@ -518,7 +518,8 @@ begin
 					pulseWrIo <= '1';
 				end if;
 			else
-				if sysCycle = CYCLE_CPUE then
+				if sysCycle = CYCLE_CPU0 then
+					-- timing is important for the collision register reads
 					pulseRd <= '1';
 				end if;
 			end if;
