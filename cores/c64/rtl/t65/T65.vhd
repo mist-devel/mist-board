@@ -477,7 +477,7 @@ begin
         end if;
 
         -- detect irq even if not rdy
-        if IR(4 downto 0)/="10000" or Jump/="01" then -- delay interrupts during branches (checked with Lorenz test and real 6510), not best way yet, though - but works...
+        if IR(4 downto 0)/="10000" or Jump/="01" or really_rdy = '0' then -- delay interrupts during branches (checked with Lorenz test and real 6510), not best way yet, though - but works...
           IRQ_n_o <= IRQ_n;
         end if;
         -- detect nmi even if not rdy
