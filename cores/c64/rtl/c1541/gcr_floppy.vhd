@@ -24,7 +24,7 @@ port(
 	mode   : in  std_logic;                      -- read/write
 --	stp    : in  std_logic_vector(1 downto 0);   -- stepper motor control
 	mtr    : in  std_logic;                      -- stepper motor on/off
---	freq   : in  std_logic_vector(1 downto 0);   -- motor (gcr_bit) frequency
+	freq   : in  std_logic_vector(1 downto 0);   -- motor (gcr_bit) frequency
 	sync_n : out std_logic;                      -- reading SYNC bytes
 	byte_n : out std_logic;                      -- byte ready
 	
@@ -160,10 +160,11 @@ with gcr_nibble_out select
 						X"E" when "11110",--"01111",
 						X"F" when others; --"10101",			
 
-bit_clk_div <=  x"67" when track_num < std_logic_vector(to_unsigned(18,6)) else
-                x"6F" when track_num < std_logic_vector(to_unsigned(25,6)) else
-                x"77" when track_num < std_logic_vector(to_unsigned(31,6)) else
-                x"7F";
+with freq select
+    bit_clk_div <= x"67" when "11",
+                   x"6F" when "10",
+                   x"77" when "01",
+                   x"7F" when others;
 
 process (clk32)
 	variable bit_clk_cnt : std_logic_vector(7 downto 0) := (others => '0');
