@@ -137,7 +137,8 @@ architecture Gideon of via6522 is
     alias ca1_edge_select   : std_logic is pcr(0);
     
     signal ira, irb         : std_logic_vector(7 downto 0) := (others => '0');
-    
+
+    signal write_t1c_l      : std_logic;
     signal write_t1c_h      : std_logic;
     signal write_t2c_h      : std_logic;
 
@@ -154,6 +155,7 @@ architecture Gideon of via6522 is
 begin
     irq <= irq_out;
     
+    write_t1c_l <= '1' when (addr = X"4" or addr = x"6") and wen='1' and falling = '1' else '0';
     write_t1c_h <= '1' when addr = X"5" and wen='1' and falling = '1' else '0';
     write_t2c_h <= '1' when addr = X"9" and wen='1' and falling = '1' else '0';
 
@@ -451,6 +453,9 @@ begin
                         
                     if timer_a_reload = '1' then
                         timer_a_count  <= timer_a_latch;
+                        if write_t1c_l = '1' then
+                            timer_a_count(7 downto 0) <= data_in;
+                        end if;
                         timer_a_reload <= '0';
                         timer_a_may_interrupt <= timer_a_may_interrupt and tmr_a_freerun;
                     else
