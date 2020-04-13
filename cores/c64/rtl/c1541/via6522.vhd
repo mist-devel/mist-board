@@ -343,6 +343,9 @@ begin
             when X"0" => -- ORB
                 --Port B reads its own output register for pins set to output.
                 data_out <= (pio_i.prb and pio_i.ddrb) or (irb and not pio_i.ddrb);
+                if tmr_a_output_en='1' then
+                    data_out(7) <= timer_a_out;
+                end if;
             when X"1" => -- ORA
                 data_out <= ira;
             when X"2" => -- DDRB
@@ -437,8 +440,8 @@ begin
     -- Timer A
     tmr_a: block
         signal timer_a_reload        : std_logic;
-        signal timer_a_oneshot_trig  : std_logic;
         signal timer_a_toggle        : std_logic;
+        signal timer_a_may_interrupt : std_logic;
     begin
         process(clock)
         begin
@@ -449,7 +452,7 @@ begin
                     if timer_a_reload = '1' then
                         timer_a_count  <= timer_a_latch;
                         timer_a_reload <= '0';
-                        timer_a_oneshot_trig <= '0';
+                        timer_a_may_interrupt <= timer_a_may_interrupt and tmr_a_freerun;
                     else
                         if timer_a_count = X"0000" then
                             -- generate an event if we were triggered
@@ -461,29 +464,29 @@ begin
                 end if;
                 
                 if rising = '1' then
-                    if timer_a_event = '1' then
+                    if timer_a_event = '1' and tmr_a_output_en = '1' then
                         timer_a_toggle <= not timer_a_toggle;
                     end if;
                 end if;
 
                 if write_t1c_h = '1' then
-                    timer_a_toggle <= '0';
+                    timer_a_may_interrupt <= '1';
+                    timer_a_toggle <= not tmr_a_output_en;
                     timer_a_count  <= data_in & timer_a_latch(7 downto 0);
                     timer_a_reload <= '0';
-                    timer_a_oneshot_trig <= '1';
                 end if;
 
                 if reset='1' then
+                    timer_a_may_interrupt <= '0';
                     timer_a_toggle <= '1';
                     timer_a_count  <= latch_reset_pattern;
                     timer_a_reload <= '0';
-                    timer_a_oneshot_trig <= '0';
                 end if;
             end if;
         end process;
 
         timer_a_out   <= timer_a_toggle;
-        timer_a_event <= rising and timer_a_reload and (tmr_a_freerun or timer_a_oneshot_trig);
+        timer_a_event <= rising and timer_a_reload and timer_a_may_interrupt;
          
     end block tmr_a;
     
