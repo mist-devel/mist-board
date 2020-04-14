@@ -108,7 +108,7 @@ constant CONF_STR : string :=
 	"C64;;"&
 	"S,D64,Mount Disk;"&
 	"F,PRGTAPCRT,Load;"& --2
-	"F,ROM,Load Kernal;"& --3
+	"F,ROM,Load;"& --3
 --	"F,T64,Load File;"&--6
 	"TH,Play/Stop TAP;"&
 	"OI,Tape sound,Off,On;"&
@@ -660,9 +660,6 @@ begin
 				if ioctl_index = FILE_BOOT or ioctl_index = FILE_ROM then
 					if ioctl_addr = 0 then
 						ioctl_load_addr <= C64_ROM_START;
-						if ioctl_index = FILE_ROM then
-							ioctl_load_addr <= C64_ROM_START + x"2000";
-						end if;
 					end if;
 					if ioctl_addr(24 downto 14) = 0 then
 						ioctl_ram_wr <= '1';
@@ -792,7 +789,7 @@ begin
 		end if;
 	end process;
 
-	c1541rom_wr <= ioctl_wr when (ioctl_index = FILE_BOOT) and (ioctl_addr(14) = '1') and (ioctl_download = '1') else '0';
+	c1541rom_wr <= ioctl_wr when (ioctl_index = FILE_BOOT or ioctl_index = FILE_ROM) and (ioctl_addr(14) = '1') and (ioctl_download = '1') else '0';
 
 	-- UART_RX synchronizer
 	process(clk_c64)
