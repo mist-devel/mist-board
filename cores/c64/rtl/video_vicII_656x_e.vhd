@@ -45,7 +45,6 @@ entity video_vicii_656x is
 		reset : in std_logic;
 		cs : in std_logic;
 		we : in std_logic;
-		rd : in std_logic;
 		lp_n : in std_logic;
 
 		aRegisters: in unsigned(5 downto 0);

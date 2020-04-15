@@ -185,8 +185,6 @@ architecture rtl of fpga64_sid_iec is
 
 	signal systemWe: std_logic;
 	signal pulseWrRam: std_logic;
-	signal pulseWrIo: std_logic;
-	signal pulseRd: std_logic;
 	signal colorWe : std_logic;
 	signal systemAddr: unsigned(15 downto 0);
 	signal ramDataReg : unsigned(7 downto 0);
@@ -380,7 +378,7 @@ begin
 					cpuHasBus <= '1';
 				end if;
 			end if;
-			if sysCycle = sysCycleDef'high then
+			if sysCycle = sysCycleDef'low then
 				phi0_cpu <= '0';
 				cpuHasBus <= '0';
 			end if;
@@ -404,12 +402,12 @@ begin
 			case sysCycle is
 			when CYCLE_VIC2 =>
 				enableVic <= '1';
-			when CYCLE_CPUE =>
+			when CYCLE_CPUF =>
 				enableVic <= '1';
 				enableCpu <= '1';
 			when CYCLE_CPUC =>
 				enableCia_n <= '1';
-			when CYCLE_CPUF =>
+			when CYCLE_VIC0 =>
 				enableCia_p <= '1';
 			when others =>
 				null;
@@ -508,19 +506,9 @@ begin
 	begin
 		if rising_edge(clk32) then
 			pulseWrRam <= '0';
-			pulseWrIo <= '0';
-			pulseRd <= '0';
 			if cpuWe = '1' then
 				if sysCycle = CYCLE_CPUC then
 					pulseWrRam <= '1';
-				end if;
-				if sysCycle = CYCLE_CPUC then
-					pulseWrIo <= '1';
-				end if;
-			else
-				if sysCycle = CYCLE_CPU0 then
-					-- timing is important for the collision register reads
-					pulseRd <= '1';
 				end if;
 			end if;
 		end if;
@@ -556,10 +544,9 @@ begin
 			mode6567old => '0',
 			mode6567R8 => ntscMode,
 			mode6572 => '0',
-			
+
 			cs => cs_vic,
-			we => pulseWrIo,
-			rd => pulseRd,
+			we => cpuWe,
 			lp_n => cia1_pbi(4),
 
 			aRegisters => cpuAddr(5 downto 0),
