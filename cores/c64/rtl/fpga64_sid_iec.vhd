@@ -149,12 +149,10 @@ architecture rtl of fpga64_sid_iec is
 	type sysCycleDef is (
 		CYCLE_IDLE0, CYCLE_IDLE1, CYCLE_IDLE2, CYCLE_IDLE3,
 		CYCLE_IDLE4, CYCLE_IDLE5, CYCLE_IDLE6, CYCLE_IDLE7,
-		CYCLE_IDLE8,
 		CYCLE_IEC0, CYCLE_IEC1, CYCLE_IEC2, CYCLE_IEC3,
 		CYCLE_VIC0, CYCLE_VIC1, CYCLE_VIC2, CYCLE_VIC3,
 		CYCLE_CPU0, CYCLE_CPU1, CYCLE_CPU2, CYCLE_CPU3,
 		CYCLE_CPU4, CYCLE_CPU5, CYCLE_CPU6, CYCLE_CPU7,
-		CYCLE_CPUP, CYCLE_CPUQ,
 		CYCLE_CPU8, CYCLE_CPU9, CYCLE_CPUA, CYCLE_CPUB,
 		CYCLE_CPUC, CYCLE_CPUD, CYCLE_CPUE, CYCLE_CPUF
 	);
@@ -162,13 +160,7 @@ architecture rtl of fpga64_sid_iec is
 	signal sysCycle : sysCycleDef := sysCycleDef'low;
 	signal sysCycleCnt : unsigned(2 downto 0);
 	signal phi0_cpu : std_logic;
-	signal phi0_vic : std_logic;
 	signal cpuHasBus : std_logic;
-	
-	signal cycleRestart : std_logic;
-	signal cycleRestartReg1 : std_logic;
-	signal cycleRestartReg2 : std_logic;
-	signal cycleRestartEdge : std_logic;
 
 	signal baLoc: std_logic;
 	signal irqLoc: std_logic;
@@ -324,8 +316,7 @@ begin
 	  (sysCycle = CYCLE_IDLE2) or (sysCycle = CYCLE_IDLE3) else '0';
 	idle <= '1' when
 	  (sysCycle = CYCLE_IDLE4) or (sysCycle = CYCLE_IDLE5) or
-	  (sysCycle = CYCLE_IDLE6) or (sysCycle = CYCLE_IDLE7) or
-	  (sysCycle = CYCLE_IDLE8) else '0';
+	  (sysCycle = CYCLE_IDLE6) or (sysCycle = CYCLE_IDLE7) else '0';
 
 -- -----------------------------------------------------------------------
 -- System state machine, controls bus accesses
@@ -336,8 +327,6 @@ begin
 		if rising_edge(clk32) then
 			if sysCycle = sysCycleDef'high then
 				sysCycle <= sysCycleDef'low;
-			elsif sysCycle = CYCLE_CPU6 then
-				sysCycle <= CYCLE_CPU8;
 			else
 				sysCycle <= sysCycleDef'succ(sysCycle);
 			end if;
@@ -378,15 +367,9 @@ begin
 					cpuHasBus <= '1';
 				end if;
 			end if;
-			if sysCycle = sysCycleDef'low then
+			if sysCycle = sysCycleDef'high then
 				phi0_cpu <= '0';
 				cpuHasBus <= '0';
-			end if;
-			if sysCycle = sysCycleDef'pred(CYCLE_VIC0) then
-				phi0_vic <= '1';
-			end if;
-			if sysCycle = CYCLE_VIC3 then
-				phi0_vic <= '0';
 			end if;
 		end if;
 	end process;
@@ -402,12 +385,12 @@ begin
 			case sysCycle is
 			when CYCLE_VIC2 =>
 				enableVic <= '1';
-			when CYCLE_CPUF =>
+			when CYCLE_CPUE =>
 				enableVic <= '1';
 				enableCpu <= '1';
 			when CYCLE_CPUC =>
 				enableCia_n <= '1';
-			when CYCLE_VIC0 =>
+			when CYCLE_CPUF =>
 				enableCia_p <= '1';
 			when others =>
 				null;
@@ -571,13 +554,13 @@ begin
 		if rising_edge(clk32) then
 			enablePixel <= '0';
 			if sysCycle = CYCLE_VIC2
-			or sysCycle = CYCLE_IDLE3      -- IDLE2
-			or sysCycle = CYCLE_IDLE7      -- IDLE6
+			or sysCycle = CYCLE_IDLE2
+			or sysCycle = CYCLE_IDLE6
 			or sysCycle = CYCLE_IEC2
 			or sysCycle = CYCLE_CPU2
 			or sysCycle = CYCLE_CPU6
-			or sysCycle = CYCLE_CPUB       -- CPUA
-			or sysCycle = CYCLE_CPUF then  -- CPUE
+			or sysCycle = CYCLE_CPUA
+			or sysCycle = CYCLE_CPUE then
 				enablePixel <= '1';
 			end if;
 		end if;
@@ -840,21 +823,19 @@ div1m: process(clk32)				-- this process devides 32 MHz to 1MHz (for the SID)
 	iec_clk_o <= not cia2_pao(4);
 	iec_atn_o <= not cia2_pao(3);
 	ramDataOut <= "00" & unsigned(cia2_pao)(5 downto 3) & "000" when sysCycle >= CYCLE_IEC0 and sysCycle <= CYCLE_IEC3 else cpuDo;
-	ramAddr <= systemAddr when (phi0_cpu = '1') or (phi0_vic = '1') else (others => '0');
+	ramAddr <= systemAddr;
 	ramWe <= '0' when sysCycle = CYCLE_IEC2 or sysCycle = CYCLE_IEC3 else not systemWe;
-	ramCE <= '0' when sysCycle /= CYCLE_IDLE0 and sysCycle /= CYCLE_IDLE1 and sysCycle /= CYCLE_IDLE2 and 
-	                  sysCycle /= CYCLE_IDLE3 and sysCycle /= CYCLE_IDLE4 and sysCycle /= CYCLE_IDLE5 and
-	                  sysCycle /= CYCLE_IDLE6 and sysCycle /= CYCLE_IDLE7 and sysCycle /= CYCLE_IDLE8 and
-	                  sysCycle /= CYCLE_IEC0 and sysCycle /= CYCLE_IEC1 and sysCycle /= CYCLE_IEC2 and 
-	                  sysCycle /= CYCLE_IEC3 and sysCycle /= CYCLE_CPU0 and sysCycle /= CYCLE_CPU1 and sysCycle /= CYCLE_CPUF and
+	ramCE <= '0' when sysCycle /= CYCLE_IDLE0 and sysCycle /= CYCLE_IDLE1 and sysCycle /= CYCLE_IDLE2 and sysCycle /= CYCLE_IDLE3 and
+	                  sysCycle /= CYCLE_IDLE4 and sysCycle /= CYCLE_IDLE5 and sysCycle /= CYCLE_IDLE6 and sysCycle /= CYCLE_IDLE7 and
+	                  sysCycle /= CYCLE_IEC0 and sysCycle /= CYCLE_IEC1 and sysCycle /= CYCLE_IEC2 and sysCycle /= CYCLE_IEC3 and
+	                  sysCycle /= CYCLE_CPU0 and sysCycle /= CYCLE_CPU1 and sysCycle /= CYCLE_CPUF and
 	                  cs_ram = '1' else '1';
 
 	romAddr <= "00" & cpuAddr(14) & cpuAddr(12 downto 0);
-	romCE <= '0' when sysCycle /= CYCLE_IDLE0 and sysCycle /= CYCLE_IDLE1 and sysCycle /= CYCLE_IDLE2 and 
-	                  sysCycle /= CYCLE_IDLE3 and sysCycle /= CYCLE_IDLE4 and sysCycle /= CYCLE_IDLE5 and
-	                  sysCycle /= CYCLE_IDLE6 and sysCycle /= CYCLE_IDLE7 and sysCycle /= CYCLE_IDLE8 and
-	                  sysCycle /= CYCLE_IEC0 and sysCycle /= CYCLE_IEC1 and sysCycle /= CYCLE_IEC2 and 
-	                  sysCycle /= CYCLE_IEC3 and sysCycle /= CYCLE_CPU0 and sysCycle /= CYCLE_CPU1 and sysCycle /= CYCLE_CPUF and
+	romCE <= '0' when sysCycle /= CYCLE_IDLE0 and sysCycle /= CYCLE_IDLE1 and sysCycle /= CYCLE_IDLE2 and sysCycle /= CYCLE_IDLE3 and
+	                  sysCycle /= CYCLE_IDLE4 and sysCycle /= CYCLE_IDLE5 and sysCycle /= CYCLE_IDLE6 and sysCycle /= CYCLE_IDLE7 and
+	                  sysCycle /= CYCLE_IEC0 and sysCycle /= CYCLE_IEC1 and sysCycle /= CYCLE_IEC2 and sysCycle /= CYCLE_IEC3 and
+	                  sysCycle /= CYCLE_CPU0 and sysCycle /= CYCLE_CPU1 and sysCycle /= CYCLE_CPUF and
 	                  cs_rom = '1' else '1';
 
 	process(clk32)
@@ -863,6 +844,9 @@ div1m: process(clk32)				-- this process devides 32 MHz to 1MHz (for the SID)
 			if sysCycle = CYCLE_CPUD
 			or sysCycle = CYCLE_VIC2 then
 				ramDataReg <= unsigned(ramDataIn);
+			end if;
+			if sysCycle = CYCLE_VIC3 then
+				lastVicDi <= vicDi;
 			end if;
 		end if;
 	end process;
@@ -901,15 +885,6 @@ div1m: process(clk32)				-- this process devides 32 MHz to 1MHz (for the SID)
 				cia2_pai(7) <= iec_data_i and not cia2_pao(5);
 				cia2_pai(6) <= iec_clk_i and not cia2_pao(4);
 			end if;	
-		end if;
-	end process;
-
-	process(clk32)
-	begin
-		if rising_edge(clk32) then
-			if phi0_vic = '1' then
-				lastVicDi <= vicDi;
-			end if;
 		end if;
 	end process;
 
