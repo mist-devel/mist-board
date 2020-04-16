@@ -168,6 +168,7 @@ architecture rtl of video_vicii_656x is
 	-- Stores colorinfo and the Pixels that are currently in shift register
 	signal shiftingChar : unsigned(11 downto 0);
 	signal shiftingPixels : unsigned(7 downto 0);
+	signal currentPixels : unsigned(1 downto 0);
 	signal shifting_ff : std_logic; -- Multicolor shift-regiter status bit.
 
 -- Sprite work registers
@@ -913,15 +914,21 @@ calcBitmap: process(clk)
 					shifting_ff <= '0';
 					shiftingChar <= waitingChar_r;
 					shiftingPixels <= waitingPixels_r;
+					if multiColor = '0' or shifting_ff = '1' then
+						-- don't change in middle of a multi-color (double width) pixel
+						currentPixels <= waitingPixels_r(7 downto 6);
+					end if;
 				elsif multiColor = '0' then
 					shiftingPixels <= shiftingPixels(6 downto 0) & '0';
+					currentPixels <= shiftingPixels(6 downto 5);
 				elsif shifting_ff = '1' then
 					shiftingPixels <= shiftingPixels(5 downto 0) & "00";
+					currentPixels <= shiftingPixels(5 downto 4);
 				end if;
 
 				--
 				-- Calculate if pixel is in foreground or background
-				pixelBgFlag <= shiftingPixels(7);
+				pixelBgFlag <= currentPixels(1);
 
 				--
 				-- Calculate color of next pixel				
@@ -929,12 +936,12 @@ calcBitmap: process(clk)
 				if (BMM = '0') and (ECM='0') then
 					if (multiColor = '0') then
 						-- normal character mode
-						if shiftingPixels(7) = '1' then
+						if currentPixels(1) = '1' then
 							pixelColor <= shiftingChar(11 downto 8);
 						end if;
 					else
 						-- multi-color character mode
-						case shiftingPixels(7 downto 6) is
+						case currentPixels is
 						when "01" => pixelColor <= B1C;
 						when "10" => pixelColor <= B2C;
 						when "11" => pixelColor <= '0' & shiftingChar(10 downto 8);
@@ -944,7 +951,7 @@ calcBitmap: process(clk)
 				elsif (MCM = '0') and (BMM = '0') and (ECM='1') then
 					-- extended-color character mode
 					-- multiple background colors but only 64 characters
-					if shiftingPixels(7) = '1' then
+					if currentPixels(1) = '1' then
 						pixelColor <= shiftingChar(11 downto 8);
 					else
 						case shiftingChar(7 downto 6) is
@@ -956,14 +963,14 @@ calcBitmap: process(clk)
 					end if;
 				elsif emulateGraphics and (MCM = '0') and (BMM = '1') and (ECM='0') then
 					-- highres bitmap mode
-					if shiftingPixels(7) = '1' then
+					if currentPixels(1) = '1' then
 						pixelColor <= shiftingChar(7 downto 4);
 					else
 						pixelColor <= shiftingChar(3 downto 0);
 					end if;
 				elsif emulateGraphics and (MCM = '1') and (BMM = '1') and (ECM='0') then
 					-- Multi-color bitmap mode
-					case shiftingPixels(7 downto 6) is
+					case currentPixels is
 					when "01" => pixelColor <= shiftingChar(7 downto 4);
 					when "10" => pixelColor <= shiftingChar(3 downto 0);
 					when "11" => pixelColor <= shiftingChar(11 downto 8);
