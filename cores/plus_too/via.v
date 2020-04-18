@@ -100,7 +100,9 @@
 `define INT_T1				6
 
 module via(
-	input clk8,
+	input clk32,
+	input clk8_en_p,
+	input clk8_en_n,
 	input _reset,
 	input selectVIA,
 	input _cpuRW,
@@ -150,10 +152,10 @@ module via(
 	// shift register can be written by CPU and by external source
 	/* Write to SR (including external input) */
 	assign kbd_out_data = viaSR;
-   always @(negedge clk8 or negedge _reset) begin
+   always @(posedge clk32 or negedge _reset) begin
 		if (_reset == 1'b0)
 			viaSR <= 8'b0;           
-		else begin
+		else if (clk8_en_n) begin
 			if((selectVIA == 1'b1) && (_cpuUDS == 1'b0) && 
 				(_cpuRW == 1'b0) && (cpuAddrRegHi == 4'hA))
 						viaSR <= dataInHi;
@@ -164,10 +166,10 @@ module via(
 	end
 
 	/* Generate sr_out_strobe */
-   always @(negedge clk8 or negedge _reset) begin
+   always @(posedge clk32 or negedge _reset) begin
 	if (_reset == 1'b0)
 		kbd_out_strobe <= 1'b0;                
-   else begin
+   else if (clk8_en_n) begin
 		if((selectVIA == 1'b1) && (_cpuUDS == 1'b0) && 
 			(_cpuRW == 1'b0) && (cpuAddrRegHi == 4'hA) && 
 			(viaACR[4:2] == 3'b111))
@@ -179,29 +181,33 @@ module via(
  	
 	// divide by 10 clock divider for the VIA timers: 0.78336 MHz
 	reg [3:0] clkDiv;
-	always @(posedge clk8) begin
-		if (clkDiv == 4'h9)
-			clkDiv <= 0;
-		else
-			clkDiv <= clkDiv + 1'b1;
+	always @(posedge clk32) begin
+		if (clk8_en_p) begin
+			if (clkDiv == 4'h9)
+				clkDiv <= 0;
+			else
+				clkDiv <= clkDiv + 1'b1;
+		end
 	end
 	wire timerStrobe = (clkDiv == 0);
 	
 	// store previous vblank value, for edge detection
 	reg _lastVblank;
-	always @(negedge clk8) begin
-		_lastVblank <= _vblank;
+	always @(posedge clk32) begin
+		if (clk8_en_n) _lastVblank <= _vblank;
 	end
 
 	// count vblanks, and set 1 second interrupt after 60 vblanks
 	reg [5:0] vblankCount;
-	always @(negedge clk8) begin
-		if (_vblank == 1'b0 && _lastVblank == 1'b1) begin
-			if (vblankCount != 59) begin
-				vblankCount <= vblankCount + 1'b1;
-			end
-			else begin
-				vblankCount <= 6'h0;
+	always @(posedge clk32) begin
+		if (clk8_en_n) begin
+			if (_vblank == 1'b0 && _lastVblank == 1'b1) begin
+				if (vblankCount != 59) begin
+					vblankCount <= vblankCount + 1'b1;
+				end
+				else begin
+					vblankCount <= 6'h0;
+				end
 			end
 		end
 	end
@@ -209,7 +215,7 @@ module via(
 	
 	// register write
 	wire loadT2 = selectVIA == 1'b1 && _cpuUDS == 1'b0 && _cpuRW == 1'b0 && cpuAddrRegHi == 4'h9;
-	always @(negedge clk8 or negedge _reset) begin
+	always @(posedge clk32 or negedge _reset) begin
 		if (_reset == 1'b0) begin
 			viaB0DDR <= 1'b1;
 			viaADataOut <= 8'b01111111;
@@ -223,7 +229,7 @@ module via(
 			viaTimer2LatchLow <= 8'h00;
 			viaTimer2Armed <= 0;
 		end
-		else begin
+		else if (clk8_en_n) begin
 			if (selectVIA == 1'b1 && _cpuUDS == 1'b0) begin
 				if (_cpuRW == 1'b0) begin
 					// normal register writes

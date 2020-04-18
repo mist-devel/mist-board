@@ -12,17 +12,19 @@
  * PS2 Mouse to Mac interface module
  */
 module ps2_mouse(input	sysclk,
-		 input	reset,
+	input clk_en,
+	input reset,
 
-		 input	ps2dat,
-		 input	ps2clk,
-		 
-		 output	reg x1,
-		 output reg y1,
-		 output reg x2,
-		 output reg y2,
-		 output reg button
+	input ps2dat,
+	input ps2clk,
+
+	output reg x1,
+	output reg y1,
+	output reg x2,
+	output reg y2,
+	output reg button
 );
+
 	wire 		istrobe;
 	wire [7:0] 	ibyte;
 	wire		timeout;
@@ -40,19 +42,21 @@ module ps2_mouse(input	sysclk,
 	reg [11:0] 	clkdiv;
 	wire		tick;	
 	wire[1:0]	dbg_lowstate;
-	
+
 	ps2 ps20(.sysclk(sysclk),
-		 .reset(reset),
-		 .ps2dat(ps2dat),
-		 .ps2clk(ps2clk),
-		 .istrobe(istrobe),
-		 .ibyte(ibyte),
-		 .oreq(oreq),
-		 .obyte(obyte),
-		 .oack(oack),
-		 .timeout(timeout),
-		 .dbg_state(dbg_lowstate));
-	
+		.clk_en(clk_en),
+		.reset(reset),
+		.ps2dat(ps2dat),
+		.ps2clk(ps2clk),
+		.istrobe(istrobe),
+		.ibyte(ibyte),
+		.oreq(oreq),
+		.obyte(obyte),
+		.oack(oack),
+		.timeout(timeout),
+		.dbg_state(dbg_lowstate)
+	);
+
 	/* State machine:
 	 *
 	 *  - at state_init: wait for BAT reply
@@ -149,24 +153,26 @@ module ps2_mouse(input	sysclk,
 	always@(posedge sysclk or posedge reset)
 		if (reset)
 		  state <= ps2m_state_byte0; // ps2m_state_init
-		else
+		else if (clk_en)
 		  state <= next;
+
 	always@(posedge sysclk or posedge reset)
 		if (reset)
 		  oreq <= 0;
-		else
+		else if (clk_en)
 		  oreq <= nreq;
+
 	always@(posedge sysclk or posedge reset)
 		if (reset)
 		  obyte <= 0;
-		else
+		else if (clk_en)
 		  obyte <= nbyte;
 
 	/* Capture button state */
 	always@(posedge sysclk or posedge reset)
 		if (reset)
 		  button <= 1;
-		else if (istrobe && state == ps2m_state_byte0)
+		else if (clk_en && istrobe && state == ps2m_state_byte0)
 			if(ibyte[3])
 				button <= ~ibyte[0];		
 
@@ -174,7 +180,7 @@ module ps2_mouse(input	sysclk,
 	always@(posedge sysclk or posedge reset)
 		if (reset)
 		  clkdiv <= 0;
-		else
+		else if (clk_en)
 		  clkdiv <= clkdiv + 1'b1;
 	assign tick = clkdiv == 0;
 
@@ -183,7 +189,7 @@ module ps2_mouse(input	sysclk,
 		if (reset) begin
 			x1 <= 0;
 			x2 <= 0;
-		end else if (tick && xacc != 0) begin
+		end else if (clk_en && tick && xacc != 0) begin
 			x1 <= ~x1;
 			x2 <= ~x1 ^ ~xacc[9];
 		end
@@ -192,7 +198,7 @@ module ps2_mouse(input	sysclk,
 		if (reset) begin
 			y1 <= 0;
 			y2 <= 0;
-		end else if (tick && yacc != 0) begin
+		end else if (clk_en && tick && yacc != 0) begin
 			y1 <= ~y1;
 			y2 <= ~y1 ^ ~yacc[9];
 		end
@@ -215,7 +221,7 @@ module ps2_mouse(input	sysclk,
 	always@(posedge sysclk or posedge reset) begin
 		if (reset)
 		  xacc <= 0;
-		else begin
+		else if (clk_en) begin
 			/* Add movement, convert to a 10-bit number if not over */
 			if (istrobe && state == ps2m_state_byte1 && xacc[8] == xacc[9])
 				xacc <= xacc + { xsign, xsign, ibyte };
@@ -229,7 +235,7 @@ module ps2_mouse(input	sysclk,
 	always@(posedge sysclk or posedge reset) begin
 		if (reset)
 		  yacc <= 0;
-		else begin
+		else if (clk_en) begin
 			/* Add movement, convert to a 10-bit number if not over*/
 			if (istrobe && state == ps2m_state_byte2 && yacc[8] == yacc[9])
 				yacc <= yacc + { ysign, ysign, ibyte };

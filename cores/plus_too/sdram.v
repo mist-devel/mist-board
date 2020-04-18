@@ -22,26 +22,26 @@
 module sdram (
 
 	// interface to the MT48LC16M16 chip
-	inout [15:0]  		sd_data,    // 16 bit bidirectional data bus
-	output reg [12:0]	sd_addr,    // 13 bit multiplexed address bus
-	output reg [1:0] 	sd_dqm,     // two byte masks
-	output reg [1:0] 	sd_ba,      // two banks
-	output 				sd_cs,      // a single chip select
-	output 				sd_we,      // write enable
-	output 				sd_ras,     // row address select
-	output 				sd_cas,     // columns address select
+	inout  reg [15:0]   sd_data,    // 16 bit bidirectional data bus
+	output reg [12:0]   sd_addr,    // 13 bit multiplexed address bus
+	output reg [1:0]    sd_dqm,     // two byte masks
+	output reg [1:0]    sd_ba,      // two banks
+	output              sd_cs,      // a single chip select
+	output              sd_we,      // write enable
+	output              sd_ras,     // row address select
+	output              sd_cas,     // columns address select
 
 	// cpu/chipset interface
-	input 		 		init,			// init signal after FPGA config to initialize RAM
-	input 		 		clk_64,		// sdram is accessed at 64MHz
-	input          	clk_8,      // 8MHz chipset clock to which sdram state machine is synchonized
-	
-	input [15:0]  		din,			// data input from chipset/cpu
-	output [15:0]     dout,			// data output to chipset/cpu
-	input [23:0]   	addr,       // 24 bit word address
-	input [1:0]    	ds,         // upper/lower data strobe
-	input 		 		oe,         // cpu/chipset requests read
-	input 		 		we          // cpu/chipset requests write
+	input               init,       // init signal after FPGA config to initialize RAM
+	input               clk_64,     // sdram is accessed at 64MHz
+	input               clk_8,      // 8MHz chipset clock to which sdram state machine is synchonized
+
+	input [15:0]        din,        // data input from chipset/cpu
+	output [15:0]       dout,       // data output to chipset/cpu
+	input [23:0]        addr,       // 24 bit word address
+	input [1:0]         ds,         // upper/lower data strobe
+	input               oe,         // cpu/chipset requests read
+	input               we          // cpu/chipset requests write
 );
 
 localparam RASCAS_DELAY   = 3'd2;   // tRCD=20ns -> 3 cycles@128MHz
@@ -113,12 +113,11 @@ assign sd_ras = sd_cmd[2];
 assign sd_cas = sd_cmd[1];
 assign sd_we  = sd_cmd[0];
 
-// drive ram data lines when writing, set them as inputs otherwise
-assign sd_data = we?din:16'bZZZZZZZZZZZZZZZZ;
 assign dout = sd_data;
 
 always @(posedge clk_64) begin
 	sd_cmd <= CMD_INHIBIT;  // default: idle
+	sd_data <= 16'bZZZZZZZZZZZZZZZZ;
 
 	if(reset != 0) begin
 		// initialization takes place at the end of the reset phase
@@ -128,38 +127,42 @@ always @(posedge clk_64) begin
 				sd_cmd <= CMD_PRECHARGE;
 				sd_addr[10] <= 1'b1;      // precharge all banks
 			end
-				
+
 			if(reset == 2) begin
 				sd_cmd <= CMD_LOAD_MODE;
 				sd_addr <= MODE;
 			end
-			
+
 		end
 	end else begin
 		// normal operation
-		
+
 		// -------------------  cpu/chipset read/write ----------------------
 		if(we || oe) begin
-		
+
 			// RAS phase
 			if(t == STATE_CMD_START) begin
 				sd_cmd <= CMD_ACTIVE;
 				sd_addr <= { 1'b0, addr[19:8] };
 				sd_ba <= addr[21:20];
-				
+
 				// always return both bytes in a read. The cpu may not
 				// need it, but the caches need to be able to store everything
 				if(!we) sd_dqm <= 2'b00;
 				else    sd_dqm <= ~ds;
 			end
-				
+
 			// CAS phase 
 			if(t == STATE_CMD_CONT) begin
 				sd_cmd <= we?CMD_WRITE:CMD_READ;
+				if (we) sd_data <= din;
 				sd_addr <= { 4'b0010, addr[22], addr[7:0] };  // auto precharge
 			end
+
+			// Data ready
+			//if (t == STATE_READ && !we) dout <= sd_data;
 		end
-		
+
 		// ------------------------ no access --------------------------
 		else begin
 			if(t == STATE_CMD_START)
@@ -167,7 +170,5 @@ always @(posedge clk_64) begin
 		end
 	end
 end
-
-
 
 endmodule

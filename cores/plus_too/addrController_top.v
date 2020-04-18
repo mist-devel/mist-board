@@ -1,7 +1,9 @@
 module addrController_top(
 	// clocks:
-	input clk8,						// 8.125 MHz CPU clock
-	
+	input clk,
+	input clk8_en_p, // 8.125 MHz CPU clock enables
+	input clk8_en_n,
+
 	// system config:
 	input turbo,               // 0 = normal, 1 = faster
 	input configROMSize,			// 0 = 64K ROM, 1 = 128K ROM
@@ -60,12 +62,12 @@ module addrController_top(
 	reg [19:0] snd_div;
 	
 	reg sndReadAckD;
-	always @(negedge clk8)
-		sndReadAckD <= sndReadAck;
+	always @(posedge clk)
+		if (clk8_en_n) sndReadAckD <= sndReadAck;
 	
 	reg vblankD, vblankD2;
-	always @(posedge clk8) begin
-		if(sndReadAckD) begin
+	always @(posedge clk) begin
+		if(clk8_en_p && sndReadAckD) begin
 			vblankD <= _vblank;
 			vblankD2 <= vblankD;
 		
@@ -82,24 +84,24 @@ module addrController_top(
 			end
 		end
 	end
-	
+
 	assign dioBusControl = extraBusControl;
 
 	// interleaved RAM access for CPU and video
 	reg [1:0] busCycle;
 	reg [1:0] extra_slot_count;
 	reg [1:0] subCycle;
-	
-	always @(posedge clk8)
-		busCycle <= busCycle + 2'd1;
-		
+
+	always @(posedge clk)
+		if (clk8_en_p) busCycle <= busCycle + 2'd1;
+
 	reg extra_slot_advance;
-	always @(negedge clk8)
-		extra_slot_advance <= (busCycle == 2'b11);
-	
+	always @(posedge clk)
+		if (clk8_en_n) extra_slot_advance <= (busCycle == 2'b11);
+
 	// allocate memory slots in the extra cycle
-	always @(posedge clk8) begin
-		if(extra_slot_advance) begin
+	always @(posedge clk) begin
+		if(clk8_en_p && extra_slot_advance) begin
 			extra_slot_count <= extra_slot_count + 2'd1;
 			
 			// the subcycle counter counts 0-1-2-0-1-2 and is used to give
@@ -194,7 +196,8 @@ module addrController_top(
 
 	// video
 	videoTimer vt(
-		.clk8(clk8), 
+		.clk(clk),
+		.clk_en(clk8_en_p),
 		.busCycle(busCycle), 
 		.videoAddr(videoAddr), 
 		.hsync(hsync), 

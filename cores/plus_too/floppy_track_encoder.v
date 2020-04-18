@@ -12,23 +12,26 @@
 module floppy_track_encoder (
    // system signals
    input 			clk, // clock at which data bytes are delivered via odata
+   input				ready,
    input 			rst,
 
    input 			side,
    input 			sides,
    input [6:0] 	track, // current track
 
-	output [21:0] 	addr,   // address to fetch from
+	output reg [21:0] 	addr,   // address to fetch from
    input [7:0] 	idata,
 			     
    output [7:0] 	odata 
 );
 
-assign addr = 
-	{ 3'b00, soff, 9'd0 } +                 // sector offset * 512 for two sides
-	(sides?{ 3'b00, soff, 9'd0 }:22'd0) +   // another sector offset * 512 for two sides
-	(side?{ 9'd0, spt, 9'd0 }:22'd0) +      // side * sectors * 512
-	{ 9'd0, sector, src_offset };           // offset within track
+always @(posedge clk) begin
+	addr <= 
+		{ 3'b00, soff, 9'd0 } +                 // sector offset * 512 for two sides
+		(sides?{ 3'b00, soff, 9'd0 }:22'd0) +   // another sector offset * 512 for two sides
+		(side?{ 9'd0, spt, 9'd0 }:22'd0) +      // side * sectors * 512
+		{ 9'd0, sector, src_offset };           // offset within track
+end
 
    // number of sectors on current track
    wire [3:0] spt =
@@ -189,11 +192,9 @@ assign addr =
 		    ((state == STATE_DATA) && (count < 683-4-1))) 
 					&& (cnt != 3);
 
-   reg [7:0] data_latch;
-   always @(posedge clk)
-     if(strobe)
-       data_latch <= idata;
-   
+reg [7:0] data_latch;
+always @(posedge clk) if(ready && strobe) data_latch <= idata;
+
 always @(posedge clk or posedge nibbler_reset) begin
    if(nibbler_reset) begin
 		c1 <= 8'h00;
@@ -205,7 +206,7 @@ always @(posedge clk or posedge nibbler_reset) begin
 		nib_xor_0 <= 8'h00;
 		nib_xor_1 <= 8'h00;
 		nib_xor_2 <= 8'h00;
-   end else if((state == STATE_DPRE) || (state == STATE_DATA)) begin
+   end else if(ready && ((state == STATE_DPRE) || (state == STATE_DATA))) begin
 		cnt <= cnt + 2'd1;
   
 		// memory read during cnt 0-3
@@ -263,7 +264,7 @@ always @(posedge clk or posedge rst) begin
 		state <= STATE_SYN0;
 		sector <= 4'd0;
 	   src_offset <= 9'd0;
-	end else begin
+	end else if(ready) begin
 		count <= count + 10'd1;
 	 
 	   if(strobe)

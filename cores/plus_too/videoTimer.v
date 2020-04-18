@@ -1,13 +1,14 @@
 // generates 1024x768 (actually 512x768) @ 60Hz, from a 32.5MHz input clock
 module videoTimer(
-    input clk8,
-	 input [1:0] busCycle,
-	 output [21:0] videoAddr,	 
-	 output reg hsync,
-	 output reg vsync,
-	 output _hblank,
-	 output _vblank,
-	 output loadPixels
+	input clk,
+	input clk_en,
+	input [1:0] busCycle,
+	output [21:0] videoAddr,	 
+	output reg hsync,
+	output reg vsync,
+	output _hblank,
+	output _vblank,
+	output loadPixels
 );
 
 	// timing data from http://tinyvga.com/vga-timing/1024x768@60Hz
@@ -31,28 +32,34 @@ module videoTimer(
 
 	wire endline = (xpos == kTotalWidth-1);
 
-	always @(posedge clk8) begin
-		if (endline)
-			xpos <= 0;
-		else if (xpos == 0 && busCycle != 0)
-			// hold xpos at 0, until xpos and busCycle are in phase
-			xpos <= 0;
-		else
-			xpos <= xpos + 1'b1;
-	end
-
-	always @(posedge clk8) begin
-		if (endline) begin
-			if (ypos == kTotalHeight-1)
-				ypos <= 0;
+	always @(posedge clk) begin
+		if (clk_en) begin
+			if (endline)
+				xpos <= 0;
+			else if (xpos == 0 && busCycle != 0)
+				// hold xpos at 0, until xpos and busCycle are in phase
+				xpos <= 0;
 			else
-				ypos <= ypos + 1'b1;	
+				xpos <= xpos + 1'b1;
 		end
 	end
 
-	always @(posedge clk8) begin
-		hsync <= ~(xpos >= kHsyncStart+kPixelLatency && xpos <= kHsyncEnd+kPixelLatency);  
-		vsync <= ~(ypos >= kVsyncStart && ypos <= kVsyncEnd);
+	always @(posedge clk) begin
+		if (clk_en) begin
+			if (endline) begin
+				if (ypos == kTotalHeight-1)
+					ypos <= 0;
+				else
+					ypos <= ypos + 1'b1;	
+			end
+		end
+	end
+
+	always @(posedge clk) begin
+		if (clk_en) begin
+			hsync <= ~(xpos >= kHsyncStart+kPixelLatency && xpos <= kHsyncEnd+kPixelLatency);  
+			vsync <= ~(ypos >= kVsyncStart && ypos <= kVsyncEnd);
+		end
 	end
 
 	assign _hblank = ~(xpos >= kVisibleWidth);

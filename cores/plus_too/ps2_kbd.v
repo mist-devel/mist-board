@@ -4,16 +4,17 @@
  * PS2 Keyboard to Mac interface module
  */
 module ps2_kbd(	input			sysclk,
-		input			reset,
+		input  clk_en,
+		input  reset,
 
-		inout			ps2dat,
-		inout			ps2clk,
+		inout  ps2dat,
+		inout  ps2clk,
 		 
-	   	input [7:0]		data_out,
-		input			strobe_out,
+	   	input [7:0] data_out,
+		input strobe_out,
 
-		output [7:0]		data_in,
-		output 			strobe_in
+		output [7:0] data_in,
+		output strobe_in
 );
 
 	reg [8:0] 		keymac;
@@ -49,16 +50,17 @@ module ps2_kbd(	input			sysclk,
 	wire [1:0] 		dbg_lowstate;
 	
 	ps2 ps20(.sysclk(sysclk),
-		 .reset(reset),
-		 .ps2dat(ps2dat),
-		 .ps2clk(ps2clk),
-		 .istrobe(istrobe),
-		 .ibyte(ibyte),
-		 .oreq(oreq),
-		 .obyte(obyte),
-		 .oack(oack),
-		 .timeout(timeout),
-		 .dbg_state(dbg_lowstate));
+		.clk_en(clk_en),
+		.reset(reset),
+		.ps2dat(ps2dat),
+		.ps2clk(ps2clk),
+		.istrobe(istrobe),
+		.ibyte(ibyte),
+		.oreq(oreq),
+		.obyte(obyte),
+		.oack(oack),
+		.timeout(timeout),
+		.dbg_state(dbg_lowstate));
 	
 	/* --- PS2 side State machine ---
 	 *
@@ -148,17 +150,17 @@ module ps2_kbd(	input			sysclk,
 	always@(posedge sysclk or posedge reset)
 	  if (reset)
 	    state <= ps2k_state_wait;  // ps2k_state_init
-	  else
+	  else if (clk_en)
 	    state <= next;	
 	always@(posedge sysclk or posedge reset)
 	  if (reset)
 	    oreq <= 0;
-	  else
+	  else if (clk_en)
 	    oreq <= nreq;
 	always@(posedge sysclk or posedge reset)
 	  if (reset)
 	    obyte <= 0;
-	  else
+	  else if (clk_en)
 	    obyte <= nbyte;
 
 	assign got_key = (state == ps2k_state_wait) && istrobe;
@@ -172,7 +174,7 @@ module ps2_kbd(	input			sysclk,
 		  extended <= 0;
 		  keybreak <= 0;	
 		  capslock <= 0;
-	  end else if (got_key) begin
+	  end else if (clk_en && got_key) begin
 		  if (got_break)
 		    keybreak <= 1;
 		  else if (got_extend)
@@ -196,7 +198,7 @@ module ps2_kbd(	input			sysclk,
 		  cmd_instant <= 0;
 		  cmd_model <= 0;
 		  cmd_test <= 0;
-	  end else begin
+	  end else if (clk_en) begin
 		  if (strobe_out) begin
 			  cmd_inquiry <= 0;
 			  cmd_instant <= 0;
@@ -218,12 +220,12 @@ module ps2_kbd(	input			sysclk,
 	always@(posedge sysclk or posedge reset)
 	  if (reset)
 	    pacetimer <= 0;
-	  else begin
+	  else if (clk_en) begin
 		  /* reset counter on command from Mac */
 		  if (strobe_out)
 		    pacetimer <= 0;		  
 		  else if (!tick_long)
-		    pacetimer <= pacetimer + 1;
+		    pacetimer <= pacetimer + 1'd1;
 	  end
 	assign tick_long  = pacetimer == 22'h3fffff;
 	assign tick_short = pacetimer == 22'h000fff;
@@ -232,7 +234,7 @@ module ps2_kbd(	input			sysclk,
 	always@(posedge sysclk or posedge reset)
 	  if (reset)
 	    inquiry_active <= 0;
-	  else begin
+	  else if (clk_en) begin
 		  if (strobe_out | strobe_in)
 		    inquiry_active <= 0;
 		  else if (tick_short)
@@ -250,24 +252,24 @@ module ps2_kbd(	input			sysclk,
 	/* Handle key_pending, and multi-byte keypad responses */
 	reg keypad_byte2;
 	always @(posedge sysclk or posedge reset)
-	  if (reset) begin
-	    key_pending <= 0;
-		 keypad_byte2 <= 0;
-	  end
-	  else begin
-		  if (cmd_model | cmd_test)
-				key_pending <= 0;		 
-		  else if (pop_key) begin
-		    if (keymac[8] & !keypad_byte2)
-				keypad_byte2 <= 1;
-		    else begin
-				key_pending <= 0;	
-				keypad_byte2 <= 0;
-		    end				
-		  end			 
-		  else if (!key_pending & got_key && !got_break && !got_extend && !ignore_capslock)
-		    key_pending <= 1;			 
-	  end
+		if (reset) begin
+			key_pending <= 0;
+			keypad_byte2 <= 0;
+		end
+		else if (clk_en) begin
+			if (cmd_model | cmd_test)
+				key_pending <= 0;
+			else if (pop_key) begin
+				if (keymac[8] & !keypad_byte2)
+					keypad_byte2 <= 1;
+				else begin
+					key_pending <= 0;
+					keypad_byte2 <= 0;
+				end
+			end
+			else if (!key_pending & got_key && !got_break && !got_extend && !ignore_capslock)
+				key_pending <= 1;
+		end
 	
 	/* Data to Mac */
 	assign data_in = cmd_test 	? 8'h7d :
@@ -279,7 +281,7 @@ module ps2_kbd(	input			sysclk,
 	 * differently
 	 */
 	always @(posedge sysclk)
-	  if (got_key && !key_pending) begin
+	  if (clk_en && got_key && !key_pending) begin
 		  case({extended,ibyte}) // Scan Code Set 2
 			  9'h000:		keymac[8:0] <= 9'h07b;
 			  9'h001:		keymac[8:0] <= 9'h07b;	//F9

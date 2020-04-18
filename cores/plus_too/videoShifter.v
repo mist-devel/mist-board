@@ -1,9 +1,9 @@
 module videoShifter(
-    input clk32,
-	 input [1:0] clkPhase,
-	 input [15:0] dataIn,
-	 input loadPixels,
-    output pixelOut
+	input clk32,
+	input [1:0] clkPhase,
+	input [15:0] dataIn,
+	input loadPixels,
+	output pixelOut
     );
 	
 	reg [15:0] shiftRegister;
@@ -22,5 +22,5 @@ module videoShifter(
 			shiftRegister <= { shiftRegister[14:0], 1'b1 };
 		end
 	end
-	
+
 endmodule

@@ -2,6 +2,8 @@ module dataController_top(
 	// clocks:
 	input clk32,					// 32.5 MHz pixel clock
 	output clk8,						// 8.125 MHz CPU clock
+	output clk8_en_p,
+	output clk8_en_n,
 	
 	// system control:
 	input _systemReset,
@@ -60,6 +62,8 @@ module dataController_top(
 	input [1:0] insertDisk,
 	input [1:0] diskSides,
 	output [1:0] diskEject,
+	output [1:0] diskMotor,
+	output [1:0] diskAct,
 
 	output [21:0] dskReadAddrInt,
 	input dskReadAckInt,
@@ -67,14 +71,16 @@ module dataController_top(
 	input dskReadAckExt,
 
 	// connections to io controller
-   output [31:0] io_lba,
-   output 	     io_rd,
-   output 	     io_wr,
-   input 	     io_ack,
-   input [7:0]   io_din,
-   input 	     io_din_strobe,
-   output [7:0]  io_dout,
-   input 	     io_dout_strobe
+	input   [1:0] img_mounted,
+	input  [31:0] img_size,
+	output [31:0] io_lba,
+	output  [1:0] io_rd,
+	output  [1:0] io_wr,
+	input         io_ack,
+	input   [8:0] sd_buff_addr,
+	input   [7:0] sd_buff_dout,
+	output  [7:0] sd_buff_din,
+	input         sd_buff_wr
 );
 	
 	// add binary volume levels according to volume setting
@@ -89,13 +95,13 @@ module dataController_top(
 	wire [10:0] audio_x4 = {    audio_latch[7]  , audio_latch, 2'b00};
 	
 	reg loadSoundD;
-	always @(negedge clk8)
-		loadSoundD <= loadSound;
+	always @(posedge clk32)
+		if (clk8_en_n) loadSoundD <= loadSound;
 
 	// read audio data and convert to signed for further volume adjustment
 	reg [7:0] audio_latch;
-	always @(posedge clk8) begin
-		if(loadSoundD) begin
+	always @(posedge clk32) begin
+		if(clk8_en_p && loadSoundD) begin
 			if(snd_ena) audio_latch <= 8'h00;
 			else  	 	audio_latch <= memoryDataIn[15:8] - 8'd128;
 		end
@@ -106,6 +112,8 @@ module dataController_top(
 	always @(posedge clk32)
 		clkPhase <= clkPhase + 2'd1;
 	assign clk8 = clkPhase[1];
+	assign clk8_en_p = clkPhase == 2'b01;
+	assign clk8_en_n = clkPhase == 2'b11;
 	
 	// CPU reset generation
 	// For initial CPU reset, RESET and HALT must be asserted for at least 100ms = 800,000 clocks of clk8
@@ -117,11 +125,11 @@ module dataController_top(
 		resetDelay <= 20'hFFFFF;
 	end
 	
-	always @(posedge clk8 or negedge _systemReset) begin
+	always @(posedge clk32 or negedge _systemReset) begin
 		if (_systemReset == 1'b0) begin
 			resetDelay <= 20'hFFFFF;
 		end
-		else if (isResetting) begin
+		else if (clk8_en_p && isResetting) begin
 			resetDelay <= resetDelay - 1'b1;
 		end
 	end
@@ -154,36 +162,41 @@ module dataController_top(
 	
 	// Memory-side
 	assign memoryDataOut = cpuDataIn;
-	
+
 	// SCSI
 	ncr5380 scsi(
-		.sysclk(clk8),
-      .reset(!_cpuReset),
-      .bus_cs(selectSCSI && cpuBusControl),
-      .bus_we(!_cpuRW),
-      .bus_rs(cpuAddrRegMid),
-      .dack(cpuAddrRegHi[0]),   // A9
-      .wdata(cpuDataIn[15:8]),
-      .rdata(scsiDataOut),
+		.clk(clk32),
+		.ce(clk8_en_p),
+		.reset(!_cpuReset),
+		.bus_cs(selectSCSI && cpuBusControl),
+		.bus_we(!_cpuRW),
+		.bus_rs(cpuAddrRegMid),
+		.dack(cpuAddrRegHi[0]),   // A9
+		.wdata(cpuDataIn[15:8]),
+		.rdata(scsiDataOut),
 
 		// connections to io controller
+		.img_mounted( img_mounted ),
+		.img_size( img_size ),
 		.io_lba ( io_lba ),
 		.io_rd ( io_rd ),
 		.io_wr ( io_wr ),
 		.io_ack ( io_ack ),
-		.io_din ( io_din ),
-		.io_din_strobe ( io_din_strobe ),
-		.io_dout ( io_dout ),
-		.io_dout_strobe ( io_dout_strobe )
+
+		.sd_buff_addr(sd_buff_addr),
+		.sd_buff_dout(sd_buff_dout),
+		.sd_buff_din(sd_buff_din),
+		.sd_buff_wr(sd_buff_wr)
 	);
 
-	
 	// VIA
 	wire [2:0] snd_vol;
 	wire snd_ena;
 	
 	via v(
-		.clk8(clk8),
+		.clk32(clk32),
+		.clk8_en_p(clk8_en_p),
+		.clk8_en_n(clk8_en_n),
 		._reset(_cpuReset),
 		.selectVIA(selectVIA && cpuBusControl),
 		._cpuRW(_cpuRW),
@@ -213,7 +226,9 @@ module dataController_top(
 		
 	// IWM
 	iwm i(
-		.clk8(clk8),
+		.clk(clk32),
+		.cep(clk8_en_p),
+		.cen(clk8_en_n),
 		._reset(_cpuReset),
 		.selectIWM(selectIWM && cpuBusControl),
 		._cpuRW(_cpuRW),
@@ -225,7 +240,9 @@ module dataController_top(
 		.insertDisk(insertDisk),
 		.diskSides(diskSides),
 		.diskEject(diskEject),
-		
+		.diskMotor(diskMotor),
+		.diskAct(diskAct),
+
 		.dskReadAddrInt(dskReadAddrInt),
 		.dskReadAckInt(dskReadAckInt),
 		.dskReadAddrExt(dskReadAddrExt),
@@ -235,14 +252,16 @@ module dataController_top(
 
 	// SCC
 	scc s(
-		.sysclk(clk8),
-	   .reset_hw(~_cpuReset),
-	   .cs(selectSCC && (_cpuLDS == 1'b0 || _cpuUDS == 1'b0) && cpuBusControl),
-	   .we(!_cpuRW),
-	   .rs(cpuAddrRegLo), 
-	   .wdata(cpuDataIn[15:8]),
-	   .rdata(sccDataOut),
-	   ._irq(_sccIrq),
+		.clk(clk32),
+		.cep(clk8_en_p),
+		.cen(clk8_en_n),
+		.reset_hw(~_cpuReset),
+		.cs(selectSCC && (_cpuLDS == 1'b0 || _cpuUDS == 1'b0) && cpuBusControl),
+		.we(!_cpuRW),
+		.rs(cpuAddrRegLo), 
+		.wdata(cpuDataIn[15:8]),
+		.rdata(sccDataOut),
+		._irq(_sccIrq),
 		.dcd_a(mouseX1),
 		.dcd_b(mouseY1),
 		.wreq(sccWReq));
@@ -257,7 +276,8 @@ module dataController_top(
 	
 	// Mouse
 	ps2_mouse mouse(
-		.sysclk(clk8),
+		.sysclk(clk32),
+		.clk_en(clk8_en_p),
 		.reset(~_cpuReset),
 		.ps2dat(mouseData),
 		.ps2clk(mouseClk),
@@ -267,14 +287,15 @@ module dataController_top(
 		.y2(mouseY2),
 		.button(mouseButton));
 
-   wire [7:0] kbd_in_data;
+	wire [7:0] kbd_in_data;
 	wire kbd_in_strobe;
-   wire [7:0] kbd_out_data;
+	wire [7:0] kbd_out_data;
 	wire kbd_out_strobe;
-		
+
 	// Keyboard
 	ps2_kbd kbd(
-		.sysclk(clk8),
+		.sysclk(clk32),
+		.clk_en(clk8_en_p),
 		.reset(~_cpuReset),
 		.ps2dat(keyData),
 		.ps2clk(keyClk),

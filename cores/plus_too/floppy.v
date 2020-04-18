@@ -58,8 +58,12 @@
 `define DRIVE_REG_INSTALLED	14 /* R: drive present (0 = yes ??) */
 `define DRIVE_REG_DRVIN		15 /* R: 400K/800k: drive present (0=yes, 1=no), Superdrive: disk capacity (0=HD, 1=DD) */
 
-module floppy(
-	input clk8,
+module floppy
+(
+	input clk,
+	input cep,
+	input cen,
+
 	input _reset,
 	input ca0,				// PH0
 	input ca1,				// PH1
@@ -76,10 +80,16 @@ module floppy(
 	input diskSides,
 	output diskEject,
 
+	output motor,
+	output act,
+
 	output [21:0] dskReadAddr,
 	input dskReadAck,
 	input [7:0] dskReadData
 );
+
+	assign motor = ~driveRegs[`DRIVE_REG_MOTORON];
+	assign act = lstrbEdge;
 
 	reg [15:0] driveRegs;
 	reg [6:0] driveTrack;
@@ -107,20 +117,24 @@ module floppy(
 	};
 
 	reg dskReadAckD;
-	always @(negedge clk8)
-		dskReadAckD <= dskReadAck;
+	always @(posedge clk) if(cen) dskReadAckD <= dskReadAck;
 
 	// latch incoming data
 	reg [7:0] dskReadDataLatch;
-	always @(posedge clk8)
-		if(dskReadAckD)
-			dskReadDataLatch <= dskReadData;
+	always @(posedge clk) if(cep && dskReadAckD) dskReadDataLatch <= dskReadData;
 		
 	wire [7:0] dskReadDataEnc;
 	
+	reg old_newByteReady;
+	always @(posedge clk) old_newByteReady <= newByteReady;
+	
 	// include track encoder
-	floppy_track_encoder enc (
-		.clk		( newByteReady ),   
+	floppy_track_encoder enc
+	(
+
+		.clk		( clk ),
+		.ready	( ~old_newByteReady & newByteReady ),
+
 		.rst     ( !_reset ),
 		
 		.side    ( driveSide ),
@@ -128,8 +142,6 @@ module floppy(
 		.track   ( driveTrack ),
 
 		.addr    ( dskReadAddr ),
-		
-		.strobe  ( ), 			    
 		.idata   ( dskReadDataLatch ),
 		.odata   ( dskReadDataEnc )
 	);
@@ -144,8 +156,8 @@ module floppy(
 	reg [6:0] diskDataByteTimer; 
 	reg [7:0] diskImageData;	
 	reg readyToAdvanceHead;
-	always @(posedge clk8 or negedge _reset) begin
-		if (_reset == 1'b0) begin		
+	always @(posedge clk or negedge _reset) begin
+		if (_reset == 0) begin		
 			driveSide <= 0;
 			diskImageData <= 8'h00;
 			diskDataIn <= 8'hFF;
@@ -154,10 +166,11 @@ module floppy(
 			newByteReady <= 1'b0;
 		end 
 		else begin			
+			if(cep) begin
 			// at time 0, latch a new byte and advance the drive head
 			if (diskDataByteTimer == 0 && readyToAdvanceHead && diskImageData != 0) begin
 				diskDataIn <= diskImageData;
-				newByteReady <= 1'b1;
+					newByteReady <= 1;
 				diskDataByteTimer <= 1;  // make timer run again
 									
 				// clear diskImageData after it's used, so we can tell when we get a new one from the disk	
@@ -194,11 +207,11 @@ module floppy(
 				driveSide <= 1;	
 		end
 	end
+	end
 	
 	// create a signal on the falling edge of lstrb
 	reg lstrbPrev;
-	always @(posedge clk8)
-		lstrbPrev <= lstrb;
+	always @(posedge clk) if(cep) lstrbPrev <= lstrb;
 		
 	wire lstrbEdge = lstrb == 1'b0 && lstrbPrev == 1'b1;
 	
@@ -209,11 +222,11 @@ module floppy(
 	wire [2:0] driveWriteAddr = {ca1,ca0,SEL};
 	
 	// DRIVE_REG_DIRTN		0  /* R/W: step direction (0=toward track 79, 1=toward track 0) */
-	always @(posedge clk8 or negedge _reset) begin
+	always @(posedge clk or negedge _reset) begin
 		if (_reset == 1'b0) begin		
 			driveRegs[`DRIVE_REG_DIRTN] <= 1'b0;
 		end 
-		else if (_enable == 1'b0 && lstrbEdge == 1'b1 && driveWriteAddr == `DRIVE_REG_DIRTN) begin
+		else if(cep && _enable == 1'b0 && lstrbEdge == 1'b1 && driveWriteAddr == `DRIVE_REG_DIRTN) begin
 			driveRegs[`DRIVE_REG_DIRTN] <= ca2;
 		end
 	end
@@ -225,33 +238,35 @@ module floppy(
 	reg [23:0] ejectIndicatorTimer;
 	assign diskEject = (ejectIndicatorTimer != 0);
 	
-	always @(posedge clk8 or negedge _reset) begin
+	always @(posedge clk or negedge _reset) begin
 		if (_reset == 1'b0) begin		
 			driveRegs[`DRIVE_REG_CSTIN] <= 1'b1;
 			ejectIndicatorTimer <= 24'd0;
 		end 
-		else if (_enable == 1'b0 && lstrbEdge == 1'b1 && driveWriteAddr == `DRIVE_REG_EJECT && ca2 == 1'b1) begin
-			// eject the disk
-			driveRegs[`DRIVE_REG_CSTIN] <= 1'b1;
-			ejectIndicatorTimer <= 24'hFFFFFF;
-		end
-		else if (insertDisk) begin
-			// insert a disk
-			driveRegs[`DRIVE_REG_CSTIN] <= 1'b0;
-		end
-		else begin
-			if (ejectIndicatorTimer != 0)
-				ejectIndicatorTimer <= ejectIndicatorTimer - 1'b1;
+		else if(cep) begin
+			if (_enable == 1'b0 && lstrbEdge == 1'b1 && driveWriteAddr == `DRIVE_REG_EJECT && ca2 == 1'b1) begin
+				// eject the disk
+				driveRegs[`DRIVE_REG_CSTIN] <= 1'b1;
+				ejectIndicatorTimer <= 24'hFFFFFF;
+			end
+			else if (insertDisk) begin
+				// insert a disk
+				driveRegs[`DRIVE_REG_CSTIN] <= 1'b0;
+			end
+			else begin
+				if (ejectIndicatorTimer != 0)
+					ejectIndicatorTimer <= ejectIndicatorTimer - 1'b1;
+			end
 		end
 	end									
 									
 	//`define DRIVE_REG_STEP		2  /* R: drive head stepping (1 = complete) */
 												/* W: 0 = step drive head */
-	always @(posedge clk8 or negedge _reset) begin
+	always @(posedge clk or negedge _reset) begin
 		if (_reset == 1'b0) begin	
 			driveTrack <= 0; 
 		end 
-		else if (_enable == 1'b0 && lstrbEdge == 1'b1 && driveWriteAddr == `DRIVE_REG_STEP && ca2 == 1'b0) begin
+		else if(cep && _enable == 1'b0 && lstrbEdge == 1'b1 && driveWriteAddr == `DRIVE_REG_STEP && ca2 == 1'b0) begin
 			if (driveRegs[`DRIVE_REG_DIRTN] == 1'b0 && driveTrack != 7'h4F) begin
 				driveTrack <= driveTrack + 1'b1;
 			end
@@ -262,11 +277,11 @@ module floppy(
 	end
 	
 	// DRIVE_REG_MOTORON	4  /* R/W: 0 = motor on */
-	always @(posedge clk8 or negedge _reset) begin
+	always @(posedge clk or negedge _reset) begin
 		if (_reset == 1'b0) begin		
 			driveRegs[`DRIVE_REG_MOTORON] <= 1'b1;
 		end 
-		else if (_enable == 1'b0 && lstrbEdge == 1'b1 && driveWriteAddr == `DRIVE_REG_MOTORON) begin
+		else if (cep && _enable == 1'b0 && lstrbEdge == 1'b1 && driveWriteAddr == `DRIVE_REG_MOTORON) begin
 			driveRegs[`DRIVE_REG_MOTORON] <= ca2;
 		end
 	end
@@ -307,12 +322,12 @@ module floppy(
 		endcase
 	end
 	
-	always @(posedge clk8 or negedge _reset) begin
+	always @(posedge clk or negedge _reset) begin
 		if (_reset == 1'b0) begin		
 			driveRegs[`DRIVE_REG_TACH] <= 1'b0;
 			driveTachTimer <= 0;
 		end 
-		else begin
+		else if(cep) begin
 			if (driveTachTimer == driveTachPeriod) begin
 				driveTachTimer <= 0;
 				driveRegs[`DRIVE_REG_TACH] <= ~driveRegs[`DRIVE_REG_TACH];

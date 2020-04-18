@@ -12,24 +12,25 @@
  */
 
 module ps2(input	sysclk,
-	   input	reset,
+	input clk_en,
+	input reset,
 
 //	   inout	ps2dat,
 //	   inout	ps2clk,
-	   input	ps2dat,
-	   input	ps2clk,
+	input ps2dat,
+	input ps2clk,
 
-	   output	istrobe,
-	   output [7:0] ibyte,
+	output istrobe,
+	output [7:0] ibyte,
 
-	   input	oreq,
-	   input [7:0]	obyte,
-	   output	oack,
+	input	oreq,
+	input [7:0]	obyte,
+	output	oack,
 
-	   output	timeout,
+	output	timeout,
 
-	   output[1:0]	dbg_state
-	   );
+	output[1:0]	dbg_state
+	);
 
 	reg [7:0] 	clkbuf;
 	reg [7:0] 	datbuf;
@@ -54,7 +55,7 @@ module ps2(input	sysclk,
 	always@(posedge sysclk or posedge reset) begin
 		if (reset)
 		  state <= ps2_state_idle;
-		else begin
+		else if (clk_en) begin
 			if (timeout && !oreq)
 			  state <= ps2_state_idle;
 			else
@@ -93,7 +94,7 @@ module ps2(input	sysclk,
 	always@(posedge sysclk or posedge reset) begin
 		if (reset)
 		  shiftcnt <= 10;
-		else begin
+		else if (clk_en) begin
 			if (state == ps2_state_idle)
 			  shiftcnt <= 10;
 			else if (state == ps2_state_ring)
@@ -107,7 +108,7 @@ module ps2(input	sysclk,
 	always@(posedge sysclk or posedge reset) begin
 		if (reset)
 		  shiftreg <= 0;
-		else begin
+		else if (clk_en) begin
 			if (oreq)
 			  shiftreg <= { 1'b1, opar, obyte, 1'b0 };
 			else if (clkdown && state != ps2_state_ring)
@@ -128,7 +129,7 @@ module ps2(input	sysclk,
 			clkbuf <= 0;
 			clksync <= 0;
 			clkprev <= 0;
-		end else begin
+		end else if (clk_en) begin
 			clkprev <= clksync;			
 			clkbuf <= { clkbuf[6:0], ps2clk };
 			if (clkbuf[7:2] == 6'b000000)
@@ -144,7 +145,7 @@ module ps2(input	sysclk,
 		if (reset) begin
 			datbuf <= 0;
 			datsync <= 0;
-		end else begin
+		end else if (clk_en) begin
 			datbuf <= { datbuf[6:0], ps2dat };
 			if (datbuf[7:2] == 6'b000000)
 			  datsync <= 0;
@@ -161,7 +162,7 @@ module ps2(input	sysclk,
 	always@(posedge sysclk or posedge reset) begin
 		if (reset)
 		  timecnt <= 0;
-		else begin
+		else if (clk_en) begin
 			if (clkdown | oreq)
 			  timecnt <= 0;
 			else

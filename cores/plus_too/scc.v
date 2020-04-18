@@ -12,48 +12,49 @@
  * for now, it's all very simplified
  */
 
-module scc(input	sysclk,
-	   input	reset_hw,
+module scc
+(
+	input clk,
+	input cep,
+	input cen,
 
-	   /* Bus interface. 2-bit address, to be wired
-	    * appropriately upstream (to A1..A2).
-	    */
-	   input	cs,
-	   input	we,
-	   input [1:0]	rs, /* [1] = data(1)/ctl [0] = a_side(1)/b_side */
-	   input [7:0]	wdata,
-	   output [7:0]	rdata,
-	   output	_irq,
+	input	reset_hw,
 
-	   /* A single serial port on Minimig */
-	   input	rxd,
-	   output	txd,
-	   input	cts, /* normally wired to device DTR output
-			      * on Mac cables. That same line is also
-			      * connected to the TRxC input of the SCC
-			      * to do fast clocking but we don't do that
-			      * here
-			      */
-	   output	rts, /* on a real mac this activates line
-			      * drivers when low */
+	/* Bus interface. 2-bit address, to be wired
+	 * appropriately upstream (to A1..A2).
+	 */
+	input	cs,
+	input	we,
+	input [1:0]	rs, /* [1] = data(1)/ctl [0] = a_side(1)/b_side */
+	input [7:0]	wdata,
+	output [7:0]	rdata,
+	output	_irq,
 
-	   /* DCD for both ports are hijacked by mouse interface */
-	   input	dcd_a, /* We don't synchronize those inputs */
-	   input	dcd_b,
+	/* A single serial port on Minimig */
+	input	rxd,
+	output	txd,
+	input	cts, /* normally wired to device DTR output
+				* on Mac cables. That same line is also
+				* connected to the TRxC input of the SCC
+				* to do fast clocking but we don't do that
+				* here
+				*/
+	output	rts, /* on a real mac this activates line
+				* drivers when low */
 
-	   /* Write request */
-	   output	wreq
-	   );
+	/* DCD for both ports are hijacked by mouse interface */
+	input	dcd_a, /* We don't synchronize those inputs */
+	input	dcd_b,
+
+	/* Write request */
+	output	wreq
+);
 
 	/* Register access is semi-insane */
 	reg [3:0]	rindex;
 	reg [3:0]	rindex_latch;
 	wire 		wreg_a;
 	wire 		wreg_b;
-	wire 		wdata_a;
-	wire 		wdata_b;
-	wire 		rdata_a;
-	wire 		rdata_b;
 
 	/* Resets via WR9, one clk pulses */
 	wire		reset_a;
@@ -83,23 +84,15 @@ module scc(input	sysclk,
 	reg [7:0] 	wr1_a;
 	reg [7:0] 	wr1_b;
 	reg [7:0] 	wr2;
-	reg [7:0] 	wr3_a;
-	reg [7:0] 	wr3_b;
-	reg [7:0] 	wr4_a;
-	reg [7:0] 	wr4_b;
 	reg [7:0] 	wr5_a;
 	reg [7:0] 	wr5_b;
 	reg [7:0] 	wr6_a;
 	reg [7:0] 	wr6_b;
-	reg [7:0] 	wr7_a;
-	reg [7:0] 	wr7_b;
 	reg [7:0] 	wr8_a;
 	reg [7:0] 	wr8_b;
 	reg [5:0] 	wr9;
 	reg [7:0] 	wr10_a;
 	reg [7:0] 	wr10_b;
-	reg [7:0] 	wr11_a;
-	reg [7:0] 	wr11_b;
 	reg [7:0] 	wr12_a;
 	reg [7:0] 	wr12_b;
 	reg [7:0] 	wr13_a;
@@ -135,23 +128,18 @@ module scc(input	sysclk,
 	/* Register/Data access helpers */
 	assign wreg_a  = cs & we & (~rs[1]) &  rs[0];
 	assign wreg_b  = cs & we & (~rs[1]) & ~rs[0];
-	assign wdata_a = cs & we & (rs[1] | (rindex == 8)) &  rs[0];
-	assign wdata_b = cs & we & (rs[1] | (rindex == 8)) & ~rs[0];
-	assign rdata_a = cs & (~we) & (rs[1] | (rindex == 8)) &  rs[0];
-	assign rdata_b = cs & (~we) & (rs[1] | (rindex == 8)) & ~rs[0];
 
 	// make sure rindex changes after the cpu cycle has ended so
 	// read data is still stable while cpu advances
-	always@(negedge sysclk)
-		rindex <= rindex_latch;
+	always@(posedge clk) if(cen) rindex <= rindex_latch;
 
 	/* Register index is set by a write to WR0 and reset
 	 * after any subsequent write. We ignore the side
 	 */
-	always@(negedge sysclk or posedge reset) begin
+	always@(posedge clk or posedge reset) begin
 		if (reset)
 		  rindex_latch <= 0;
-		else if (cs && !rs[1]) begin
+		else if (cen && cs && !rs[1]) begin
 			/* Default, reset index */
 			rindex_latch <= 0;
 
@@ -179,20 +167,20 @@ module scc(input	sysclk,
 
 	/* WR1
 	 * Reset: bit 5 and 2 unchanged */
-	always@(negedge sysclk or posedge reset_hw) begin
+	always@(posedge clk or posedge reset_hw) begin
 		if (reset_hw)
 		  wr1_a <= 0;
-		else begin
+		else if(cen) begin
 			if (reset_a)
 			  wr1_a <= { 2'b00, wr1_a[5], 2'b00, wr1_a[2], 2'b00 };
 			else if (wreg_a && rindex == 1)
 			  wr1_a <= wdata;
 		end
 	end
-	always@(negedge sysclk or posedge reset_hw) begin
+	always@(posedge clk or posedge reset_hw) begin
 		if (reset_hw)
 		  wr1_b <= 0;
-		else begin
+		else if(cen) begin
 			if (reset_b)
 			  wr1_b <= { 2'b00, wr1_b[5], 2'b00, wr1_b[2], 2'b00 };
 			else if (wreg_b && rindex == 1)
@@ -203,78 +191,30 @@ module scc(input	sysclk,
 	/* WR2
 	 * Reset: unchanged 
 	 */
-	always@(negedge sysclk or posedge reset_hw) begin
+	always@(posedge clk or posedge reset_hw) begin
 		if (reset_hw)
 		  wr2 <= 0;
-		else if ((wreg_a || wreg_b) && rindex == 2)
+		else if (cen && (wreg_a || wreg_b) && rindex == 2)
 		  wr2 <= wdata;			
-	end
-
-	/* WR3
-	 * Reset: bit 0 to 0, otherwise unchanged.
-	 */
-	always@(negedge sysclk or posedge reset_hw) begin
-		if (reset_hw)
-		  wr3_a <= 0;
-		else begin
-			if (reset_a)
-			  wr3_a[0] <= 0;
-			else if (wreg_a && rindex == 3)
-			  wr3_a <= wdata;
-		end
-	end
-	always@(negedge sysclk or posedge reset_hw) begin
-		if (reset_hw)
-		  wr3_b <= 0;
-		else begin
-			if (reset_b)
-			  wr3_b[0] <= 0;
-			else if (wreg_b && rindex == 3)
-			  wr3_b <= wdata;
-		end
-	end
-
-	/* WR4
-	 * Reset: Bit 2 to 1, otherwise unchanged
-	 */
-	always@(negedge sysclk or posedge reset_hw) begin
-		if (reset_hw)
-		  wr4_a <= 0;
-		else begin
-			if (reset_a)
-			  wr4_a[2] <= 1;
-			else if (wreg_a && rindex == 4)
-			  wr4_a <= wdata;
-		end
-	end
-	always@(negedge sysclk or posedge reset_hw) begin
-		if (reset_hw)
-		  wr4_b <= 0;
-		else begin
-			if (reset_b)
-			  wr4_b[2] <= 1;
-			else if (wreg_b && rindex == 4)
-			  wr4_b <= wdata;
-		end
 	end
 
 	/* WR5
 	 * Reset: Bits 7,4,3,2,1 to 0
 	 */
-	always@(negedge sysclk or posedge reset_hw) begin
+	always@(posedge clk or posedge reset_hw) begin
 		if (reset_hw)
 		  wr5_a <= 0;
-		else begin
+		else if(cen) begin
 			if (reset_a)
 			  wr5_a <= { 1'b0, wr5_a[6:5], 4'b0000, wr5_a[0] };			
 			else if (wreg_a && rindex == 5)
 			  wr5_a <= wdata;
 		end
 	end
-	always@(negedge sysclk or posedge reset_hw) begin
+	always@(posedge clk or posedge reset_hw) begin
 		if (reset_hw)
 		  wr5_b <= 0;
-		else begin
+		else if(cen) begin
 			if (reset_b)
 			  wr5_b <= { 1'b0, wr5_b[6:5], 4'b0000, wr5_b[0] };			
 			else if (wreg_b && rindex == 5)
@@ -282,65 +222,33 @@ module scc(input	sysclk,
 		end
 	end
 
-	/* WR6
-	 * Reset: Unchanged.
-	 */
-	always@(negedge sysclk or posedge reset_hw) begin
-		if (reset_hw)
-		  wr6_a <= 0;
-		else if (wreg_a && rindex == 6)
-		  wr6_a <= wdata;
-	end
-	always@(negedge sysclk or posedge reset_hw) begin
-		if (reset_hw)
-		  wr6_b <= 0;
-		else if (wreg_b && rindex == 6)
-		  wr6_b <= wdata;
-	end
-
-	/* WR7
-	 * Reset: Unchanged.
-	 */
-	always@(negedge sysclk or posedge reset_hw) begin
-		if (reset_hw)
-		  wr7_a <= 0;
-		else if (wreg_a && rindex == 7)
-		  wr7_a <= wdata;
-	end
-	always@(negedge sysclk or posedge reset_hw) begin
-		if (reset_hw)
-		  wr7_b <= 0;
-		else if (wreg_b && rindex == 7)
-		  wr7_b <= wdata;
-	end
-	
 	/* WR9. Special: top bits are reset, handled separately, bottom
 	 * bits are only reset by a hw reset
 	 */
-	always@(negedge sysclk or posedge reset_hw) begin
+	always@(posedge clk or posedge reset_hw) begin
 		if (reset_hw)
 		  wr9 <= 0;
-		else if ((wreg_a || wreg_b) && rindex == 9)
+		else if (cen && (wreg_a || wreg_b) && rindex == 9)
 		  wr9 <= wdata[5:0];			
 	end
 
 	/* WR10
 	 * Reset: all 0, except chanel reset retains 6 and 5
 	 */
-	always@(negedge sysclk or posedge reset) begin
+	always@(posedge clk or posedge reset) begin
 		if (reset)
 		  wr10_a <= 0;
-		else begin
+		else if(cen) begin
 			if (reset_a)
 			  wr10_a <= { 1'b0, wr10_a[6:5], 5'b00000 };
 			else if (wreg_a && rindex == 10)
 			  wr10_a <= wdata;
 		end		
 	end
-	always@(negedge sysclk or posedge reset) begin
+	always@(posedge clk or posedge reset) begin
 		if (reset)
 		  wr10_b <= 0;
-		else begin
+		else if(cen) begin
 			if (reset_b)
 			  wr10_b <= { 1'b0, wr10_b[6:5], 5'b00000 };
 			else if (wreg_b && rindex == 10)
@@ -348,51 +256,35 @@ module scc(input	sysclk,
 		end		
 	end
 
-	/* WR11
-	 * Reset: On full reset only, not channel reset
-	 */
-	always@(negedge sysclk or posedge reset) begin
-		if (reset)
-		  wr11_a <= 8'b00001000;
-		else if (wreg_a && rindex == 11)
-		  wr11_a <= wdata;
-	end
-	always@(negedge sysclk or posedge reset) begin
-		if (reset)
-		  wr11_b <= 8'b00001000;
-		else if (wreg_b && rindex == 11)
-		  wr11_b <= wdata;
-	end
-
 	/* WR12
 	 * Reset: Unchanged
 	 */
-	always@(negedge sysclk or posedge reset_hw) begin
+	always@(posedge clk or posedge reset_hw) begin
 		if (reset_hw)
 		  wr12_a <= 0;
-		else if (wreg_a && rindex == 12)
+		else if (cen && wreg_a && rindex == 12)
 		  wr12_a <= wdata;
 	end
-	always@(negedge sysclk or posedge reset_hw) begin
+	always@(posedge clk or posedge reset_hw) begin
 		if (reset_hw)
 		  wr12_b <= 0;		
-		else if (wreg_b && rindex == 12)
+		else if (cen && wreg_b && rindex == 12)
 		  wr12_b <= wdata;
 	end
 
 	/* WR13
 	 * Reset: Unchanged
 	 */
-	always@(negedge sysclk or posedge reset_hw) begin
+	always@(posedge clk or posedge reset_hw) begin
 		if (reset_hw)
 		  wr13_a <= 0;
-		else if (wreg_a && rindex == 13)
+		else if (cen && wreg_a && rindex == 13)
 		  wr13_a <= wdata;
 	end
-	always@(negedge sysclk or posedge reset_hw) begin
+	always@(posedge clk or posedge reset_hw) begin
 		if (reset_hw)
 		  wr13_b <= 0;		
-		else if (wreg_b && rindex == 13)
+		else if (cen && wreg_b && rindex == 13)
 		  wr13_b <= wdata;
 	end
 
@@ -401,10 +293,10 @@ module scc(input	sysclk,
 	 * Chan reset also maitains bottom 2 bits, bit 4 also
 	 * reset to a different value
 	 */
-	always@(negedge sysclk or posedge reset_hw) begin
+	always@(posedge clk or posedge reset_hw) begin
 		if (reset_hw)
 		  wr14_a <= 0;
-		else begin
+		else if(cen) begin
 			if (reset)
 			  wr14_a <= { wr14_a[7:6], 6'b110000 };
 			else if (reset_a)
@@ -413,10 +305,10 @@ module scc(input	sysclk,
 			  wr14_a <= wdata;
 		end		
 	end
-	always@(negedge sysclk or posedge reset_hw) begin
+	always@(posedge clk or posedge reset_hw) begin
 		if (reset_hw)
 		  wr14_b <= 0;
-		else begin
+		else if(cen) begin
 			if (reset)
 			  wr14_b <= { wr14_b[7:6], 6'b110000 };
 			else if (reset_b)
@@ -427,11 +319,11 @@ module scc(input	sysclk,
 	end
 
 	/* WR15 */
-	always@(negedge sysclk or posedge reset) begin
+	always@(posedge clk or posedge reset) begin
 		if (reset) begin
 		  wr15_a <= 8'b11111000;
 		  wr15_b <= 8'b11111000;
-		end else if (rindex == 15) begin
+		end else if (cen && rindex == 15) begin
 		  if(wreg_a) wr15_a <= wdata;			
 		  if(wreg_b) wr15_b <= wdata;			
 		end
@@ -622,38 +514,42 @@ module scc(input	sysclk,
 	assign do_latch_b = latch_open_b & (dcd_ip_b /* | cts... */);
 
 	/* "Master" interrupt, set when latch close & WR1[0] is set */
-	always@(posedge sysclk or posedge reset) begin
+	always@(posedge clk or posedge reset) begin
 		if (reset)
 		  ex_irq_ip_a <= 0;
-		else if (do_extreset_a)
-		  ex_irq_ip_a <= 0;
-		else if (do_latch_a && wr1_a[0])
-		  ex_irq_ip_a <= 1;
+		else if(cep) begin
+			if (do_extreset_a)
+			  ex_irq_ip_a <= 0;
+			else if (do_latch_a && wr1_a[0])
+			  ex_irq_ip_a <= 1;
+		end
 	end
-	always@(posedge sysclk or posedge reset) begin
+	always@(posedge clk or posedge reset) begin
 		if (reset)
 		  ex_irq_ip_b <= 0;
-		else if (do_extreset_b)
-		  ex_irq_ip_b <= 0;
-		else if (do_latch_b && wr1_b[0])
-		  ex_irq_ip_b <= 1;
+		else if(cep) begin
+			if (do_extreset_b)
+			  ex_irq_ip_b <= 0;
+			else if (do_latch_b && wr1_b[0])
+			  ex_irq_ip_b <= 1;
+		end
 	end
 
 	/* Latch open/close control */
-	always@(posedge sysclk or posedge reset) begin
+	always@(posedge clk or posedge reset) begin
 		if (reset)
 		  latch_open_a <= 1;
-		else begin
+		else if(cep) begin
 			if (do_extreset_a)
 			  latch_open_a <= 1;
 			else if (do_latch_a)
 			  latch_open_a <= 0;
 		end
 	end
-	always@(posedge sysclk or posedge reset) begin
+	always@(posedge clk or posedge reset) begin
 		if (reset)
 		  latch_open_b <= 1;
-		else begin
+		else if(cep) begin
 			if (do_extreset_b)
 			  latch_open_b <= 1;
 			else if (do_latch_b)
@@ -662,27 +558,27 @@ module scc(input	sysclk,
 	end
 
 	/* Latches proper */
-	always@(posedge sysclk or posedge reset) begin
+	always@(posedge clk or posedge reset) begin
 		if (reset) begin
 			dcd_latch_a <= 0;
 			/* cts ... */
-		end else begin
+		end else if(cep) begin
 			if (do_latch_a)
 			  dcd_latch_a <= dcd_a;
 			/* cts ... */
 		end
 	end
-	always@(posedge sysclk or posedge reset) begin
+	always@(posedge clk or posedge reset) begin
 		if (reset) begin
 			dcd_latch_b <= 0;			
 			/* cts ... */
-		end else begin
+		end else if(cep) begin
 			if (do_latch_b)
 			  dcd_latch_b <= dcd_b;
 			/* cts ... */
 		end
 	end
-	
+
 	/* NYI */
 	assign txd = 1;
 	assign rts = 1;

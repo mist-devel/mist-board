@@ -38,17 +38,19 @@ set_time_format -unit ns -decimal_places 3
 # Create Clock
 #**************************************************************
 
-create_clock -name {altera_reserved_tck} -period 100.000 -waveform { 0.000 50.000 } [get_ports {altera_reserved_tck}]
-create_clock -name {clk50} -period 20.000 -waveform { 0.000 10.000 } [get_ports {clk50}]
-create_clock -name {dataController_top:dc0|clkPhase[1]} -period 123.076 -waveform { 0.000 61.538 } [get_registers { dataController_top:dc0|clkPhase[1] }]
+
+create_clock -name "CLOCK_27" -period 37.037 [get_ports {CLOCK_27[0]}]
+create_clock -name {SPI_SCK}  -period 41.666 -waveform { 20.8 41.666 } [get_ports {SPI_SCK}]
 
 
 #**************************************************************
 # Create Generated Clock
 #**************************************************************
 
-create_generated_clock -name {clock325MHz:cs0|altpll:altpll_component|_clk0} -source [get_pins {cs0|altpll_component|pll|inclk[0]}] -duty_cycle 50.000 -multiply_by 13 -divide_by 20 -master_clock {clk50} [get_pins {cs0|altpll_component|pll|clk[0]}] 
+derive_pll_clocks -create_base_clocks
 
+# Automatically calculate clock uncertainty to jitter and other effects.
+derive_clock_uncertainty
 
 #**************************************************************
 # Set Clock Latency
@@ -78,7 +80,7 @@ create_generated_clock -name {clock325MHz:cs0|altpll:altpll_component|_clk0} -so
 # Set Clock Groups
 #**************************************************************
 
-set_clock_groups -asynchronous -group [get_clocks {altera_reserved_tck}] 
+set_clock_groups -asynchronous -group [get_clocks {SPI_SCK}] -group [get_clocks {cs0|altpll_component|auto_generated|pll1|clk[*]}]
 
 
 #**************************************************************
@@ -109,3 +111,17 @@ set_clock_groups -asynchronous -group [get_clocks {altera_reserved_tck}]
 # Set Input Transition
 #**************************************************************
 
+
+# SDRAM delays
+set_input_delay -clock [get_clocks {cs0|altpll_component|auto_generated|pll1|clk[0]}] -reference_pin [get_ports {SDRAM_CLK}] -max 6.4 [get_ports SDRAM_DQ[*]]
+set_input_delay -clock [get_clocks {cs0|altpll_component|auto_generated|pll1|clk[0]}] -reference_pin [get_ports {SDRAM_CLK}] -min 3.2 [get_ports SDRAM_DQ[*]]
+
+set_output_delay -clock [get_clocks {cs0|altpll_component|auto_generated|pll1|clk[0]}] -reference_pin [get_ports {SDRAM_CLK}] -max 1.5 [get_ports {SDRAM_D* SDRAM_A* SDRAM_BA* SDRAM_n* SDRAM_CKE}]
+set_output_delay -clock [get_clocks {cs0|altpll_component|auto_generated|pll1|clk[0]}] -reference_pin [get_ports {SDRAM_CLK}] -min -0.8 [get_ports {SDRAM_D* SDRAM_A* SDRAM_BA* SDRAM_n* SDRAM_CKE}]
+
+# VGA delayes
+set_output_delay -clock [get_clocks {cs0|altpll_component|auto_generated|pll1|clk[1]}] -max 0 [get_ports {VGA_*}]
+set_output_delay -clock [get_clocks {cs0|altpll_component|auto_generated|pll1|clk[1]}] -min -5 [get_ports {VGA_*}]
+
+set_multicycle_path -to {VGA_*[*]} -setup 2
+set_multicycle_path -to {VGA_*[*]} -hold 1

@@ -39,6 +39,8 @@ module plusToo_top(
   input wire            CONF_DATA0  // SPI_SS for user_io
   );
 
+assign LED = ~(dio_download || |(diskAct ^ diskMotor));
+
 // ------------------------------ Plus Too Bus Timing ---------------------------------
 // for stability and maintainability reasons the whole timing has been simplyfied:
 //                00           01             10           11
@@ -48,28 +50,6 @@ module plusToo_top(
 //                        |                    |      |
 //                      video                 cpu    cpu
 //                       read                write   read
-  
-// include the OSD into the video data path
-osd #(10,0,2) osd (
-   .pclk       ( clk32        ),
-
-   // spi for OSD
-   .sdi        ( SPI_DI       ),
-   .sck        ( SPI_SCK      ),
-   .ss         ( SPI_SS3      ),
-
-   .red_in     ( { red, 2'b00 }   ),
-   .green_in   ( { green, 2'b00 } ),
-   .blue_in    ( { blue, 2'b00 }  ),
-   .hs_in      ( hsync        ),
-   .vs_in      ( vsync        ),
-
-   .red_out    ( VGA_R        ),
-   .green_out  ( VGA_G        ),
-   .blue_out   ( VGA_B        ),
-   .hs_out     ( VGA_HS       ),
-   .vs_out     ( VGA_VS       )
-);
 
 // -------------------------------------------------------------------------
 // ------------------------------ data_io ----------------------------------
@@ -92,21 +72,24 @@ wire dsk_ext_ins = dsk_ext_ds || dsk_ext_ss;
 
 // at the end of a download latch file size
 // diskEject is set by macos on eject
-always @(negedge dio_download or posedge diskEject[0]) begin
+reg dio_download_d;
+always @(posedge clk32) dio_download_d <= dio_download;
+
+always @(posedge clk32) begin
 	if(diskEject[0]) begin
 		dsk_int_ds <= 1'b0;
 		dsk_int_ss <= 1'b0;
-	end else if(dio_index == 1) begin
+	end else if(~dio_download && dio_download_d && dio_index == 1) begin
 		dsk_int_ds <= (dio_addr == 409599);   // double sides disk, addr counts words, not bytes
 		dsk_int_ss <= (dio_addr == 204799);   // single sided disk
 	end
 end	
-	
-always @(negedge dio_download or posedge diskEject[1]) begin
+
+always @(posedge clk32) begin
 	if(diskEject[1]) begin
 		dsk_ext_ds <= 1'b0;
 		dsk_ext_ss <= 1'b0;
-	end else if(dio_index == 2) begin
+	end else if(~dio_download && dio_download_d && dio_index == 2) begin
 		dsk_ext_ds <= (dio_addr == 409599);   // double sided disk, addr counts words, not bytes
 		dsk_ext_ss <= (dio_addr == 204799);   // single sided disk
 	end
@@ -142,37 +125,26 @@ wire [3:0] key = 4'd0;
 // send to the VGA
 wire hsync;
 wire vsync;
-wire [3:0] red;
-wire [3:0] green;
-wire [3:0] blue;
 	 
 // ps2 interface for mouse, to be mapped into user_io
 wire mouseClk;
 wire mouseData;
 wire keyClk;
 wire keyData;
-	
+
 	// synthesize a 32.5 MHz clock
 	wire clk64;
 	wire pll_locked;
-	
-	reg clk32; 
-	always @(posedge clk64)
-		clk32 <= !clk32;
-	
+	wire clk32;
+
 	pll cs0(
 		.inclk0	( CLOCK_27[0]	),
-		.c0		( clk64			), 	
-		.c1	   ( SDRAM_CLK    ),
+		.c0		( clk64			),
+		.c1     ( clk32         ),
 		.locked	( pll_locked	)
 	);
-	
-	// generate ~16kHz for ps2
-	wire ps2_clk = ps2_clk_div[8];
-	reg [8:0] ps2_clk_div;
-	always @(posedge clk8)
-		ps2_clk_div <= ps2_clk_div + 9'd1;
-	
+	assign SDRAM_CLK = clk64;
+
 	// set the real-world inputs to sane defaults
 	localparam serialIn = 1'b0,
 				  configROMSize = 1'b1;  // 128K ROM
@@ -182,6 +154,7 @@ wire keyData;
 	// interconnects
 	// CPU
 	wire clk8, _cpuReset, _cpuUDS, _cpuLDS, _cpuRW;
+	wire clk8_en_p, clk8_en_n;
 	wire [2:0] _cpuIPL;
 	wire [7:0] cpuAddrHi;
 	wire [23:0] cpuAddr;
@@ -211,79 +184,81 @@ wire keyData;
 	wire [21:0] dskReadAddrInt;
 	wire dskReadAckExt;
 	wire [21:0] dskReadAddrExt;
-	
-	// convert 1-bit pixel data to 4:4:4 RGB
-	assign red[3:0] =   { pixelOut, pixelOut, pixelOut, pixelOut };
-	assign green[3:0] = { pixelOut, pixelOut, pixelOut, pixelOut };
-	assign blue[3:0] =  { pixelOut, pixelOut, pixelOut, pixelOut };
-	
+
 	// the configuration string is returned to the io controller to allow
 	// it to control the menu on the OSD 
 	parameter CONF_STR = {
-        "PLUS_TOO;;",
-        "F1,DSK;",
-        "F2,DSK;",
-		  "S3,IMG;",
-		  "O4,Memory,1MB,4MB;",
-		  "O5,Speed,Normal,Turbo;",
-        "T6,Reset"
+		"PLUS_TOO;;",
+		"F1,DSK;",
+		"F2,DSK;",
+		"S0,IMG;",
+		"O4,Memory,1MB,4MB;",
+		"O5,Speed,Normal,Turbo;",
+		"O67,CPU,68000,68010,68020;",
+        "T0,Reset"
 	};
-	
+
 	wire status_mem = status[4];
 	wire status_turbo = status[5];
-	wire status_reset = status[6];
-	
-	parameter CONF_STR_LEN = 10+7+7+7+18+22+8;
+	wire [1:0] status_cpu = status[7:6];
+	wire status_reset = status[0];
 
 	// the status register is controlled by the on screen display (OSD)
 	wire [7:0] status;
 	wire [1:0] buttons;
+	wire       ypbpr;
 
 	wire [31:0] io_lba;
-	wire io_rd;
-	wire io_wr;
-	wire io_ack;
-	wire [7:0] io_din;
-	wire io_din_strobe;
-	wire [7:0] io_dout;
-	wire io_dout_strobe;
- 
+	wire [1:0] io_rd;
+	wire [1:0] io_wr;
+	wire       io_ack;
+	wire [1:0] img_mounted;
+	wire [31:0] img_size;
+	wire [7:0] sd_buff_dout;
+	wire       sd_buff_wr;
+	wire [8:0] sd_buff_addr;
+	wire [7:0] sd_buff_din;
+
 	// include user_io module for arm controller communication
-	user_io #(.STRLEN(CONF_STR_LEN)) user_io ( 
-		.conf_str   	( CONF_STR   	  ),
+	user_io #(.STRLEN($size(CONF_STR)>>3)) user_io (
+		.clk_sys        ( clk32          ),
+		.clk_sd         ( clk32          ),
+		.conf_str       ( CONF_STR       ),
 
-		.SPI_CLK    	( SPI_SCK    	  ),	
-		.SPI_SS_IO  	( CONF_DATA0 	  ),
-		.SPI_MISO   	( SPI_DO     	  ),
-		.SPI_MOSI   	( SPI_DI     	  ),
+		.SPI_CLK        ( SPI_SCK        ),	
+		.SPI_SS_IO      ( CONF_DATA0     ),
+		.SPI_MISO       ( SPI_DO         ),
+		.SPI_MOSI       ( SPI_DI         ),
 
-      .status     	( status     	  ),
-      .buttons    	( buttons     	  ),
-                 
-      // ps2 interface
-      .ps2_clk    	( ps2_clk     	  ),
-      .ps2_kbd_clk	( keyClk      	  ),
-      .ps2_kbd_data	( keyData 		  ),
-		.ps2_mouse_clk ( mouseClk		  ),
-      .ps2_mouse_data( mouseData	     ),
+		.status         ( status         ),
+		.buttons        ( buttons        ),
+		.ypbpr          ( ypbpr          ),
+
+		// ps2 interface
+		.ps2_kbd_clk    ( keyClk         ),
+		.ps2_kbd_data   ( keyData        ),
+		.ps2_mouse_clk  ( mouseClk       ),
+		.ps2_mouse_data ( mouseData	     ),
 
 		// SD/block device interface
-		.sd_lba        ( io_lba         ),
-		.sd_rd         ( io_rd          ),
-      .sd_wr         ( io_wr          ),
-      .sd_ack        ( io_ack         ),
-      .sd_conf       ( 1'b0           ),
-      .sd_sdhc       ( 1'b1           ),
-      .sd_dout       ( io_din         ),
-      .sd_dout_strobe( io_din_strobe  ),
-      .sd_din        ( io_dout        ),
-      .sd_din_strobe ( io_dout_strobe )
+		.img_mounted    ( img_mounted    ),
+		.img_size       ( img_size       ),
+		.sd_lba         ( io_lba         ),
+		.sd_rd          ( io_rd          ),
+		.sd_wr          ( io_wr          ),
+		.sd_ack         ( io_ack         ),
+		.sd_conf        ( 1'b0           ),
+		.sd_sdhc        ( 1'b1           ),
+		.sd_dout        ( sd_buff_dout   ),
+		.sd_dout_strobe ( sd_buff_wr     ),
+		.sd_buff_addr   ( sd_buff_addr   ),
+		.sd_din         ( sd_buff_din    )
 	);
 
 	wire [1:0] cpu_busstate;
-	wire cpu_clkena = cpuBusControl || (cpu_busstate == 2'b01);
-	TG68KdotC_Kernel #(0,0,0,0,0,0) m68k (
-        .clk            ( clk8           ),
+	wire cpu_clkena = clk8_en_p && (cpuBusControl || (cpu_busstate == 2'b01));
+	TG68KdotC_Kernel #(2,2,2,2,2,2,0,0) m68k (
+        .clk            ( clk32          ),
         .nReset         ( _cpuReset      ),
         .clkena_in      ( cpu_clkena     ), 
         .data_in        ( dataControllerDataOut ),
@@ -291,8 +266,8 @@ wire keyData;
         .IPL_autovector ( 1'b1           ),
         .berr           ( 1'b0           ),
         .clr_berr       ( 1'b0           ),
-        .CPU            ( 2'b00          ),   // 00=68000
-        .addr           ( {cpuAddrHi, cpuAddr} ),
+        .CPU            ( { status_cpu[1], |status_cpu } ),   // 00->68000  01->68010  11->68020
+        .addr_out       ( {cpuAddrHi, cpuAddr} ),
         .data_write     ( cpuDataOut     ),
         .nUDS           ( _cpuUDS        ),
         .nLDS           ( _cpuLDS        ),
@@ -300,11 +275,12 @@ wire keyData;
         .busstate       ( cpu_busstate   ), // 00-> fetch code 10->read data 11->write data 01->no memaccess
         .nResetOut      (                ),
         .FC             (                )
-);
+	);
 
-	
 	addrController_top ac0(
-		.clk8(clk8), 
+		.clk(clk32),
+		.clk8_en_p(clk8_en_p),
+		.clk8_en_n(clk8_en_n),
 		.cpuAddr(cpuAddr), 
 		._cpuUDS(_cpuUDS),
 		._cpuLDS(_cpuLDS),
@@ -340,23 +316,26 @@ wire keyData;
 		.dskReadAddrExt(dskReadAddrExt),
 		.dskReadAckExt(dskReadAckExt)
 	);
-	
+
 	wire [1:0] diskEject;
-	
+	wire [1:0] diskMotor, diskAct;
+
 	// addional ~8ms delay in reset
 	wire rom_download = dio_download && (dio_index == 0);
 	wire n_reset = (rst_cnt == 0);
 	reg [15:0] rst_cnt;
 	reg last_mem_config;
-	always @(posedge clk8) begin
-		last_mem_config <= status_mem;
+	always @(posedge clk32) begin
+		if (clk8_en_p) begin
+			last_mem_config <= status_mem;
 	
-		// various sources can reset the mac
-		if(!pll_locked || status[0] || status_reset || buttons[1] || 
-			rom_download || (last_mem_config != status_mem)) 
-			rst_cnt <= 16'd65535;
-		else if(rst_cnt != 0)
-			rst_cnt <= rst_cnt - 16'd1;
+			// various sources can reset the mac
+			if(!pll_locked || status_reset || buttons[1] || 
+				rom_download || (last_mem_config != status_mem)) 
+				rst_cnt <= 16'd65535;
+			else if(rst_cnt != 0)
+				rst_cnt <= rst_cnt - 16'd1;
+		end
 	end
 
 	wire [10:0] audio;
@@ -370,8 +349,10 @@ wire keyData;
 
 	dataController_top dc0(
 		.clk32(clk32), 
-		.clk8(clk8),  
-		._systemReset(n_reset), 
+		.clk8(clk8),
+		.clk8_en_p(clk8_en_p),
+		.clk8_en_n(clk8_en_n),
+		._systemReset(n_reset),
 		._cpuReset(_cpuReset), 
 		._cpuIPL(_cpuIPL),
 		._cpuUDS(_cpuUDS), 
@@ -390,26 +371,26 @@ wire keyData;
 		.videoBusControl(videoBusControl),
 		.memoryDataOut(memoryDataOut),
 		.memoryDataIn(sdram_do),
-		
+
 		// peripherals
 		.keyClk(keyClk), 
 		.keyData(keyData), 
 		.mouseClk(mouseClk),
 		.mouseData(mouseData),
 		.serialIn(serialIn), 
-		
+
 		// video
 		._hblank(_hblank),
 		._vblank(_vblank), 
 		.pixelOut(pixelOut),
 		.loadPixels(loadPixels),
-		
+
 		.memoryOverlayOn(memoryOverlayOn),
 
 		.audioOut(audio),
 		.snd_alt(snd_alt),
 		.loadSound(loadSound),
-		
+
 		// floppy disk interface
 		.insertDisk( { dsk_ext_ins, dsk_int_ins} ),
 		.diskSides( { dsk_ext_ds, dsk_int_ds} ),
@@ -418,18 +399,59 @@ wire keyData;
 		.dskReadAckInt(dskReadAckInt),
 		.dskReadAddrExt(dskReadAddrExt),
 		.dskReadAckExt(dskReadAckExt),
+		.diskMotor(diskMotor),
+		.diskAct(diskAct),
 
 		// block device interface for scsi disk
-		.io_lba 			( io_lba 			),
-		.io_rd 			( io_rd 				),
-		.io_wr 			( io_wr 				),
-		.io_ack 			( io_ack				),
-		.io_din 			( io_din				),
-		.io_din_strobe ( io_din_strobe	),
-		.io_dout 		( io_dout			),
-		.io_dout_strobe( io_dout_strobe	)
+		.img_mounted  ( img_mounted  ),
+		.img_size     ( img_size     ),
+		.io_lba       ( io_lba       ),
+		.io_rd        ( io_rd        ),
+		.io_wr        ( io_wr        ),
+		.io_ack       ( io_ack       ),
+		.sd_buff_addr ( sd_buff_addr ),
+		.sd_buff_dout ( sd_buff_dout ),
+		.sd_buff_din  ( sd_buff_din  ),
+		.sd_buff_wr   ( sd_buff_wr   )
 	);
-		
+
+// video output
+mist_video #(.COLOR_DEPTH(1)) mist_video (
+	.clk_sys     ( clk32      ),
+
+	// OSD SPI interface
+	.SPI_SCK     ( SPI_SCK    ),
+	.SPI_SS3     ( SPI_SS3    ),
+	.SPI_DI      ( SPI_DI     ),
+
+	// 0 = HVSync 31KHz, 1 = CSync 15KHz
+	// no scandoubler for plus_too
+	.scandoubler_disable ( 1'b1 ),
+	// disable csync without scandoubler
+	.no_csync    ( 1'b1       ),
+	// YPbPr always uses composite sync
+	.ypbpr       ( ypbpr      ),
+	// Rotate OSD [0] - rotate [1] - left or right
+	.rotate      ( 2'b00      ),
+	// composite-like blending
+	.blend       ( 1'b0       ),
+
+	// video in
+	.R           ( pixelOut   ),
+	.G           ( pixelOut   ),
+	.B           ( pixelOut   ),
+
+	.HSync       ( hsync      ),
+	.VSync       ( vsync      ),
+
+	// MiST video output signals
+	.VGA_R       ( VGA_R      ),
+	.VGA_G       ( VGA_G      ),
+	.VGA_B       ( VGA_B      ),
+	.VGA_VS      ( VGA_VS     ),
+	.VGA_HS      ( VGA_HS     )
+);
+
 // sdram used for ram/rom maps directly into 68k address space
 wire download_cycle = dio_download && dioBusControl;
 
@@ -440,7 +462,6 @@ wire [1:0] sdram_ds = download_cycle?2'b11:{ !_memoryUDS, !_memoryLDS };
 wire sdram_we = download_cycle?dio_write:!_ramWE;
 wire sdram_oe = download_cycle?1'b0:(!_ramOE || !_romOE);
 
-
 // during rom/disk download ffff is returned so the screen is black during download
 // "extra rom" is used to hold the disk image. It's expected to be byte wide and
 // we thus need to properly demultiplex the word returned from sdram in that case
@@ -449,35 +470,35 @@ wire [15:0] extra_rom_data_demux = memoryAddr[0]?
 wire [15:0] sdram_do = download_cycle?16'hffff:
 	(dskReadAckInt || dskReadAckExt)?extra_rom_data_demux:
 	sdram_out;
-	
+
 wire [15:0] sdram_out;
-	
+
 assign SDRAM_CKE         = 1'b1;
 
 sdram sdram (
 	// interface to the MT48LC16M16 chip
-   .sd_data        ( SDRAM_DQ                 ),
-   .sd_addr        ( SDRAM_A                  ),
-   .sd_dqm         ( {SDRAM_DQMH, SDRAM_DQML} ),
-   .sd_cs          ( SDRAM_nCS                ),
-   .sd_ba          ( SDRAM_BA                 ),
-   .sd_we          ( SDRAM_nWE                ),
-   .sd_ras         ( SDRAM_nRAS               ),
-   .sd_cas         ( SDRAM_nCAS               ),
+	.sd_data        ( SDRAM_DQ                 ),
+	.sd_addr        ( SDRAM_A                  ),
+	.sd_dqm         ( {SDRAM_DQMH, SDRAM_DQML} ),
+	.sd_cs          ( SDRAM_nCS                ),
+	.sd_ba          ( SDRAM_BA                 ),
+	.sd_we          ( SDRAM_nWE                ),
+	.sd_ras         ( SDRAM_nRAS               ),
+	.sd_cas         ( SDRAM_nCAS               ),
 
-   // system interface
-   .clk_64         ( clk64                    ),
-   .clk_8          ( clk8                     ),
-   .init           ( !pll_locked              ),
+	// system interface
+	.clk_64         ( clk64                    ),
+	.clk_8          ( clk8                     ),
+	.init           ( !pll_locked              ),
 
-   // cpu/chipset interface
+	// cpu/chipset interface
 	// map rom to sdram word address $200000 - $20ffff
-  .din            ( sdram_din                 ),
-  .addr           ( sdram_addr                ),
-  .ds             ( sdram_ds                  ),
-  .we             ( sdram_we                  ),
-  .oe             ( sdram_oe                  ),
-  .dout           ( sdram_out                 )
+	.din            ( sdram_din                ),
+	.addr           ( sdram_addr               ),
+	.ds             ( sdram_ds                 ),
+	.we             ( sdram_we                 ),
+	.oe             ( sdram_oe                 ),
+	.dout           ( sdram_out                )
 );
 
 endmodule
