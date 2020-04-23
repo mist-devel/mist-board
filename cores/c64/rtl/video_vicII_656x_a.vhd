@@ -138,6 +138,7 @@ architecture rtl of video_vicii_656x is
 	signal M2DDelay: unsigned(7 downto 0); -- Sprite to character collision
 	signal M2Mhit : std_logic;
 	signal M2Dhit : std_logic;
+	signal M2MClr : std_logic; -- collision register clear flag
 
 -- Raster counters
 	signal rasterX : unsigned(9 downto 0) := (others => '0');
@@ -196,6 +197,7 @@ architecture rtl of video_vicii_656x is
 
 -- Read/Write lines
 	signal we_r : std_logic;
+	signal rd_r : std_logic;
 	signal addr_r: unsigned(5 downto 0);
 	signal di_r: unsigned(7 downto 0);
 
@@ -222,6 +224,7 @@ begin
 		if rising_edge(clk) then
 			if phi = '1' then
 				we_r <= cs and we;
+				rd_r <= cs and not we;
 				addr_r <= aRegisters;
 				di_r <= diRegisters;
 			end if;
@@ -1289,11 +1292,27 @@ calcBitmap: process(clk)
 	end process;
 
 -- -----------------------------------------------------------------------
+-- Collision register clear flag
+-- -----------------------------------------------------------------------
+collisionClearFlag: process(clk)
+	begin
+		if rising_edge(clk) then
+			-- spritevssprite.prg
+			if phi = '1' and cs = '1' and we = '0' and aRegisters = "011110" then
+				M2MClr <= '1';
+			end if;
+			if phi = '0' and not (addr_r = "011110" and rd_r = '1') then
+				M2MClr <= '0';
+			end if;
+		end if;
+	end process;
+
+-- -----------------------------------------------------------------------
 -- Sprite to sprite collision
 -- -----------------------------------------------------------------------
 spriteSpriteCollision: process(clk)
 	begin
-		if rising_edge(clk) then			
+		if rising_edge(clk) then
 			if resetIMMC = '1' then
 				IMMC <= '0';
 			end if;
@@ -1320,14 +1339,12 @@ spriteSpriteCollision: process(clk)
 					IMMC <= '1';
 					M2Mhit <= '1';
 				end if;
-			end if;
 
-			if (myRd = '1')
-			and	(aRegisters = "011110") then
-				M2M <= (others => '0');
-				M2Mhit <= '0';
+				if M2MClr = '1' then
+					M2M <= (others => '0');
+					M2Mhit <= '0';
+				end if;
 			end if;
-
 		end if;
 	end process;
 
