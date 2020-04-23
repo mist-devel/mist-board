@@ -509,7 +509,7 @@ begin
 	vic: entity work.video_vicii_656x
 		generic map (
 			registeredAddress => false,
-			emulateRefresh => false,
+			emulateRefresh => true,
 			emulateLightpen => true,
 			emulateGraphics => true
 		)			

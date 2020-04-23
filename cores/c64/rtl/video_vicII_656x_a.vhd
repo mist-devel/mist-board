@@ -379,9 +379,6 @@ vicStateMachine: process(clk)
 				vicAddrLoc <= CB & nextChar(7 downto 0) & rowCounter;
 			end if;
 		end if;
-		if ECM = '1' then
-			vicAddrLoc(10 downto 9) <= "00";
-		end if;
 
 		case vicCycle is
 		when cycleRefresh1 | cycleRefresh2 | cycleRefresh3 | cycleRefresh4 | cycleRefresh5 =>
@@ -393,19 +390,27 @@ vicStateMachine: process(clk)
 		when cycleSpriteBa1 | cycleSpriteBa2 | cycleSpriteBa3 =>
 			vicAddrLoc <= (others => '1');
 		when cycleSpriteA =>
-			vicAddrLoc <= VM & "1111111" & sprite;
 			if phi = '1' then
-				vicAddrLoc <= MPtr & MCnt(to_integer(sprite));
+				if MDMA_Next(to_integer(sprite)) then
+					vicAddrLoc <= MPtr & MCnt(to_integer(sprite));
+				end if;
+			else
+				vicAddrLoc <= VM & "1111111" & sprite;
 			end if;
 		when cycleSpriteB =>
-			vicAddrLoc <= MPtr & MCnt(to_integer(sprite));
+			if MDMA_Next(to_integer(sprite)) then
+				vicAddrLoc <= MPtr & MCnt(to_integer(sprite));
+			end if;
 		when others =>
+			if ECM = '1' then
+				vicAddrLoc(10 downto 9) <= "00";
+			end if;
 			if phi = '1' then
 				vicAddrLoc <= VM & colCounter;
 			end if;
 		end case;
 	end process;
-	
+
 	-- Registered address
 	process(clk)
 	begin
