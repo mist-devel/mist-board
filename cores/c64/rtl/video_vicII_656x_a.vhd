@@ -635,7 +635,7 @@ vicStateMachine: process(clk)
 			shiftChars <= true;
 		end if;
 		shiftLoadEna <= false;
-		if rasterXDelay(9 downto 3) > "0000010"
+		if rasterXDelay(9 downto 3) > "0000001"
 		and rasterXDelay(9 downto 3) <= "0101010" then
 			shiftLoadEna <= true;
 		end if;
@@ -930,10 +930,7 @@ calcBitmap: process(clk)
 					shifting_ff <= '0';
 					shiftingChar <= waitingChar_r;
 					shiftingPixels <= waitingPixels_r;
-					if multiColor = '0' or shifting_ff = '1' then
-						-- don't change in middle of a multi-color (double width) pixel
-						currentPixels <= waitingPixels_r(7 downto 6);
-					end if;
+					currentPixels <= waitingPixels_r(7 downto 6);
 				elsif multiColor = '0' then
 					shiftingPixels <= shiftingPixels(6 downto 0) & '0';
 					currentPixels <= shiftingPixels(6 downto 5);
