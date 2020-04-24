@@ -32,6 +32,13 @@ derive_pll_clocks -create_base_clocks
 # Automatically calculate clock uncertainty to jitter and other effects.
 derive_clock_uncertainty
 
+# SPI ports
+set_input_delay -add_delay  -clock_fall -clock [get_clocks {SPI_SCK}]  1.000 [get_ports {SPI_DI}]
+set_input_delay -add_delay  -clock_fall -clock [get_clocks {SPI_SCK}]  1.000 [get_ports {SPI_SCK}]
+set_input_delay -add_delay  -clock_fall -clock [get_clocks {SPI_SCK}]  1.000 [get_ports {SPI_SS2}]
+set_input_delay -add_delay  -clock_fall -clock [get_clocks {SPI_SCK}]  1.000 [get_ports {SPI_SS3}]
+set_output_delay -add_delay  -clock_fall -clock [get_clocks {SPI_SCK}] 1.000 [get_ports {SPI_DO}]
+
 # Clock groups
 set_clock_groups -asynchronous -group [get_clocks {SPI_SCK}] -group [get_clocks {pll|altpll_component|auto_generated|pll1|clk[*]}]
 set_clock_groups -asynchronous -group [get_clocks {SPI_SCK}] -group [get_clocks {pll_2|altpll_component|auto_generated|pll1|clk[*]}]
