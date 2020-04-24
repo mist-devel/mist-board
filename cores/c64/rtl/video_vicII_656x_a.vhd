@@ -47,6 +47,7 @@ architecture rtl of video_vicii_656x is
 	signal vicCycle : vicCycles := cycleRefresh1;
 	signal sprite : unsigned(2 downto 0) := "000";
 	signal shiftChars : boolean;
+	signal shiftLoadEna : boolean;
 	signal idle: std_logic := '1';
 	signal rasterIrqDone : std_logic; -- Only one interrupt each rasterLine
 	signal rasterEnable: std_logic;
@@ -623,15 +624,21 @@ vicStateMachine: process(clk)
 	end process;
 
 -- -----------------------------------------------------------------------
--- Generate ShiftChars flag
+-- Generate ShiftChars and ShiftLoadEna flags
 -- -----------------------------------------------------------------------
-	process(rasterX)
+	process(rasterX, rasterXDelay)
 	begin
 		shiftChars <= false;
 		if rasterX(9 downto 3) > "0000001"
 		and rasterX(9 downto 3) <= "0101001" then
 			shiftChars <= true;
 		end if;
+		shiftLoadEna <= false;
+		if rasterXDelay(9 downto 3) > "0000010"
+		and rasterXDelay(9 downto 3) <= "0101010" then
+			shiftLoadEna <= true;
+		end if;
+
 	end process;
 
 -- -----------------------------------------------------------------------
@@ -918,7 +925,7 @@ calcBitmap: process(clk)
 				--
 				-- Reload shift register when xscroll=rasterX
 				-- otherwise shift pixels
-				if xscroll = rasterXDelay(2 downto 0) then
+				if shiftLoadEna and xscroll = rasterXDelay(2 downto 0) then
 					shifting_ff <= '0';
 					shiftingChar <= waitingChar_r;
 					shiftingPixels <= waitingPixels_r;
