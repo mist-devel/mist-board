@@ -367,7 +367,8 @@ vicStateMachine: process(clk)
 -- Address generator
 -- -----------------------------------------------------------------------
 	process(phi, vicCycle, sprite, shiftChars, idle,
-			VM, CB, ECM, BMM, nextChar, colCounter, rowCounter, MPtr, MCnt)
+			VM, CB, ECM, BMM, nextChar, colCounter, rowCounter, MPtr, MCnt,
+			MDMA_next, refreshCounter)
 	begin
 		--
 		-- Default case ($3FFF fetches)
