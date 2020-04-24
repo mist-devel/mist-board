@@ -1259,6 +1259,7 @@ begin
 		SD_HCNT_WIDTH => 10,
 		COLOR_DEPTH => 6,
 		OSD_COLOR => "011",
+		OSD_X_OFFSET => "00"&x"10",
 		OSD_AUTO_CE => false
 	)
 	port map (
