@@ -1332,7 +1332,11 @@ spriteSpriteCollision: process(clk)
 
 			if enaPixel = '1' then
 				for i in 0 to 7 loop
-					collision(i) <= MCurrentPixel(i)(1);
+					if MC(i) = '0' then
+						collision(i) <= MCurrentPixel(i)(1);
+					else
+						collision(i) <= MCurrentPixel(i)(1) or MCurrentPixel(i)(0);
+					end if;
 				end loop;
 				if  (collision /= "00000000")
 				and (collision /= "00000001")
@@ -1373,7 +1377,8 @@ spriteBackgroundCollision: process(clk)
 
 			if enaPixel = '1' then
 				for i in 0 to 7 loop
-					if  MCurrentPixel(i)(1) = '1'
+					if ((MC(i) = '0' and MCurrentPixel(i)(1) = '1') or
+					    (MC(i) = '1' and MCurrentPixel(i) /= "00"))
 					and pixelBgFlag = '1'
 					and (TBBorder = '0') then
 						M2DDelay(i) <= '1';
