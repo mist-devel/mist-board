@@ -1122,11 +1122,14 @@ calcBitmap: process(clk)
 
 			if phi = '0'
 			and enaData = '1' then
-					MCBase <= MCBase_Next;
-					MDMA <= MDMA_Next;
-					MYE_ff <= MYE_ff_Next;
-					MCnt <= MCnt_Next;
-					MActive <= MActive_Next;
+				MCBase <= MCBase_Next;
+				MDMA <= MDMA_Next;
+				MYE_ff <= MYE_ff_Next;
+				MCnt <= MCnt_Next;
+			end if;
+			if phi = '1'
+			and enaPixel = '1' then
+				MActive <= MActive_Next;
 			end if;
 
 			-- 5. If the DMA for a sprite is turned on, three s-accesses are done in
@@ -1156,15 +1159,12 @@ calcBitmap: process(clk)
 		if rising_edge(clk) then
 			if enaPixel = '1' then
 				for i in 0 to 7 loop
-					--if MPixels(i) = 0 then
-						--MShift(i) <= false;
-					--end if;
 					-- Enable sprites on the correct X position
-					if MActive_next(i) and rasterXDelay = MX(i) then
+					if MActive(i) and rasterXDelay = MX(i) then
 						MShift(i) <= true;
 					end if;
-					-- Stop shifting in the s cycles
-					if (sprite = i and ((vicCycle = cycleSpriteA and phi = '1') or vicCycle = cycleSpriteB)) then
+					-- Stop shifting in the third s cycle
+					if sprite = i and phi = '1' and vicCycle = cycleSpriteB then
 						MShift(i) <= false;
 					end if;
 				end loop;
@@ -1177,8 +1177,14 @@ calcBitmap: process(clk)
 							MC_ff(i) <= (not MC_ff(i)) and MC(i);
 							if MC_ff(i) = '0' then
 								MCurrentPixel(i) <= MPixels(i)(23 downto 22);
+								if MPixels(i) = 0 then
+									MShift(i) <= false;
+								end if;
 							end if;
-							MPixels(i) <= MPixels(i)(22 downto 0) & '0';
+							-- Don't shift in the s cycles (sprite0move.prg, demusinterruptus.prg)
+							if not (sprite = i and ((vicCycle = cycleSpriteA and phi = '1') or vicCycle = cycleSpriteB)) then
+								MPixels(i) <= MPixels(i)(22 downto 0) & '0';
+							end if;
 						end if;
 					else
 						MXE_ff(i) <= '0';
@@ -1201,23 +1207,21 @@ calcBitmap: process(clk)
 			end if;
 
 			--
-			-- Fill Sprite shift-register with new data.
+			-- Fill Sprite shift-register with new data (even if the sprite is not active)
 			if enaData = '1' then
-				if Mactive_Next(to_integer(sprite)) then
-					case vicCycle is
-					when cycleSpriteA =>
-						if phi = '1' then
-							MPixelStore(15 downto 8) <= di;
-						end if;
-					when cycleSpriteB =>
-						if phi = '0' then
-							MPixelStore(7 downto 0) <= di;
-						else
-							MPixels(to_integer(sprite)) <= MPixelStore & di;
-						end if;
-						when others => null;
-					end case;
-				end if;
+				case vicCycle is
+				when cycleSpriteA =>
+					if phi = '1' then
+						MPixelStore(15 downto 8) <= di;
+					end if;
+				when cycleSpriteB =>
+					if phi = '0' then
+						MPixelStore(7 downto 0) <= di;
+					else
+						MPixels(to_integer(sprite)) <= MPixelStore & di;
+					end if;
+					when others => null;
+				end case;
 			end if;
 		end if;
 	end process;
