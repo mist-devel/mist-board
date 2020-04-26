@@ -240,6 +240,7 @@ architecture rtl of fpga64_sid_iec is
 	signal ioE_ext: std_logic;
 	signal io_data: unsigned(7 downto 0);
 
+	signal vicBus: unsigned(7 downto 0);
 	signal vicDi: unsigned(7 downto 0);
 	signal vicDiAec: unsigned(7 downto 0);
 	signal vicAddr: unsigned(15 downto 0);
@@ -500,10 +501,23 @@ begin
 -- -----------------------------------------------------------------------
 -- VIC-II video interface chip
 -- -----------------------------------------------------------------------
+	process(clk32)
+	begin
+		if rising_edge(clk32) then
+			if phi0_cpu = '1' then
+				if cpuWe = '1' and cs_vic = '1' then
+					vicBus <= cpuDo;
+				else
+					vicBus <= x"FF";
+				end if;
+			end if;
+		end if;
+	end process;
+
 	-- In the first three cycles after BA went low, the VIC reads
 	-- $ff as character pointers and
 	-- as color information the lower 4 bits of the opcode after the access to $d011.
-	vicDiAec <= x"FF" when aec = '0' else vicDi;
+	vicDiAec <= vicBus when aec = '0' else vicDi;
 	colorDataAec <= cpuDi(3 downto 0) when aec = '0' else colorData;
 
 	vic: entity work.video_vicii_656x
