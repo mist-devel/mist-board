@@ -1,6 +1,10 @@
 -- ****
 -- T65(b) core. In an effort to merge and maintain bug fixes ....
 --
+-- Ver 315 SzGy April 2020
+--   Reduced the IRQ detection delay when RDY is not asserted (NMI?)
+--   Undocumented opcodes behavior change during not RDY and page boundary crossing (VICE tests - cpu/sha, cpu/shs, cpu/shxy)
+--
 -- Ver 313 WoS January 2015
 --   Fixed issue that NMI has to be first if issued the same time as a BRK instruction is latched in
 --   Now all Lorenz CPU tests on FPGAARCADE C64 core (sources used: SVN version 1021) are OK! :D :D :D
@@ -176,6 +180,8 @@ architecture rtl of T65 is
   signal IR                 : std_logic_vector(7 downto 0);
   signal MCycle             : std_logic_vector(2 downto 0);
 
+  signal DO_r               : std_logic_vector(7 downto 0);
+
   signal Mode_r             : std_logic_vector(1 downto 0);
   signal ALU_Op_r           : T_ALU_Op;
   signal Write_Data_r       : T_Write_Data;
@@ -209,6 +215,7 @@ architecture rtl of T65 is
   signal Write_Data         : T_Write_Data;
   signal Jump               : std_logic_vector(1 downto 0);
   signal BAAdd              : std_logic_vector(1 downto 0);
+  signal BAQuirk            : std_logic_vector(1 downto 0);
   signal BreakAtNA          : std_logic;
   signal ADAdd              : std_logic;
   signal AddY               : std_logic;
@@ -231,6 +238,7 @@ architecture rtl of T65 is
   signal Res_n_i        : std_logic;
   signal Res_n_d        : std_logic;
 
+  signal rdy_mod        : std_logic; -- RDY signal turned off during the instruction
   signal really_rdy     : std_logic;
   signal WRn_i          : std_logic;
 
@@ -268,6 +276,7 @@ begin
       IR          => IR,
       MCycle      => MCycle,
       P           => P,
+      Rdy_mod     => rdy_mod,
 --outputs
       LCycle      => LCycle,
       ALU_Op      => ALU_Op,
@@ -276,6 +285,7 @@ begin
       Write_Data  => Write_Data,
       Jump        => Jump,
       BAAdd       => BAAdd,
+      BAQuirk     => BAQuirk,
       BreakAtNA   => BreakAtNA,
       ADAdd       => ADAdd,
       AddY        => AddY,
@@ -341,6 +351,13 @@ begin
 
     elsif Clk'event and Clk = '1' then  
       if (Enable = '1') then
+        -- some instructions behavior changed by the Rdy line. Detect this at the correct cycles.
+        if MCycle  = "000" then
+          rdy_mod <= '0';
+        elsif ((MCycle = "011" and IR /= x"93") or (MCycle = "100" and IR = x"93")) and Rdy = '0' then
+          rdy_mod <= '1';
+        end if;
+
         if (really_rdy = '1') then
           WRn_i <= not Write or RstCycle;
 
@@ -534,7 +551,13 @@ begin
           when "11" =>
             -- BA Adj
             if BAL(8) = '1' then
-              BAH <= std_logic_vector(unsigned(BAH) + 1);
+              -- Handle quirks with some undocumented opcodes crossing page boundary
+              case BAQuirk is
+              when "00" => BAH <= std_logic_vector(unsigned(BAH) + 1); -- no quirk
+              when "01" => BAH <= std_logic_vector(unsigned(BAH) + 1) and DO_r;
+              when "10" => BAH <= DO_r;
+              when others => null;
+              end case;
             end if;
           when others =>
           end case;
@@ -612,8 +635,10 @@ begin
   -- This is the P that gets pushed on stack with correct B flag. I'm not sure if NMI also clears B, but I guess it does.
   PwithB<=(P and x"ef") when (IRQCycle='1' or NMICycle='1') else P;
 
+  DO <= DO_r;
+
   with Write_Data_r select
-    DO <=
+    DO_r <=
       DL                                  when Write_Data_DL,
       ABC(7 downto 0)                     when Write_Data_ABC,
       X(7 downto 0)                       when Write_Data_X,
