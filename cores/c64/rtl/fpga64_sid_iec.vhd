@@ -246,6 +246,7 @@ architecture rtl of fpga64_sid_iec is
 	signal vicAddr: unsigned(15 downto 0);
 	signal vicData: unsigned(7 downto 0);
 	signal lastVicDi : unsigned(7 downto 0);
+	signal vicAddr1514: std_logic_vector(1 downto 0);
 
 	signal colorQ : unsigned(3 downto 0);
 	signal colorData : unsigned(3 downto 0);
@@ -920,8 +921,23 @@ div1m: process(clk32)				-- this process devides 32 MHz to 1MHz (for the SID)
 -- -----------------------------------------------------------------------
 -- VIC bank to address lines
 -- -----------------------------------------------------------------------
-	vicAddr(14) <= (not cia2_pao(0));
-	vicAddr(15) <= (not cia2_pao(1));
+-- The glue logic on a C64C will generate a glitch during 10 <-> 01
+-- generating 00 (in other words, bank 3) for one cycle.
+--
+-- When using the data direction register to change a single bit 0->1
+-- (in other words, decreasing the video bank number by 1 or 2),
+-- the bank change is delayed by one cycle. This effect is unstable.
+	process(clk32)
+	begin
+		if rising_edge(clk32) then
+			if phi0_cpu = '0' and enableVic = '1' then
+				vicAddr1514 <= not cia2_pao(1 downto 0);
+			end if;
+		end if;
+	end process;
+
+	-- emulate only the first glitch (enough for Undead from Emulamer)
+	vicAddr(15 downto 14) <= "11" when ((vicAddr1514 xor not cia2_pao(1 downto 0)) = "11") and (cia2_pao(0) /= cia2_pao(1)) else not unsigned(cia2_pao(1 downto 0));
 
 -- -----------------------------------------------------------------------
 -- Interrupt lines
