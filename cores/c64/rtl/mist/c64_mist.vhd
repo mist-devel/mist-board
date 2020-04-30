@@ -487,7 +487,8 @@ begin
 	user_io_d : user_io
 	generic map (
 		STRLEN => CONF_STR'length,
-		ROM_DIRECT_UPLOAD => 1
+		ROM_DIRECT_UPLOAD => 1,
+		PS2DIV => 1000
 	)
 	port map (
 		clk_sys => clk_c64,
