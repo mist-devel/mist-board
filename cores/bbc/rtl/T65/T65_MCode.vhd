@@ -61,6 +61,7 @@ entity T65_MCode is
     IR                      : in  std_logic_vector(7 downto 0);
     MCycle                  : in  T_Lcycle;
     P                       : in  std_logic_vector(7 downto 0);
+    Rdy_mod                 : in  std_logic;
     LCycle                  : out T_Lcycle;
     ALU_Op                  : out T_ALU_Op;
     Set_BusA_To             : out T_Set_BusA_To; -- DI,A,X,Y,S,P,DA,DAO,DAX,AAX
@@ -68,6 +69,7 @@ entity T65_MCode is
     Write_Data              : out T_Write_Data;  -- DL,A,X,Y,S,P,PCL,PCH,AX,AXB,XB,YB
     Jump                    : out std_logic_vector(1 downto 0); -- PC,++,DIDL,Rel
     BAAdd                   : out std_logic_vector(1 downto 0); -- None,DB Inc,BA Add,BA Adj
+    BAQuirk                 : out std_logic_vector(1 downto 0); -- None,And,Copy
     BreakAtNA               : out std_logic;
     ADAdd                   : out std_logic;
     AddY                    : out std_logic;
@@ -106,7 +108,7 @@ begin
               not P(Flag_Z) when "110",
                   P(Flag_Z) when others;
 
-  process (IR, MCycle, P, Branch, Mode)
+  process (IR, MCycle, P, Branch, Mode, Rdy_mod)
   begin
     lCycle      <= Cycle_1;
     Set_BusA_To <= Set_BusA_To_ABC;
@@ -114,6 +116,7 @@ begin
     Write_Data  <= Write_Data_DL;
     Jump        <= (others => '0');
     BAAdd       <= "00";
+    BAQuirk     <= "00";
     BreakAtNA   <= '0';
     ADAdd       <= '0';
     PCAdd       <= '0';
@@ -140,14 +143,22 @@ begin
           when "00" => -- IR: $80,$84,$88,$8C,$90,$94,$98,$9C
             Set_BusA_To <= Set_BusA_To_Y;
             if IR(4 downto 2)="111" then   --  SYA ($9C)
-              Write_Data <= Write_Data_YB;
+              if Rdy_mod = '0' then
+                Write_Data <= Write_Data_YB;
+              else
+                Write_Data <= Write_Data_Y;
+              end if;
             else
               Write_Data <= Write_Data_Y;
             end if;
           when "10" => -- IR: $82,$86,$8A,$8E,$92,$96,$9A,$9E
             Set_BusA_To <= Set_BusA_To_X;
             if IR(4 downto 2)="111" then   --  SXA ($9E)
-              Write_Data <= Write_Data_XB;
+              if Rdy_mod = '0' then
+                Write_Data <= Write_Data_XB;
+              else
+                Write_Data <= Write_Data_X;
+              end if;
             else
               Write_Data <= Write_Data_X;
             end if;
@@ -159,7 +170,11 @@ begin
               Set_BusA_To <= Set_BusA_To_ABC;
             end if;
             if IR(4 downto 2)="111" or IR(4 downto 2)="110" or IR(4 downto 2)="100" then   --  SHA ($9F, $93), SHS ($9B)
-              Write_Data <= Write_Data_AXB;
+              if Rdy_mod = '0' then
+                Write_Data <= Write_Data_AXB;
+              else
+                Write_Data <= Write_Data_AX;
+              end if;
             else
               Write_Data <= Write_Data_AX;
             end if;
@@ -843,6 +858,9 @@ begin
             BAAdd <= "11";  -- BA Adj
             if IR(7 downto 5) = "100" then
               Write <= '1';
+              if IR(3 downto 0) = x"3" then
+                BAQuirk <= "10"; -- COPY
+              end if;
             elsif IR(1)='0' or IR=x"B3" then -- Dont do this on $x3, except undoc LAXiy $B3 (says real CPU and Lorenz tests)
               BreakAtNA <= '1';
             end if;
@@ -956,6 +974,9 @@ begin
             BAAdd <= "11";  -- BA adj
             if IR(7 downto 5) = "100" then--99/9b
               Write <= '1';
+              if IR(3 downto 0) = x"B" then
+                BAQuirk <= "01"; -- AND
+              end if;
             elsif IR(1)='0' or IR=x"BB" then -- Dont do this on $xB, except undoc $BB (says real CPU and Lorenz tests)
               BreakAtNA <= '1';
             end if;
@@ -1045,8 +1066,13 @@ begin
               Set_Addr_To <= Set_Addr_To_BA;
             when Cycle_3 =>
               BAAdd <= "11";      -- BA adj
-              if IR(7 downto 5) = "100" then -- ($9E,$9F)
+              if IR(7 downto 5) = "100" then -- ($9C,$9D,$9E,$9F)
                 Write <= '1';
+                case IR(1 downto 0) is
+                when "00"|"10" => BAQuirk <= "01"; -- AND
+                when "11" => BAQuirk <= "10"; -- COPY
+                when others => null;
+                end case;
               else
                 BreakAtNA <= '1';
               end if;

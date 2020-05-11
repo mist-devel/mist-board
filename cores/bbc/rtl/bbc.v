@@ -284,7 +284,7 @@ T65 CPU (
 	.Res_n  (reset_n),
 	.Enable (cpu_clken),
 	.Clk    (CLK32M_I),
-	.Rdy    (cpu_clken),
+	.Rdy    (cpu_ready),
 	.Abort_n(cpu_abort_n),
 	.NMI_n  (cpu_nmi_n),
 	.IRQ_n  (cpu_irq_n),
@@ -654,6 +654,7 @@ assign sys_via_pb_in[3:0] = sys_via_pb_out[3:0];
 // Fixes Planetoid, Snapper etc
 assign user_via_pa_in = user_via_pa_out; 
 assign user_via_pb_in = user_via_pb_out;
+
 
 
 assign MEM_ADR = cpu_a[15:0];
