@@ -176,56 +176,52 @@ wire    [7:0] sound_ao;
 
 //  System VIA signals
 wire    [7:0] sys_via_do;
-reg     [7:0] sys_via_do_r;
-wire    sys_via_do_oe_n; 
-wire    sys_via_irq_n; 
-wire     sys_via_ca1_in; 
-wire     sys_via_ca2_in; 
-wire    sys_via_ca2_out; 
-wire    sys_via_ca2_oe_n; 
-wire    [7:0] sys_via_pa_in; 
-wire    [7:0] sys_via_pa_out; 
-wire    [7:0] sys_via_pa_oe_n; 
-wire     sys_via_cb1_in; 
+wire    sys_via_irq; 
+wire    sys_via_ca1_in;
+wire    sys_via_ca2_in;
+wire    sys_via_ca2_out;
+wire    sys_via_ca2_oe;
+wire    [7:0] sys_via_pa_in;
+wire    [7:0] sys_via_pa_out;
+wire    [7:0] sys_via_pa_oe;
+wire    sys_via_cb1_in; 
 wire    sys_via_cb1_out; 
-wire    sys_via_cb1_oe_n; 
-wire     sys_via_cb2_in; 
+wire    sys_via_cb1_oe; 
+wire    sys_via_cb2_in; 
 wire    sys_via_cb2_out; 
-wire    sys_via_cb2_oe_n; 
+wire    sys_via_cb2_oe; 
 wire    [7:0] sys_via_pb_in; 
 wire    [7:0] sys_via_pb_out; 
-wire    [7:0] sys_via_pb_oe_n; 
+wire    [7:0] sys_via_pb_oe; 
 
 //  User VIA signals
 wire    [7:0] user_via_do;
-reg     [7:0] user_via_do_r;
-wire    user_via_do_oe_n; 
-wire    user_via_irq_n; 
-reg     user_via_ca1_in; 
-reg     user_via_ca2_in; 
-wire    user_via_ca2_out; 
-wire    user_via_ca2_oe_n; 
-wire    [7:0] user_via_pa_in; 
-wire    [7:0] user_via_pa_out; 
-wire    [7:0] user_via_pa_oe_n; 
-wire     user_via_cb1_in; 
-wire    user_via_cb1_out; 
-wire    user_via_cb1_oe_n; 
-wire     user_via_cb2_in; 
-wire    user_via_cb2_out; 
-wire    user_via_cb2_oe_n; 
-wire    [7:0] user_via_pb_in; 
-wire    [7:0] user_via_pb_out; 
-wire    [7:0] user_via_pb_oe_n; 
+wire    user_via_irq;
+reg     user_via_ca1_in;
+reg     user_via_ca2_in;
+wire    user_via_ca2_out;
+wire    user_via_ca2_oe;
+wire    [7:0] user_via_pa_in;
+wire    [7:0] user_via_pa_out;
+wire    [7:0] user_via_pa_oe;
+wire     user_via_cb1_in;
+wire     user_via_cb1_out;
+wire     user_via_cb1_oe;
+wire     user_via_cb2_in;
+wire     user_via_cb2_out;
+wire     user_via_cb2_oe;
+wire     [7:0] user_via_pb_in;
+wire     [7:0] user_via_pb_out;
+wire     [7:0] user_via_pb_oe;
 
 // MMC
 // SDCLK is driven from either PB1 or CB1 depending on the SR Mode
-wire   sdclk_int = ~user_via_pb_oe_n[1] ? user_via_pb_out[1] : 
-						(~user_via_cb1_oe_n ? user_via_cb1_out : 1);
+wire   sdclk_int = user_via_pb_oe[1] ? user_via_pb_out[1] : 
+						(user_via_cb1_oe ? user_via_cb1_out : 1);
 assign SDCLK = sdclk_int;
 assign user_via_cb1_in = sdclk_int;
 // SDMOSI is always driven from PB0
-assign SDMOSI = ~user_via_pb_oe_n[0] ? user_via_pb_out[0] : 1;
+assign SDMOSI = user_via_pb_oe[0] ? user_via_pb_out[0] : 1;
 // SDMISO is always read from CB2
 assign user_via_cb2_in = SDMISO;
 assign SDSS = 0;
@@ -300,79 +296,84 @@ T65 CPU (
 	.A      (cpu_a)
 );
 
+via6522 SYS_VIA (
+	 .clock       (CLK32M_I),
+	 .rising      (mhz2_clken &  mhz1_clken),
+	 .falling     (mhz2_clken & ~mhz1_clken),
+	 .reset       (~reset_n),
 
-m6522 SYS_VIA (	
-	  //  System VIA is reset by power on reset only
+	 .addr        (cpu_a[3:0]),
+	 .wen         (sys_via_enable & ~cpu_r_nw),
+	 .ren         (sys_via_enable &  cpu_r_nw),
+	 .data_in     (cpu_do),
+	 .data_out    (sys_via_do),
 
-	 .I_RS(cpu_a[3:0]),
-	 .I_DATA(cpu_do),
-	 .O_DATA(sys_via_do),
-	 .O_DATA_OE_L(sys_via_do_oe_n),
+    //-- pio --
+	 .port_a_i    (sys_via_pa_in),
+	 .port_a_o    (sys_via_pa_out),
+	 .port_a_t    (sys_via_pa_oe),
 
-	 .I_RW_L(cpu_r_nw),
-	 .I_CS1(sys_via_enable),
-	 .I_CS2_L(1'b 0), // nCS2(1'b 0),	 
-	 .O_IRQ_L(sys_via_irq_n),
+	 .port_b_i    (sys_via_pb_in),
+	 .port_b_o    (sys_via_pb_out),
+	 .port_b_t    (sys_via_pb_oe),
 
-	 .I_CA1(sys_via_ca1_in),
-	 .I_CA2(sys_via_ca2_in),
-	 .O_CA2(sys_via_ca2_out),
-	 .O_CA2_OE_L(sys_via_ca2_oe_n),
+    //-- handshake pins
+	 .ca1_i       (sys_via_ca1_in),
 
-	 .I_PA(sys_via_pa_in),
-	 .O_PA(sys_via_pa_out),
-	 .O_PA_OE_L(sys_via_pa_oe_n),
+	 .ca2_i       (sys_via_ca2_in),
+	 .ca2_o       (sys_via_ca2_out),
+	 .ca2_t       (sys_via_ca2_oe),
 
-	 .I_CB1(sys_via_cb1_in),
-	 .O_CB1(sys_via_cb1_out),
-	 .O_CB1_OE_L(sys_via_cb1_oe_n),
+	 .cb1_i       (sys_via_cb1_in),
+	 .cb1_o       (sys_via_cb1_out),
+	 .cb1_t       (sys_via_cb1_oe),
 
-	 .I_CB2(sys_via_cb2_in),
-	 .O_CB2(sys_via_cb2_out),
-	 .O_CB2_OE_L(sys_via_cb2_oe_n),
+	 .cb2_i       (sys_via_cb2_in),
+	 .cb2_o       (sys_via_cb2_out),
+	 .cb2_t       (sys_via_cb2_oe),
 
-	 .I_PB(sys_via_pb_in),
-	 .O_PB(sys_via_pb_out),
-	 .O_PB_OE_L(sys_via_pb_oe_n),
-
-	 .I_P2_H(mhz1_clken),
-	 .RESET_L(reset_n),
-	 .ENA_4(mhz4_clken),
-	 .CLK(CLK32M_I)
+	 .irq         (sys_via_irq)
 );
 
-m6522 USER_VIA (	
-	 .ENA_4(mhz4_clken),
-	 .CLK(CLK32M_I),
-	 .I_RS(cpu_a[3:0]),
-	 .I_DATA(cpu_do),
-	 .O_DATA(user_via_do),
-	 .O_DATA_OE_L(user_via_do_oe_n),
-	 .I_RW_L(cpu_r_nw),
-	 .I_CS1(user_via_enable), // using the econet port
-	 .I_CS2_L(1'b 0), // nCS2(1'b 0),	 
-	 .O_IRQ_L(user_via_irq_n),
- 	 .I_P2_H(mhz1_clken),
-	 .RESET_L(reset_n),
-	 
-	 .I_CA1(user_via_ca1_in),
-	 .I_CA2(user_via_ca2_in),
-	 .O_CA2(user_via_ca2_out),
-	 .O_CA2_OE_L(user_via_ca2_oe_n),
-	 .I_PA(user_via_pa_in),
-	 .O_PA(user_via_pa_out),
-	 .O_PA_OE_L(user_via_pa_oe_n),
-	 .I_CB1(user_via_cb1_in),
-	 .O_CB1(user_via_cb1_out),
-	 .O_CB1_OE_L(user_via_cb1_oe_n),
-	 .I_CB2(user_via_cb2_in),
-	 .O_CB2(user_via_cb2_out),
-	 .O_CB2_OE_L(user_via_cb2_oe_n),
-	 .I_PB(user_via_pb_in),
-	 .O_PB(user_via_pb_out),
-	 .O_PB_OE_L(user_via_pb_oe_n)
+via6522 USER_VIA (
+	 .clock       (CLK32M_I),
+	 .rising      (mhz2_clken &  mhz1_clken),
+	 .falling     (mhz2_clken & ~mhz1_clken),
+	 .reset       (~reset_n),
+
+	 .addr        (cpu_a[3:0]),
+	 .wen         (user_via_enable & ~cpu_r_nw),
+	 .ren         (user_via_enable &  cpu_r_nw),
+	 .data_in     (cpu_do),
+	 .data_out    (user_via_do),
+
+    //-- pio --
+	 .port_a_i    (user_via_pa_in),
+	 .port_a_o    (user_via_pa_out),
+	 .port_a_t    (user_via_pa_oe),
+
+	 .port_b_i    (user_via_pb_in),
+	 .port_b_o    (user_via_pb_out),
+	 .port_b_t    (user_via_pb_oe),
+
+    //-- handshake pins
+	 .ca1_i       (user_via_ca1_in),
+
+	 .ca2_i       (user_via_ca2_in),
+	 .ca2_o       (user_via_ca2_out),
+	 .ca2_t       (user_via_ca2_oe),
+
+	 .cb1_i       (user_via_cb1_in),
+	 .cb1_o       (user_via_cb1_out),
+	 .cb1_t       (user_via_cb1_oe),
+
+	 .cb2_i       (user_via_cb2_in),
+	 .cb2_o       (user_via_cb2_out),
+	 .cb2_t       (user_via_cb2_oe),
+
+	 .irq         (user_via_irq)
 );
-	
+
 //  Keyboard	
 keyboard KEYB (	
 
@@ -496,15 +497,6 @@ initial begin : via_init
    user_via_ca2_in = 1'b 0;
    crtc_lpstb = 1'b 0;
 
-end
-
-// This is needed as in v003 of the 6522 data out is only valid while I_P2_H is asserted
-// I_P2_H is driven from mhz1_clken
-always @(posedge CLK32M_I) begin 
-	if (mhz1_clken) begin
-		user_via_do_r <= user_via_do;
-		sys_via_do_r  <= sys_via_do;
-	end
 end
 
 // rom select latch
@@ -631,15 +623,15 @@ assign cpu_di = ram_enable === 1'b 1 ? MEM_DI :
 	mos_enable === 1'b 1 ? MEM_DI :
 	crtc_enable === 1'b 1 ? crtc_do : 
 	acia_enable === 1'b 1 ? 8'b 00000010 : 
-	sys_via_enable === 1'b 1 ? sys_via_do_r : 
-	user_via_enable === 1'b 1 ? user_via_do_r : 
+	sys_via_enable === 1'b 1 ? sys_via_do : 
+	user_via_enable === 1'b 1 ? user_via_do : 
 	adc_enable === 1'b 1 ? adc_do : 
 	//tube_enable === 1'b 1 ? tube_do : 
 	//adlc_enable === 1'b 1 ? bbcddr_out :
 	'd0; 
 	
 //  un-decoded locations are pulled down by RP1
-assign cpu_irq_n = sys_via_irq_n & user_via_irq_n; // & tube_irq_n;
+assign cpu_irq_n = ~sys_via_irq & ~user_via_irq; // & tube_irq_n;
 
 // can we write to ram? Further decodig happens on top-level to deal with sideways ram etc
 assign ram_we = ~RESET_I & ~cpu_r_nw;

@@ -129,7 +129,7 @@ set_location_assignment PIN_65 -to AUDIO_L
 set_location_assignment PIN_80 -to AUDIO_R
 
 set_global_assignment -name ENABLE_SIGNALTAP OFF
-set_global_assignment -name USE_SIGNALTAP_FILE output_files/dio.stp
+set_global_assignment -name USE_SIGNALTAP_FILE output_files/via.stp
 set_global_assignment -name ENABLE_CONFIGURATION_PINS OFF
 set_global_assignment -name ENABLE_NCE_PIN OFF
 set_global_assignment -name ENABLE_BOOT_SEL_PIN OFF
@@ -172,7 +172,7 @@ set_global_assignment -name VERILOG_FILE ../../rtl/keyboard.v
 set_global_assignment -name VERILOG_FILE ../../rtl/clocks.v
 set_global_assignment -name VERILOG_FILE ../../rtl/address_decode.v
 set_global_assignment -name VERILOG_FILE ../../rtl/bbc.v
-set_global_assignment -name VHDL_FILE ../../rtl/m6522.vhd
+set_global_assignment -name VHDL_FILE ../../rtl/via6522.vhd
 set_global_assignment -name VERILOG_FILE ../../rtl/saa5050/saa5050_rom.v
 set_global_assignment -name VERILOG_FILE ../../rtl/saa5050/saa5050.v
 set_global_assignment -name VHDL_FILE "../../rtl/sn76489-1.0/sn76489_top-c.vhd"
@@ -199,4 +199,5 @@ set_global_assignment -name VERILOG_FILE sdram.v
 set_global_assignment -name VERILOG_FILE clockgen.v
 set_global_assignment -name QIP_FILE "../../../../mist-modules/mist.qip"
 set_global_assignment -name VERILOG_FILE "../../../../mist-modules/sd_card.v"
+set_global_assignment -name SIGNALTAP_FILE output_files/via.stp
 set_instance_assignment -name PARTITION_HIERARCHY root_partition -to | -section_id Top
