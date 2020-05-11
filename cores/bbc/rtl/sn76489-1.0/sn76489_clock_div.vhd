@@ -45,7 +45,9 @@
 -------------------------------------------------------------------------------
 
 library ieee;
-use ieee.std_logic_1164.all;
+use IEEE.STD_LOGIC_1164.ALL;
+use IEEE.STD_LOGIC_ARITH.ALL;
+use IEEE.STD_LOGIC_UNSIGNED.ALL; 
 
 entity sn76489_clock_div is
 
@@ -68,7 +70,7 @@ use ieee.numeric_std.all;
 architecture rtl of sn76489_clock_div is
 
   signal cnt_s,
-         cnt_q  : unsigned(3 downto 0);
+         cnt_q  : std_logic_vector(3 downto 0);
 
 begin
 
@@ -109,9 +111,9 @@ begin
         clk_en_o <= true;
 
         if clock_div_16_g = 1 then
-          cnt_s  <= to_unsigned(15, cnt_q'length);
+          cnt_s  <= conv_std_logic_vector(15, cnt_q'length);
         elsif clock_div_16_g = 0 then
-          cnt_s  <= to_unsigned( 1, cnt_q'length);
+          cnt_s  <= conv_std_logic_vector( 1, cnt_q'length);
         else
           -- pragma translate_off
           assert false

@@ -45,8 +45,9 @@
 -------------------------------------------------------------------------------
 
 library ieee;
-use ieee.std_logic_1164.all;
-use ieee.numeric_std.all;
+use IEEE.STD_LOGIC_1164.ALL;
+use IEEE.STD_LOGIC_ARITH.ALL;
+use IEEE.STD_LOGIC_UNSIGNED.ALL; 
 
 entity sn76489_noise is
 
@@ -58,29 +59,25 @@ entity sn76489_noise is
     d_i        : in  std_logic_vector(0 to 7);
     r2_i       : in  std_logic;
     tone3_ff_i : in  std_logic;
-    noise_o    : out signed(0 to 7)
+    noise_o    : out std_logic_vector(0 to 7)
   );
 
 end sn76489_noise;
 
-
-use work.sn76489_comp_pack.sn76489_attenuator;
 
 architecture rtl of sn76489_noise is
 
   signal nf_q       : std_logic_vector(0 to 1);
   signal fb_q       : std_logic;
   signal a_q        : std_logic_vector(0 to 3);
-  signal freq_cnt_q : unsigned(0 to 6);
+  signal freq_cnt_q : std_logic_vector(0 to 6);
   signal freq_ff_q  : std_logic;
 
   signal shift_source_s,
          shift_source_q    : std_logic;
   signal shift_rise_edge_s : boolean;
 
-  signal lfsr_q            : std_logic_vector(0 to 15);
-
-  signal freq_s      : signed(0 to 1);
+  signal lfsr_q            : std_logic_vector(0 to 14);
 
 begin
 
@@ -136,11 +133,11 @@ begin
           -- reload frequency counter according to NF setting
           case nf_q is
             when "00" =>
-              freq_cnt_q <= to_unsigned(16 * 2 - 1, freq_cnt_q'length);
+              freq_cnt_q <= conv_std_logic_vector(16 * 2 - 1, freq_cnt_q'length);
             when "01" =>
-              freq_cnt_q <= to_unsigned(16 * 4 - 1, freq_cnt_q'length);
+              freq_cnt_q <= conv_std_logic_vector(16 * 4 - 1, freq_cnt_q'length);
             when "10" =>
-              freq_cnt_q <= to_unsigned(16 * 8 - 1, freq_cnt_q'length);
+              freq_cnt_q <= conv_std_logic_vector(16 * 8 - 1, freq_cnt_q'length);
             when others =>
               null;
           end case;
@@ -205,9 +202,9 @@ begin
   lfsr: process (clock_i, res_n_i)
 
     function lfsr_tapped_f(lfsr : in std_logic_vector) return std_logic is
-      constant tapped_bits_c : std_logic_vector(0 to 15)
+      constant tapped_bits_c : std_logic_vector(0 to 14)
         -- tapped bits are 0, 2, 15
-        := "1010000000000001";
+        := "110000000000000";
       variable parity_v : std_logic;
     begin
       parity_v := '0';
@@ -256,25 +253,14 @@ begin
       end if;
     end if;
   end process lfsr;
-  --
-  -----------------------------------------------------------------------------
-
-
-  -----------------------------------------------------------------------------
-  -- Map output of LFSR to signed value for attenuator.
-  -----------------------------------------------------------------------------
-  freq_s <=   to_signed(+1, 2)
-            when lfsr_q(0) = '1' else
-              to_signed( 0, 2);
-
 
   -----------------------------------------------------------------------------
   -- The attenuator itself
   -----------------------------------------------------------------------------
-  attenuator_b : sn76489_attenuator
+  attenuator_b : entity work.sn76489_attenuator
     port map (
       attenuation_i => a_q,
-      factor_i      => freq_s,
+      factor_i      => lfsr_q(0),
       product_o     => noise_o
     );
 

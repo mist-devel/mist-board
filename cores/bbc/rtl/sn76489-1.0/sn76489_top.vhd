@@ -56,8 +56,9 @@
 -------------------------------------------------------------------------------
 
 library ieee;
-use ieee.std_logic_1164.all;
-use ieee.numeric_std.all;
+use IEEE.STD_LOGIC_1164.ALL;
+use IEEE.STD_LOGIC_ARITH.ALL;
+use IEEE.STD_LOGIC_UNSIGNED.ALL; 
 
 entity sn76489_top is
 
@@ -72,7 +73,7 @@ entity sn76489_top is
     we_n_i     : in  std_logic;
     ready_o    : out std_logic;
     d_i        : in  std_logic_vector(0 to 7);
-    aout_o     : out signed(0 to 7)
+    aout_o     : out std_logic_vector(0 to 7)
   );
 
 end sn76489_top;
@@ -80,7 +81,6 @@ end sn76489_top;
 
 library ieee;
 use ieee.numeric_std.all;
-use work.sn76489_comp_pack.all;
 
 architecture struct of sn76489_top is
 
@@ -95,7 +95,7 @@ architecture struct of sn76489_top is
   signal tone1_s,
          tone2_s,
          tone3_s,
-         noise_s     : signed(0 to 7);
+         noise_s     : std_logic_vector(0 to 7);
 
   signal tone3_ff_s  : std_logic;
 
@@ -104,7 +104,7 @@ begin
   -----------------------------------------------------------------------------
   -- Clock Divider
   -----------------------------------------------------------------------------
-  clock_div_b : sn76489_clock_div
+  clock_div_b : entity work.sn76489_clock_div
     generic map (
       clock_div_16_g => clock_div_16_g
     )
@@ -119,7 +119,7 @@ begin
   -----------------------------------------------------------------------------
   -- Latch Control = CPU Interface
   -----------------------------------------------------------------------------
-  latch_ctrl_b : sn76489_latch_ctrl
+  latch_ctrl_b : entity work.sn76489_latch_ctrl
     port map (
       clock_i    => clock_i,
       clk_en_i   => clk_en_s,
@@ -139,7 +139,7 @@ begin
   -----------------------------------------------------------------------------
   -- Tone Channel 1
   -----------------------------------------------------------------------------
-  tone1_b : sn76489_tone
+  tone1_b : entity work.sn76489_tone
     port map (
       clock_i  => clock_i,
       clk_en_i => clk_en_s,
@@ -154,7 +154,7 @@ begin
   -----------------------------------------------------------------------------
   -- Tone Channel 2
   -----------------------------------------------------------------------------
-  tone2_b : sn76489_tone
+  tone2_b : entity work.sn76489_tone
     port map (
       clock_i  => clock_i,
       clk_en_i => clk_en_s,
@@ -169,7 +169,7 @@ begin
   -----------------------------------------------------------------------------
   -- Tone Channel 3
   -----------------------------------------------------------------------------
-  tone3_b : sn76489_tone
+  tone3_b : entity work.sn76489_tone
     port map (
       clock_i  => clock_i,
       clk_en_i => clk_en_s,
@@ -184,7 +184,7 @@ begin
   -----------------------------------------------------------------------------
   -- Noise Channel
   -----------------------------------------------------------------------------
-  noise_b : sn76489_noise
+  noise_b : entity work.sn76489_noise
     port map (
       clock_i    => clock_i,
       clk_en_i   => clk_en_s,
@@ -197,14 +197,6 @@ begin
     );
 
 
-	-- Register output
-	process(clock_i)
-	begin
-		if res_n_i = '0' then
-			aout_o <= (others => '0');
-		elsif rising_edge(clock_i) then
-			aout_o <= tone1_s + tone2_s + tone3_s + noise_s;
-		end if;
-	end process;
+  aout_o <= tone1_s + tone2_s + tone3_s + noise_s;
 
 end struct;

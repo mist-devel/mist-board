@@ -45,8 +45,9 @@
 -------------------------------------------------------------------------------
 
 library ieee;
-use ieee.std_logic_1164.all;
-use ieee.numeric_std.all;
+use IEEE.STD_LOGIC_1164.ALL;
+use IEEE.STD_LOGIC_ARITH.ALL;
+use IEEE.STD_LOGIC_UNSIGNED.ALL; 
 
 entity sn76489_tone is
 
@@ -58,22 +59,18 @@ entity sn76489_tone is
     d_i      : in  std_logic_vector(0 to 7);
     r2_i     : in  std_logic;
     ff_o     : out std_logic;
-    tone_o   : out signed(0 to 7)
+    tone_o   : out std_logic_vector(0 to 7)
   );
 
 end sn76489_tone;
-
-
-use work.sn76489_comp_pack.sn76489_attenuator;
 
 architecture rtl of sn76489_tone is
 
   signal f_q        : std_logic_vector(0 to 9);
   signal a_q        : std_logic_vector(0 to 3);
-  signal freq_cnt_q : unsigned(0 to 9);
+  signal freq_cnt_q : std_logic_vector(0 to 9);
   signal freq_ff_q  : std_logic;
-
-  signal freq_s     : signed(0 to 1);
+  signal output_ff  : std_logic;
 
   function all_zero(a : in std_logic_vector) return boolean is
     variable result_v : boolean;
@@ -137,20 +134,24 @@ begin
     if res_n_i = '0' then
       freq_cnt_q <= (others => '0');
       freq_ff_q  <= '0';
+      output_ff <= '0';
 
     elsif clock_i'event and clock_i = '1' then
       if clk_en_i then
-        if freq_cnt_q = 0 then
+        if freq_cnt_q = 1 then
           -- update counter from frequency register
-          freq_cnt_q <= unsigned(f_q);
+          freq_cnt_q <= f_q;
 
           -- and toggle the frequency flip-flop if enabled
-          if not all_zero(f_q) then
+          if (f_q > 5) then
             freq_ff_q <= not freq_ff_q;
           else
             -- if frequency setting is 0, then keep flip-flop at +1
             freq_ff_q <= '1';
           end if;
+
+          -- either way toggle the output_ff - this is used to clock noise
+          output_ff <= not output_ff;
 
         else
           -- decrement frequency counter
@@ -160,25 +161,15 @@ begin
       end if;
     end if;
   end process freq_gen;
-  --
-  -----------------------------------------------------------------------------
-
-
-  -----------------------------------------------------------------------------
-  -- Map frequency flip-flop to signed value for attenuator.
-  -----------------------------------------------------------------------------
-  freq_s <=   to_signed(+1, 2)
-            when freq_ff_q = '1' else
-              to_signed(-1, 2);
 
 
   -----------------------------------------------------------------------------
   -- The attenuator itself
   -----------------------------------------------------------------------------
-  attenuator_b : sn76489_attenuator
+  attenuator_b : entity work.sn76489_attenuator
     port map (
       attenuation_i => a_q,
-      factor_i      => freq_s,
+      factor_i      => freq_ff_q,
       product_o     => tone_o
     );
 
@@ -186,6 +177,6 @@ begin
   -----------------------------------------------------------------------------
   -- Output mapping
   -----------------------------------------------------------------------------
-  ff_o <= freq_ff_q;
+  ff_o <= output_ff;
 
 end rtl;

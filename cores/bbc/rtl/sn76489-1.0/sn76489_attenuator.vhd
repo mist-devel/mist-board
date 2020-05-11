@@ -45,22 +45,24 @@
 -------------------------------------------------------------------------------
 
 library ieee;
-use ieee.std_logic_1164.all;
-use ieee.numeric_std.all;
+use IEEE.STD_LOGIC_1164.ALL;
+use IEEE.STD_LOGIC_ARITH.ALL;
+use IEEE.STD_LOGIC_UNSIGNED.ALL; 
 
 entity sn76489_attenuator is
 
   port (
     attenuation_i : in  std_logic_vector(0 to 3);
-    factor_i      : in  signed(0 to 1);
-    product_o     : out signed(0 to 7)
+    factor_i      : in  std_logic;
+    product_o     : out std_logic_vector(0 to 7)
   );
 
 end sn76489_attenuator;
 
 
 architecture rtl of sn76489_attenuator is
-
+    type     volume_t is array (natural range 0 to 15) of natural;
+    constant volume_c : volume_t := (31, 25, 20, 16, 12, 10, 8, 6, 5, 4, 3, 2, 2, 2, 1, 0);
 begin
 
   -----------------------------------------------------------------------------
@@ -78,37 +80,8 @@ begin
   --     v(0)   = 31
   --     v(n+1) = v(n) * 0.79432823
   --
-  attenuate: process (attenuation_i,
-                      factor_i)
 
-    type     volume_t is array (natural range 0 to 15) of natural;
-    constant volume_c : volume_t :=
-      (31, 25, 20, 16, 12, 10, 8, 6, 5, 4, 3, 2, 2, 2, 1, 0);
-
-    variable attenuation_v  : unsigned(attenuation_i'range);
-    variable volume_v       : signed(product_o'range);
-
-  begin
-
-    attenuation_v := unsigned(attenuation_i);
-
-    -- volume look-up table
-    volume_v := to_signed(volume_c(to_integer(attenuation_v)),
-                          product_o'length);
-
-    -- this replaces a multiplier and consumes a bit fewer
-    -- resources
-    case to_integer(factor_i) is
-      when +1 =>
-        product_o <= volume_v;
-      when -1 =>
-        product_o <= -volume_v;
-      when others =>
-        product_o <= (others => '0');
-    end case;
-
-  end process attenuate;
-  --
-  -----------------------------------------------------------------------------
+  product_o <= conv_std_logic_vector(volume_c(conv_integer(attenuation_i)), product_o'length) when factor_i = '1'
+          else (others => '0');
 
 end rtl;

@@ -590,9 +590,8 @@ always @(crtc_ma or crtc_ra or disp_addr_offs)
    end
 
 // SOUND 
-// Convert from 8bit signed to unsigned for MiST DAC
-assign AUDIO_L = {~sound_ao[7], sound_ao[6:0], 8'b00000000};
-assign AUDIO_R = {~sound_ao[7], sound_ao[6:0], 8'b00000000};
+assign AUDIO_L = {sound_ao, 8'b00000000};
+assign AUDIO_R = {sound_ao, 8'b00000000};
 
 //  VIDPROC
 assign vidproc_invert_n = 1'b 1; 
