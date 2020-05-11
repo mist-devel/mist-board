@@ -217,11 +217,11 @@ wire     [7:0] user_via_pb_oe;
 // MMC
 // SDCLK is driven from either PB1 or CB1 depending on the SR Mode
 wire   sdclk_int = user_via_pb_oe[1] ? user_via_pb_out[1] : 
-						(user_via_cb1_oe ? user_via_cb1_out : 1);
+						(user_via_cb1_oe ? user_via_cb1_out : 1'b1);
 assign SDCLK = sdclk_int;
 assign user_via_cb1_in = sdclk_int;
 // SDMOSI is always driven from PB0
-assign SDMOSI = user_via_pb_oe[0] ? user_via_pb_out[0] : 1;
+assign SDMOSI = user_via_pb_oe[0] ? user_via_pb_out[0] : 1'b1;
 // SDMISO is always read from CB2
 assign user_via_cb2_in = SDMISO;
 assign SDSS = 0;
@@ -551,25 +551,25 @@ always @(crtc_ma or crtc_ra or disp_addr_offs)
          begin
 
 //  Mode 3 - restart at 0x4000
-         process_3_aa = crtc_ma[11:8] + 8;   
+         process_3_aa = crtc_ma[11:8] + 4'd8;
          end
       2'b 01:
          begin
 
 //  Mode 6 - restart at 0x6000
-         process_3_aa = crtc_ma[11:8] + 12;   
+         process_3_aa = crtc_ma[11:8] + 4'd12;
          end
       2'b 10:
          begin
 
 //  Mode 0,1,2 - restart at 0x3000
-         process_3_aa = crtc_ma[11:8] + 6;   
+         process_3_aa = crtc_ma[11:8] + 4'd6;
          end
       2'b 11:
          begin
 
 //  Mode 4,5 - restart at 0x5800
-         process_3_aa = crtc_ma[11:8] + 11;   
+         process_3_aa = crtc_ma[11:8] + 4'd11;
          end
       default:
          ;
@@ -627,7 +627,7 @@ assign cpu_di = ram_enable === 1'b 1 ? MEM_DI :
 	adc_enable === 1'b 1 ? adc_do : 
 	//tube_enable === 1'b 1 ? tube_do : 
 	//adlc_enable === 1'b 1 ? bbcddr_out :
-	'd0; 
+	8'd0;
 	
 //  un-decoded locations are pulled down by RP1
 assign cpu_irq_n = ~sys_via_irq & ~user_via_irq; // & tube_irq_n;

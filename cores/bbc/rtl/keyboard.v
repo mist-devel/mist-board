@@ -100,7 +100,7 @@ always @(posedge CLOCK) begin
         end  else if (CLKEN_1MHZ === 1'b 1 ) begin
 
             //  Otherwise increment the counter once per 1 MHz tick
-            col <= col + 1;
+            col <= col + 1'd1;
 			
         end
     end

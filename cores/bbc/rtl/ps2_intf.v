@@ -128,7 +128,7 @@ always @(posedge CLK) begin
                 if (ps2_dat_in === 1'b 0) begin
 
                     //  This is a start bit
-                    bit_count <= bit_count + 'd1;
+                    bit_count <= bit_count + 1'd1;
                 end
 
                 //  Running.  8-bit data comes in LSb first followed by
@@ -139,7 +139,7 @@ always @(posedge CLK) begin
                 if (bit_count < 10) begin
 
                     //  Shift in data and parity (9 bits)
-                    bit_count <= bit_count + 1;
+                    bit_count <= bit_count + 1'd1;
                     shiftreg <= {ps2_dat_in, shiftreg[8:1]};
                     parity <= parity ^ ps2_dat_in;
                     //  Calculate parity
