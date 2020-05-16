@@ -50,12 +50,16 @@ module i2cSlave (
   input sdaIn,
   output sdaOut,
   input scl,
-  
-  // parallel write
+
+  // parallel read/write
   input we,
+  input rd,
   input [7:0] addr,
-  input [7:0] data
+  input [7:0] din,
+  output [7:0] dout
 );
+
+assign dout = dataFromRegIF;
 
 // local wires and regs
 reg sdaDeb;
@@ -152,8 +156,8 @@ end
 
 registerInterface u_registerInterface(
   .clk(clk),
-  .addr(we ? addr : regAddr),
-  .dataIn(we ? data : dataToRegIF),
+  .addr((we | rd) ? addr : regAddr),
+  .dataIn(we ? din : dataToRegIF),
   .writeEn(writeEn | we),
   .dataOut(dataFromRegIF)
 );

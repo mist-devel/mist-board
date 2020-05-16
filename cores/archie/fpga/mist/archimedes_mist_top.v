@@ -84,7 +84,7 @@ wire       core_hs, core_vs;
 wire [15:0] coreaud_l, coreaud_r;
 
 // data loading 
-wire       downloading;
+wire       downloading, uploading;
 wire       loader_active = downloading && (dio_index == 1 || dio_index == 2);
 wire [7:0] dio_index;
 wire       loader_we /* synthesis keep */ ;
@@ -92,7 +92,8 @@ reg        loader_stb = 1'b0 /* synthesis keep */ ;
 reg        rom_ready = 0;
 (*KEEP="TRUE"*)wire [3:0]	loader_sel /* synthesis keep */ ;
 (*KEEP="TRUE"*)wire [23:0]	loader_addr /* synthesis keep */ ;
-(*KEEP="TRUE"*)wire [31:0]	loader_data /* synthesis keep */ ;
+(*KEEP="TRUE"*)wire [31:0]	loader_dout /* synthesis keep */ ;
+wire [7:0] loader_din;
           
 // user io
 
@@ -408,7 +409,8 @@ DATA_IO  (
 	.ide_data_rd    ( ide_data_rd    ),
 	.ide_data_we    ( ide_data_we    ),
 
-	.downloading	( downloading	 ),
+	.downloading    ( downloading    ),
+	.uploading      ( uploading      ),
 	.index          ( dio_index      ),
 
 	// ram interface
@@ -416,7 +418,8 @@ DATA_IO  (
 	.wr            ( loader_we       ),
 	.a             ( loader_addr     ),
 	.sel           ( loader_sel      ),
-	.d             ( loader_data     )
+	.dout          ( loader_dout     ),
+	.din           ( loader_din      )
 );
 
 wire        core_ack_in   /* synthesis keep */ ;
@@ -568,8 +571,10 @@ i2cSlaveTop CMOS (
 	.sdaOut	        ( i2c_dout       ),
 	.scl            ( i2c_clock      ),
 	.we             ( downloading && dio_index == 3 && loader_we ),
+	.rd             ( uploading && dio_index == 3),
 	.addr           ( loader_addr[7:0] ),
-	.data           ( loader_data[7:0] )
+	.din            ( loader_dout[7:0] ),
+	.dout           ( loader_din )
 );
 
 audio	AUDIO	(
@@ -603,7 +608,7 @@ assign ram_sel      = loader_active ? loader_sel : core_sel_o;
 assign ram_address  = loader_active ? {loader_addr[23:2],2'b00} : {core_address_out[23:2],2'b00};
 assign ram_stb      = loader_active ? loader_stb : core_stb_out;
 assign ram_cyc      = loader_active ? loader_stb : core_stb_out;
-assign ram_data_in  = loader_active ? loader_data : core_data_out;
+assign ram_data_in  = loader_active ? loader_dout : core_data_out;
 assign core_ack_in  = loader_active ? 1'b0 : ram_ack;
 
 endmodule // archimedes_mist_top

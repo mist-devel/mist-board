@@ -52,10 +52,12 @@ module i2cSlaveTop (
   output sdaOut,
   input scl,
   
-  // parallel write
+  // parallel read/write
   input we,
+  input rd,
   input [7:0] addr,
-  input [7:0] data
+  input [7:0] din,
+  output [7:0] dout
 );
 
 i2cSlave u_i2cSlave(
@@ -64,9 +66,11 @@ i2cSlave u_i2cSlave(
   .sdaIn(sdaIn),
   .sdaOut(sdaOut),
   .scl(scl),
+  .rd(rd),
   .we(we),
   .addr(addr),
-  .data(data)
+  .din(din),
+  .dout(dout)
 );
 
 endmodule

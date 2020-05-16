@@ -5,7 +5,7 @@
 // Providing ROM and IDE data up- and download via the MISTs
 // own arm7 cpu.
 //
-// http://code.google.com/p/mist-board/
+// https://github.com/mist-devel/mist-board
 //
 // Copyright (c) 2014-2015 Till Harbaum <till@harbaum.org>
 //
@@ -48,6 +48,7 @@ module data_io #(parameter ADDR_WIDTH=24, START_ADDR = 0) (
 	output reg          ide_data_we,
 
 	output reg downloading, // signal indicating an active download
+	output reg uploading,   // signal indicating an active upload (CMOS RAM)
 	output [ADDR_WIDTH-1:0]     size, // number of bytes in input buffer
 	output reg [7:0] index, // menu index
 
@@ -56,14 +57,15 @@ module data_io #(parameter ADDR_WIDTH=24, START_ADDR = 0) (
 	output reg 		    wr,
 	output reg [ADDR_WIDTH-1:0] a,
 	output [3:0] 		    sel, 
-	output [31:0] 		    d
+	output [31:0] 		  dout,
+	input  [7:0]        din
 );
 
 (*KEEP="TRUE"*)assign sel = a[1:0] == 	2'b00 ? 4'b0001 :
 								a[1:0] == 	2'b01 ? 4'b0010 :
 								a[1:0] == 	2'b10 ? 4'b0100 : 4'b1000;
 
-assign d = {data,data,data,data};
+assign dout = {data,data,data,data};
 assign size = addr - START_ADDR;
 
 // *********************************************************************************
@@ -81,9 +83,12 @@ reg [2:0]      bit_cnt_sd;
 
 reg [ADDR_WIDTH-1:0] addr;
 
-localparam UIO_FILE_TX         = 8'h53;
-localparam UIO_FILE_TX_DAT     = 8'h54;
-localparam UIO_FILE_INDEX      = 8'h55;
+localparam DIO_FILE_TX         = 8'h53;
+localparam DIO_FILE_TX_DAT     = 8'h54;
+localparam DIO_FILE_INDEX      = 8'h55;
+localparam DIO_FILE_INFO       = 8'h56;
+localparam DIO_FILE_RX         = 8'h57;
+localparam DIO_FILE_RX_DAT     = 8'h58;
 
 localparam CMD_IDECMD          = 8'h04;
 localparam CMD_IDEDAT          = 8'h08;
@@ -154,6 +159,8 @@ always@(negedge sck or posedge ss) begin
 				end
 
 				CMD_IDE_DATA_RD: dout_r <= ide_data_i;
+
+				DIO_FILE_RX_DAT: dout_r <= din;
 
 				default: dout_r <= cmdcode;
 
@@ -290,7 +297,7 @@ always @(posedge clk) begin
 			if (abyte_cnt > 4) ide_data_rd <= 1;
 
 			// file transfer commands
-			UIO_FILE_TX:
+			DIO_FILE_TX:
 			begin
 				// prepare 
 				if(spi_byte_in) begin
@@ -303,7 +310,7 @@ always @(posedge clk) begin
 			end
 
 			// transfer
-			UIO_FILE_TX_DAT:
+			DIO_FILE_TX_DAT:
 			begin
 				a <= addr;
 				addr <= addr + 1'd1;
@@ -312,7 +319,25 @@ always @(posedge clk) begin
 			end
 
 			// index
-			UIO_FILE_INDEX: index <= spi_byte_in;
+			DIO_FILE_INDEX: index <= spi_byte_in;
+
+			// start/stop receive
+			DIO_FILE_RX:
+			begin
+				// prepare 
+				if(spi_byte_in) begin
+					a <= START_ADDR;
+					uploading <= 1; 
+				end else begin
+					uploading <= 0;
+				end
+			end
+
+			DIO_FILE_RX_DAT:
+			begin
+				a <= a + 1'd1;
+			end
+
 			endcase;
 		end
 	end
