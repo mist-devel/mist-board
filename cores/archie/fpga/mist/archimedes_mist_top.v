@@ -103,6 +103,7 @@ wire [1:0] buttons;
 wire [1:0] switches;
 wire       scandoubler_disable;
 wire       ypbpr;
+wire       no_csync;
 
 // the top file should generate the correct clocks for the machine
 
@@ -258,74 +259,48 @@ always @(posedge clk_pix) begin
 		{ r_adj, g_adj, b_adj } <= 12'h0;
 end
 
-wire [5:0] sd_r, sd_g, sd_b;
-wire       sd_hs;
-wire       sd_vs;
-
-scandoubler #(11, 4) scandoubler
-(
-	.clk_sys    ( clk_pix    ),
-	.scanlines  ( 2'b00      ),
-	.ce_divider ( 1'b1       ),
-	.hs_in      ( hs_adj     ),
-	.vs_in      ( vs_adj     ),
-	.r_in       ( r_adj      ),
-	.g_in       ( g_adj      ),
-	.b_in       ( b_adj      ),
-	.hs_out     ( sd_hs      ),
-	.vs_out     ( sd_vs      ),
-	.r_out      ( sd_r       ),
-	.g_out      ( sd_g       ),
-	.b_out      ( sd_b       )
-);
-
-wire       vs = scandoubler_en ? sd_vs : core_vs;
-wire       hs = scandoubler_en ? sd_hs : core_hs;
-wire [5:0] r = scandoubler_en  ? sd_r : { r_adj, r_adj[3:2] };
-wire [5:0] g = scandoubler_en  ? sd_g : { g_adj, g_adj[3:2] };
-wire [5:0] b = scandoubler_en  ? sd_b : { b_adj, b_adj[3:2] };
-
-wire [5:0] osd_r_o, osd_g_o, osd_b_o;
-
-osd #(10'd0,10'd0,4) OSD (
-	.clk_sys    ( clk_pix      ),
-
-	// spi for OSD
-	.SPI_DI     ( SPI_DI       ),
-	.SPI_SCK    ( SPI_SCK      ),
-	.SPI_SS3    ( SPI_SS3      ),
-
-	.R_in       ( r            ),
-	.G_in       ( g            ),
-	.B_in       ( b            ),
-	.HSync      ( hs           ),
-	.VSync      ( vs           ),
-
-	.R_out      ( osd_r_o      ),
-	.G_out      ( osd_g_o      ),
-	.B_out      ( osd_b_o      )
-);
-
-wire [5:0] Y, Pb, Pr;
-
-rgb2ypbpr rgb2ypbpr
-(
-	.red   ( osd_r_o ),
-	.green ( osd_g_o ),
-	.blue  ( osd_b_o ),
-	.y     ( Y       ),
-	.pb    ( Pb      ),
-	.pr    ( Pr      )
-);
-
 wire   scandoubler_en = ~scandoubler_disable && pixbaseclk_select[0] == pixbaseclk_select[1];
-assign VGA_R = ypbpr?Pr:osd_r_o;
-assign VGA_G = ypbpr? Y:osd_g_o;
-assign VGA_B = ypbpr?Pb:osd_b_o;
-wire   CSync = ~(hs ^ vs);
-//24 MHz modes get composite sync automatically
-assign VGA_HS = ((pixbaseclk_select[0] == pixbaseclk_select[1] && scandoubler_disable) | ypbpr) ? CSync : hs;
-assign VGA_VS = ((pixbaseclk_select[0] == pixbaseclk_select[1] && scandoubler_disable) | ypbpr) ? 1'b1 : vs;
+
+mist_video #(.COLOR_DEPTH(4), .SD_HCNT_WIDTH(10)) mist_video (
+	.clk_sys     ( clk_pix      ),
+
+	// OSD SPI interface
+	.SPI_SCK     ( SPI_SCK    ),
+	.SPI_SS3     ( SPI_SS3    ),
+	.SPI_DI      ( SPI_DI     ),
+
+	// scanlines (00-none 01-25% 10-50% 11-75%)
+	.scanlines   ( 2'b00      ),
+
+	// non-scandoubled pixel clock divider 0 - clk_sys/4, 1 - clk_sys/2
+	.ce_divider  ( 1'b0       ),
+
+	// 0 = HVSync 31KHz, 1 = CSync 15KHz
+	.scandoubler_disable ( ~scandoubler_en ),
+	// disable csync without scandoubler
+	.no_csync    ( no_csync   ),
+	// YPbPr always uses composite sync
+	.ypbpr       ( ypbpr      ),
+	// Rotate OSD [0] - rotate [1] - left or right
+	.rotate      ( 2'b00      ),
+	// composite-like blending
+	.blend       ( 1'b0       ),
+
+	// video in
+	.R           ( r_adj      ),
+	.G           ( g_adj      ),
+	.B           ( b_adj      ),
+
+	.HSync       ( hs_adj     ),
+	.VSync       ( vs_adj     ),
+
+	// MiST video output signals
+	.VGA_R       ( VGA_R      ),
+	.VGA_G       ( VGA_G      ),
+	.VGA_B       ( VGA_B      ),
+	.VGA_VS      ( VGA_VS     ),
+	.VGA_HS      ( VGA_HS     )
+);
 
 wire [31:0] sd_lba;
 wire  [1:0] sd_rd;
@@ -358,6 +333,7 @@ user_io user_io(
 	.BUTTONS        ( buttons        ),
 	.scandoubler_disable(scandoubler_disable),
 	.ypbpr          ( ypbpr          ),
+	.no_csync       ( no_csync       ),
 
 	.JOY0           ( joyA           ),
 	.JOY1           ( joyB           ),

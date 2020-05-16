@@ -33,6 +33,7 @@ module user_io (
         output     [7:0] JOY1,
         output           scandoubler_disable,
         output           ypbpr,
+        output           no_csync,
 
         input      [7:0] kbd_out_data,
         input            kbd_out_strobe,
@@ -80,6 +81,7 @@ assign BUTTONS  = but_sw[1:0];
 assign SWITCHES = but_sw[3:2];
 assign scandoubler_disable = but_sw[4];
 assign ypbpr = but_sw[5];
+assign no_csync = but_sw[6];
 
 // this variant of user_io is for the achie core (type == a6) only
 wire [7:0] core_type = 8'ha6;

@@ -136,7 +136,7 @@ set_instance_assignment -name CURRENT_STRENGTH_NEW "MAXIMUM CURRENT" -to VGA_*
 set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to DRAM_*
 
 set_global_assignment -name ENABLE_SIGNALTAP OFF
-set_global_assignment -name USE_SIGNALTAP_FILE output_files/ide.stp
+set_global_assignment -name USE_SIGNALTAP_FILE output_files/dio.stp
 set_global_assignment -name STRATIX_DEVICE_IO_STANDARD "3.3-V LVTTL"
 set_global_assignment -name ENABLE_CONFIGURATION_PINS OFF
 set_global_assignment -name ENABLE_NCE_PIN OFF
@@ -181,13 +181,15 @@ set_global_assignment -name PHYSICAL_SYNTHESIS_EFFORT EXTRA
 set_global_assignment -name PRE_MAPPING_RESYNTHESIS ON
 set_global_assignment -name REMOVE_REDUNDANT_LOGIC_CELLS ON
 set_global_assignment -name VERILOG_FILE archimedes_mist_top.v
-set_global_assignment -name SYSTEMVERILOG_FILE rgb2ypbpr.sv
-set_global_assignment -name VERILOG_FILE scandoubler.v
+set_global_assignment -name VERILOG_FILE "../../../../mist-modules/mist_video.v"
+set_global_assignment -name SYSTEMVERILOG_FILE "../../../../mist-modules/cofi.sv"
+set_global_assignment -name VERILOG_FILE "../../../../mist-modules/scandoubler.v"
+set_global_assignment -name SYSTEMVERILOG_FILE "../../../../mist-modules/rgb2ypbpr.sv"
+set_global_assignment -name VERILOG_FILE "../../../../mist-modules/osd.v"
 set_global_assignment -name VERILOG_FILE sigma_delta_dac.v
 set_global_assignment -name VERILOG_FILE audio.v
 set_global_assignment -name VERILOG_FILE data_io.v
 set_global_assignment -name VERILOG_FILE user_io.v
-set_global_assignment -name VERILOG_FILE osd.v
 set_global_assignment -name VERILOG_FILE sram_line_en.v
 set_global_assignment -name VERILOG_FILE sram_byte_en.v
 set_global_assignment -name QIP_FILE clockgen.qip
@@ -229,6 +231,4 @@ set_global_assignment -name QIP_FILE rom_reconfig_25.qip
 set_global_assignment -name QIP_FILE pll_reconfig.qip
 set_global_assignment -name QIP_FILE rom_reconfig_36.qip
 set_global_assignment -name QIP_FILE pll_vidc.qip
-set_global_assignment -name SIGNALTAP_FILE output_files/vidc.stp
-set_global_assignment -name SIGNALTAP_FILE output_files/sd.stp
 set_instance_assignment -name PARTITION_HIERARCHY root_partition -to | -section_id Top
