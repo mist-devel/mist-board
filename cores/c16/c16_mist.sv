@@ -1,5 +1,5 @@
 //
-// c16_mist.v - C16 for the MiST
+// c16_mist.sv - C16 for the MiST
 //
 // https://github.com/mist-devel
 // 
@@ -83,8 +83,6 @@ parameter CONF_STR = {
         "O89,SID,Off,6581,8580;",
         "T5,Reset;"
 };
-
-parameter CONF_STR_LEN = 11+17+18+18+21+30+28+18+22+9;
 
 localparam ROM_MEM_START = 25'h10000;
 localparam TAP_MEM_START = 25'h20000;
@@ -275,7 +273,7 @@ wire img_mounted;
 wire [8:0] sd_buff_addr;
 
 // include user_io module for arm controller communication
-user_io #(.STRLEN(CONF_STR_LEN)) user_io (
+user_io #(.STRLEN($size(CONF_STR)>>3)) user_io (
 	.conf_str       ( CONF_STR       ),
 
 	.clk_sys        ( clk28          ),
@@ -492,7 +490,7 @@ always @(posedge clk28) begin
         if (clkref_D && !clkref && !ioctl_downloading && tap_play_addr != tap_last_addr && !tap_wrfull) tap_sdram_oe <= 1;
         if (clkref && !clkref_D && tap_sdram_oe) begin
             tap_wrreq <= 1;
-			tap_data_in <= tap_play_addr[0] ? sdram_dout[15:8]:sdram_dout[7:0];
+            tap_data_in <= tap_play_addr[0] ? sdram_dout[15:8]:sdram_dout[7:0];
             tap_sdram_oe <= 0;
             tap_play_addr <= tap_play_addr + 1'd1;
         end
@@ -852,7 +850,7 @@ c1541_sd c1541_sd (
    .sd_buff_din    ( sd_din         ),
    .sd_buff_dout   ( sd_dout        ),
    .sd_buff_wr     ( sd_dout_strobe ),
-	.sd_buff_addr   ( sd_buff_addr   ),
+   .sd_buff_addr   ( sd_buff_addr   ),
    .led ( led_disk ),
 
    .c1541rom_clk   ( clk28         ),
