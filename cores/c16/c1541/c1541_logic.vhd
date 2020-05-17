@@ -170,14 +170,15 @@ begin
   uc1_ca1_i <= not sb_atn_in;
   -- PA
   uc1_pa_i(0) <= tr00_sense_n;
-  uc1_pa_i(7 downto 1) <= (others => '0');  -- NC
+  uc1_pa_i(7 downto 1) <= (others => '1');  -- NC
+
   -- PB
-
   uc1_pb_i(0) <=  not (sb_data_in and sb_data_oe);
-  sb_data_oe <=   not (uc1_pb_o(1) or uc1_pb_oe_n(1)) and not atn;
+  uc1_pb_i(1) <=  '1';
+  sb_data_oe  <=  not (uc1_pb_o(1) or uc1_pb_oe_n(1)) and not atn;
   uc1_pb_i(2) <=  not (sb_clk_in and sb_clk_oe);
-  sb_clk_oe <=    not (uc1_pb_o(3) or uc1_pb_oe_n(3));
-
+  sb_clk_oe   <=  not (uc1_pb_o(3) or uc1_pb_oe_n(3));
+  uc1_pb_i(4 downto 3) <= "11"; -- NC
   atna <= uc1_pb_o(4) or uc1_pb_oe_n(4);
   uc1_pb_i(6 downto 5) <= DEVICE_SELECT xor ds;     -- allows override
   uc1_pb_i(7) <= not sb_atn_in;
@@ -314,10 +315,10 @@ begin
       port_b_i        => uc1_pb_i,
 
       ca1_i           => uc1_ca1_i,
-      ca2_i           => '0',
+      ca2_i           => '1',
 
-      cb1_i           => '0',
-      cb2_i           => '0',
+      cb1_i           => '1',
+      cb2_i           => '1',
 
       irq             => uc1_irq
     );
@@ -353,13 +354,13 @@ begin
       ca1_i           => uc3_ca1_i,
 
       ca2_o           => uc3_ca2_o,
-      ca2_i           => '0',
+      ca2_i           => '1',
       ca2_t           => uc3_ca2_oe,
 
-      cb1_i           => '0',
+      cb1_i           => '1',
 
       cb2_o           => uc3_cb2_o,
-      cb2_i           => '0',
+      cb2_i           => '1',
       cb2_t           => uc3_cb2_oe,
 
       irq             => uc3_irq

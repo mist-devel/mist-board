@@ -199,7 +199,7 @@ port map
 	mode   => mode,   -- read/write
 --    stp    => stp,  -- stepper motor control
 	mtr    => mtr,    -- stepper motor on/off
---    freq   => freq, -- motor (gcr_bit) frequency
+	freq   => freq,   -- motor (gcr_bit) frequency
 	sync_n => sync_n, -- reading SYNC bytes
 	byte_n => byte_n, -- byte ready
 

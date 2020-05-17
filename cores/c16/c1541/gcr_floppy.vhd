@@ -24,7 +24,7 @@ port(
 	mode   : in  std_logic;                      -- read/write
 --	stp    : in  std_logic_vector(1 downto 0);   -- stepper motor control
 	mtr    : in  std_logic;                      -- stepper motor on/off
---	freq   : in  std_logic_vector(1 downto 0);   -- motor (gcr_bit) frequency
+	freq   : in  std_logic_vector(1 downto 0);   -- motor (gcr_bit) frequency
 	sync_n : out std_logic;                      -- reading SYNC bytes
 	byte_n : out std_logic;                      -- byte ready
 	
@@ -43,6 +43,7 @@ end gcr_floppy;
 architecture struct of gcr_floppy is
 
 signal bit_clk_en  : std_logic;
+signal bit_clk_div : std_logic_vector(7 downto 0);
 signal sync_cnt    : std_logic_vector(5 downto 0) := (others => '0');
 signal byte_cnt    : std_logic_vector(8 downto 0) := (others => '0');
 signal nibble      : std_logic := '0';
@@ -134,7 +135,7 @@ with nibble select
 
 gcr_bit <= gcr_nibble(to_integer(unsigned(gcr_bit_cnt)));
 
-sector_max <=  "10100" when track_num < std_logic_vector(to_unsigned(18,6)) else 
+sector_max <=  "10100" when track_num < std_logic_vector(to_unsigned(18,6)) else
                "10010" when track_num < std_logic_vector(to_unsigned(25,6)) else
 				   "10001" when track_num < std_logic_vector(to_unsigned(31,6)) else
  	         	"10000" ;
@@ -158,27 +159,33 @@ with gcr_nibble_out select
 						X"D" when "11101",--"10111",
 						X"E" when "11110",--"01111",
 						X"F" when others; --"10101",			
-				
+
+with freq select
+    bit_clk_div <= x"67" when "11",
+                   x"6F" when "10",
+                   x"77" when "01",
+                   x"7F" when others;
+
 process (clk32)
 	variable bit_clk_cnt : std_logic_vector(7 downto 0) := (others => '0');
 begin
 	if rising_edge(clk32) then
 
 		mode_r1 <= mode;
-		
+
 		if (mode_r1 xor mode) = '1' then -- read <-> write change
 			bit_clk_cnt := (others => '0');			
 			byte_n <= '1';
 			bit_clk_en <= '0';
 		else
 			bit_clk_en <= '0';
-			if bit_clk_cnt = X"6F" then
+			if bit_clk_cnt = bit_clk_div then
 				bit_clk_en <= '1';
 				bit_clk_cnt := (others => '0');
 			else
 				bit_clk_cnt := bit_clk_cnt + '1';
 			end if;
-			
+
 			byte_n <= '1';
 			if byte_in_n = '0' and mtr = '1' and ram_ready = '1' then
 				if bit_clk_cnt > X"10" then
@@ -187,9 +194,7 @@ begin
 					end if;
 				end if;
 			end if;
-			
 		end if;
-			
 	end if;
 end process;
 
@@ -201,11 +206,11 @@ begin
 
 	  if old_track /= track_num then
 	    sector <= (others => '0'); --reset sector number on track change
-	  else if bit_clk_en = '1' then
+	  elsif bit_clk_en = '1' then
 
 		mode_r2 <= mode;
 		if mode = '1' then autorise_write <= '0'; end if;
-		
+
 		if (mode xor mode_r2) = '1' then 
 			if mode = '1' then  -- leaving write mode
 				sync_in_n <= '0';
@@ -220,9 +225,9 @@ begin
 				data_cks    <= (others => '0');
 			end if;	
 		end if;
-			
+
 		if sync_in_n = '0' and mode = '1' then
-			
+
 			byte_cnt        <= (others => '0');
 			nibble          <= '0';
 			gcr_bit_cnt     <= (others => '0');
@@ -230,18 +235,18 @@ begin
 			c1541_logic_din <= (others => '0');
 			gcr_byte        <= (others => '0');
 			data_cks        <= (others => '0');
-			
+
 			if sync_cnt = X"31" then 
 				sync_cnt <= (others => '0');
 				sync_in_n <= '1';
 			else
 				sync_cnt <= sync_cnt + '1';
 			end if;
-	
+
 		end if;
 
 		if sync_in_n = '1' or mode = '0' then
-			
+
 			gcr_bit_cnt <= gcr_bit_cnt + '1';
 			if gcr_bit_cnt = X"4" then
 				gcr_bit_cnt <= (others => '0');
@@ -292,17 +297,17 @@ begin
 					end if;
 				end if;
 			end if;
-				
+
 			-- demux byte from floppy (ram)			
 			gcr_byte <= gcr_byte(6 downto 0) & gcr_bit;
-				
+
 			if bit_cnt = X"7" then
 				c1541_logic_din <= gcr_byte(6 downto 0) & gcr_bit;
 			end if;
-				
+
 			-- serialise/convert byte to floppy (ram)				
 			gcr_nibble_out <= gcr_nibble_out(3 downto 0) & gcr_bit_out;
-			
+
 			if gcr_bit_cnt = X"0" then
 				if nibble = '0' then 
 					ram_di(3 downto 0) <= nibble_out; 
@@ -318,11 +323,10 @@ begin
 			else
 				ram_we <= '0';
 			end if;
-				
+
 		end if;
 	  end if;
 	end if;
-  end if;
 end process;
 
 end struct;
