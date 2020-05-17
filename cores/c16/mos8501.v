@@ -67,9 +67,9 @@ T65 cpu_core(
 	
 	.Mode (2'b00),
 	.Res_n (~reset),
-	.Enable(enable_cpu),
+	.Enable(enable),
 	.Clk(clk),
-	.Rdy(enable_cpu),
+	.Rdy(rdy),
 	.Abort_n(1),
 	.IRQ_n(irq_n),
 	.NMI_n(1),
@@ -183,6 +183,6 @@ always @*
 	end
 	
 assign port_out=port_data;
-assign enable_cpu=(~rdy & ~we)?1'b0:enable;			// When RDY is low and cpu would do a read, halt cpu									
+//assign enable_cpu=(~rdy & ~we)?1'b0:enable;			// When RDY is low and cpu would do a read, halt cpu
 					 
 endmodule
