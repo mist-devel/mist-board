@@ -67,6 +67,7 @@ wire kbd_in_strobe;
 
 // generated clocks
 wire clk_pix;
+wire clk_vid;
 wire ce_pix;
 wire clk_sys /* synthesis keep */ ;
 wire clk_mem /* synthesis keep */ ;
@@ -117,7 +118,8 @@ clockgen CLOCKS(
 
 pll_vidc CLOCKS_VIDC(
 	.inclk0	(CLOCK_27[0]),
-	.c0		(clk_pix),
+	.c0     (clk_pix), // 2x VIDC pixel clock (48, 50, 76 MHz);
+	.c1     (clk_vid), // 4x VIDC pixel clock for scandoubler use (24MHz mode => 96 MHz), otherwise 2x pixel clock
 	.areset(pll_areset),
 	.scanclk(pll_scanclk),
 	.scandata(pll_scandata),
@@ -246,23 +248,26 @@ wire      back_porch_n =  (pixbaseclk_select[0] == pixbaseclk_select[1]) ? &pix_
 
 always @(posedge clk_pix) begin
 
-	hs_adj <= core_hs;
-	vs_adj <= core_vs;
-
 	if (~back_porch_n) pix_cnt <= pix_cnt + 1'd1;
 	if (~hs_adj) pix_cnt <= 0;
-	if (back_porch_n) begin
-		r_adj <= core_r;
-		g_adj <= core_g;
-		b_adj <= core_b;
-	end else
-		{ r_adj, g_adj, b_adj } <= 12'h0;
+
+	if (ce_pix) begin
+		hs_adj <= core_hs;
+		vs_adj <= core_vs;
+
+		if (back_porch_n) begin
+			r_adj <= core_r;
+			g_adj <= core_g;
+			b_adj <= core_b;
+		end else
+			{ r_adj, g_adj, b_adj } <= 12'h0;
+	end
 end
 
 wire   scandoubler_en = ~scandoubler_disable && pixbaseclk_select[0] == pixbaseclk_select[1];
 
-mist_video #(.COLOR_DEPTH(4), .SD_HCNT_WIDTH(10)) mist_video (
-	.clk_sys     ( clk_pix      ),
+mist_video #(.COLOR_DEPTH(4), .SD_HCNT_WIDTH(12)) mist_video (
+	.clk_sys     ( clk_vid    ),
 
 	// OSD SPI interface
 	.SPI_SCK     ( SPI_SCK    ),
@@ -273,7 +278,7 @@ mist_video #(.COLOR_DEPTH(4), .SD_HCNT_WIDTH(10)) mist_video (
 	.scanlines   ( 2'b00      ),
 
 	// non-scandoubled pixel clock divider 0 - clk_sys/4, 1 - clk_sys/2
-	.ce_divider  ( 1'b0       ),
+	.ce_divider  ( 1'b1       ),
 
 	// 0 = HVSync 31KHz, 1 = CSync 15KHz
 	.scandoubler_disable ( ~scandoubler_en ),
@@ -431,7 +436,7 @@ wire        reset = ~ram_ready | ~rom_ready;
 archimedes_top ARCHIMEDES(
 	
 	.CLKCPU_I       ( clk_sys        ),
-	.CLKPIX_I       ( clk_pix        ), // pixel clock for OSD
+	.CLKPIX_I       ( clk_pix        ), // 2xVIDC clock
 	.CEPIX_O        ( ce_pix         ),
 
 	.RESET_I        ( reset          ),

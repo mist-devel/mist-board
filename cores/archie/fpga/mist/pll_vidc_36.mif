@@ -18,7 +18,7 @@
 --    Device Speed Grade: 8
 --    PLL Scan Chain: Fast PLL (144 bits)
 --    File Name: /home/gyuri/git/mist-board/cores/archie/fpga/mist/pll_vidc_36.mif
---    Generated: Sat Feb 23 00:01:12 2019
+--    Generated: Sun May 17 02:54:24 2020
 
 WIDTH=1;
 DEPTH=144;
@@ -99,22 +99,22 @@ CONTENT BEGIN
 	69   :   1;
 	70   :   0;
 	71   :   0;
-	72   :   1; -- clk1 counter: Bypass = 1 (1 bit(s))
-	73   :   0; -- clk1 counter: High Count = 0 (8 bit(s))
+	72   :   0; -- clk1 counter: Bypass = 0 (1 bit(s))
+	73   :   0; -- clk1 counter: High Count = 5 (8 bit(s))
 	74   :   0;
 	75   :   0;
 	76   :   0;
 	77   :   0;
-	78   :   0;
+	78   :   1;
 	79   :   0;
-	80   :   0;
-	81   :   0; -- clk1 counter: Odd Division = 0 (1 bit(s))
-	82   :   0; -- clk1 counter: Low Count = 0 (8 bit(s))
+	80   :   1;
+	81   :   1; -- clk1 counter: Odd Division = 1 (1 bit(s))
+	82   :   0; -- clk1 counter: Low Count = 4 (8 bit(s))
 	83   :   0;
 	84   :   0;
 	85   :   0;
 	86   :   0;
-	87   :   0;
+	87   :   1;
 	88   :   0;
 	89   :   0;
 	90   :   1; -- clk2 counter: Bypass = 1 (1 bit(s))

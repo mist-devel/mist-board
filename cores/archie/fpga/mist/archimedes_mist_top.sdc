@@ -51,6 +51,7 @@ set sdram_clk "CLOCKS|altpll_component|auto_generated|pll1|clk[3]"
 set mem_clk   "CLOCKS|altpll_component|auto_generated|pll1|clk[1]"
 set sys_clk   "CLOCKS|altpll_component|auto_generated|pll1|clk[0]"
 set vidc_clk  "CLOCKS_VIDC|altpll_component|auto_generated|pll1|clk[0]"
+set vidc2x_clk "CLOCKS_VIDC|altpll_component|auto_generated|pll1|clk[1]"
 
 #**************************************************************
 # Set Clock Latency
@@ -87,7 +88,9 @@ set_output_delay -clock [get_clocks $vidc_clk] -min -5 [get_ports {VGA_*}]
 
 set_clock_groups -asynchronous -group [get_clocks {SPI_SCK}] -group [get_clocks {CLOCKS|*}]
 set_clock_groups -asynchronous -group [get_clocks {SPI_SCK}] -group [get_clocks $vidc_clk]
+set_clock_groups -asynchronous -group [get_clocks {SPI_SCK}] -group [get_clocks $vidc2x_clk]
 set_clock_groups -asynchronous -group [get_clocks {CLOCKS|altpll_component|auto_generated|pll1|clk[*]}] -group [get_clocks $vidc_clk]
+set_clock_groups -asynchronous -group [get_clocks {CLOCKS|altpll_component|auto_generated|pll1|clk[*]}] -group [get_clocks $vidc2x_clk]
 
 #**************************************************************
 # Set False Path
