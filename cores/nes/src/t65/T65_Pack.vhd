@@ -92,9 +92,9 @@ package T65_Pack is
   
   type T_Set_Addr_To is
   (
+    Set_Addr_To_PBR,
     Set_Addr_To_SP,
     Set_Addr_To_ZPG,
-    Set_Addr_To_PBR,
     Set_Addr_To_BA
   );
   

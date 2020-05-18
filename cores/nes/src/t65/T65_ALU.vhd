@@ -190,7 +190,7 @@ begin
     -- ASL, ROL, LSR, ROR, BIT, LD, DEC, INC
     P_Out <= P_In;
     Q_t := BusA;
-    Q2_t := Q_t;
+    Q2_t := BusA;
     case Op is
       when ALU_OP_OR=>
         Q_t := BusA or BusB;

@@ -57,6 +57,7 @@ use work.T65_Pack.all;
 entity T65_ALU is
   port(
     Mode    : in std_logic_vector(1 downto 0);      -- "00" => 6502, "01" => 65C02, "10" => 65816
+    BCD_en  : in std_logic;
     Op      : in T_ALU_OP;
     BusA    : in std_logic_vector(7 downto 0);
     BusB    : in std_logic_vector(7 downto 0);
@@ -83,7 +84,7 @@ architecture rtl of T65_ALU is
 
 begin
 
-  process (P_In, BusA, BusB)
+  process (P_In, BusA, BusB, BCD_en)
     variable AL : unsigned(6 downto 0);
     variable AH : unsigned(6 downto 0);
     variable C : std_logic;
@@ -102,7 +103,7 @@ begin
       ADC_Z <= '0';
     end if;
 
-    if AL(5 downto 1) > 9 and P_In(Flag_D) = '1' then
+    if AL(5 downto 1) > 9 and P_In(Flag_D) = '1' and BCD_en = '1' then
       AL(6 downto 1) := AL(6 downto 1) + 6;
     end if;
 
@@ -116,7 +117,7 @@ begin
       if is_x(std_logic_vector(AH)) then AH := "0000000"; end if;
 -- pragma translate_on
 
-    if AH(5 downto 1) > 9 and P_In(Flag_D) = '1' then
+    if AH(5 downto 1) > 9 and P_In(Flag_D) = '1' and BCD_en = '1' then
       AH(6 downto 1) := AH(6 downto 1) + 6;
     end if;
 
@@ -125,7 +126,7 @@ begin
     ADC_Q <= std_logic_vector(AH(4 downto 1) & AL(4 downto 1));
   end process;
 
-  process (Op, P_In, BusA, BusB)
+  process (Op, P_In, BusA, BusB, BCD_en)
     variable AL : unsigned(6 downto 0);
     variable AH : unsigned(5 downto 0);
     variable C : std_logic;
@@ -165,7 +166,7 @@ begin
 
     SBX_Q <= std_logic_vector(AH(4 downto 1) & AL(4 downto 1));
 
-    if P_In(Flag_D) = '1' then
+    if P_In(Flag_D) = '1' and BCD_en = '1' then
       if AL(5) = '1' then
         AL(5 downto 1) := AL(5 downto 1) - 6;
       end if;
@@ -181,7 +182,7 @@ begin
   process (Op, P_In, BusA, BusB,
       ADC_Z, ADC_C, ADC_V, ADC_N, ADC_Q,
       SBC_Z, SBC_C, SBC_V, SBC_N, SBC_Q,
-      SBX_Q)
+      SBX_Q, BCD_en)
     variable Q_t : std_logic_vector(7 downto 0);
     variable Q2_t : std_logic_vector(7 downto 0);
   begin
@@ -226,7 +227,7 @@ begin
         Q_t := P_In(Flag_C) & (BusA(7 downto 1) and BusB(7 downto 1));
         P_Out(Flag_V) <= Q_t(5) xor Q_t(6);
         Q2_t := Q_t;
-        if P_In(Flag_D)='1' then
+        if P_In(Flag_D)='1' and BCD_en = '1' then
           if (BusA(3 downto 0) and BusB(3 downto 0)) > "0100" then
             Q2_t(3 downto 0) := std_logic_vector(unsigned(Q_t(3 downto 0)) + x"6");
           end if;

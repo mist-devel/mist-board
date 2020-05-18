@@ -1,6 +1,10 @@
 -- ****
 -- T65(b) core. In an effort to merge and maintain bug fixes ....
 --
+-- Ver 315 SzGy April 2020
+--   Reduced the IRQ detection delay when RDY is not asserted (NMI?)
+--   Undocumented opcodes behavior change during not RDY and page boundary crossing (VICE tests - cpu/sha, cpu/shs, cpu/shxy)
+--
 -- Ver 313 WoS January 2015
 --   Fixed issue that NMI has to be first if issued the same time as a BRK instruction is latched in
 --   Now all Lorenz CPU tests on FPGAARCADE C64 core (sources used: SVN version 1021) are OK! :D :D :D
@@ -129,17 +133,12 @@ library IEEE;
 
 entity T65 is
   port(
-    Mode    : in  std_logic_vector(1 downto 0); -- "00" => 6502, "01" => 65C02, "10" => 65C816
+    Mode    : in  std_logic_vector(1 downto 0);      -- "00" => 6502, "01" => 65C02, "10" => 65C816
     BCD_en  : in  std_logic := '1';             -- '0' => 2A03/2A07, '1' => others
 
     Res_n   : in  std_logic;
+    Enable  : in  std_logic;
     Clk     : in  std_logic;
-    Enable  : in  std_logic := '1';
-
-    A       : out std_logic_vector(23 downto 0);
-    DI      : in  std_logic_vector(7 downto 0);
-    DO      : out std_logic_vector(7 downto 0);
-
     Rdy     : in  std_logic := '1';
     Abort_n : in  std_logic := '1';
     IRQ_n   : in  std_logic := '1';
@@ -154,7 +153,11 @@ entity T65 is
     VP_n    : out std_logic;
     VDA     : out std_logic;
     VPA     : out std_logic;
-
+    A       : out std_logic_vector(23 downto 0);
+    DI      : in  std_logic_vector(7 downto 0);
+    DO      : out std_logic_vector(7 downto 0);
+    -- 6502 registers (MSB) PC, SP, P, Y, X, A (LSB)
+    Regs    : out std_logic_vector(63 downto 0);
     DEBUG   : out T_t65_dbg;
     NMI_ack : out std_logic
   );
@@ -178,6 +181,8 @@ architecture rtl of T65 is
 
   signal IR                 : std_logic_vector(7 downto 0);
   signal MCycle             : std_logic_vector(2 downto 0);
+
+  signal DO_r               : std_logic_vector(7 downto 0);
 
   signal Mode_r             : std_logic_vector(1 downto 0);
   signal BCD_en_r           : std_logic;
@@ -213,6 +218,7 @@ architecture rtl of T65 is
   signal Write_Data         : T_Write_Data;
   signal Jump               : std_logic_vector(1 downto 0);
   signal BAAdd              : std_logic_vector(1 downto 0);
+  signal BAQuirk            : std_logic_vector(1 downto 0);
   signal BreakAtNA          : std_logic;
   signal ADAdd              : std_logic;
   signal AddY               : std_logic;
@@ -235,6 +241,7 @@ architecture rtl of T65 is
   signal Res_n_i        : std_logic;
   signal Res_n_d        : std_logic;
 
+  signal rdy_mod        : std_logic; -- RDY signal turned off during the instruction
   signal really_rdy     : std_logic;
   signal WRn_i          : std_logic;
 
@@ -242,7 +249,7 @@ architecture rtl of T65 is
 
 begin
   NMI_ack <= NMIAct;
- 
+
   -- gate Rdy with read/write to make an "OK, it's really OK to stop the processor 
   really_rdy <= Rdy or not(WRn_i);
   Sync <= '1' when MCycle = "000" else '0';
@@ -263,6 +270,8 @@ begin
   DEBUG.S <= std_logic_vector(S(7 downto 0));
   DEBUG.P <= P;
 
+  Regs <= std_logic_vector(PC) & std_logic_vector(S)& P & Y(7 downto 0) & X(7 downto 0) & ABC(7 downto 0);
+
   mcode : entity work.T65_MCode
     port map(
 --inputs
@@ -270,6 +279,7 @@ begin
       IR          => IR,
       MCycle      => MCycle,
       P           => P,
+      Rdy_mod     => rdy_mod,
 --outputs
       LCycle      => LCycle,
       ALU_Op      => ALU_Op,
@@ -278,6 +288,7 @@ begin
       Write_Data  => Write_Data,
       Jump        => Jump,
       BAAdd       => BAAdd,
+      BAQuirk     => BAQuirk,
       BreakAtNA   => BreakAtNA,
       ADAdd       => ADAdd,
       AddY        => AddY,
@@ -345,6 +356,13 @@ begin
 
     elsif Clk'event and Clk = '1' then  
       if (Enable = '1') then
+        -- some instructions behavior changed by the Rdy line. Detect this at the correct cycles.
+        if MCycle  = "000" then
+          rdy_mod <= '0';
+        elsif ((MCycle = "011" and IR /= x"93") or (MCycle = "100" and IR = x"93")) and Rdy = '0' then
+          rdy_mod <= '1';
+        end if;
+
         if (really_rdy = '1') then
           WRn_i <= not Write or RstCycle;
 
@@ -384,7 +402,7 @@ begin
           if Inc_S = '1' then
             S <= S + 1;
           end if;
-          if Dec_S = '1' and (RstCycle = '0' or Mode="00") then  -- 6502 only?
+          if Dec_S = '1' and RstCycle = '0' then
             S <= S - 1;
           end if;
 
@@ -479,9 +497,11 @@ begin
 
           P<=tmpP;--new way
 
-          if IR(4 downto 0)/="10000" or Jump/="01" then -- delay interrupts during branches (checked with Lorenz test and real 6510), not best way yet, though - but works...
-            IRQ_n_o <= IRQ_n;
-          end if;
+        end if;
+
+        -- detect irq even if not rdy
+        if IR(4 downto 0)/="10000" or Jump/="01" or really_rdy = '0' then -- delay interrupts during branches (checked with Lorenz test and real 6510), not best way yet, though - but works...
+          IRQ_n_o <= IRQ_n;
         end if;
         -- detect nmi even if not rdy
         if IR(4 downto 0)/="10000" or Jump/="01" then -- delay interrupts during branches (checked with Lorenz test and real 6510) not best way yet, though - but works...
@@ -537,7 +557,13 @@ begin
           when "11" =>
             -- BA Adj
             if BAL(8) = '1' then
-              BAH <= std_logic_vector(unsigned(BAH) + 1);
+              -- Handle quirks with some undocumented opcodes crossing page boundary
+              case BAQuirk is
+              when "00" => BAH <= std_logic_vector(unsigned(BAH) + 1); -- no quirk
+              when "01" => BAH <= std_logic_vector(unsigned(BAH) + 1) and DO_r;
+              when "10" => BAH <= DO_r;
+              when others => null;
+              end case;
             end if;
           when others =>
           end case;
@@ -615,8 +641,10 @@ begin
   -- This is the P that gets pushed on stack with correct B flag. I'm not sure if NMI also clears B, but I guess it does.
   PwithB<=(P and x"ef") when (IRQCycle='1' or NMICycle='1') else P;
 
+  DO <= DO_r;
+
   with Write_Data_r select
-    DO <=
+    DO_r <=
       DL                                  when Write_Data_DL,
       ABC(7 downto 0)                     when Write_Data_ABC,
       X(7 downto 0)                       when Write_Data_X,
