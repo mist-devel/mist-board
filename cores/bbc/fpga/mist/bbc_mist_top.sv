@@ -71,9 +71,6 @@ wire 			core_r, core_g, core_b, core_hs, core_vs;
 wire			core_clken;
 
 // memory bus signals.
-wire [14:0] vid_adr;
-wire [7:0]  vid_data;
-
 wire [15:0] mem_adr;
 wire [3:0]  mem_romsel;
 
@@ -84,6 +81,7 @@ wire [7:0]  ram_do;
 wire [7:0]  mem_do;
 wire        mem_we;
 wire        mem_sync;
+wire        phi0;
 
 // core's raw audio 
 wire [15:0]	coreaud_l, coreaud_r;
@@ -269,8 +267,8 @@ wire reset_in = ~pll_ready || ~sdram_ready || status[0] ||
 
 // synchronize reset with memory state machine
 reg reset;
-always @(posedge mem_sync)
-	reset <= reset_in;
+always @(posedge clk_32m)
+	if (mem_sync) reset <= reset_in;
 
 // the autoboot feature simply works by pressing shift for 2 seconds after 
 // the bbc has been reset
@@ -297,6 +295,7 @@ bbc BBC(
 	.VIDEO_R    ( core_r        ),
 	.VIDEO_G    ( core_g        ),
 	.VIDEO_B    ( core_b        ),
+	.VIDEO_DE   ( video_de      ),
 
 	.MEM_ADR    ( mem_adr       ),
 	.MEM_WE     ( mem_we        ),
@@ -304,9 +303,7 @@ bbc BBC(
 	.MEM_DI     ( mem_di        ),
 	.MEM_SYNC   ( mem_sync      ),
 	.ROMSEL     ( mem_romsel    ),
-
-	.VID_ADR    ( vid_adr       ),
-	.VID_DI     ( vid_data      ),
+	.PHI0       ( phi0          ),
 
 	.SHIFT      ( autoboot_shift ),
 
@@ -347,6 +344,8 @@ wire sdram_we = loader_active?loader_we:(mem_we && (cpu_ram || sideways_ram));
 wire [7:0] sdram_di = 
 	loader_active?loader_data:mem_do;
 
+wire video_de;
+
 sdram sdram (
 	// interface to the MT48LC16M16 chip
 	.sd_data        ( SDRAM_DQ                 ),
@@ -370,9 +369,7 @@ sdram sdram (
 	.cpu_we         ( sdram_we                 ),
 	.cpu_do         ( ram_do                   ),
 
-	.vid_blnk       ( loader_active            ),
-	.vid_adr        ( { 9'd0, vid_adr }        ),
-	.vid_do         ( vid_data                 )
+	.vid_blnk       ( !video_de                ) // for refresh
 );
 
 wire [7:0] os_do;
@@ -405,6 +402,7 @@ wire basic_map = rommap?(mem_romsel == 4'h0):(mem_romsel == 4'he);
 wire mmfs_map = rommap?(mem_romsel == 4'h2):(mem_romsel == 4'hc);
 
 assign mem_di = 
+	~phi0 ? ram_do :
 	((mem_adr[15:14] == 2'b10) && basic_map) ? basic_do : 
 	((mem_adr[15:14] == 2'b10) && mmfs_map) ? mmfs_do :
 	((mem_adr[15:14] == 2'b10) && (mem_romsel == 4'ha)) ? ram_do :

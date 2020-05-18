@@ -39,6 +39,7 @@ module clocks(
 		
 		output wire cpu_cycle,
 		output wire cpu_clken,
+		output wire cpu_phi0,
 		
 		output wire vid_clken,
 		output wire ttxt_clken,
@@ -70,6 +71,9 @@ assign mhz1_clken = mhz2_clken & clken_counter[4];
 assign cpu_cycle = ~(clken_counter[0] | clken_counter[1] | clken_counter[2] | clken_counter[3]);
 //  0/16^M
 assign cpu_clken = cpu_cycle & ~cpu_cycle_mask[1] & ~cpu_cycle_mask[0];
+
+wire [4:0] clken_counter_next = clken_counter - 1'd1;
+assign cpu_phi0 = clken_counter_next[3];
 
 always @(posedge clk_32m)
    begin : clk_gen

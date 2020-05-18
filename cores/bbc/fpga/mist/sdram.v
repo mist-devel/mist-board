@@ -23,14 +23,14 @@
 module sdram (
 
 	// interface to the MT48LC16M16 chip
-	inout [15:0]  		sd_data,    // 16 bit bidirectional data bus
-	output reg [12:0]	sd_addr,    // 13 bit multiplexed address bus
-	output reg [1:0] 	sd_dqm,     // two byte masks
-	output reg[1:0] 	sd_ba,      // two banks
-	output 				sd_cs,      // a single chip select
-	output 				sd_we,      // write enable
-	output 				sd_ras,     // row address select
-	output 				sd_cas,     // columns address select
+	inout  reg [15:0] sd_data, // 16 bit bidirectional data bus
+	output reg [12:0]	sd_addr, // 13 bit multiplexed address bus
+	output reg [1:0]  sd_dqm,  // two byte masks
+	output reg[1:0]   sd_ba,   // two banks
+	output            sd_cs,   // a single chip select
+	output            sd_we,   // write enable
+	output            sd_ras,  // row address select
+	output            sd_cas,  // columns address select
 
 	// cpu/chipset interface
 	input 		 		init,			// init signal after FPGA config to initialize RAM
@@ -39,8 +39,6 @@ module sdram (
 	output            ready,      // sdram is done initializing
 
 	input					vid_blnk,
-	input [24:0]   	vid_adr,    // 24 bit video word address
-	output reg [7:0] 	vid_do,		// data output to video
 
 	input [7:0]  		cpu_di,		// data input from cpu
 	input [24:0]   	cpu_adr,    // 24 bit cpu word address
@@ -49,10 +47,10 @@ module sdram (
 );
 
 // no burst configured
-localparam RASCAS_DELAY   = 3'd2;   // tRCD>=20ns -> 2 cycles@64MHz
+localparam RASCAS_DELAY   = 3'd1;   // tRCD>=20ns -> 1 cycle@32MHz
 localparam BURST_LENGTH   = 3'b000; // 000=none, 001=2, 010=4, 011=8
 localparam ACCESS_TYPE    = 1'b0;   // 0=sequential, 1=interleaved
-localparam CAS_LATENCY    = 3'd3;   // 2/3 allowed
+localparam CAS_LATENCY    = 3'd2;   // 2/3 allowed
 localparam OP_MODE        = 2'b00;  // only 00 (standard operation) allowed
 localparam NO_WRITE_BURST = 1'b1;   // 0= write burst enabled, 1=only single access write
 
@@ -71,18 +69,18 @@ localparam STATE_LAST      = 3'd7;   // last state in cycle
 // itself to the cpu cycle. The first fill memory cycle is used for the CPU and the second
 // and fourth is used for video. The third cycle is refresh
 
-reg [4:0] q;
+reg [3:0] q;
 always @(posedge clk) begin
 	// 32Mhz counter synchronous to cpu
-	if( sync ) q <= 5'd0;
-	else  	  q <= q + 5'd1;
+	if( sync ) q <= 0;
+	else  	  q <= q + 1'd1;
 end
 
-wire cpu_cyc = (q[4:3] == 2'b00);
-wire vid_cyc = (q[3] == 1'b1);
+wire cpu_cyc = q[3];
+wire vid_cyc = ~q[3];
 
 // switch between video and cpu address
-wire [24:0] addr = vid_cyc?vid_adr:cpu_adr;
+wire [24:0] addr = cpu_adr;
 
 // ---------------------------------------------------------------------
 // --------------------------- startup/reset ---------------------------
@@ -122,24 +120,10 @@ assign sd_ras = sd_cmd[2];
 assign sd_cas = sd_cmd[1];
 assign sd_we  = sd_cmd[0];
 
-// drive data if it's the cpu cycle and if the cpu writes
-wire cpu_cycle_write = cpu_we && (q[4:3]==2'b00);
-assign sd_data = cpu_cycle_write?{cpu_di,cpu_di}:16'bZZZZZZZZZZZZZZZZ;
-
 always @(posedge clk) begin
-	// latch cpu data at the end of the cpu cycle
-	if(cpu_cyc && (q[2:0] == 7) && !cpu_we)
-		cpu_do <= cpu_adr[0]?sd_data[7:0]:sd_data[15:8];
 
-	// latch video data at end of video cycle
-	if(vid_cyc && (q[2:0] == 7)) begin
-		if(vid_blnk)
-			vid_do = 8'h00;
-		else
-			vid_do <= vid_adr[0]?sd_data[7:0]:sd_data[15:8];
-	end
-		
 	sd_cmd <= CMD_INHIBIT;
+	sd_data <= 16'bZZZZZZZZZZZZZZZZ;
 
 	if(reset != 0) begin
 		sd_ba <= 2'b00;
@@ -153,26 +137,32 @@ always @(posedge clk) begin
 			if(reset ==  2)  sd_cmd <= CMD_LOAD_MODE;
 		end
 	end else begin
-		if(q[2:0] <= STATE_CMD_START) begin	
-			sd_addr <= addr[21:9];
-			sd_ba <= addr[23:22];
-			sd_dqm <= { addr[0], !addr[0] };
-		end else
-			sd_addr <= { 4'b0010, addr[24], addr[8:1]};
-	
+
 		if(q[2:0] == STATE_IDLE) begin
 			sd_cmd <= CMD_AUTO_REFRESH;
 			
-			if(cpu_cyc || (vid_cyc)&&(!vid_blnk))	// CPU or video transfers data
+			if(cpu_cyc || (vid_cyc && !vid_blnk)) begin// CPU or video transfers data
 				sd_cmd <= CMD_ACTIVE;
+				sd_addr <= addr[21:9];
+				sd_ba <= addr[23:22];
+				sd_dqm <= { addr[0], !addr[0] };
+			end
+
 		end else if(q[2:0] == STATE_CMD_CONT) begin
+			sd_addr <= { 4'b0010, addr[24], addr[8:1]};
 			if(cpu_cyc) begin  			// CPU reads or writes
-				if(cpu_we)	 sd_cmd <= CMD_WRITE;
+				if(cpu_we) begin
+					sd_cmd <= CMD_WRITE;
+					sd_data <= {cpu_di,cpu_di};
+				end
 				else 			 sd_cmd <= CMD_READ;
 			end else if(vid_cyc && !vid_blnk)      // video always reads
 								 sd_cmd <= CMD_READ;
-		end 
+		end else if (q[2:0] == 5) begin
+			cpu_do <= addr[0]?sd_data[7:0]:sd_data[15:8];
+		end
 	end
+
 end
 
 endmodule

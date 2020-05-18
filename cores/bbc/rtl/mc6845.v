@@ -47,7 +47,6 @@
 module mc6845 (
            CLOCK,
            CLKEN,
-           CLKEN_ADR,
            nRESET,
            ENABLE,
            R_nW,
@@ -67,7 +66,6 @@ module mc6845 (
 
 input   CLOCK;
 input   CLKEN;
-input   CLKEN_ADR;
 input   nRESET;
 input   ENABLE;
 input   R_nW;
@@ -537,7 +535,7 @@ always @(posedge CLOCK) begin
         RA <= 'd0;
         MA <= 'd0;
     end
-    else if (CLKEN_ADR === 1'b 1 ) begin
+    else if (CLKEN === 1'b 1 ) begin
 
         //  Character row address is just the scan line counter delayed by
         //  one clock to line up with the syncs.

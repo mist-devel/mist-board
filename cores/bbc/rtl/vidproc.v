@@ -46,8 +46,8 @@ module vidproc (
            input   		CLOCK,
            input   		CLKEN,
            input   		nRESET,
+           input      MHZ1_CLKEN, // sync to the clock generator
            output  		CLKEN_CRTC,
-			  output       CLKEN_CRTC_ADR,
            input   		ENABLE,
            input   		A0,
            input [7:0] 	DI_CPU,
@@ -77,17 +77,19 @@ reg     [3:0] palette [0:15];
 reg     [7:0] shiftreg;
 
 //  Delayed display enable
-reg     delayed_disen;
+reg     delayed_disen1, delayed_disen2;
 
 //  Internal clock enable generation
 wire    clken_pixel;
 wire    clken_fetch;
+wire    mhz4_clken;
 reg     [3:0] clken_counter;
 
 //  Cursor generation - can span up to 32 pixels
 //  Segments 0 and 1 are 8 pixels wide
 //  Segment 2 is 16 pixels wide
 wire    cursor_invert;
+reg     cursor_invert_delayed;
 reg     cursor_active;
 reg     [1:0] cursor_counter;
 
@@ -96,7 +98,7 @@ integer  V2V_colour;
 
 always @(posedge CLOCK) begin : process_1
 
-    if (nRESET === 1'b 0) begin
+    if (~nRESET) begin
         r0_cursor0 <= 1'b 0;
         r0_cursor1 <= 1'b 0;
         r0_cursor2 <= 1'b 0;
@@ -110,7 +112,7 @@ always @(posedge CLOCK) begin : process_1
         end
     end
     else begin
-        if (ENABLE === 1'b 1) begin
+        if (ENABLE) begin
             if (A0 === 1'b 0) begin
 
                 //  Access control register
@@ -135,90 +137,87 @@ end
 //  Pixel clock can be divided by 1,2,4 or 8 depending on the value
 //  programmed at r0_pixel_rate
 //  00 = /8, 01 = /4, 10 = /2, 11 = /1
+
 assign clken_pixel = r0_pixel_rate === 2'b 11 ? CLKEN :
-       r0_pixel_rate === 2'b 10 ? CLKEN & ~clken_counter[0] :
-       r0_pixel_rate === 2'b 01 ? CLKEN & ~(clken_counter[0] | clken_counter[1]) :
-       CLKEN & ~(clken_counter[0] | clken_counter[1] | clken_counter[2]);
+       r0_pixel_rate === 2'b 10 ? CLKEN & clken_counter[0] :
+       r0_pixel_rate === 2'b 01 ? CLKEN & clken_counter[0] & clken_counter[1] :
+       CLKEN & clken_counter[0] & clken_counter[1] & ~clken_counter[2];
 
 //  The CRT controller is always enabled in the 15th cycle, so that the result
-//  is ready for latching into the shift register in cycle 0.  If 2 MHz mode is
+//  is ready for latching into the shift register in cycle 3.  If 2 MHz mode is
 //  selected then the CRTC is also enabled in the 7th cycle
 assign CLKEN_CRTC = CLKEN & clken_counter[0] & clken_counter[1] & clken_counter[2] &
        (clken_counter[3] | r0_crtc_2mhz);
 
-// extra signal for crtc address setup a little earlier		 
-assign CLKEN_CRTC_ADR = CLKEN & clken_counter[0] & clken_counter[1] & !clken_counter[2] &
-       (clken_counter[3] | r0_crtc_2mhz);
-
-//  The result is fetched from the CRTC in cycle 0 and also cycle 8 if 2 MHz
+//  The result is fetched from the RAM in cycle 11 and also cycle 3 if 2 MHz
 //  mode is selected.  This is used for reloading the shift register as well as
 //  counting cursor pixels
-assign clken_fetch = CLKEN & ~(clken_counter[0] | clken_counter[1] | clken_counter[2] | clken_counter[3] & ~r0_crtc_2mhz);
-
+assign mhz4_clken = CLKEN & ~clken_counter[2] & clken_counter[1] & clken_counter[0];
+assign clken_fetch = mhz4_clken & (clken_counter[3] | r0_crtc_2mhz);
 
 wire [7:0]  shiftreg_nxt = clken_fetch ? DI_RAM :
      clken_pixel ? {shiftreg[6:0], 1'b 1} : shiftreg;
 
 always @(posedge CLOCK)  begin : process_2
 
-    if (nRESET === 1'b 0) begin
-        clken_counter <= 'd0;
+    if (~nRESET) begin
+        clken_counter <= 0;
     end
-    else if (CLKEN === 1'b 1 ) begin
-
-        //  Increment internal cycle counter during each video clock
-        clken_counter <= clken_counter + 1;
+    else if (CLKEN) begin
+        if (MHZ1_CLKEN)
+            clken_counter <= 0;
+        else
+            //  Increment internal cycle counter during each video clock
+            clken_counter <= clken_counter + 1'd1;
     end
 end
 
 //  Fetch control
-
 always @(posedge CLOCK) begin : process_3
 
-    if (nRESET === 1'b 0) begin
-
-        shiftreg <= 'd0;
-
+    if (~nRESET) begin
+        shiftreg <= 0;
     end
     else begin
-
         shiftreg <= shiftreg_nxt;
-
     end
 end
 
 //  Cursor generation
 assign cursor_invert = cursor_active & (r0_cursor0 & ~(cursor_counter[0] | cursor_counter[1]) |
-                                        r0_cursor1 & cursor_counter[0] & ~cursor_counter[1] | r0_cursor2 &
-                                        cursor_counter[1]);
+                                       (r0_cursor1 & cursor_counter[0] & ~cursor_counter[1]) |
+                                       (r0_cursor2 & cursor_counter[1]));
+
+// delayed cursor for teletext
+always @(posedge CLOCK) if (mhz4_clken) cursor_invert_delayed <= cursor_invert;
 
 always @(posedge CLOCK) begin : process_4
 
-    if (nRESET === 1'b 0) begin
-        cursor_active <= 'd0;
-        cursor_counter <= 'd0;
+    if (~nRESET) begin
+        cursor_active <= 0;
+        cursor_counter <= 0;
     end
-    else if (clken_fetch === 1'b 1 ) begin
-        if ((CURSOR | cursor_active) === 1'b 1) begin
+    else if (clken_fetch) begin
 
+        if (CURSOR | cursor_active) begin
             //  Latch cursor
-            cursor_active <= 1'b 1;
+            cursor_active <= 1;
 
             //  Reset on counter wrap
             if (cursor_counter === 2'b 11) begin
-                cursor_active <= 1'b 0;
+                cursor_active <= 0;
             end
 
             //  Increment counter
-            if (cursor_active === 1'b 0) begin
+            if (!cursor_active) begin
 
                 //  Reset
-                cursor_counter <= {2{1'b 0}};
+                cursor_counter <= 0;
 
-                //  Increment
             end
             else begin
-                cursor_counter <= cursor_counter + 1;
+                //  Increment
+                cursor_counter <= cursor_counter + 1'd1;
             end
         end
     end
@@ -226,7 +225,7 @@ end
 
 //  Pixel generation
 //  The new shift register contents are loaded during
-//  cycle 0 (and 8) but will not be read here until the next cycle.
+//  cycle 11 (and 3) but will not be read here until the next cycle.
 //  By running this process on every single video tick instead of at
 //  the pixel rate we ensure that the resulting delay is minimal and
 //  constant (running this at the pixel rate would cause
@@ -239,30 +238,35 @@ end
 //  bit 1 - Not GREEN
 //  bit 0 - Not RED
 
-wire [3:0]  palette_a 	= {shiftreg[7], shiftreg[5], shiftreg[3], shiftreg[1]};
-wire [3:0]  dot_val		= palette[palette_a];
+wire [3:0]  palette_a = {shiftreg[7], shiftreg[5], shiftreg[3], shiftreg[1]};
+wire [3:0]  dot_val   = palette[palette_a];
 
 //  Apply flash inversion if required
-wire	red_val 	= dot_val[3] & r0_flash ^ ~dot_val[0];
-wire 	green_val 	= dot_val[3] & r0_flash ^ ~dot_val[1];
-wire 	blue_val 	= dot_val[3] & r0_flash ^ ~dot_val[2];
+wire	red_val   = dot_val[3] & r0_flash ^ ~dot_val[0];
+wire 	green_val = dot_val[3] & r0_flash ^ ~dot_val[1];
+wire 	blue_val  = dot_val[3] & r0_flash ^ ~dot_val[2];
+
+//  Display enable signal delayed by one clock
+always @(posedge CLOCK) begin
+    if (mhz4_clken) begin
+        delayed_disen1 <= DISEN;
+        delayed_disen2 <= delayed_disen1;
+    end
+end
+wire delayed_disen = r0_crtc_2mhz ? delayed_disen1 : delayed_disen2;
 
 always @(posedge CLOCK) begin
 
-    if (nRESET === 1'b 0) begin
-
-        R 	<=	'd0;
-        G 	<= 	'd0;
-        B 	<= 	'd0;
-
-        delayed_disen <= 'd0;
-
+    if (~nRESET) begin
+        R <= 0;
+        G <= 0;
+        B <= 0;
     end
-    else if (CLKEN === 1'b1) begin
+    else if (CLKEN) begin
 
         //  To output
         //  FIXME: INVERT option
-        if (r0_teletext === 1'b0) begin
+        if (!r0_teletext) begin
 
             //  Cursor can extend outside the bounds of the screen, so
             //  it is not affected by DISEN
@@ -273,17 +277,14 @@ always @(posedge CLOCK) begin
         end
         else begin
 
-            R <= R_IN ^ cursor_invert;
-            G <= G_IN ^ cursor_invert;
-            B <= B_IN ^ cursor_invert;
+            R <= R_IN ^ cursor_invert_delayed;
+            G <= G_IN ^ cursor_invert_delayed;
+            B <= B_IN ^ cursor_invert_delayed;
 
         end
 
-        //  Display enable signal delayed by one clock
-        delayed_disen <= DISEN;
     end
 
 end
 
 endmodule // module vidproc
-

@@ -3,54 +3,52 @@
 module bbc(
 
 	input		    CLK32M_I,
-	input			CLK24M_I,
-	
-  	input 			RESET_I,
-	
-	output			HSYNC,
-	output			VSYNC,
-	
-	output			VIDEO_CLKEN, 
-	output  		VIDEO_R,
-	output  		VIDEO_G,
-	output  		VIDEO_B,
-    
-    // RAM Interface (CPU)
-    
-    output [15:0]   MEM_ADR,
-    output          MEM_WE,
-    output [7:0]    MEM_DO,
-    input  [7:0]    MEM_DI,
-	 output [3:0]    ROMSEL,
-   
-	 output          MEM_SYNC,   // signal to synchronite sdram state machine
-	
-    output [14:0]   VID_ADR,
-    input  [7:0]    VID_DI,
-    
+	input       CLK24M_I,
+
+	input       RESET_I,
+
+	output      HSYNC,
+	output      VSYNC,
+
+	output      VIDEO_CLKEN, 
+	output      VIDEO_R,
+	output      VIDEO_G,
+	output      VIDEO_B,
+	output      VIDEO_DE,
+
+	// RAM Interface (CPU)
+	output [15:0] MEM_ADR,
+	output        MEM_WE,
+	output [7:0]  MEM_DO,
+	input  [7:0]  MEM_DI,
+	output [3:0]  ROMSEL,
+
+	output        MEM_SYNC,   // signal to synchronite sdram state machine
+	output        PHI0,
+
 	// Keyboard interface
-	input 			PS2_CLK,
-	input 			PS2_DAT,
-	
+	input         PS2_CLK,
+	input         PS2_DAT,
+
 	// audio signal.
 	output [15:0]	AUDIO_L,
 	output [15:0]	AUDIO_R,
 
 	// externally pressed "shift" key for autoboot
-	input          SHIFT,
+	input         SHIFT,
 
-	output         SDSS,
-	output         SDCLK,
-	output         SDMOSI,
-	input          SDMISO,
-	
+	output        SDSS,
+	output        SDCLK,
+	output        SDMOSI,
+	input         SDMISO,
+
 	// analog joystick input 
 	input [1:0]	 	joy_but,
 	input [7:0] 	joy0_axis0,
 	input [7:0] 	joy0_axis1,
 	input [7:0] 	joy1_axis0,
 	input [7:0] 	joy1_axis1,
-	
+
 	// boot settings
 	input [7:0]		DIP_SWITCH
 );
@@ -58,6 +56,8 @@ module bbc(
 // let sdram state machine synchronize to cpu
 assign MEM_SYNC = cpu_clken;
 assign ROMSEL = romsel;
+assign PHI0 = cpu_phi0;
+assign VIDEO_DE = crtc_de;
 
 wire 		  ram_we;
 
@@ -76,6 +76,7 @@ wire tube_clken;
 
 wire cpu_clken;
 wire cpu_cycle;
+wire cpu_phi0;
 
 // decode signals
 wire    ddr_enable;
@@ -248,6 +249,7 @@ clocks CLOCKS(
 	
 	.cpu_cycle		( cpu_cycle		),
 	.cpu_clken		( cpu_clken		),
+	.cpu_phi0     ( cpu_phi0    ),
 	
 	.ttxt_clken		( ttxt_clken	),
 	.ttxt_clkenx2	( ttxt_clkenx2	),
@@ -262,9 +264,9 @@ address_decode ADDRDECODE(
 	.ram_enable(ram_enable),
 	.rom_enable(rom_enable),
 	.mos_enable(mos_enable),
-    .io_fred(io_fred), 
-    .io_jim(io_jim),
-    .io_sheila(io_sheila),
+	.io_fred(io_fred), 
+	.io_jim(io_jim),
+	.io_sheila(io_sheila),
 	.crtc_enable(crtc_enable),
 	.acia_enable(acia_enable),
 	.serproc_enable(serproc_enable),
@@ -290,7 +292,7 @@ T65 CPU (
 	.IRQ_n  (cpu_irq_n),
 	.SO_n   (cpu_so_n),
 	.R_W_n  (cpu_r_nw),
-	
+
 	.DI     (cpu_di),
 	.DO     (cpu_do),
 	.A      (cpu_a)
@@ -412,7 +414,6 @@ adc ADC (
 mc6845 CRTC (
 	 .CLOCK(CLK32M_I),
 	 .CLKEN(crtc_clken),
-	 .CLKEN_ADR(crtc_clken_adr),
 	 .nRESET(reset_n),
 	 .ENABLE(crtc_enable),
 	 .R_nW(cpu_r_nw),
@@ -449,11 +450,10 @@ vidproc VIDEO_ULA (
 		.CLKEN(VIDEO_CLKEN),
 		.nRESET(reset_n),
 		.CLKEN_CRTC(crtc_clken),
-		.CLKEN_CRTC_ADR(crtc_clken_adr),
 		.ENABLE(vidproc_enable),
 		.A0(cpu_a[0]),
 		.DI_CPU(cpu_do),
-		.DI_RAM(VID_DI[7:0]),
+		.DI_RAM(MEM_DI[7:0]),
 		.nINVERT(vidproc_invert_n),
 		.DISEN(vidproc_disen),
 		.CURSOR(crtc_cursor),
@@ -469,26 +469,24 @@ vidproc VIDEO_ULA (
 
 saa5050 TELETEXT (
 
-		  //  This runs at 6 MHz, which we can't derive from the 32 MHz clock
-	    .CLOCK		( CLK24M_I		),
-		 .CLKEN		( ttxt_clken	),
-		 .PIXCLKEN	( ttxt_clkenx2	),
-		 .nRESET		( reset_n		),
-		 		 
-		  //  Data input is synchronised to the main cpu bus clock.
-		 .DI_CLOCK	( CLK32M_I		),
-		 .DI_CLKEN	( VIDEO_CLKEN	),
-		 .DI			( VID_DI[6:0]	),
-	
-		 .GLR			( ttxt_glr		),
-		 .DEW			( ttxt_dew		),
-		 .CRS			( ttxt_crs		),
-		 .LOSE		( ttxt_lose		),
-		
-		 .R			( ttxt_r			),
-		 .G			( ttxt_g			),
-		 .B			( ttxt_b			)
+	//  This runs at 6 MHz, which we can't derive from the 32 MHz clock
+	.CLOCK    ( CLK24M_I     ),
+	.CLKEN    ( ttxt_clkenx2 ),
+	.nRESET   ( reset_n      ),
 
+	//  Data input is synchronised to the main cpu bus clock.
+	.DI_CLOCK ( CLK32M_I     ),
+	.DI_CLKEN ( VIDEO_CLKEN & mhz4_clken & ~mhz2_clken ),
+	.DI       ( MEM_DI[6:0]  ),
+
+	.GLR      ( ttxt_glr     ),
+	.DEW      ( ttxt_dew     ),
+	.CRS      ( ttxt_crs     ),
+	.LOSE     ( ttxt_lose    ),
+
+	.R        ( ttxt_r       ),
+	.G        ( ttxt_g       ),
+	.B        ( ttxt_b       )
 );
 
 initial begin : via_init   
@@ -655,11 +653,8 @@ assign sys_via_pb_in[3:0] = sys_via_pb_out[3:0];
 assign user_via_pa_in = user_via_pa_out; 
 assign user_via_pb_in = user_via_pb_out;
 
-
-
-assign MEM_ADR = cpu_a[15:0];
-assign VID_ADR = display_a;
-assign MEM_WE = ram_we;
+assign MEM_ADR = cpu_phi0 ? cpu_a[15:0] : display_a;
+assign MEM_WE = ram_we & cpu_phi0;
 assign MEM_DO = cpu_do;
 
 endmodule
