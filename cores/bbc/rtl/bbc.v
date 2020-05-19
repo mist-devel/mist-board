@@ -127,8 +127,6 @@ wire    crtc_cursor;
 reg     crtc_lpstb; 
 wire    [13:0] crtc_ma; 
 wire    [4:0] crtc_ra; 
-wire 	  crtc_interlace;
-wire    crtc_odd_field;
 
 //  Decoded display address after address translation for hardware
 //  scrolling
@@ -426,9 +424,7 @@ mc6845 CRTC (
 	 .CURSOR(crtc_cursor),
 	 .LPSTB(crtc_lpstb),
 	 .MA(crtc_ma),
-	 .RA(crtc_ra),
-	 .ODDFIELD(crtc_odd_field),
-	 .INTERLACE(crtc_interlace)
+	 .RA(crtc_ra)
 );
 
 // no sound in the simulator.

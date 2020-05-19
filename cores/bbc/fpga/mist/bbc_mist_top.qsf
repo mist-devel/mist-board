@@ -165,13 +165,13 @@ set_location_assignment PLL_1 -to CLOCKS|altpll_component|auto_generated|pll1
 set_global_assignment -name VERILOG_FILE ../rtl/sigma_delta_dac.v
 set_global_assignment -name VERILOG_FILE ../rtl/audio.v
 set_global_assignment -name VERILOG_FILE ../../rtl/adc.v
-set_global_assignment -name VERILOG_FILE ../../rtl/mc6845.v
 set_global_assignment -name VERILOG_FILE ../../rtl/ps2_intf.v
 set_global_assignment -name VERILOG_FILE ../../rtl/vidproc.v
 set_global_assignment -name VERILOG_FILE ../../rtl/keyboard.v
 set_global_assignment -name VERILOG_FILE ../../rtl/clocks.v
 set_global_assignment -name VERILOG_FILE ../../rtl/address_decode.v
 set_global_assignment -name VERILOG_FILE ../../rtl/bbc.v
+set_global_assignment -name VHDL_FILE ../../rtl/mc6845.vhd
 set_global_assignment -name VHDL_FILE ../../rtl/via6522.vhd
 set_global_assignment -name VHDL_FILE ../../rtl/saa5050/saa5050_rom_dual_port.vhd
 set_global_assignment -name VHDL_FILE ../../rtl/saa5050/saa5050.vhd

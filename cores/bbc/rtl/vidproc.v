@@ -153,7 +153,7 @@ assign CLKEN_CRTC = CLKEN & clken_counter[0] & clken_counter[1] & clken_counter[
 //  mode is selected.  This is used for reloading the shift register as well as
 //  counting cursor pixels
 assign mhz4_clken = CLKEN & ~clken_counter[2] & clken_counter[1] & clken_counter[0];
-assign clken_fetch = mhz4_clken & (clken_counter[3] | r0_crtc_2mhz);
+assign clken_fetch = mhz4_clken & (~clken_counter[3] | r0_crtc_2mhz);
 
 wire [7:0]  shiftreg_nxt = clken_fetch ? DI_RAM :
      clken_pixel ? {shiftreg[6:0], 1'b 1} : shiftreg;
@@ -187,9 +187,6 @@ end
 assign cursor_invert = cursor_active & (r0_cursor0 & ~(cursor_counter[0] | cursor_counter[1]) |
                                        (r0_cursor1 & cursor_counter[0] & ~cursor_counter[1]) |
                                        (r0_cursor2 & cursor_counter[1]));
-
-// delayed cursor for teletext
-always @(posedge CLOCK) if (mhz4_clken) cursor_invert_delayed <= cursor_invert;
 
 always @(posedge CLOCK) begin : process_4
 
@@ -247,13 +244,11 @@ wire 	green_val = dot_val[3] & r0_flash ^ ~dot_val[1];
 wire 	blue_val  = dot_val[3] & r0_flash ^ ~dot_val[2];
 
 //  Display enable signal delayed by one clock
-always @(posedge CLOCK) begin
-    if (mhz4_clken) begin
-        delayed_disen1 <= DISEN;
-        delayed_disen2 <= delayed_disen1;
-    end
-end
-wire delayed_disen = r0_crtc_2mhz ? delayed_disen1 : delayed_disen2;
+reg delayed_disen;
+always @(posedge CLOCK) if (mhz4_clken) delayed_disen <= DISEN;
+
+// delayed cursor for teletext
+always @(posedge CLOCK) if (CLKEN) cursor_invert_delayed <= cursor_invert;
 
 always @(posedge CLOCK) begin
 
