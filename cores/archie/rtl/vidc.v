@@ -106,7 +106,7 @@ wire		vidrq_int;
 
 reg      cepix;
 
-always @(negedge clkpix) begin
+always @(posedge clkpix) begin
 	reg [2:0] div6 = 0;
 	reg [1:0] div4 = 0;
 
