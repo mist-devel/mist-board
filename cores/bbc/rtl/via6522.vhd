@@ -1,17 +1,15 @@
 -------------------------------------------------------------------------------
---
--- (C) COPYRIGHT 2007-2017, Gideon's Logic Architectures
---
--------------------------------------------------------------------------------
 -- Title      : VIA 6522
 -------------------------------------------------------------------------------
 -- Author     : Gideon Zweijtzer  <gideon.zweijtzer@gmail.com>
 -------------------------------------------------------------------------------
 -- Description: This module implements the 6522 VIA chip.
---              Please note: A LOT OF REVERSE ENGINEERING has been done to
---              make this module as accurate as it is now. Please do not copy
---              (use in your own projects) without written permission of the
---              author.
+--              A LOT OF REVERSE ENGINEERING has been done to make this module
+--              as accurate as it is now. Thanks to gyurco for ironing out some
+--              differences that were left unnoticed.
+-------------------------------------------------------------------------------
+-- License:     GPL 3.0 - Free to use, distribute and change to your own needs.
+--              Leaving a reference to the author will be highly appreciated.
 -------------------------------------------------------------------------------
 library ieee;
 use ieee.std_logic_1164.all;
@@ -704,3 +702,4 @@ begin
         end process;                
     end block ser;
 end Gideon;
+
