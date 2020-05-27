@@ -420,7 +420,7 @@ audio	AUDIO	(
 	.audio_r     ( AUDIO_R    )
 );
 
-mist_video #(.COLOR_DEPTH(1), .SD_HCNT_WIDTH(10)) mist_video (
+mist_video #(.COLOR_DEPTH(1), .SD_HCNT_WIDTH(10), .SYNC_AND(1)) mist_video (
 	.clk_sys     ( clk_32m    ),
 
 	// OSD SPI interface
@@ -450,8 +450,8 @@ mist_video #(.COLOR_DEPTH(1), .SD_HCNT_WIDTH(10)) mist_video (
 	.G           ( core_g     ),
 	.B           ( core_b     ),
 
-	.HSync       ( core_hs    ),
-	.VSync       ( core_vs    ),
+	.HSync       ( ~core_hs   ),
+	.VSync       ( ~core_vs   ),
 
 	// MiST video output signals
 	.VGA_R       ( VGA_R      ),
