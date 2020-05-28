@@ -348,8 +348,8 @@ end component cartridge;
 	signal st_reset            : std_logic;                    -- status(0)
 
 	signal sd_lba         : std_logic_vector(31 downto 0);
-	signal sd_rd          : std_logic;
-	signal sd_wr          : std_logic;
+	signal sd_rd          : std_logic_vector(1 downto 0);
+	signal sd_wr          : std_logic_vector(1 downto 0);
 	signal sd_ack         : std_logic;
 	signal sd_ack_conf    : std_logic;
 	signal sd_conf        : std_logic;
@@ -358,7 +358,7 @@ end component cartridge;
 	signal sd_buff_dout   : std_logic_vector(7 downto 0);
 	signal sd_buff_din    : std_logic_vector(7 downto 0);
 	signal sd_buff_wr     : std_logic;
-	signal sd_change      : std_logic;
+	signal sd_change      : std_logic_vector(1 downto 0);
 	signal disk_readonly  : std_logic;
 	signal old_download     : std_logic;	
 	signal sdram_we : std_logic;
@@ -487,7 +487,7 @@ begin
 	user_io_d : user_io
 	generic map (
 		STRLEN => CONF_STR'length,
-		ROM_DIRECT_UPLOAD => 1,
+		ROM_DIRECT_UPLOAD => true,
 		PS2DIV => 1000
 	)
 	port map (
@@ -1151,6 +1151,9 @@ begin
 		end if;
 	end process;
 
+	sd_rd(1) <= '0';
+	sd_wr(1) <= '0';
+
 	c1541_sd_inst : entity work.c1541_sd
 	port map
 	(
@@ -1162,7 +1165,7 @@ begin
 		c1541rom_data => ioctl_data,
 		c1541rom_wr => c1541rom_wr,
 
-		disk_change => sd_change,
+		disk_change => sd_change(0),
 		disk_num  => (others => '0'), -- always 0 on MiST, the image is selected by the OSD menu
 		disk_readonly => disk_readonly,
 
@@ -1175,8 +1178,8 @@ begin
 		iec_clk_o  => c1541_iec_clk_o,
 
 		sd_lba => sd_lba,
-		sd_rd  => sd_rd,
-		sd_wr  => sd_wr,
+		sd_rd  => sd_rd(0),
+		sd_wr  => sd_wr(0),
 		sd_ack => sd_ack,
 		sd_buff_addr => sd_buff_addr,
 		sd_buff_dout => sd_buff_dout,
