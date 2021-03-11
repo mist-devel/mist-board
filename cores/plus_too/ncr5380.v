@@ -215,7 +215,7 @@ module ncr5380
 			end
 		end
 	end
-   
+
 	/* CSR (read only). We don't do parity */
 	assign csr = { scsi_rst, scsi_bsy, scsi_req, scsi_msg,
 	               scsi_cd, scsi_io, scsi_sel, 1'b0 };	
@@ -241,7 +241,7 @@ module ncr5380
 	wire scsi_bsy = 
 	    icr[`ICR_A_BSY] |
 	    scsi2_bsy |
-	    //scsi6_bsy |
+	    scsi6_bsy |
 	    mr[`MR_ARB];
 
 	/* Remains of simplified arbitration logic */
@@ -256,7 +256,7 @@ module ncr5380
 	wire scsi_rst = icr[`ICR_A_RST];
 	wire scsi_ack = icr[`ICR_A_ACK] | dma_ack;
 	wire scsi_atn = icr[`ICR_A_ATN];
-
+/*
 	wire scsi_cd  = scsi2_cd;
 	wire scsi_io  = scsi2_io;
 	wire scsi_msg = scsi2_msg;
@@ -266,13 +266,14 @@ module ncr5380
 
 	assign io_lba      = io_lba_2;
 	assign sd_buff_din = sd_buff_din_2;
+*/
 	/* Other trivial lines set by target */
-	/*
+
 	wire scsi_cd  = (scsi2_bsy) ? scsi2_cd : scsi6_cd;
 	wire scsi_io  = (scsi2_bsy) ? scsi2_io : scsi6_io;
 	wire scsi_msg = (scsi2_bsy) ? scsi2_msg : scsi6_msg;
 	wire scsi_req = (scsi2_bsy) ? scsi2_req : scsi6_req;
-	
+
 	assign din = scsi2_bsy ? scsi2_dout : 
 	             scsi6_bsy ? scsi6_dout : 
 	             8'h55;
@@ -280,7 +281,7 @@ module ncr5380
 	assign io_lba      = (scsi2_bsy) ? io_lba_2 : io_lba_6;
 	assign sd_buff_din = (scsi2_bsy) ? sd_buff_din_2 : sd_buff_din_6;
 	assign io_req_type = 16'h0000;	// Not used atm. Could be used for CD-ROM sector requests later. ElectronAsh.
-*/
+
 	// input signals from target 2
 	wire scsi2_bsy, scsi2_msg, scsi2_io, scsi2_cd, scsi2_req;
 	wire [7:0] scsi2_dout;
@@ -309,11 +310,11 @@ module ncr5380
 
 		// connection to io controller to read and write sectors
 		// to sd card
-		.img_mounted(img_mounted[0]),
+		.img_mounted(img_mounted[1]),
 		.img_blocks(img_size[31:9]),
 		.io_lba ( io_lba_2 ),
-		.io_rd  ( io_rd[0] ),
-		.io_wr  ( io_wr[0] ),
+		.io_rd  ( io_rd[1] ),
+		.io_wr  ( io_wr[1] ),
 		.io_ack ( io_ack & scsi2_bsy ),
 
 		.sd_buff_addr( sd_buff_addr ),
@@ -322,7 +323,7 @@ module ncr5380
 		.sd_buff_wr( sd_buff_wr & scsi2_bsy )
 	);
 
-/*
+
 	// input signals from target 6
 	wire scsi6_bsy, scsi6_msg, scsi6_io, scsi6_cd, scsi6_req;
 	wire [7:0] scsi6_dout;
@@ -332,29 +333,29 @@ module ncr5380
 
 	scsi #(.ID(6)) scsi6
 	(
-		.clk		( clk ) ,           // input  clk
-		.rst		( scsi_rst ) ,      // input  rst
-		.sel		( scsi_sel ) ,      // input  sel
-		.atn		( scsi_atn ) ,      // input  atn
+		.clk    ( clk ) ,           // input  clk
+		.rst    ( scsi_rst ) ,      // input  rst
+		.sel    ( scsi_sel ) ,      // input  sel
+		.atn    ( scsi_atn ) ,      // input  atn
 		
-		.ack		( scsi_ack ) ,      // input  ack
+		.ack    ( scsi_ack ) ,      // input  ack
 		
-		.bsy		( scsi6_bsy ) ,     // output  bsy
-		.msg		( scsi6_msg ) ,     // output  msg
-		.cd         ( scsi6_cd ) ,      // output  cd
-		.io         ( scsi6_io ) ,      // output  io
-		.req		( scsi6_req ) ,     // output  req
-		.dout		( scsi6_dout ) ,    // output [7:0] dout
+		.bsy    ( scsi6_bsy ) ,     // output  bsy
+		.msg    ( scsi6_msg ) ,     // output  msg
+		.cd     ( scsi6_cd ) ,      // output  cd
+		.io     ( scsi6_io ) ,      // output  io
+		.req    ( scsi6_req ) ,     // output  req
+		.dout   ( scsi6_dout ) ,    // output [7:0] dout
 
-		.din		( dout ) ,          // input [7:0] din
+		.din    ( dout ) ,          // input [7:0] din
 
 		// connection to io controller to read and write sectors
 		// to sd card
-		.img_mounted( img_mounted[1] ),
+		.img_mounted( img_mounted[0] ),
 		.img_blocks( img_size[31:9] ),
 		.io_lba	( io_lba_6 ) ,		// output [31:0] io_lba
-		.io_rd	( io_rd[1] ) ,		// output  io_rd
-		.io_wr	( io_wr[1] ) ,		// output  io_wr
+		.io_rd	( io_rd[0] ) ,		// output  io_rd
+		.io_wr	( io_wr[0] ) ,		// output  io_wr
 		.io_ack	( io_ack & scsi6_bsy ) ,		// input  io_ack
 
 		.sd_buff_addr( sd_buff_addr ) ,	// input [8:0] sd_buff_addr
@@ -362,6 +363,6 @@ module ncr5380
 		.sd_buff_din( sd_buff_din_6 ) ,	// output [7:0] sd_buff_din
 		.sd_buff_wr( sd_buff_wr & scsi6_bsy ) 	// input  sd_buff_wr
 	);
-*/
+
 
 endmodule

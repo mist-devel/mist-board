@@ -170,34 +170,34 @@ module floppy
 			// at time 0, latch a new byte and advance the drive head
 			if (diskDataByteTimer == 0 && readyToAdvanceHead && diskImageData != 0) begin
 				diskDataIn <= diskImageData;
-					newByteReady <= 1;
+				newByteReady <= 1;
 				diskDataByteTimer <= 1;  // make timer run again
-									
+
 				// clear diskImageData after it's used, so we can tell when we get a new one from the disk	
 				diskImageData <= 0;
-				
+
 				// for debugging, don't advance the head until the IWM says it's ready
 				readyToAdvanceHead <= 1'b1; // TEMP: treat IWM as always ready
 			end
-			
+
 			// extraRomReadAck comes every hsync which is every 21us. The iwm data rates
 			// is 8MHZ/128 = 16us
 			else begin
 				// a timer governs when the next disk byte will become available
 				diskDataByteTimer <= diskDataByteTimer + 1'b1;
-			
+
 				newByteReady <= 1'b0;
-				
+
 				if (dskReadAck) begin
 					// whenever ACK is received, store the data from the current diskImageAddr 
 					diskImageData <= dskReadDataEnc;  // xyz
  				end
-				
+
 				if (advanceDriveHead) begin
 					readyToAdvanceHead <= 1'b1;
 				end
 			end
-			
+
 			// switch drive sides if DRIVE_REG_RDDATA0 or DRIVE_REG_RDDATA1 are read
 			// TODO: we don't know if this is a true read, since we don't know if IWM is selected or 
 			// could be bad if we use this test to flush a cache of encoded disk data
@@ -208,13 +208,13 @@ module floppy
 		end
 	end
 	end
-	
+
 	// create a signal on the falling edge of lstrb
 	reg lstrbPrev;
 	always @(posedge clk) if(cep) lstrbPrev <= lstrb;
-		
+
 	wire lstrbEdge = lstrb == 1'b0 && lstrbPrev == 1'b1;
-	
+
 	assign readData = (driveReadAddr == `DRIVE_REG_RDDATA0 || driveReadAddr == `DRIVE_REG_RDDATA1) ? diskDataIn :
 							{ driveRegsAsRead[driveReadAddr], 7'h00 };
 		

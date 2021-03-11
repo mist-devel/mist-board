@@ -1,8 +1,11 @@
 module addrController_top(
 	// clocks:
 	input clk,
-	input clk8_en_p, // 8.125 MHz CPU clock enables
-	input clk8_en_n,
+	output clk8,						// 8.125 MHz CPU clock
+	output clk8_en_p,
+	output clk8_en_n,
+	output clk16_en_p,
+	output clk16_en_n,
 
 	// system config:
 	input turbo,               // 0 = normal, 1 = faster
@@ -14,6 +17,7 @@ module addrController_top(
 	input _cpuUDS,
 	input _cpuLDS,
 	input _cpuRW,	
+	input _cpuAS,
 	
 	// RAM/ROM:
 	output [21:0] memoryAddr,
@@ -25,12 +29,15 @@ module addrController_top(
 	output videoBusControl,
 	output dioBusControl,
 	output cpuBusControl,
+	output memoryLatch,
 	
 	// peripherals:
 	output selectSCSI,
 	output selectSCC,
 	output selectIWM,
 	output selectVIA,
+	output selectRAM,
+	output selectROM,
 	
 	// video:
 	output hsync,
@@ -89,11 +96,20 @@ module addrController_top(
 
 	// interleaved RAM access for CPU and video
 	reg [1:0] busCycle;
+	reg [1:0] busPhase;
 	reg [1:0] extra_slot_count;
-	reg [1:0] subCycle;
 
-	always @(posedge clk)
-		if (clk8_en_p) busCycle <= busCycle + 2'd1;
+	always @(posedge clk) begin
+		busPhase <= busPhase + 1'd1;
+		if (busPhase == 2'b11)
+			busCycle <= busCycle + 2'd1;
+	end
+	assign memoryLatch = busPhase == 2'd3;
+	assign clk8 = !busPhase[1];
+	assign clk8_en_p = busPhase == 2'b11;
+	assign clk8_en_n = busPhase == 2'b01;
+	assign clk16_en_p = !busPhase[0];
+	assign clk16_en_n = busPhase[0];
 
 	reg extra_slot_advance;
 	always @(posedge clk)
@@ -103,31 +119,17 @@ module addrController_top(
 	always @(posedge clk) begin
 		if(clk8_en_p && extra_slot_advance) begin
 			extra_slot_count <= extra_slot_count + 2'd1;
-			
-			// the subcycle counter counts 0-1-2-0-1-2 and is used to give
-			// the cpu 2 out of three bus cycles for a speed close to a real mac
-			
-			// Update: Counter now runs 0-1-2-3-0-1-2... so the CPU runs 3 out of
-			// 4 cycles. Making it slower (e.g. 2/3) will cause the floppy ot stop
-			// working reliably. Making it faster will cause scsi to stop working ...
-			
-	//		if(subCycle == 2'd2) subCycle <= 2'd0;
-	//		else  
-			subCycle <= subCycle + 2'd1;
 		end
 	end
 
 	// video controls memory bus during the first clock of the four-clock cycle
 	assign videoBusControl = (busCycle == 2'b00);
-	// cpu controls memory bus during the third clock of the four-clock cycle
-	assign cpuBusControl = turbo?cpuBusControl_fast:cpuBusControl_normal;
-	wire cpuBusControl_normal = (busCycle == 2'b01) && (subCycle != 2'd2);
-	wire cpuBusControl_fast = (busCycle == 2'b01) || (busCycle == 2'b11);
-
+	// cpu controls memory bus during the second and fourth clock of the four-clock cycle
+	assign cpuBusControl = (busCycle == 2'b01) || (busCycle == 2'b11);
+	// IWM/audio gets 3rd cycle
 	wire extraBusControl = (busCycle == 2'b10);
-		
+
 	// interconnects
-	wire selectRAM, selectROM;
 	wire [21:0] videoAddr;
 	
 	// RAM/ROM control signals
@@ -186,6 +188,7 @@ module addrController_top(
 	// address decoding
 	addrDecoder ad(
 		.address(cpuAddr),
+		._cpuAS(_cpuAS),
 		.memoryOverlayOn(memoryOverlayOn),
 		.selectRAM(selectRAM),
 		.selectROM(selectROM),

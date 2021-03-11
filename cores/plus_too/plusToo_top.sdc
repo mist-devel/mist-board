@@ -93,6 +93,8 @@ set_clock_groups -asynchronous -group [get_clocks {SPI_SCK}] -group [get_clocks 
 # Set Multicycle Path
 #**************************************************************
 
+set_multicycle_path -from {user_io:user_io|rtc[*]} -to {dataController_top:dc0|rtc:pram|secs[*]} -setup 4
+set_multicycle_path -from {user_io:user_io|rtc[*]} -to {dataController_top:dc0|rtc:pram|secs[*]} -hold 3
 
 
 #**************************************************************

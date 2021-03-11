@@ -177,8 +177,8 @@ always @(posedge clk) begin
 	reg old_ack;
 	
 	old_ack <= ack;
-	stb_ack <= (~old_ack & ack);
-	stb_adv <= stb_ack;
+	stb_ack <= (~old_ack & ack); // on rising edge
+	stb_adv <= (old_ack & ~ack); // on falling edge
 end
 
 // store data on rising edge of ack, ...
@@ -262,10 +262,13 @@ wire       cmd_mode_select = (op_code == 8'h15);
 wire       cmd_mode_sense = (op_code == 8'h1a);
 wire       cmd_test_unit_ready = (op_code == 8'h00);
 wire       cmd_read_capacity = (op_code == 8'h25);
+wire       cmd_read_buffer = (op_code == 8'h3b);  // fake
+wire       cmd_write_buffer = (op_code == 8'h3c); // fake
 
 // valid command in buffer? TODO: check for valid command parameters
 wire  cmd_ok = cmd_read || cmd_write || cmd_inquiry || cmd_test_unit_ready || 
-		  cmd_read_capacity || cmd_mode_select || cmd_format || cmd_mode_sense;
+		  cmd_read_capacity || cmd_mode_select || cmd_format || cmd_mode_sense ||
+		  cmd_read_buffer | cmd_write_buffer;
 
 // latch parameters once command is complete
 reg [31:0] lba;
@@ -310,9 +313,9 @@ always @(posedge clk) begin
 					// continue according to command
 
 					// these commands return data
-					if(cmd_read || cmd_inquiry || cmd_read_capacity || cmd_mode_sense) phase <= `PHASE_DATA_OUT;
+					if(cmd_read || cmd_inquiry || cmd_read_capacity || cmd_mode_sense || cmd_read_buffer) phase <= `PHASE_DATA_OUT;
 					// these commands receive dataa
-					else if(cmd_write || cmd_mode_select) phase <= `PHASE_DATA_IN;
+					else if(cmd_write || cmd_mode_select || cmd_write_buffer) phase <= `PHASE_DATA_IN;
 					// and all other valid commands are just "ok"
 					else phase <= `PHASE_STATUS_OUT;
 				end else begin

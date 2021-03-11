@@ -179,7 +179,7 @@ module iwm
 		selectExternalDriveNext <= selectExternalDrive;
 		q6Next <= q6;
 		q7Next <= q7;
-		
+
 		if (selectIWM == 1'b1 && _cpuLDS == 1'b0) begin
 			case (cpuAddrRegHi[3:1])
 				3'h0: // ca0
@@ -204,7 +204,7 @@ module iwm
 			endcase
 		end
 	end
-	
+
 	// update IWM bit registers
 	always @(posedge clk or negedge _reset) begin
 		if (_reset == 1'b0) begin
@@ -218,7 +218,7 @@ module iwm
 			q6 <= 0;
 			q7 <= 0;
 		end
-		else if(cen) begin
+		else begin
 			ca0 <= ca0Next;
 			ca1 <= ca1Next;
 			ca2 <= ca2Next;
@@ -247,7 +247,7 @@ module iwm
 				dataOutLo <= 0;
 		endcase
 	end
-	
+
 	// write IWM state
 	always @(posedge clk or negedge _reset) begin
 		if (_reset == 1'b0) begin		
@@ -268,16 +268,14 @@ module iwm
 			end
 		end
 	end
-	
+
 	// Manage incoming bytes from the disk drive
 	wire iwmRead = (_cpuRW == 1'b1 && selectIWM == 1'b1 && _cpuLDS == 1'b0);
-	reg iwmReadPrev;
 	reg [3:0] readLatchClearTimer; 
 	always @(posedge clk or negedge _reset) begin
 		if (_reset == 1'b0) begin	
 			readDataLatch <= 0;
 			readLatchClearTimer <= 0;
-			iwmReadPrev <= 0;
 		end 
 		else if(cen) begin
 			// a countdown timer governs how long after a data latch read before the latch is cleared
@@ -286,10 +284,10 @@ module iwm
 			end
 
 			// the conclusion of a valid CPU read from the IWM will start the timer to clear the latch
-			if (iwmReadPrev && !iwmRead && readDataLatch[7]) begin
+			if (iwmRead && readDataLatch[7]) begin
 				readLatchClearTimer <= 4'hD; // clear latch 14 clocks after the conclusion of a valid read
 			end
-			
+
 			// when the drive indicates that a new byte is ready, latch it
 			// NOTE: the real IWM must self-synchronize with the incoming data to determine when to latch it
 			if (newByteReady) begin
@@ -298,8 +296,6 @@ module iwm
 			else if (readLatchClearTimer == 1'b1) begin
 				readDataLatch <= 0;
 			end
-			
-			iwmReadPrev <= iwmRead;
 		end
 	end
 	assign advanceDriveHead = readLatchClearTimer == 1'b1; // prevents overrun when debugging, does not exist on a real Mac!

@@ -124,32 +124,41 @@ module scc
 	reg		ex_irq_ip_a;
 	reg		ex_irq_ip_b;
 	wire [2:0] 	rr2_vec_stat;	
- 		
+
 	/* Register/Data access helpers */
 	assign wreg_a  = cs & we & (~rs[1]) &  rs[0];
 	assign wreg_b  = cs & we & (~rs[1]) & ~rs[0];
 
 	// make sure rindex changes after the cpu cycle has ended so
 	// read data is still stable while cpu advances
-	always@(posedge clk) if(cen) rindex <= rindex_latch;
+	always@(posedge clk) if(~cs) rindex <= rindex_latch;
 
 	/* Register index is set by a write to WR0 and reset
 	 * after any subsequent write. We ignore the side
 	 */
 	always@(posedge clk or posedge reset) begin
-		if (reset)
+		if (reset) begin
 		  rindex_latch <= 0;
-		else if (cen && cs && !rs[1]) begin
-			/* Default, reset index */
-			rindex_latch <= 0;
+			data_a <= 0;
+			data_b <= 0;
+		end else if (cen && cs) begin
+			if (!rs[1]) begin
+				/* Default, reset index */
+				rindex_latch <= 0;
 
-			/* Write to WR0 */
-			if (we && rindex == 0) begin
-				/* Get low index bits */
-				rindex_latch[2:0] <= wdata[2:0];
+				/* Write to WR0 */
+				if (we && rindex == 0) begin
+					/* Get low index bits */
+					rindex_latch[2:0] <= wdata[2:0];
 				  
-				/* Add point high */
-				rindex_latch[3] <= (wdata[5:3] == 3'b001);
+					/* Add point high */
+					rindex_latch[3] <= (wdata[5:3] == 3'b001);
+				end
+			end else begin
+				if (we) begin
+					if (rs[0]) data_a <= wdata;
+					else data_b <= wdata;
+				end
 			end
 		end
 	end

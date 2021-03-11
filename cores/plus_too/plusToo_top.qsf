@@ -32,7 +32,7 @@ set_global_assignment -name DEVICE_FILTER_PIN_COUNT 144
 set_global_assignment -name POWER_PRESET_COOLING_SOLUTION "NO HEAT SINK WITH STILL AIR"
 set_global_assignment -name POWER_BOARD_THERMAL_MODEL "NONE (CONSERVATIVE)"
 set_global_assignment -name OPTIMIZE_HOLD_TIMING "ALL PATHS"
-set_global_assignment -name FITTER_EFFORT "AUTO FIT"
+set_global_assignment -name FITTER_EFFORT "STANDARD FIT"
 set_global_assignment -name STRATIX_CONFIGURATION_DEVICE EPCS4
 set_global_assignment -name CYCLONEII_RESERVE_NCEO_AFTER_CONFIGURATION "USE AS REGULAR IO"
 set_global_assignment -name RESERVE_ASDO_AFTER_CONFIGURATION "AS INPUT TRI-STATED"
@@ -120,7 +120,7 @@ set_location_assignment PIN_59 -to SDRAM_nCS
 set_location_assignment PIN_33 -to SDRAM_CKE
 set_location_assignment PIN_43 -to SDRAM_CLK
 
-set_global_assignment -name CYCLONEII_OPTIMIZATION_TECHNIQUE BALANCED
+set_global_assignment -name CYCLONEII_OPTIMIZATION_TECHNIQUE SPEED
 set_global_assignment -name SMART_RECOMPILE ON
 set_global_assignment -name ENABLE_SIGNALTAP OFF
 set_global_assignment -name USE_SIGNALTAP_FILE out/cpu.stp
@@ -140,14 +140,14 @@ set_global_assignment -name SYNTH_TIMING_DRIVEN_SYNTHESIS ON
 set_global_assignment -name AUTO_RAM_TO_LCELL_CONVERSION OFF
 set_global_assignment -name AUTO_RAM_RECOGNITION ON
 set_global_assignment -name AUTO_ROM_RECOGNITION ON
-set_global_assignment -name PHYSICAL_SYNTHESIS_REGISTER_RETIMING ON
+set_global_assignment -name PHYSICAL_SYNTHESIS_REGISTER_RETIMING OFF
 set_global_assignment -name LL_ROOT_REGION ON -section_id "Root Region"
 set_global_assignment -name LL_MEMBER_STATE LOCKED -section_id "Root Region"
 set_global_assignment -name PARTITION_NETLIST_TYPE SOURCE -section_id Top
 set_global_assignment -name PARTITION_COLOR 2147039 -section_id Top
 set_global_assignment -name PARTITION_FITTER_PRESERVATION_LEVEL PLACEMENT_AND_ROUTING -section_id Top
 
-set_global_assignment -name PHYSICAL_SYNTHESIS_ASYNCHRONOUS_SIGNAL_PIPELINING ON
+set_global_assignment -name PHYSICAL_SYNTHESIS_ASYNCHRONOUS_SIGNAL_PIPELINING OFF
 set_global_assignment -name PHYSICAL_SYNTHESIS_COMBO_LOGIC_FOR_AREA OFF
 set_global_assignment -name PHYSICAL_SYNTHESIS_MAP_LOGIC_TO_MEMORY_FOR_AREA OFF
 
@@ -342,23 +342,27 @@ set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to UART_RX
 set_global_assignment -name ENABLE_CONFIGURATION_PINS OFF
 set_global_assignment -name ENABLE_NCE_PIN OFF
 set_global_assignment -name ENABLE_BOOT_SEL_PIN OFF
+set_global_assignment -name SDC_FILE plusToo_top.sdc
 set_global_assignment -name SYSTEMVERILOG_FILE plusToo_top.sv
-set_global_assignment -name VERILOG_FILE scsi.v
-set_global_assignment -name VERILOG_FILE ncr5380.v
-set_global_assignment -name VERILOG_FILE sigma_delta_dac.v
-set_global_assignment -name VERILOG_FILE floppy_track_encoder.v
-set_global_assignment -name VERILOG_FILE ps2_kbd.v
+set_global_assignment -name QIP_FILE "../../mist-modules/mist.qip"
+set_global_assignment -name SYSTEMVERILOG_FILE fx68k/uaddrPla.sv
+set_global_assignment -name SYSTEMVERILOG_FILE fx68k/fx68kAlu.sv
+set_global_assignment -name SYSTEMVERILOG_FILE fx68k/fx68k.sv
+set_global_assignment -name VERILOG_FILE tg68k.v
 set_global_assignment -name VHDL_FILE TG68K_Pack.vhd
 set_global_assignment -name VHDL_FILE TG68KdotC_Kernel.vhd
 set_global_assignment -name VHDL_FILE TG68K_ALU.vhd
-set_global_assignment -name VERILOG_FILE data_io.v
+set_global_assignment -name VHDL_FILE via6522.vhd
+set_global_assignment -name VERILOG_FILE ncr5380.v
+set_global_assignment -name VERILOG_FILE scsi.v
+set_global_assignment -name VERILOG_FILE sigma_delta_dac.v
+set_global_assignment -name VERILOG_FILE floppy_track_encoder.v
+set_global_assignment -name VERILOG_FILE ps2_kbd.v
 set_global_assignment -name VERILOG_FILE sdram.v
-set_global_assignment -name SDC_FILE plusToo_top.sdc
 set_global_assignment -name VERILOG_FILE scc.v
 set_global_assignment -name VERILOG_FILE ps2_mouse.v
 set_global_assignment -name VERILOG_FILE ps2.v
 set_global_assignment -name VERILOG_FILE iwm.v
-set_global_assignment -name VERILOG_FILE via.v
 set_global_assignment -name VERILOG_FILE addrDecoder.v
 set_global_assignment -name VERILOG_FILE addrController_top.v
 set_global_assignment -name VERILOG_FILE dataController_top.v
@@ -366,6 +370,13 @@ set_global_assignment -name VERILOG_FILE videoTimer.v
 set_global_assignment -name VERILOG_FILE videoShifter.v
 set_global_assignment -name VERILOG_FILE floppy.v
 set_global_assignment -name QIP_FILE pll.qip
-set_global_assignment -name QIP_FILE "../../mist-modules/mist_core.qip"
 set_global_assignment -name SIGNALTAP_FILE out/cpu.stp
+set_global_assignment -name SIGNALTAP_FILE out/fx68via.stp
+set_global_assignment -name SIGNALTAP_FILE out/viakbd.stp
+set_global_assignment -name SIGNALTAP_FILE out/fx68scc.stp
+set_global_assignment -name SIGNALTAP_FILE out/fx68scsi.stp
+set_global_assignment -name SIGNALTAP_FILE out/sdram.stp
+set_global_assignment -name SIGNALTAP_FILE out/iwm.stp
+set_global_assignment -name SIGNALTAP_FILE out/tg68k.stp
+set_global_assignment -name VERILOG_FILE rtc.v
 set_instance_assignment -name PARTITION_HIERARCHY root_partition -to | -section_id Top

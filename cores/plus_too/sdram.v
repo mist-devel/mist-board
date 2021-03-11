@@ -37,7 +37,7 @@ module sdram (
 	input               clk_8,      // 8MHz chipset clock to which sdram state machine is synchonized
 
 	input [15:0]        din,        // data input from chipset/cpu
-	output [15:0]       dout,       // data output to chipset/cpu
+	output reg [15:0]   dout,       // data output to chipset/cpu
 	input [23:0]        addr,       // 24 bit word address
 	input [1:0]         ds,         // upper/lower data strobe
 	input               oe,         // cpu/chipset requests read
@@ -47,7 +47,7 @@ module sdram (
 localparam RASCAS_DELAY   = 3'd2;   // tRCD=20ns -> 3 cycles@128MHz
 localparam BURST_LENGTH   = 3'b000; // 000=1, 001=2, 010=4, 011=8
 localparam ACCESS_TYPE    = 1'b0;   // 0=sequential, 1=interleaved
-localparam CAS_LATENCY    = 3'd3;   // 2/3 allowed
+localparam CAS_LATENCY    = 3'd2;   // 2/3 allowed
 localparam OP_MODE        = 2'b00;  // only 00 (standard operation) allowed
 localparam NO_WRITE_BURST = 1'b1;   // 0= write burst enabled, 1=only single access write
 
@@ -62,7 +62,7 @@ localparam MODE = { 3'b000, NO_WRITE_BURST, OP_MODE, CAS_LATENCY, ACCESS_TYPE, B
 // It wraps from T15 to T0 on the rising edge of clk_8
 
 localparam STATE_FIRST     = 3'd0;   // first state in cycle
-localparam STATE_CMD_START = 3'd1;   // state in which a new command can be started
+localparam STATE_CMD_START = 3'd0;   // state in which a new command can be started
 localparam STATE_CMD_CONT  = STATE_CMD_START  + RASCAS_DELAY; // command can be continued
 localparam STATE_READ      = STATE_CMD_CONT + CAS_LATENCY + 4'd1;
 localparam STATE_LAST      = 3'd7;  // last state in cycle
@@ -113,8 +113,6 @@ assign sd_ras = sd_cmd[2];
 assign sd_cas = sd_cmd[1];
 assign sd_we  = sd_cmd[0];
 
-assign dout = sd_data;
-
 always @(posedge clk_64) begin
 	sd_cmd <= CMD_INHIBIT;  // default: idle
 	sd_data <= 16'bZZZZZZZZZZZZZZZZ;
@@ -145,22 +143,21 @@ always @(posedge clk_64) begin
 				sd_cmd <= CMD_ACTIVE;
 				sd_addr <= { 1'b0, addr[19:8] };
 				sd_ba <= addr[21:20];
-
-				// always return both bytes in a read. The cpu may not
-				// need it, but the caches need to be able to store everything
-				if(!we) sd_dqm <= 2'b00;
-				else    sd_dqm <= ~ds;
 			end
 
 			// CAS phase 
 			if(t == STATE_CMD_CONT) begin
 				sd_cmd <= we?CMD_WRITE:CMD_READ;
 				if (we) sd_data <= din;
+				// always return both bytes in a read. The cpu may not
+				// need it, but the caches need to be able to store everything
+				if(!we) sd_dqm <= 2'b00;
+				else    sd_dqm <= ~ds;
 				sd_addr <= { 4'b0010, addr[22], addr[7:0] };  // auto precharge
 			end
 
 			// Data ready
-			//if (t == STATE_READ && !we) dout <= sd_data;
+			if (t == STATE_READ && !we) dout <= sd_data;
 		end
 
 		// ------------------------ no access --------------------------

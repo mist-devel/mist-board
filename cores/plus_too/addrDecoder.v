@@ -81,6 +81,7 @@
 
 module addrDecoder(
 	input [23:0] address,
+	input _cpuAS,
 	input memoryOverlayOn,
 	output reg selectRAM,
 	output reg selectROM,
@@ -101,30 +102,30 @@ module addrDecoder(
 		casez (address[23:20])
 			4'b00??: begin
 				if (memoryOverlayOn == 0)
-					selectRAM = 1'b1;
+					selectRAM = !_cpuAS;
 				else begin
 					if (address[23:20] == 0) begin
 						// Mac Plus: repeated images of overlay ROM only extend to $0F0000
 						// Mac 512K: more repeated ROM images at $020000-$02FFFF
-						selectROM = 1'b1;
+						selectROM = !_cpuAS;
 					end
 				end
 			end
 			4'b0100: 
 				if( address[17] == 1'b0)   // <- this detects SCSI!!!
-					selectROM = 1'b1;
+					selectROM = !_cpuAS;
 			4'b0101: 
 				if (address[19:12] == 8'h80)
-					selectSCSI = 1'b1;		
+					selectSCSI = !_cpuAS;
 			4'b0110: 
 				if (memoryOverlayOn)
-					selectRAM = 1'b1;		
+					selectRAM = !_cpuAS;
 			4'b10?1:
-				selectSCC = 1'b1;
+				selectSCC = !_cpuAS;
 			4'b1101:
-				selectIWM = 1'b1;
+				selectIWM = !_cpuAS;
 			4'b1110:
-				selectVIA = 1'b1;
+				selectVIA = !_cpuAS;
 			default:
 				; // select nothing
 		endcase

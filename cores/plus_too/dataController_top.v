@@ -1,9 +1,10 @@
 module dataController_top(
 	// clocks:
 	input clk32,					// 32.5 MHz pixel clock
-	output clk8,						// 8.125 MHz CPU clock
-	output clk8_en_p,
-	output clk8_en_n,
+	input clk8_en_p,
+	input clk8_en_n,
+	input E_rising,
+	input E_falling,
 	
 	// system control:
 	input _systemReset,
@@ -27,12 +28,14 @@ module dataController_top(
 	input selectSCC,
 	input selectIWM,
 	input selectVIA,
+	input _cpuVMA,
 	
 	// RAM/ROM:
 	input videoBusControl,	
 	input cpuBusControl,	
 	input [15:0] memoryDataIn,
 	output [15:0] memoryDataOut,
+	input memoryLatch,
 	
 	// keyboard:
 	input keyClk, 
@@ -45,7 +48,10 @@ module dataController_top(
 	// serial:
 	input serialIn, 
 	output serialOut,	
-	
+
+	// RTC
+	input [63:0] rtc,
+
 	// video:
 	output pixelOut,	
 	input _hblank,
@@ -107,19 +113,11 @@ module dataController_top(
 		end
 	end
 	
-	// divide 32.5 MHz clock by four to get CPU clock
-	reg [1:0] clkPhase;
-	always @(posedge clk32)
-		clkPhase <= clkPhase + 2'd1;
-	assign clk8 = clkPhase[1];
-	assign clk8_en_p = clkPhase == 2'b01;
-	assign clk8_en_n = clkPhase == 2'b11;
-	
 	// CPU reset generation
 	// For initial CPU reset, RESET and HALT must be asserted for at least 100ms = 800,000 clocks of clk8
 	reg [19:0] resetDelay; // 20 bits = 1 million
 	wire isResetting = resetDelay != 0;
-	
+
 	initial begin
 		// force a reset when the FPGA configuration is completed
 		resetDelay <= 20'hFFFFF;
@@ -152,13 +150,16 @@ module dataController_top(
 		
 	// Serial port
 	assign serialOut = 0;
-	
+
+	reg [15:0] cpu_data;
+	always @(posedge clk32) if (cpuBusControl && memoryLatch) cpu_data <= memoryDataIn;
+
 	// CPU-side data output mux
 	assign cpuDataOut = selectIWM ? iwmDataOut :
 							  selectVIA ? viaDataOut :
 							  selectSCC ? { sccDataOut, 8'hEF } :
 							  selectSCSI ? { scsiDataOut, 8'hEF } :
-							  memoryDataIn;	
+							  (cpuBusControl && memoryLatch) ? memoryDataIn : cpu_data;
 	
 	// Memory-side
 	assign memoryDataOut = cpuDataIn;
@@ -168,7 +169,7 @@ module dataController_top(
 		.clk(clk32),
 		.ce(clk8_en_p),
 		.reset(!_cpuReset),
-		.bus_cs(selectSCSI && cpuBusControl),
+		.bus_cs(selectSCSI),
 		.bus_we(!_cpuRW),
 		.bus_rs(cpuAddrRegMid),
 		.dack(cpuAddrRegHi[0]),   // A9
@@ -189,48 +190,189 @@ module dataController_top(
 		.sd_buff_wr(sd_buff_wr)
 	);
 
+	// count vblanks, and set 1 second interrupt after 60 vblanks
+	reg [5:0] vblankCount;
+	reg _lastVblank;
+	always @(posedge clk32) begin
+		if (clk8_en_n) begin
+			_lastVblank <= _vblank;
+			if (_vblank == 1'b0 && _lastVblank == 1'b1) begin
+				if (vblankCount != 59) begin
+					vblankCount <= vblankCount + 1'b1;
+				end
+				else begin
+					vblankCount <= 6'h0;
+				end
+			end
+		end
+	end
+	wire onesec = vblankCount == 59;
+
 	// VIA
 	wire [2:0] snd_vol;
 	wire snd_ena;
-	
-	via v(
-		.clk32(clk32),
-		.clk8_en_p(clk8_en_p),
-		.clk8_en_n(clk8_en_n),
-		._reset(_cpuReset),
-		.selectVIA(selectVIA && cpuBusControl),
-		._cpuRW(_cpuRW),
-		._cpuUDS(_cpuUDS),	
-		.dataIn(cpuDataIn),
-		.cpuAddrRegHi(cpuAddrRegHi),
-		._hblank(_hblank),
-		._vblank(_vblank),
-		.mouseY2(mouseY2),
-		.mouseX2(mouseX2),
-		.mouseButton(mouseButton),
-		.sccWReq(sccWReq),
-		._irq(_viaIrq),
-		.dataOut(viaDataOut),
-		.memoryOverlayOn(memoryOverlayOn),
-		.SEL(SEL),
-		
-		.snd_vol(snd_vol),
-		.snd_ena(snd_ena),
-		.snd_alt(snd_alt),
-		
-		.kbd_in_data(kbd_in_data),
-		.kbd_in_strobe(kbd_in_strobe),
-		.kbd_out_data(kbd_out_data),
-		.kbd_out_strobe(kbd_out_strobe)
-		);
-		
+
+	wire [7:0] via_pa_i, via_pa_o, via_pa_oe;
+	wire [7:0] via_pb_i, via_pb_o, via_pb_oe;
+	wire viaIrq;
+
+	assign _viaIrq = ~viaIrq;
+
+	//port A
+	assign via_pa_i = {sccWReq, ~via_pa_oe[6:0] | via_pa_o[6:0]};
+	assign snd_vol = ~via_pa_oe[2:0] | via_pa_o[2:0];
+	assign snd_alt = ~(~via_pa_oe[3] | via_pa_o[3]);
+	assign memoryOverlayOn = ~via_pa_oe[4] | via_pa_o[4];
+	assign SEL = ~via_pa_oe[5] | via_pa_o[5];
+
+	//port B
+	assign via_pb_i = {1'b1, _hblank, mouseY2, mouseX2, mouseButton, 2'b11, rtcdat_o};
+	assign snd_ena = ~via_pb_oe[7] | via_pb_o[7];
+
+	assign viaDataOut[7:0] = 8'hEF;
+
+	via6522 via(
+		.clock      (clk32),
+		.rising     (E_rising),
+		.falling    (E_falling),
+		.reset      (!_cpuReset),
+
+		.addr       (cpuAddrRegHi),
+		.wen        (selectVIA && !_cpuVMA && !_cpuRW),
+		.ren        (selectVIA && !_cpuVMA &&  _cpuRW),
+		.data_in    (cpuDataIn[15:8]),
+		.data_out   (viaDataOut[15:8]),
+
+		.phi2_ref   (),
+
+		//-- pio --
+		.port_a_o   (via_pa_o),
+		.port_a_t   (via_pa_oe),
+		.port_a_i   (via_pa_i),
+
+		.port_b_o   (via_pb_o),
+		.port_b_t   (via_pb_oe),
+		.port_b_i   (via_pb_i),
+
+		//-- handshake pins
+		.ca1_i      (_vblank),
+		.ca2_i      (onesec),
+
+		.cb1_i      (kbdclk),
+		.cb2_i      (cb2_i),
+		.cb2_o      (cb2_o),
+		.cb2_t      (cb2_t),
+
+		.irq        (viaIrq)
+	);
+
+	wire _rtccs   = ~via_pb_oe[2] | via_pb_o[2];
+	wire rtcck    = ~via_pb_oe[1] | via_pb_o[1];
+	wire rtcdat_i = ~via_pb_oe[0] | via_pb_o[0];
+	wire rtcdat_o;
+
+	rtc pram (
+		.clk        (clk32),
+		.reset      (!_cpuReset),
+		.rtc        (rtc),
+		._cs        (_rtccs),
+		.ck         (rtcck),
+		.dat_i      (rtcdat_i),
+		.dat_o      (rtcdat_o)
+	);
+
+	reg kbdclk;
+	reg [10:0] kbdclk_count;
+	reg kbd_transmitting, kbd_wait_receiving, kbd_receiving;
+	reg [2:0] kbd_bitcnt;
+
+	wire cb2_i = kbddata_o;
+	wire cb2_o, cb2_t;
+	wire kbddat_i = ~cb2_t | cb2_o;
+	reg kbddata_o;
+	reg  [7:0] kbd_to_mac;
+	reg kbd_data_valid;
+
+	// Keyboard transmitter-receiver
+	always @(posedge clk32) begin
+		if (clk8_en_p) begin
+			if ((kbd_transmitting && !kbd_wait_receiving) || kbd_receiving) begin
+				kbdclk_count <= kbdclk_count + 1'd1;
+				if (kbdclk_count == 12'd1600) begin
+					kbdclk <= ~kbdclk;
+					kbdclk_count <= 0;
+					if (kbdclk) begin 
+						// shift before the falling edge
+						if (kbd_transmitting) kbd_out_data <= { kbd_out_data[6:0], kbddat_i };
+						if (kbd_receiving) kbddata_o <= kbd_to_mac[7-kbd_bitcnt];
+					end
+				end
+			end else begin
+				kbdclk_count <= 0;
+				kbdclk <= 1;
+			end
+		end
+	end
+
+	// Keyboard control
+	always @(posedge clk32) begin
+		reg kbdclk_d;
+		if (!_cpuReset) begin
+			kbd_bitcnt <= 0;
+			kbd_transmitting <= 0;
+			kbd_wait_receiving <= 0;
+			kbd_data_valid <= 0;
+		end else if (clk8_en_p) begin
+			if (kbd_in_strobe) begin
+				kbd_to_mac <= kbd_in_data;
+				kbd_data_valid <= 1;
+			end
+
+			kbd_out_strobe <= 0;
+			kbdclk_d <= kbdclk;
+
+			// Only the Macintosh can initiate communication over the keyboard lines. On
+			// power-up of either the Macintosh or the keyboard, the Macintosh is in
+			// charge, and the external device is passive. The Macintosh signals that it's
+			// ready to begin communication by pulling the keyboard data line low.
+			if (!kbd_transmitting && !kbd_receiving && !kbddat_i) begin
+				kbd_transmitting <= 1;
+				kbd_bitcnt <= 0;
+			end
+			// The last bit of the command leaves the keyboard data line low; the
+			// Macintosh then indicates it's ready to receive the keyboard's response by
+			// setting the data line high. 
+			if (kbd_wait_receiving && kbddat_i && kbd_data_valid) begin
+				kbd_wait_receiving <= 0;
+				kbd_receiving <= 1;
+				kbd_transmitting <= 0;
+			end
+
+			// send/receive bits at rising edge of the keyboard clock
+			if (~kbdclk_d & kbdclk) begin
+				kbd_bitcnt <= kbd_bitcnt + 1'd1;
+
+				if (kbd_bitcnt == 3'd7) begin
+					if (kbd_transmitting) begin
+						kbd_out_strobe <= 1;
+						kbd_wait_receiving <= 1;
+					end
+					if (kbd_receiving) begin
+						kbd_receiving <= 0;
+						kbd_data_valid <= 0;
+					end
+				end
+			end
+		end
+	end
+
 	// IWM
 	iwm i(
 		.clk(clk32),
 		.cep(clk8_en_p),
 		.cen(clk8_en_n),
 		._reset(_cpuReset),
-		.selectIWM(selectIWM && cpuBusControl),
+		.selectIWM(selectIWM),
 		._cpuRW(_cpuRW),
 		._cpuLDS(_cpuLDS),
 		.dataIn(cpuDataIn),
@@ -256,8 +398,10 @@ module dataController_top(
 		.cep(clk8_en_p),
 		.cen(clk8_en_n),
 		.reset_hw(~_cpuReset),
-		.cs(selectSCC && (_cpuLDS == 1'b0 || _cpuUDS == 1'b0) && cpuBusControl),
-		.we(!_cpuRW),
+		.cs(selectSCC && (_cpuLDS == 1'b0 || _cpuUDS == 1'b0)),
+//		.cs(selectSCC && (_cpuLDS == 1'b0 || _cpuUDS == 1'b0) && cpuBusControl),
+//		.we(!_cpuRW),
+		.we(!_cpuLDS),
 		.rs(cpuAddrRegLo), 
 		.wdata(cpuDataIn[15:8]),
 		.rdata(sccDataOut),
@@ -269,8 +413,8 @@ module dataController_top(
 	// Video
 	videoShifter vs(
 		.clk32(clk32), 
-		.clkPhase(clkPhase), 
-		.dataIn(memoryDataIn), 
+		.memoryLatch(memoryLatch),
+		.dataIn(memoryDataIn),
 		.loadPixels(loadPixels), 
 		.pixelOut(pixelOut));
 	
@@ -289,8 +433,8 @@ module dataController_top(
 
 	wire [7:0] kbd_in_data;
 	wire kbd_in_strobe;
-	wire [7:0] kbd_out_data;
-	wire kbd_out_strobe;
+	reg  [7:0] kbd_out_data;
+	reg  kbd_out_strobe;
 
 	// Keyboard
 	ps2_kbd kbd(

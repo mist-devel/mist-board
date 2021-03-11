@@ -45,11 +45,11 @@ assign LED = ~(dio_download || |(diskAct ^ diskMotor));
 // for stability and maintainability reasons the whole timing has been simplyfied:
 //                00           01             10           11
 //    ______ _____________ _____________ _____________ _____________ ___
-//    ______X_video_cycle_X______IO_____X__cpu_cycle__X___unused____X___
-//                        ^                    ^      ^
-//                        |                    |      |
-//                      video                 cpu    cpu
-//                       read                write   read
+//    ______X_video_cycle_X__cpu_cycle__X__IO_cycle___X__cpu_cycle__X___
+//                        ^      ^    ^                      ^    ^
+//                        |      |    |                      |    |
+//                      video    | CPU|                      | CPU|
+//                       read   write read                  write read
 
 // -------------------------------------------------------------------------
 // ------------------------------ data_io ----------------------------------
@@ -57,10 +57,10 @@ assign LED = ~(dio_download || |(diskAct ^ diskMotor));
 
 // include ROM download helper
 wire dio_download;
-wire dio_write;
+wire dio_write_i;
 wire [23:0] dio_addr;
 wire [4:0] dio_index;
-wire [15:0] dio_data;
+wire [7:0] dio_data;
 
 // good floppy image sizes are 819200 bytes and 409600 bytes
 reg dsk_int_ds, dsk_ext_ds;  // double sided image inserted
@@ -80,8 +80,8 @@ always @(posedge clk32) begin
 		dsk_int_ds <= 1'b0;
 		dsk_int_ss <= 1'b0;
 	end else if(~dio_download && dio_download_d && dio_index == 1) begin
-		dsk_int_ds <= (dio_addr == 409599);   // double sides disk, addr counts words, not bytes
-		dsk_int_ss <= (dio_addr == 204799);   // single sided disk
+		dsk_int_ds <= (dio_addr[23:1] == 409599);   // double sides disk, addr counts words, not bytes
+		dsk_int_ss <= (dio_addr[23:1] == 204799);   // single sided disk
 	end
 end	
 
@@ -90,47 +90,46 @@ always @(posedge clk32) begin
 		dsk_ext_ds <= 1'b0;
 		dsk_ext_ss <= 1'b0;
 	end else if(~dio_download && dio_download_d && dio_index == 2) begin
-		dsk_ext_ds <= (dio_addr == 409599);   // double sided disk, addr counts words, not bytes
-		dsk_ext_ss <= (dio_addr == 204799);   // single sided disk
+		dsk_ext_ds <= (dio_addr[23:1] == 409599);   // double sided disk, addr counts words, not bytes
+		dsk_ext_ss <= (dio_addr[23:1] == 204799);   // single sided disk
 	end
 end
 
 // disk images are being stored right after os rom at word offset 0x80000 and 0x100000 
-wire [20:0] dio_a = 
-	(dio_index == 0)?dio_addr[20:0]:                 // os rom
-	(dio_index == 1)?{21'h80000 + dio_addr[20:0]}:   // first dsk image at 512k word addr
-	{21'h100000 + dio_addr[20:0]};                   // second dsk image at 1M word addr
+wire [21:1] dio_a = 
+	(dio_index == 0)?dio_addr[21:1]:                 // os rom
+	(dio_index == 1)?{21'h80000 + dio_addr[21:1]}:   // first dsk image at 512k word addr
+	{21'h100000 + dio_addr[21:1]};                   // second dsk image at 1M word addr
    
 data_io data_io (
+	.clk_sys  ( clk32   ),
    // io controller spi interface
-   .sck ( SPI_SCK ),
-   .ss  ( SPI_SS2 ),
-   .sdi ( SPI_DI  ),
+   .SPI_SCK ( SPI_SCK ),
+   .SPI_SS2 ( SPI_SS2 ),
+   .SPI_DI  ( SPI_DI  ),
 
-   .downloading ( dio_download ),  // signal indicating an active rom download
-   .index    ( dio_index ),        // 0=rom download, 1=disk image
-                 
+   .ioctl_download ( dio_download ),  // signal indicating an active rom download
+   .ioctl_index    ( dio_index ),     // 0=rom download, 1=disk image
+
    // external ram interface
-   .clk   ( download_cycle ),
-   .wr    ( dio_write ),
-   .addr  ( dio_addr  ),
-   .data  ( dio_data  )
+   .clkref_n   ( dio_clkref_n ),
+   .ioctl_wr   ( dio_write_i ),
+   .ioctl_addr ( dio_addr  ),
+   .ioctl_dout ( dio_data  )
 );
-                        
+
+wire dio_clkref_n = ~(~download_cycle & download_cycle_d);
+reg dio_write;
+reg download_cycle_d;
+always @(posedge clk32) begin
+	download_cycle_d <= download_cycle;
+	if (~dio_clkref_n) dio_write <= 0;
+	if (dio_write_i) dio_write <= 1;
+end
+
 // keys and switches are dummies as the mist doesn't have any ...
 wire [9:0] sw = 10'd0;
 wire [3:0] key = 4'd0;
-
-// the macs video signals. To be fed into the MiSTs OSD overlay and then
-// send to the VGA
-wire hsync;
-wire vsync;
-	 
-// ps2 interface for mouse, to be mapped into user_io
-wire mouseClk;
-wire mouseData;
-wire keyClk;
-wire keyData;
 
 	// synthesize a 32.5 MHz clock
 	wire clk64;
@@ -143,59 +142,21 @@ wire keyData;
 		.c1     ( clk32         ),
 		.locked	( pll_locked	)
 	);
+
 	assign SDRAM_CLK = clk64;
-
-	// set the real-world inputs to sane defaults
-	localparam serialIn = 1'b0,
-				  configROMSize = 1'b1;  // 128K ROM
-
-	wire [1:0] configRAMSize = status_mem?2'b11:2'b10; // 1MB/4MB
-				  
-	// interconnects
-	// CPU
-	wire clk8, _cpuReset, _cpuUDS, _cpuLDS, _cpuRW;
-	wire clk8_en_p, clk8_en_n;
-	wire [2:0] _cpuIPL;
-	wire [7:0] cpuAddrHi;
-	wire [23:0] cpuAddr;
-	wire [15:0] cpuDataOut;
-	
-	// RAM/ROM
-	wire _romOE;
-	wire _ramOE, _ramWE;
-	wire _memoryUDS, _memoryLDS;
-	wire videoBusControl;
-	wire dioBusControl;
-	wire cpuBusControl;
-	wire [21:0] memoryAddr;
-	wire [15:0] memoryDataOut;
-	
-	// peripherals
-	wire loadPixels, pixelOut, _hblank, _vblank;
-	wire memoryOverlayOn, selectSCSI, selectSCC, selectIWM, selectVIA;	 
-	wire [15:0] dataControllerDataOut;
-	
-	// audio
-	wire snd_alt;
-	wire loadSound;
-	
-	// floppy disk image interface
-	wire dskReadAckInt;
-	wire [21:0] dskReadAddrInt;
-	wire dskReadAckExt;
-	wire [21:0] dskReadAddrExt;
-
 	// the configuration string is returned to the io controller to allow
-	// it to control the menu on the OSD 
+	// it to control the menu on the OSD
+
 	parameter CONF_STR = {
 		"PLUS_TOO;;",
 		"F1,DSK;",
 		"F2,DSK;",
-		"S0,IMG;",
+		"S0,IMGVHD,Mount SCSI6;",
+		"S1,IMGVHD,Mount SCSI2;",
 		"O4,Memory,1MB,4MB;",
-		"O5,Speed,Normal,Turbo;",
-		"O67,CPU,68000,68010,68020;",
-        "T0,Reset"
+		"O5,Speed,8MHz,16MHz;",
+		"O67,CPU,FX68K-68000,TG68K-68010,TG68K-68020;",
+		"T0,Reset"
 	};
 
 	wire status_mem = status[4];
@@ -207,6 +168,12 @@ wire keyData;
 	wire [7:0] status;
 	wire [1:0] buttons;
 	wire       ypbpr;
+	// ps2 interface for mouse, to be mapped into user_io
+	wire mouseClk;
+	wire mouseData;
+	wire keyClk;
+	wire keyData;
+	wire [63:0] rtc;
 
 	wire [31:0] io_lba;
 	wire [1:0] io_rd;
@@ -234,6 +201,8 @@ wire keyData;
 		.buttons        ( buttons        ),
 		.ypbpr          ( ypbpr          ),
 
+		.rtc            ( rtc            ),
+
 		// ps2 interface
 		.ps2_kbd_clk    ( keyClk         ),
 		.ps2_kbd_data   ( keyData        ),
@@ -255,40 +224,196 @@ wire keyData;
 		.sd_din         ( sd_buff_din    )
 	);
 
-	wire [1:0] cpu_busstate;
-	wire cpu_clkena = clk8_en_p && (cpuBusControl || (cpu_busstate == 2'b01));
-	TG68KdotC_Kernel #(2,2,2,2,2,2,0,0) m68k (
-        .clk            ( clk32          ),
-        .nReset         ( _cpuReset      ),
-        .clkena_in      ( cpu_clkena     ), 
-        .data_in        ( dataControllerDataOut ),
-        .IPL            ( _cpuIPL        ),
-        .IPL_autovector ( 1'b1           ),
-        .berr           ( 1'b0           ),
-        .clr_berr       ( 1'b0           ),
-        .CPU            ( { status_cpu[1], |status_cpu } ),   // 00->68000  01->68010  11->68020
-        .addr_out       ( {cpuAddrHi, cpuAddr} ),
-        .data_write     ( cpuDataOut     ),
-        .nUDS           ( _cpuUDS        ),
-        .nLDS           ( _cpuLDS        ),
-        .nWr            ( _cpuRW         ),
-        .busstate       ( cpu_busstate   ), // 00-> fetch code 10->read data 11->write data 01->no memaccess
-        .nResetOut      (                ),
-        .FC             (                )
+	// set the real-world inputs to sane defaults
+	localparam serialIn = 1'b0,
+				  configROMSize = 1'b1;  // 128K ROM
+
+	wire [1:0] configRAMSize = status_mem?2'b11:2'b10; // 1MB/4MB
+				  
+	// interconnects
+	// CPU
+	wire clk8, _cpuReset, _cpuUDS, _cpuLDS, _cpuRW, _cpuAS;
+	wire clk8_en_p, clk8_en_n;
+	wire clk16_en_p, clk16_en_n;
+	wire _cpuVMA, _cpuVPA, _cpuDTACK;
+	wire E_rising, E_falling;
+	wire [2:0] _cpuIPL;
+	wire [2:0] cpuFC;
+	wire [7:0] cpuAddrHi;
+	wire [23:0] cpuAddr;
+	wire [15:0] cpuDataOut;
+	
+	// RAM/ROM
+	wire _romOE;
+	wire _ramOE, _ramWE;
+	wire _memoryUDS, _memoryLDS;
+	wire videoBusControl;
+	wire dioBusControl;
+	wire cpuBusControl;
+	wire [21:0] memoryAddr;
+	wire [15:0] memoryDataOut;
+	wire memoryLatch;
+	
+	// peripherals
+	wire loadPixels, pixelOut, _hblank, _vblank, hsync, vsync;
+	wire memoryOverlayOn, selectSCSI, selectSCC, selectIWM, selectVIA, selectRAM, selectROM;
+	wire [15:0] dataControllerDataOut;
+	
+	// audio
+	wire snd_alt;
+	wire loadSound;
+
+	// floppy disk image interface
+	wire dskReadAckInt;
+	wire [21:0] dskReadAddrInt;
+	wire dskReadAckExt;
+	wire [21:0] dskReadAddrExt;
+
+	// dtack generation in turbo mode
+	reg  turbo_dtack_en, cpuBusControl_d;
+	always @(posedge clk32) begin
+		if (!_cpuReset) begin
+			turbo_dtack_en <= 0;
+		end
+		else begin
+			cpuBusControl_d <= cpuBusControl;
+			if (_cpuAS) turbo_dtack_en <= 0;
+			if (!_cpuAS & ((!cpuBusControl_d & cpuBusControl) | (!selectROM & !selectRAM))) turbo_dtack_en <= 1;
+		end
+	end
+
+	assign      _cpuVPA = (cpuFC == 3'b111) ? 1'b0 : ~(!_cpuAS && cpuAddr[23:21] == 3'b111);
+	assign      _cpuDTACK = ~(!_cpuAS && cpuAddr[23:21] != 3'b111) | (status_turbo & !turbo_dtack_en);
+
+	wire        cpu_en_p      = status_turbo ? clk16_en_p : clk8_en_p;
+	wire        cpu_en_n      = status_turbo ? clk16_en_n : clk8_en_n;
+
+	wire        is68000       = status_cpu == 0;
+	assign      _cpuRW        = is68000 ? fx68_rw : tg68_rw;
+	assign      _cpuAS        = is68000 ? fx68_as_n : tg68_as_n;
+	assign      _cpuUDS       = is68000 ? fx68_uds_n : tg68_uds_n;
+	assign      _cpuLDS       = is68000 ? fx68_lds_n : tg68_lds_n;
+	assign      E_falling     = is68000 ? fx68_E_falling : tg68_E_falling;
+	assign      E_rising      = is68000 ? fx68_E_rising : tg68_E_rising;
+	assign      _cpuVMA       = is68000 ? fx68_vma_n : tg68_vma_n;
+	assign      cpuFC[0]      = is68000 ? fx68_fc0 : tg68_fc0;
+	assign      cpuFC[1]      = is68000 ? fx68_fc1 : tg68_fc1;
+	assign      cpuFC[2]      = is68000 ? fx68_fc2 : tg68_fc2;
+	assign      cpuAddr[23:1] = is68000 ? fx68_a : tg68_a[23:1];
+	assign      cpuDataOut    = is68000 ? fx68_dout : tg68_dout;
+
+	wire        fx68_rw;
+	wire        fx68_as_n;
+	wire        fx68_uds_n;
+	wire        fx68_lds_n;
+	wire        fx68_E_falling;
+	wire        fx68_E_rising;
+	wire        fx68_vma_n;
+	wire        fx68_fc0;
+	wire        fx68_fc1;
+	wire        fx68_fc2;
+	wire [15:0] fx68_dout;
+	wire [23:1] fx68_a;
+
+	fx68k fx68k (
+		.clk        ( clk32 ),
+		.extReset   ( !_cpuReset ),
+		.pwrUp      ( !_cpuReset ),
+		.enPhi1     ( cpu_en_p   ),
+		.enPhi2     ( cpu_en_n   ),
+
+		.eRWn       ( fx68_rw ),
+		.ASn        ( fx68_as_n ),
+		.LDSn       ( fx68_lds_n ),
+		.UDSn       ( fx68_uds_n ),
+		.E          ( ),
+		.E_div      ( status_turbo ),
+		.E_PosClkEn ( fx68_E_falling ),
+		.E_NegClkEn ( fx68_E_rising ),
+		.VMAn       ( fx68_vma_n ),
+		.FC0        ( fx68_fc0 ),
+		.FC1        ( fx68_fc1 ),
+		.FC2        ( fx68_fc2 ),
+		.BGn        ( ),
+		.oRESETn    ( ),
+		.oHALTEDn   ( ),
+		.DTACKn     ( _cpuDTACK ),
+		.VPAn       ( _cpuVPA ),
+		.HALTn      ( 1'b1 ),
+		.BERRn      ( 1'b1 ),
+		.BRn        ( 1'b1 ),
+		.BGACKn     ( 1'b1 ),
+		.IPL0n      ( _cpuIPL[0] ),
+		.IPL1n      ( _cpuIPL[1] ),
+		.IPL2n      ( _cpuIPL[2] ),
+		.iEdb       ( dataControllerDataOut ),
+		.oEdb       ( fx68_dout ),
+		.eab        ( fx68_a )
+	);
+
+	wire        tg68_rw;
+	wire        tg68_as_n;
+	wire        tg68_uds_n;
+	wire        tg68_lds_n;
+	wire        tg68_E_rising;
+	wire        tg68_E_falling;
+	wire        tg68_vma_n;
+	wire        tg68_fc0;
+	wire        tg68_fc1;
+	wire        tg68_fc2;
+	wire [15:0] tg68_dout;
+	wire [31:0] tg68_a;
+
+	tg68k tg68k (
+		.clk        ( clk32      ),
+		.reset      ( !_cpuReset ),
+		.phi1       ( clk8_en_p  ),
+		.phi2       ( clk8_en_n  ),
+		.cpu        ( {status_cpu[1], |status_cpu} ),
+
+		.dtack_n    ( _cpuDTACK  ),
+		.rw_n       ( tg68_rw    ),
+		.as_n       ( tg68_as_n  ),
+		.uds_n      ( tg68_uds_n ),
+		.lds_n      ( tg68_lds_n ),
+		.fc         ( { tg68_fc2, tg68_fc1, tg68_fc0 } ),
+		.reset_n    (  ),
+
+		.E          (  ),
+		.E_div      ( status_turbo ),
+		.E_PosClkEn ( tg68_E_falling ),
+		.E_NegClkEn ( tg68_E_rising  ),
+		.vma_n      ( tg68_vma_n ),
+		.vpa_n      ( _cpuVPA ),
+
+		.br_n       ( 1'b1    ),
+		.bg_n       (  ),
+		.bgack_n    ( 1'b1 ),
+
+		.ipl        ( _cpuIPL ),
+		.berr       ( 1'b0 ),
+		.din        ( dataControllerDataOut ),
+		.dout       ( tg68_dout ),
+		.addr       ( tg68_a )
 	);
 
 	addrController_top ac0(
 		.clk(clk32),
+		.clk8(clk8),
 		.clk8_en_p(clk8_en_p),
 		.clk8_en_n(clk8_en_n),
+		.clk16_en_p(clk16_en_p),
+		.clk16_en_n(clk16_en_n),
 		.cpuAddr(cpuAddr), 
 		._cpuUDS(_cpuUDS),
 		._cpuLDS(_cpuLDS),
-		._cpuRW(_cpuRW), 
+		._cpuRW(_cpuRW),
+		._cpuAS(_cpuAS),
 		.turbo (status_turbo),
 		.configROMSize(configROMSize), 
 		.configRAMSize(configRAMSize), 
-		.memoryAddr(memoryAddr),			
+		.memoryAddr(memoryAddr),
+		.memoryLatch(memoryLatch),
 		._memoryUDS(_memoryUDS),
 		._memoryLDS(_memoryLDS),
 		._romOE(_romOE), 
@@ -301,6 +426,8 @@ wire keyData;
 		.selectSCC(selectSCC),
 		.selectIWM(selectIWM),
 		.selectVIA(selectVIA),
+		.selectRAM(selectRAM),
+		.selectROM(selectROM),
 		.hsync(hsync), 
 		.vsync(vsync),
 		._hblank(_hblank),
@@ -325,13 +452,15 @@ wire keyData;
 	wire n_reset = (rst_cnt == 0);
 	reg [15:0] rst_cnt;
 	reg last_mem_config;
+	reg [1:0] last_cpu_config;
 	always @(posedge clk32) begin
 		if (clk8_en_p) begin
 			last_mem_config <= status_mem;
+			last_cpu_config <= status_cpu;
 	
 			// various sources can reset the mac
 			if(!pll_locked || status_reset || buttons[1] || 
-				rom_download || (last_mem_config != status_mem)) 
+				rom_download || (last_mem_config != status_mem) || (last_cpu_config != status_cpu)) 
 				rst_cnt <= 16'd65535;
 			else if(rst_cnt != 0)
 				rst_cnt <= rst_cnt - 16'd1;
@@ -349,15 +478,17 @@ wire keyData;
 
 	dataController_top dc0(
 		.clk32(clk32), 
-		.clk8(clk8),
 		.clk8_en_p(clk8_en_p),
 		.clk8_en_n(clk8_en_n),
+		.E_rising(E_rising),
+		.E_falling(E_falling),
 		._systemReset(n_reset),
 		._cpuReset(_cpuReset), 
 		._cpuIPL(_cpuIPL),
 		._cpuUDS(_cpuUDS), 
 		._cpuLDS(_cpuLDS), 
 		._cpuRW(_cpuRW), 
+		._cpuVMA(_cpuVMA),
 		.cpuDataIn(cpuDataOut),
 		.cpuDataOut(dataControllerDataOut), 	
 		.cpuAddrRegHi(cpuAddr[12:9]),
@@ -371,13 +502,15 @@ wire keyData;
 		.videoBusControl(videoBusControl),
 		.memoryDataOut(memoryDataOut),
 		.memoryDataIn(sdram_do),
+		.memoryLatch(memoryLatch),
 
 		// peripherals
 		.keyClk(keyClk), 
 		.keyData(keyData), 
 		.mouseClk(mouseClk),
 		.mouseData(mouseData),
-		.serialIn(serialIn), 
+		.serialIn(serialIn),
+		.rtc(rtc),
 
 		// video
 		._hblank(_hblank),
@@ -455,10 +588,10 @@ mist_video #(.COLOR_DEPTH(1)) mist_video (
 // sdram used for ram/rom maps directly into 68k address space
 wire download_cycle = dio_download && dioBusControl;
 
-wire [24:0] sdram_addr = download_cycle?{ 4'b0001, dio_a[20:0] }:{ 3'b000, ~_romOE, memoryAddr[21:1] };
+wire [24:0] sdram_addr = download_cycle?{ 4'b0001, dio_a[21:1] }:{ 3'b000, ~_romOE, memoryAddr[21:1] };
 
-wire [15:0] sdram_din = download_cycle?dio_data:memoryDataOut;
-wire [1:0] sdram_ds = download_cycle?2'b11:{ !_memoryUDS, !_memoryLDS };
+wire [15:0] sdram_din = download_cycle?{dio_data,dio_data}:memoryDataOut;
+wire [1:0] sdram_ds = download_cycle?{~dio_addr[0], dio_addr[0]}:{ !_memoryUDS, !_memoryLDS };
 wire sdram_we = download_cycle?dio_write:!_ramWE;
 wire sdram_oe = download_cycle?1'b0:(!_ramOE || !_romOE);
 
