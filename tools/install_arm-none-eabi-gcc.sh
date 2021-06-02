@@ -90,7 +90,7 @@ cd ${GCC_VERSION}
 ln -s ../${NEWLIB_VERSION}/newlib .
 mkdir arm-none-eabi
 cd arm-none-eabi
-../configure --target=arm-none-eabi --prefix=/opt/arm-none-eabi --enable-languages=c --with-newlib
+../configure --target=arm-none-eabi --prefix=/opt/arm-none-eabi --enable-languages=c --with-newlib --enable-newlib-io-long-long
 make
 sudo make install
 cd ../../
