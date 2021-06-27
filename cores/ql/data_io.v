@@ -83,7 +83,9 @@ always@(posedge sck, posedge ss) begin
 			if(sdi) begin
 				// download rom to address 0, microdrive image to 16MB+
 				if(index == 0) laddr <= 25'h0 - 25'd1;
-				else           laddr <= 25'h800000 - 25'd1;
+				if(index == 1) laddr <= 25'h800000 - 25'd1; //mdv1_
+				if(index == 2) laddr <= 25'h900000 - 25'd1; //mdv2_
+				if(index == 3) laddr <= 25'h0 - 25'd1;  //Additional ROM bios selection
 				
 				downloading_reg <= 1'b1; 
 			end else

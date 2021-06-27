@@ -25,8 +25,10 @@ module mdv (
 	input reset,
 	
 	input reverse,
-	
-	input sel,
+
+   input mdv_drive,
+   
+	input sel,               // select microdrive 1 or 2
 
    // control bits	
 	output gap,
@@ -46,8 +48,9 @@ module mdv (
 	input [15:0] mem_din
 );
 
-localparam BASE_ADDR = 25'h800000;   
-   
+// mdv1_ image stored at h800000, mdv2_ image stored at address h900000
+wire [24:0] BASE_ADDR = (mdv_drive == 1)?25'h800000:25'h900000;
+  
 // a gap is permanently present if no mdv is inserted or if
 // there's a gap on the inserted one. This is the signal that triggers
 // the irq and can be seen by the cpu
@@ -118,7 +121,7 @@ always @(posedge mdv_clk) begin
 	mdv_bit_cnt <= mdv_bit_cnt + 4'd1;
 	if(mdv_bit_cnt == 15) begin
 		mdv_data <= mdv_din;
-	        mdv_data_valid <= !mdv_gap_active &&
+	   mdv_data_valid <= !mdv_gap_active &&
 			      // don't generate data_valid for first 12 bytes (preamble)
                               (mdv_gap_cnt > 5) &&
 			      // and also not for the sector internal preamble
@@ -126,8 +129,9 @@ always @(posedge mdv_clk) begin
 	
 		mdv_next_word <= 1'b1;
 
-	        // reset counters when address is out of range
-                if((mem_addr > mdv_end)||(mem_addr < 25'h800000)) begin
+	   // reset counters when address is out of range
+      if((mem_addr > mdv_end)||(mem_addr < BASE_ADDR)) begin
+
 			mem_addr <= BASE_ADDR;
 			
 			// assume we start at the end of a post-sector/pre-header gap

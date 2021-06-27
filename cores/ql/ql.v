@@ -70,7 +70,9 @@ module ql (
 // it to control the menu on the OSD 
 parameter CONF_STR = {
         "QL;;",
-        "F1,MDV;",
+        "F,MDV,Load MDV1;",
+        "F,MDV,Load MDV2;",
+        "F,ROM;",
         "O2,MDV direction,normal,reverse;",
         "O3,RAM,128k,640k;",
         "O4,Video mode,PAL,NTSC;",
@@ -78,7 +80,7 @@ parameter CONF_STR = {
         "T6,Reset"
 };
 
-parameter CONF_STR_LEN = 4+7+32+17+23+20+8;
+parameter CONF_STR_LEN = 4+16+16+6+32+17+23+20+8;
 
 // the status register is controlled by the on screen display (OSD)
 wire [7:0] status;
@@ -206,8 +208,10 @@ wire sys_wr =          dio_download?dio_write:(cpu_wr && cpu_ram);
 wire sys_oe =          dio_download?1'b0:(cpu_rd && cpu_mem);
 
 // microdrive emulation and video share the video cycle time slot
-wire [24:0] video_cycle_addr = mdv_read?mdv_addr:{6'd0, video_addr};
-wire video_cycle_rd = mdv_read?1'b1:video_rd;
+// only one drive at a time is accessed
+wire [24:0] video_cycle_addr = (mdv_read || mdv2_read)?(mdv_seldrive?mdv2_addr:mdv_addr):{6'd0, video_addr};
+wire video_cycle_rd = (mdv_read || mdv2_read)?1'b1:video_rd;
+
 
 // video and CPU/data_io time share the sdram bus
 wire [24:0] sdram_addr = video_cycle?video_cycle_addr:sys_addr;
@@ -352,7 +356,7 @@ osd #(12,0,5) osd (
 // -------------------------------------- reset ------------------------------------
 // ---------------------------------------------------------------------------------
 
-wire rom_download = dio_download && (dio_index == 0);
+wire rom_download = dio_download && (dio_index == 0 || dio_index == 3);
 reg [11:0] reset_cnt;
 wire reset = (reset_cnt != 0);
 always @(posedge clk2) begin
@@ -370,10 +374,15 @@ wire zx8302_sel = cpu_cycle && cpu_io && !cpu_addr[6];
 wire [1:0] zx8302_addr = {cpu_addr[5], cpu_addr[1]};
 wire [15:0] zx8302_dout;
 
-wire mdv_download = (dio_index == 1) && dio_download;
-wire mdv_men;
+wire mdv_download = (dio_index == 1) && dio_download;		//signal for active download from SD
+wire mdv2_download = (dio_index == 2) && dio_download;	//signal for active download from SD
+wire mdv_men;        //signal telling mdv emulation that it may use the video
 wire mdv_read;
+wire mdv2_read;
 wire [24:0] mdv_addr;
+wire [24:0] mdv2_addr;
+wire mdv_seldrive;	//1 for MDV2_ active, 0 for MDV1_ active or nothing
+
 
 wire audio;
 assign AUDIO_L = audio;
@@ -397,7 +406,7 @@ zx8302 zx8302 (
 	.cpu_addr     ( zx8302_addr  ),
 	.cpu_ds       ( cpu_ds       ),
 	.cpu_din      ( cpu_dout     ),
-   .cpu_dout     ( zx8302_dout  ),
+	.cpu_dout     ( zx8302_dout  ),
 
 	// joysticks 
 	.js0          ( js0[4:0]     ),
@@ -410,15 +419,22 @@ zx8302 zx8302 (
 
 	// microdrive sdram interface
 	.mdv_addr     ( mdv_addr     ),
+	.mdv2_addr    ( mdv2_addr    ),
 	.mdv_din      ( sdram_dout   ),
 	.mdv_read     ( mdv_read     ),
+	.mdv2_read    ( mdv2_read    ),
 	.mdv_men      ( mdv_men      ),
 	.video_cycle  ( video_cycle  ),
 	
 	.mdv_reverse  ( status[2]    ),
 
 	.mdv_download ( mdv_download ),
+	.mdv2_download ( mdv2_download ),
+	
+	.mdv_seldrive ( mdv_seldrive) ,
+	
 	.mdv_dl_addr  ( dio_addr     )
+
 );
 	 
 // ---------------------------------------------------------------------------------

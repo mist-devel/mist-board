@@ -32,14 +32,19 @@ module zx8302 (
 		
 		// sdram interface for microdrive emulation
 		output [24:0]  mdv_addr,
+		output [24:0]  mdv2_addr,
 		input [15:0]   mdv_din,
 		output         mdv_read,
+		output         mdv2_read,
 		input          mdv_men,
 		input          video_cycle,
 
 		// interface to watch MDV cartridge upload
 		input [24:0]   mdv_dl_addr,
 		input          mdv_download,
+		input          mdv2_download,
+		
+		output 			mdv_seldrive,
 
 		input          mdv_reverse,
 		output         led,
@@ -127,8 +132,10 @@ end
 // bit 7       COMDATA
 
 wire [7:0] io_status = { zx8302_comdata_in, ipc_busy, 2'b00,
-		mdv_gap, mdv_rx_ready, mdv_tx_empty, 1'b0 };
-
+		(mdv_seldrive?mdv2_gap:mdv_gap), 
+		(mdv_seldrive?mdv2_rx_ready:mdv_rx_ready), 
+		(mdv_seldrive?mdv2_tx_empty:mdv_tx_empty), 1'b0 };
+		
 assign cpu_dout =
 	// 18000/18001 and 18002/18003
 	(cpu_addr == 2'b00)?rtc[47:32]:
@@ -136,7 +143,7 @@ assign cpu_dout =
 
 	// 18020/18021 and 18022/18023
 	(cpu_addr == 2'b10)?{io_status, irq_pending}:
-	(cpu_addr == 2'b11)?{mdv_byte, mdv_byte}:
+	(cpu_addr == 2'b11)?(mdv_seldrive?{mdv2_byte, mdv2_byte}:{mdv_byte, mdv_byte}):
 
 	16'h0000;	
 
@@ -213,7 +220,7 @@ always @(posedge vs or posedge vsync_irq_reset) begin
 end
 
 // toggling the mask will also trigger irqs ...
-wire gap_irq_in = mdv_gap && irq_mask[0];
+wire gap_irq_in = (mdv_seldrive?mdv2_gap:mdv_gap) && irq_mask[0];
 reg gap_irq;
 wire gap_irq_reset = reset || irq_ack[0];
 always @(posedge gap_irq_in or posedge gap_irq_reset) begin
@@ -236,16 +243,22 @@ end
 // ---------------------------------------------------------------------------------
 
 wire mdv_gap;
+wire mdv2_gap;
 wire mdv_tx_empty;
+wire mdv2_tx_empty;
 wire mdv_rx_ready;
+wire mdv2_rx_ready;
 wire [7:0] mdv_byte;
+wire [7:0] mdv2_byte;
 
-assign led = !mdv_sel[0];
+assign led = !(mdv_sel[0] || mdv_sel[1]);
 
 mdv mdv (
    .clk      ( clk          ),
 	.reset    ( init         ),
 	
+   .mdv_drive (1),		//This is MDV1_
+   
 	.sel      ( mdv_sel[0]   ),
 
 	.reverse  ( mdv_reverse  ),
@@ -268,11 +281,46 @@ mdv mdv (
 	.mem_din  ( mdv_din      )	
 );
 
+mdv mdv2 (
+   .clk      ( clk          ),
+	.reset    ( init         ),
+   
+   .mdv_drive ( 2 ),		//This is MDV2_
+	
+   .sel      ( mdv_sel[1]   ),
+
+	.reverse  ( mdv_reverse  ),
+
+   // control bits	
+	.gap      ( mdv2_gap      ),
+	.tx_empty ( mdv2_tx_empty ),
+	.rx_ready ( mdv2_rx_ready ),
+	.dout     ( mdv2_byte     ),
+	
+	.download ( mdv2_download ),
+	.dl_addr  ( mdv_dl_addr  ),
+
+	// ram interface to read image
+   .mem_ena  ( mdv_men      ),
+   .mem_cycle( video_cycle  ),
+	.mem_clk  ( clk_bus      ),
+	.mem_addr ( mdv2_addr     ),
+	.mem_read ( mdv2_read     ),  
+
+	.mem_din  ( mdv_din      )	
+);
+
 // the microdrive control register mctrl generates the drive selection
+// mdv_sel = 1 for mdv1_, mdv_sel = 2 for mdv2_
 reg [7:0] mdv_sel;
 
 always @(negedge mctrl[1])
 	mdv_sel <= { mdv_sel[6:0], mctrl[0] };
+
+// 0 for MDV1_ or nothing and 1 for MDV2_
+// Only one microdrive can be accessed at a time, this allows
+// switching between them.
+assign mdv_seldrive = mdv_sel[1]?1'b1:1'b0;
 
 // ---------------------------------------------------------------------------------
 // -------------------------------------- RTC --------------------------------------
