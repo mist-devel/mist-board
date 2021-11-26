@@ -1,0 +1,36 @@
+#!/bin/bash
+
+# generate xauth file for Docker container
+
+CONTAINER_HOSTNAME=$1
+XAUTH_FILE=$2
+
+mkdir -p $(dirname $XAUTH_FILE)
+ 
+# attempt to bring host DISPLAY/xauth to container
+
+rm -f $XAUTH_FILE && touch $XAUTH_FILE
+DOCKER_XAUTH=$(xauth list $DISPLAY | awk '{print $3}')
+DOCKER_DISPLAY=$DISPLAY
+
+# assume that <hostname>:# displays are TCP displays, use docker host IP as display in container
+# this requres sshd_config option "X11UseLocalhost no"
+if [[ $DISPLAY == $(hostname)* ]]; then
+	DOCKER_DISPLAY="172.17.0.1:$(echo $DISPLAY | cut -d : -f 2)"
+fi
+
+# if we have no magic cookie (e.g. bad DISPLAY, or wide-open DISPLAY), just bail
+if [ "$DOCKER_XAUTH" == "" ]; then
+	echo $DOCKER_DISPLAY
+	exit
+fi
+
+# if DISPLAY is just :# (no hostname), assume this is a local unix-socket X11 server
+if [[ $DOCKER_DISPLAY == :* ]]; then
+	xauth -f $XAUTH_FILE add $CONTAINER_HOSTNAME/unix$DOCKER_DISPLAY . $DOCKER_XAUTH
+else
+	xauth -f $XAUTH_FILE add $DOCKER_DISPLAY . $DOCKER_XAUTH
+fi
+
+echo $DOCKER_DISPLAY
+

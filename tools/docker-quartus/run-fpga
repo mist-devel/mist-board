@@ -1,0 +1,54 @@
+#!/bin/bash
+
+
+list_tools () {
+    echo "Available tools:"
+    docker images fpga
+    exit
+}
+
+tool=quartus131
+
+container_id=$(docker images "fpga:$tool" --format "{{.ID}}")
+if [ -z "$container_id" ]; then
+       echo "Couldn't locate an image for \"$tool\"."
+       list_tools
+       exit 1
+fi
+
+echo "Starting $tool-$container_id"
+
+# settings overrides
+
+docker_home=$(dirname $0)
+
+### Set up X11 forwarding/authentication
+
+if [[ "$DISPLAY" == "" ]]; then
+	echo "DISPLAY environment variable is not set. An X display is required to run."
+	exit 1
+fi
+
+username=$(whoami)
+hostname="$tool-$username"
+
+DISPLAY=$($docker_home/gen-xauth $hostname $docker_home/.Xauthority)
+
+if [[ "$DISPLAY" == :* ]]; then
+	x11flags="--ipc=host -v /tmp/.X11-unix:/tmp/.X11-unix"
+	echo "Using DISPLAY=$DISPLAY via UNIX socket"
+else
+	x11flags="-e QT_X11_NO_MITSHM=1 -e _X11_NO_MITSHM=1 -e _MITSHM=0"
+	echo "Using DISPLAY=$DISPLAY via TCP"
+fi
+
+
+docker run --rm -it \
+-l fpga-docker --name $hostname -h $hostname \
+-e "DISPLAY=$DISPLAY" $x11flags \
+-e "FPGA_UID=$(id -u)" -e "FPGA_GID=$(id -g)" -e "FPGA_UNAME=$username" -e "HOME=/home/$username" \
+-v /home/$username:/home/$username \
+--device-cgroup-rule 'c 189:* rmw' \
+-v /dev/bus/usb:/dev/bus/usb \
+$container_id \
+/opt/quartus/quartus/bin/quartus --64bit
